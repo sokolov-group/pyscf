@@ -21,6 +21,7 @@ Unrestricted algebraic diagrammatic construction
 '''
 import time
 import numpy as np
+from functools import reduce
 from pyscf import lib
 from pyscf.lib import logger
 from pyscf.adc import uadc_ao2mo
@@ -52,6 +53,10 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     U = np.array(U)
 
     T = adc.get_trans_moments()
+
+    E_gs = adc.get_ground_state(T, imds, eris)
+    print (E_gs)
+    exit()
 
     spec_factors = adc.get_spec_factors(T, U, nroots)
 
@@ -612,6 +617,7 @@ class UADC(lib.StreamObject):
         self.chkfile = mf.chkfile
         self.method = "adc(2)"
         self.method_type = "ip"
+        self.h1e = mf.get_hcore()
 
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mol', 'mo_energy_b', 'max_memory', 'scf_energy', 'e_tot', 't1', 'frozen', 'mo_energy_a', 'chkfile', 'max_space', 't2', 'mo_occ', 'max_cycle'))
 
@@ -2970,6 +2976,138 @@ def get_spec_factors(adc, T, U, nroots=1):
 
     return P
 
+def get_ground_state(adc, T, imds, eris=None): 
+
+    T_a = T[0]
+    T_b = T[1]
+
+    nmo_a = adc.nmo_a
+    nmo_b = adc.nmo_b
+
+    mo_a = adc.mo_coeff[0].copy()
+    mo_b = adc.mo_coeff[1].copy()
+
+    MT_a = []
+    MT_b = []
+
+    row_a = np.dot(T_a, T_a.T)
+    row_b = np.dot(T_b, T_b.T)
+
+    h1e_ao = adc.h1e
+    h1e_a = reduce(np.dot, (mo_a.T, h1e_ao, mo_a))
+    h1e_b = reduce(np.dot, (mo_b.T, h1e_ao, mo_b))
+
+    hrow_a = np.dot(h1e_a,row_a)  
+    hrow_b = np.dot(h1e_b,row_b)
+
+    matvec = adc.matvec(imds, eris)
+    for orb in range(nmo_a):
+
+            T_aa = T_a[orb,:]
+            MT_aa = matvec(T_aa)
+            MT_a.append(MT_aa)
+
+    MT_a = np.array(MT_a)
+
+    for orb in range(nmo_b):
+
+            T_bb = T_b[orb,:]
+            MT_bb = matvec(T_bb)
+            MT_b.append(MT_bb)
+
+    MT_b = np.array(MT_b)
+
+    delta_a = np.dot(T_a,MT_a.T)
+    delta_b = np.dot(T_b,MT_b.T)
+
+    E_a = 0.5 * np.trace(hrow_a + delta_a)
+    E_b = 0.5 * np.trace(hrow_b + delta_b)
+
+    return (E_a + E_b)
+
+#def get_ground_state(adc, T, imds, eris=None): 
+#
+#    nocc_a = adc.nocc_a
+#    nocc_b = adc.nocc_b
+#    nvir_a = adc.nvir_a
+#    nvir_b = adc.nvir_b
+#
+#    n_singles_a = nocc_a
+#    n_singles_b = nocc_b
+#    n_doubles_aaa = nocc_a* (nocc_a - 1) * nvir_a // 2
+#    n_doubles_bab = nvir_b * nocc_a* nocc_b
+#    n_doubles_aba = nvir_a * nocc_b* nocc_a
+#    n_doubles_bbb = nocc_b* (nocc_b - 1) * nvir_b // 2
+#
+#    dim = n_singles_a + n_singles_b + n_doubles_aaa + n_doubles_bab + n_doubles_aba + n_doubles_bbb
+#
+#    idn_occ_a = np.identity(nocc_a)
+#    idn_occ_b = np.identity(nocc_b)
+#    idn_vir_a = np.identity(nvir_a)
+#    idn_vir_b = np.identity(nvir_b)
+#
+#    s_a = 0
+#    f_a = n_singles_a
+#    s_b = f_a
+#    f_b = s_b + n_singles_b
+#    s_aaa = f_b
+#    f_aaa = s_aaa + n_doubles_aaa
+#    s_bab = f_aaa
+#    f_bab = s_bab + n_doubles_bab
+#    s_aba = f_bab
+#    f_aba = s_aba + n_doubles_aba
+#    s_bbb = f_aba
+#    f_bbb = s_bbb + n_doubles_bbb
+#
+#    T_a_new = np.zeros((nmo_a,dim))
+#    T_b_new = np.zeros((nmo_b,dim))
+#
+#    T_aa = T[0]
+#    T_bb = T[1]
+#
+#    dm_a = np.dot(T_aa, T_aa.T)
+#    dm_b = np.dot(T_bb, T_bb.T)
+#
+#    T_a = T_aa[0]
+#    T_b = T_bb[0]
+#
+#    #T_a_new[s_a:f_a] = T_a[s_a:f_a]
+#    #T_b_new[s_b:f_b] = T_b[s_b:f_b]
+#    #T_a_new[s_aaa:f_aaa] = T_a[s_aaa:f_aaa]
+#    #T_a_new[s_bab:f_bab] = T_a[s_bab:f_bab]
+#    #T_b_new[s_bbb:f_bbb] = T_b[s_bbb:f_bbb]
+#    #T_b_new[s_aba:f_aba] = T_b[s_aba:f_aba]
+#
+#    #T_a_new[s_a:f_a] = T_a[s_a:f_a]
+#    #T_b_new[s_b:f_b] = T_a[s_b:f_b]
+#    #T_a_new[s_aaa:f_aaa] = T_a[s_aaa:f_aaa]
+#    #T_a_new[s_bab:f_bab] = T_a[s_bab:f_bab]
+#    #T_b_new[s_bbb:f_bbb] = T_b[s_bbb:f_bbb]
+#    #T_b_new[s_aba:f_aba] = T_b[s_aba:f_aba]
+#
+#    matvec = adc.matvec(imds, eris)
+#    MT_a = matvec(T_a_new)
+#    MT_b = matvec(T_b_new.T)
+#
+#    delta_a = np.dot(T_a_new,MT_a)
+#    delta_b = np.dot(T_b_new,MT_b)
+#
+#    print(MT_a.shape) 
+#    exit()
+#  
+#    h1e_a = adc.h1e[0]  
+#    h1e_b = adc.h1e[1]
+#
+#    hrow_a = np.dot(h1e_a,dm_a)  
+#    hrow_b = np.dot(h1e_b,dm_b)
+#
+#    int_a = (hrow_a + delta_a).reshape(adc.nmo_a, -1)
+#    int_b = (hrow_b + delta_b).reshape(adc.nmo_b, -1)
+#
+#    E_a = 0.5 * np.trace(int_a)
+#    E_b = 0.5 * np.trace(int_b)
+#
+#    return (E_a + E_b)
 
 class UADCEA(UADC):
     '''unrestricted ADC for EA energies and spectroscopic amplitudes
@@ -3128,6 +3266,7 @@ class UADCIP(UADC):
         self.mo_energy_b = adc.mo_energy_b
         self.nmo_a = adc._nmo[0]
         self.nmo_b = adc._nmo[1]
+        self.h1e = adc.h1e
 
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
@@ -3140,6 +3279,8 @@ class UADCIP(UADC):
     compute_trans_moments = ip_compute_trans_moments
     get_trans_moments = get_trans_moments
     get_spec_factors = get_spec_factors
+
+    get_ground_state = get_ground_state
 
     def get_init_guess(self, nroots=1, diag=None, ascending = True):
         if diag is None :
