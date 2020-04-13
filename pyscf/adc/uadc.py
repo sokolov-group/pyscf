@@ -54,8 +54,10 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     T = adc.get_trans_moments()
 
-    E_gs = adc.get_ground_state(T, imds, eris)
-    print (E_gs)
+    E_gs_elec = adc.get_ground_state(T, imds, eris)
+    E_gs_total = adc.e_nuc + E_gs_elec
+
+    print (E_gs_total)
     exit()
 
     spec_factors = adc.get_spec_factors(T, U, nroots)
@@ -605,6 +607,7 @@ class UADC(lib.StreamObject):
         
         self.mo_coeff = mo_coeff
         self.mo_occ = mo_occ
+        self.e_nuc = mf.mol.energy_nuc()
         self.e_corr = None
         self.e_tot = None
         self.t1 = None
@@ -3017,11 +3020,14 @@ def get_ground_state(adc, T, imds, eris=None):
 
     MT_b = np.array(MT_b)
 
-    delta_a = np.dot(T_a,MT_a.T)
-    delta_b = np.dot(T_b,MT_b.T)
+    delta_a = -np.dot(T_a,MT_a.T)
+    delta_b = -np.dot(T_b,MT_b.T)
 
     E_a = 0.5 * np.trace(hrow_a + delta_a)
     E_b = 0.5 * np.trace(hrow_b + delta_b)
+
+    print ("Trace of 1-RDM:")
+    print (np.trace(row_a) + np.trace(row_b))
 
     return (E_a + E_b)
 
@@ -3070,6 +3076,7 @@ class UADCEA(UADC):
         self.conv_tol  = adc.conv_tol
         self.t1 = adc.t1
         self.t2 = adc.t2
+        self.e_nuc = adc.e_nuc
         self.e_corr = adc.e_corr
         self.method = adc.method
         self.method_type = adc.method_type
@@ -3168,6 +3175,7 @@ class UADCIP(UADC):
         self.conv_tol  = adc.conv_tol
         self.t1 = adc.t1
         self.t2 = adc.t2
+        self.e_nuc = adc.e_nuc
         self.e_corr = adc.e_corr
         self.method = adc.method
         self.method_type = adc.method_type
