@@ -47,9 +47,30 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     imds = adc.get_imds(eris)
     matvec, diag = adc.gen_matvec(imds, eris)
 
-    guess = adc.get_init_guess(nroots, diag, ascending = True)
+########### "guess_old" was originally "guess" ###############
+    guess_old = adc.get_init_guess(nroots, diag, ascending = True)
 
-    conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+############### Constructing Koopman's states guess vectors from eigenvectors of imds ##################################   
+    kop_r, kop_c = np.array(guess_old).shape
+    guess_kop = np.zeros((kop_r, kop_c))
+    kop_w, kop_v = np.linalg.eigh(imds)
+    kop_w = -np.flip(kop_w)
+    kop_v_size = kop_v.shape[0]
+    for w_root, w in enumerate(kop_w):
+        print("root #", w_root, "Mij  Koopman [Eh]: ", kop_w[w_root] ) ## only works for ip. need another print statement for ea
+    for i in range(kop_r):
+        for j in range(kop_v_size):
+            guess_kop[i,j] = kop_v[j,i]
+    def eig_close_to_init_guess(w, v, nroots, envs):
+            x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])
+            s = np.dot(np.asarray(guess_kop).conj(), np.asarray(x0).T)
+            snorm = np.einsum('pi,pi->i', s.conj(), s)
+            idx = np.argsort(-snorm)[:nroots]
+            return lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
+    conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess_kop, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+    #conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess_old, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+
+############################################
 
     U = np.array(U)
 
