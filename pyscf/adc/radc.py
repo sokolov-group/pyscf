@@ -51,7 +51,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     guess_old = adc.get_init_guess(nroots, diag, ascending = True)
 
 ############### Constructing Koopman's states guess vectors from eigenvectors of imds ##################################   
-    kop_r, kop_c = np.array(guess_old).shape
+    """kop_r, kop_c = np.array(guess_old).shape
     guess_kop = np.zeros((kop_r, kop_c))
     kop_w, kop_v = np.linalg.eigh(imds)
     kop_w = -np.flip(kop_w)
@@ -67,8 +67,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
             snorm = np.einsum('pi,pi->i', s.conj(), s)
             idx = np.argsort(-snorm)[:nroots]
             return lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
-    conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess_kop, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
-    #conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess_old, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+    conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess_kop, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)"""
+    conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess_old, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
 
 ############################################
 
@@ -115,6 +115,7 @@ def compute_amplitudes(myadc, eris):
 
     nocc = myadc._nocc
     nvir = myadc._nvir
+    nfc_orb = 2
 
     eris_oooo = eris.oooo
     eris_ovoo = eris.ovoo
@@ -122,41 +123,61 @@ def compute_amplitudes(myadc, eris):
     eris_oovv = eris.oovv
     eris_ovvo = eris.ovvo
 
+    # Froze Core Approximation (Default no. of frozen orbitals is zero)
+    """nfc_orb = 2
+
+    eris_oooo[:nfc_orb, :nfc_orb, :nfc_orb, :nfc_orb] = 0
+    eris_ovoo[:nfc_orb, :, :nfc_orb, :nfc_orb] = 0
+    eris_ovov[:nfc_orb, :, :nfc_orb, :] = 0
+    eris_oovv[:nfc_orb, :nfc_orb, :, :] = 0
+    eris_ovvo[:nfc_orb, :, :, :nfc_orb] = 0"""
+    
+
+
     # Compute first-order doubles t2 (tijab)
 
-    v2e_oovv = eris_ovov[:].transpose(0,2,1,3).copy()
+    v2e_oovv = eris.ovov[:].transpose(0,2,1,3).copy()
+
     e = myadc.mo_energy
     d_ij = e[:nocc][:,None] + e[:nocc]
     d_ab = e[nocc:][:,None] + e[nocc:]
 
     D2 = d_ij.reshape(-1,1) - d_ab.reshape(-1)
-    D2 = D2.reshape((nocc,nocc,nvir,nvir))
-
     D1 = e[:nocc][:None].reshape(-1,1) - e[nocc:].reshape(-1)
+
+    D2 = D2.reshape((nocc,nocc,nvir,nvir))
     D1 = D1.reshape((nocc,nvir))
 
     t2_1 = v2e_oovv/D2
+    # Frozen core
+    print("t2_1 shape: ", t2_1.shape)
+    t2_1[:nfc_orb,:,:,:] = 0
+    t2_1[:,:nfc_orb,:,:] = 0
+    t2_1[:nfc_orb,:nfc_orb,:,:] = 0
     del (v2e_oovv)
     del (D2)
 
     cput0 = log.timer_debug1("Completed t2_1 amplitude calculation", *cput0)
 
     # Compute second-order singles t1 (tij)
-
+ 
     if isinstance(eris.ovvv, type(None)):
         chnk_size = radc_ao2mo.calculate_chunk_size(myadc)
     else :
         chnk_size = nocc
     a = 0
     t1_2 = np.zeros((nocc,nvir))
-
+    
     for p in range(0,nocc,chnk_size):
         if getattr(myadc, 'with_df', None):
             eris_ovvv = dfadc.get_ovvv_df(myadc, eris.Lov, eris.Lvv, p, chnk_size).reshape(-1,nvir,nvir,nvir)
         else :
             eris_ovvv = radc_ao2mo.unpack_eri_1(eris.ovvv, nvir)
         k = eris_ovvv.shape[0]
-       
+        
+        # Frozen core
+        #eris_ovvv[:nfc_orb,:,:,:] = 0
+ 
         t1_2 += 0.5*lib.einsum('kdac,ikcd->ia',eris_ovvv,t2_1[:,a:a+k],optimize=True)
         t1_2 -= 0.5*lib.einsum('kdac,kicd->ia',eris_ovvv,t2_1[a:a+k,:],optimize=True)
         t1_2 -= 0.5*lib.einsum('kcad,ikcd->ia',eris_ovvv,t2_1[:,a:a+k],optimize=True)
@@ -171,7 +192,10 @@ def compute_amplitudes(myadc, eris):
     t1_2 -= 0.5*lib.einsum('kcli,lkac->ia',eris_ovoo,t2_1,optimize=True)
     t1_2 += 0.5*lib.einsum('kcli,klac->ia',eris_ovoo,t2_1,optimize=True)
     t1_2 -= lib.einsum('lcki,klac->ia',eris_ovoo,t2_1,optimize=True)
-
+    
+    # Frozen core
+    print("t1_2 shape: ", t1_2.shape)
+    t1_2[:nfc_orb,:] = 0
     t1_2 = t1_2/D1
 
     cput0 = log.timer_debug1("Completed t1_2 amplitude calculation", *cput0)
@@ -183,8 +207,12 @@ def compute_amplitudes(myadc, eris):
 
     # Compute second-order doubles t2 (tijab)
 
-        eris_oooo = eris.oooo
+        eris_oooo = eris.oooo 
         eris_ovvo = eris.ovvo
+        
+        # Frozen core               
+        #eris_oooo[:nfc_orb, :nfc_orb, :nfc_orb, :nfc_orb] = 0
+        #eris_ovvo[:nfc_orb, :, :, :nfc_orb] = 0 
 
         if isinstance(eris.vvvv, np.ndarray):
             eris_vvvv = eris.vvvv
@@ -206,10 +234,16 @@ def compute_amplitudes(myadc, eris):
         t2_2 -= lib.einsum('kcai,jkcb->ijab',eris_ovvo,t2_1,optimize=True)
         t2_2 += lib.einsum('kcai,kjcb->ijab',eris_ovvo,t2_1,optimize=True)
         t2_2 -= lib.einsum('kiac,kjcb->ijab',eris_oovv,t2_1,optimize=True)
-
+        
+       
         D2 = d_ij.reshape(-1,1) - d_ab.reshape(-1)
         D2 = D2.reshape((nocc,nocc,nvir,nvir))
-
+        
+        # Frozen core
+        print("t2_2 shape", t2_2.shape)
+        t2_2[:nfc_orb,:,:,:] = 0
+        t2_2[:,:nfc_orb,:,:] = 0      
+        t2_2[:nfc_orb,:nfc_orb,:,:] = 0
         t2_2 = t2_2/D2
         del (D2)
 
@@ -219,7 +253,9 @@ def compute_amplitudes(myadc, eris):
     # Compute third-order singles (tij)
 
         eris_ovoo = eris.ovoo
-
+        # Frozen core 
+        #eris_ovoo[:nfc_orb, :, :nfc_orb, :nfc_orb] = 0
+                
         t1_3 = lib.einsum('d,ilad,ld->ia',e[nocc:],t2_1,t1_2,optimize=True)
         t1_3 -= lib.einsum('d,liad,ld->ia',e[nocc:],t2_1,t1_2,optimize=True)
         t1_3 += lib.einsum('d,ilad,ld->ia',e[nocc:],t2_1,t1_2,optimize=True)
@@ -249,12 +285,13 @@ def compute_amplitudes(myadc, eris):
         t1_3 += 0.5*lib.einsum('lmad,ldmi->ia',t2_2,eris_ovoo,optimize=True)
         t1_3 -= 0.5*lib.einsum('mlad,ldmi->ia',t2_2,eris_ovoo,optimize=True)
         t1_3 -=     lib.einsum('lmad,mdli->ia',t2_2,eris_ovoo,optimize=True)
- 
+        
         if isinstance(eris.ovvv, type(None)):
             chnk_size = radc_ao2mo.calculate_chunk_size(myadc)
         else :
             chnk_size = nocc
         a = 0
+      
 
         for p in range(0,nocc,chnk_size):
             if getattr(myadc, 'with_df', None):
@@ -262,6 +299,9 @@ def compute_amplitudes(myadc, eris):
             else :
                 eris_ovvv = radc_ao2mo.unpack_eri_1(eris.ovvv, nvir)
             k = eris_ovvv.shape[0]
+            
+            # Frozen core            
+            #eris_ovvv[:nfc_orb,:,:,:] = 0
 
             t1_3 += 0.5*lib.einsum('ilde,lead->ia', t2_2[:,a:a+k],eris_ovvv,optimize=True)
             t1_3 -= 0.5*lib.einsum('lide,lead->ia', t2_2[a:a+k],eris_ovvv,optimize=True)
@@ -419,9 +459,12 @@ def compute_amplitudes(myadc, eris):
 
         t1_3 -= lib.einsum('lnde,neim,mlad->ia',t2_1,eris_ovoo,t2_1,optimize=True)
         t1_3 += lib.einsum('nlde,neim,mlad->ia',t2_1,eris_ovoo,t2_1,optimize=True)
-
+        
+        # Frozen core
+        print("t1_3 shape", t1_3.shape)
+        t1_3[:nfc_orb,:] = 0
         t1_3 = t1_3/D1
-
+      
     t1 = (t1_2, t1_3)
     t2 = (t2_1, t2_2)
 
@@ -439,8 +482,13 @@ def compute_energy(myadc, t1, t2, eris):
 
     nocc = myadc._nocc
     nvir = myadc._nvir
+    
 
     eris_ovov = eris.ovov
+    
+    """# Frozen core approximation (Default no. of frozen orbitals is zero)
+    nfc_orb = 2
+    eris_ovov[:nfc_orb,:,:nfc_orb,:] = 0"""
 
     t2_1  = t2[0]
 
@@ -460,6 +508,11 @@ def compute_energy(myadc, t1, t2, eris):
         eris_oovv = eris.oovv
         eris_ovvo = eris.ovvo
         eris_oooo = eris.oooo
+        
+        """# Frozen core
+        eris_oovv[:nfc_orb, :nfc_orb, :, :] = 0
+        eris_ovvo[:nfc_orb, :, :, :nfc_orb] = 0        
+        eris_oooo[:nfc_orb, :nfc_orb, :nfc_orb, :nfc_orb] = 0"""
 
         temp_t2_a = None
         temp_t2_ab = None
@@ -534,6 +587,10 @@ def compute_energy(myadc, t1, t2, eris):
         del temp_t2_t2
     
         e_corr += e_mp3
+        
+        print("MP2 Correlation Energy: ", e_mp2)
+        print("MP3 Correlation Energy: ", e_corr)
+        exit() 
     cput0 = log.timer_debug1("Completed mp energy calculation", *cput0)
 
     log.timer_debug1("Completed mpn energy calculation")
@@ -1256,6 +1313,12 @@ def get_imds_ip(adc, eris=None):
 
     # i-j block
     # Zeroth-order terms
+    
+    """FC = True
+    nfc_orb = 2
+    if FC is True:
+        e_occ = e_occ[nfc_orb:]
+        idn_occ = np.identity(nocc-nfc_orb)"""
 
     M_ij = lib.einsum('ij,j->ij', idn_occ ,e_occ)
 
@@ -1288,7 +1351,11 @@ def get_imds_ip(adc, eris=None):
     M_ij -= 0.25 *  lib.einsum('j,lide,ljde->ij',e_occ,t2_1, t2_1, optimize=True)
     M_ij -= 0.25 *  lib.einsum('j,ilde,jlde->ij',e_occ,t2_1, t2_1, optimize=True)
     M_ij -= 0.25 *  lib.einsum('j,ilde,jlde->ij',e_occ,t2_1, t2_1, optimize=True)
-
+    
+    """if FC is True:
+        M_ivjv_FC = eris_ovov[:nfc_orb,:,:nfc_orb,:].copy()
+        eris_ovov = eris_ovov[nfc_orb:,:,nfc_orb:,:].copy()"""
+        
     M_ij += 0.5 *  lib.einsum('ilde,jdle->ij',t2_1, eris_ovov,optimize=True)
     M_ij -= 0.5 *  lib.einsum('lide,jdle->ij',t2_1, eris_ovov,optimize=True)
     M_ij -= 0.5 *  lib.einsum('ilde,jeld->ij',t2_1, eris_ovov,optimize=True)
@@ -1300,7 +1367,7 @@ def get_imds_ip(adc, eris=None):
     M_ij -= 0.5 *  lib.einsum('jlde,ldie->ij',t2_1, eris_ovov,optimize=True)
     M_ij += 0.5 *  lib.einsum('ljde,ldie->ij',t2_1, eris_ovov,optimize=True)
     M_ij += lib.einsum('jlde,idle->ij',t2_1, eris_ovov,optimize=True)
-
+    
     cput0 = log.timer_debug1("Completed M_ij second-order terms ADC(2) calculation", *cput0)
     # Third-order terms
 
