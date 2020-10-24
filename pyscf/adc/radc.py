@@ -43,32 +43,50 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     if eris is None:
         eris = adc.transform_integrals()
-
+    
     imds = adc.get_imds(eris)
-    matvec, diag = adc.gen_matvec(imds, eris)
+    matvec, diag = adc.gen_matvec(imds, eris, cvs=False)
+    guess = adc.get_init_guess(nroots, diag, ascending = True) 
+    
+    nfc_orb = adc.nfc_orb
+    nroots_cvs = 5
+    if nfc_orb > 0:
+        cvs = True
 
-########### "guess_old" was originally "guess" ###############
-    guess_old = adc.get_init_guess(nroots, diag, ascending = True)
+    if cvs is True:
+        matvec, diag = adc.gen_matvec(imds, eris, cvs)
+        guess = adc.get_init_guess(nroots, diag, ascending = True)
+        conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+        guess = U
+        
+    nkop = adc.nkop
+    if nkop > 0:
+        nroots = nkop
+        kop_r, kop_c = np.array(guess).shape
+        guess = np.zeros((kop_r, kop_c))
+        print("number of rows of guess vector: ", kop_r)
+        print("number of columns of guess vector: ", kop_c)
+        kop_w, kop_v = np.linalg.eigh(imds)
+        kop_w = -np.flip(kop_w)
+        kop_v_size = kop_v.shape[0]
+        for w_root, w in enumerate(kop_w):
+            print("Koopman State #", w_root, "Mij  Koopman Energy [Eh]: ", kop_w[w_root] ) ## Only works for IP; need another print statement for EA
+        for i in range(kop_r):
+            for j in range(kop_v_size):
+                guess[i,j] = kop_v[j,i]
 
-############### Constructing Koopman's states guess vectors from eigenvectors of imds ##################################   
-    """kop_r, kop_c = np.array(guess_old).shape
-    guess_kop = np.zeros((kop_r, kop_c))
-    kop_w, kop_v = np.linalg.eigh(imds)
-    kop_w = -np.flip(kop_w)
-    kop_v_size = kop_v.shape[0]
-    for w_root, w in enumerate(kop_w):
-        print("root #", w_root, "Mij  Koopman [Eh]: ", kop_w[w_root] ) ## only works for ip. need another print statement for ea
-    for i in range(kop_r):
-        for j in range(kop_v_size):
-            guess_kop[i,j] = kop_v[j,i]
-    def eig_close_to_init_guess(w, v, nroots, envs):
+    if (cvs is True) and (nkop > 0):
+        raise Exception("Cannot calculate CVS and Koopman's excitations simultaneously")
+
+    if (cvs is True) or (nkop > 0):
+        def eig_close_to_init_guess(w, v, nroots, envs):
             x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])
-            s = np.dot(np.asarray(guess_kop).conj(), np.asarray(x0).T)
+            s = np.dot(np.asarray(guess).conj(), np.asarray(x0).T)
             snorm = np.einsum('pi,pi->i', s.conj(), s)
             idx = np.argsort(-snorm)[:nroots]
             return lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
-    conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess_kop, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)"""
-    conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess_old, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+        conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+    #conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
 
 ############################################
 
@@ -115,7 +133,7 @@ def compute_amplitudes(myadc, eris):
 
     nocc = myadc._nocc
     nvir = myadc._nvir
-    nfc_orb = 2
+    nfc_orb = myadc.nfc_orb
 
     eris_oooo = eris.oooo
     eris_ovoo = eris.ovoo
@@ -631,6 +649,38 @@ def contract_ladder(myadc,t_amp,vvvv):
 
     return t
 
+def cvs_projector(adc, r):
+    
+    nfc_orb = adc.nfc_orb
+
+    nocc = adc._nocc
+    nvir = adc._nvir
+
+    n_singles = nocc
+    n_doubles = nvir * nocc * nocc
+    ij_ind = np.tril_indices(nocc, k=-1)
+    print("nocc: ", nocc)
+    print("nvir: ", nvir)
+    print("n_singles: ", n_singles)
+    print("n_doubles: ", n_doubles)
+    s1 = 0
+    f1 = n_singles
+    s2 = f1
+    f2 = s2 + n_doubles 
+    
+    Pr = r.copy()
+    
+    Pr[(s1 + nfc_orb):f1] = 0.0    
+    
+    temp = np.zeros((nvir, nocc, nocc))
+    temp = Pr[s2:f2].reshape((nvir, nocc, nocc)).copy()
+    
+    temp[:,nfc_orb:,nfc_orb:] = 0.0
+    temp[:,:nfc_orb,:nfc_orb] = 0.0
+    
+    Pr[s2:f2] = temp.reshape(-1).copy()
+    
+    return Pr
 
 def density_matrix(myadc, T=None):
 
@@ -733,6 +783,8 @@ class RADC(lib.StreamObject):
         self.method_type = "ip"
         self.with_df = None
         self.compute_mpn_energy = True
+        self.nfc_orb = 0 
+        self.nkop = 0
 
         keys = set(('conv_tol', 'e_corr', 'method', 'mo_coeff', 'mol', 'mo_energy', 'max_memory', 'incore_complete', 'scf_energy', 'e_tot', 't1', 'frozen', 'chkfile', 'max_space', 't2', 'mo_occ', 'max_cycle'))
 
@@ -1680,12 +1732,12 @@ def ea_adc_diag(adc,M_ab=None,eris=None):
                 temp[:] += np.diagonal(eris_ovov_p).reshape(nocc, nvir)
                 temp = np.ascontiguousarray(temp.transpose(1,2,0))
                 diag[s2:f2] += -temp.reshape(-1)
-
+                
     log.timer_debug1("Completed ea_diag calculation")
     return diag
 
 
-def ip_adc_diag(adc,M_ij=None,eris=None):
+def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False):
    
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
@@ -1764,6 +1816,19 @@ def ip_adc_diag(adc,M_ij=None,eris=None):
                 temp[:] += np.diagonal(eris_ovov_p).reshape(nocc, nvir)
                 temp = np.ascontiguousarray(temp.transpose(2,0,1))
                 diag[s2:f2] += temp.reshape(-1)
+    
+    if cvs is True:
+
+        shift = -100000.0
+        nfc_orb = adc.nfc_orb
+
+        diag[nfc_orb:f1] += shift
+
+        temp = np.zeros((nvir,nocc,nocc))
+        temp[:,nfc_orb:,nfc_orb:] += shift
+        temp[:,:nfc_orb,:nfc_orb] += shift
+
+        diag[s2:f2] = temp.reshape(-1).copy()
 
     diag = -diag
 
@@ -2043,7 +2108,7 @@ def ea_adc_matvec(adc, M_ab=None, eris=None):
     return sigma_
 
 
-def ip_adc_matvec(adc, M_ij=None, eris=None):
+def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
@@ -2089,6 +2154,9 @@ def ip_adc_matvec(adc, M_ij=None, eris=None):
     def sigma_(r):
         cput0 = (time.clock(), time.time())
         log = logger.Logger(adc.stdout, adc.verbose)
+        
+        if cvs is True:
+            r = cvs_projector(adc, r)
 
         s = np.zeros((dim))
 
@@ -2248,7 +2316,10 @@ def ip_adc_matvec(adc, M_ij=None, eris=None):
                del temp_2
 
         s *= -1.0
-
+        
+        if cvs is True:
+            s = cvs_projector(adc, s)
+        
         return s
 
     return sigma_
@@ -2660,7 +2731,9 @@ class RADCIP(RADC):
         self.transform_integrals = adc.transform_integrals
         self.with_df = adc.with_df
         self.compute_mpn_energy = True
-
+        self.nfc_orb = adc.nfc_orb
+        self.nkop = adc.nkop
+                
         keys = set(('conv_tol', 'e_corr', 'method', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
         self._keys = set(self.__dict__.keys()).union(keys)
@@ -2691,10 +2764,10 @@ class RADCIP(RADC):
             guess.append(g[:,p])
         return guess
 
-    def gen_matvec(self, imds=None, eris=None):
+    def gen_matvec(self, imds=None, eris=None, cvs=False):
         if imds is None: imds = self.get_imds(eris)
-        diag = self.get_diag(imds, eris)
-        matvec = self.matvec(imds, eris)
+        diag = self.get_diag(imds, eris, cvs)
+        matvec = self.matvec(imds, eris, cvs)
         return matvec, diag
 
 if __name__ == '__main__':
