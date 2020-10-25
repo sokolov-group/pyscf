@@ -43,50 +43,56 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     if eris is None:
         eris = adc.transform_integrals()
-    
-    imds = adc.get_imds(eris)
-    matvec, diag = adc.gen_matvec(imds, eris, cvs=False)
-    guess = adc.get_init_guess(nroots, diag, ascending = True) 
-    
+      
     nfc_orb = adc.nfc_orb
-    nroots_cvs = 5
-    if nfc_orb > 0:
-        cvs = True
+    nkop = adc.nkop
+   
+    if (nfc_orb > 0) and (nkop > 0):
+        raise Exception("Cannot calculate CVS and Koopman's excitations simultaneously")
 
-    if cvs is True:
-        matvec, diag = adc.gen_matvec(imds, eris, cvs)
+    if ((nkop > 0) or (nfc_orb > 0)) and (adc.method_type == "ea"):
+       raise Exception("CVS and Koopman's aren't not implemented for EA")
+
+    imds = adc.get_imds(eris)
+    if ((nkop == 0) and (nfc_orb == 0)) or (nkop > 0):
+        matvec, diag = adc.gen_matvec(imds, eris, cvs=False)
+        guess = adc.get_init_guess(nroots, diag, ascending = True)
+
+    if (nfc_orb > 0):
+        matvec, diag = adc.gen_matvec(imds, eris, cvs=True)
         guess = adc.get_init_guess(nroots, diag, ascending = True)
         conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
-        guess = U
+        #guess = U
         
-    nkop = adc.nkop
     if nkop > 0:
-        nroots = nkop
+        #nroots = nkop
         kop_r, kop_c = np.array(guess).shape
         guess = np.zeros((kop_r, kop_c))
-        print("number of rows of guess vector: ", kop_r)
-        print("number of columns of guess vector: ", kop_c)
+        #print("number of rows of guess vector: ", kop_r)
+        #print("number of columns of guess vector: ", kop_c)
         kop_w, kop_v = np.linalg.eigh(imds)
         kop_w = -np.flip(kop_w)
         kop_v_size = kop_v.shape[0]
+
         for w_root, w in enumerate(kop_w):
             print("Koopman State #", w_root, "Mij  Koopman Energy [Eh]: ", kop_w[w_root] ) ## Only works for IP; need another print statement for EA
+ 
         for i in range(kop_r):
             for j in range(kop_v_size):
                 guess[i,j] = kop_v[j,i]
+    
+    if (nkop > 0) or (nfc_orb > 0):
 
-    if (cvs is True) and (nkop > 0):
-        raise Exception("Cannot calculate CVS and Koopman's excitations simultaneously")
-
-    if (cvs is True) or (nkop > 0):
         def eig_close_to_init_guess(w, v, nroots, envs):
             x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])
             s = np.dot(np.asarray(guess).conj(), np.asarray(x0).T)
             snorm = np.einsum('pi,pi->i', s.conj(), s)
             idx = np.argsort(-snorm)[:nroots]
             return lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
+
         conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
-    #conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+    else:
+        conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
 
 ############################################
 
@@ -140,18 +146,7 @@ def compute_amplitudes(myadc, eris):
     eris_ovov = eris.ovov
     eris_oovv = eris.oovv
     eris_ovvo = eris.ovvo
-
-    # Froze Core Approximation (Default no. of frozen orbitals is zero)
-    """nfc_orb = 2
-
-    eris_oooo[:nfc_orb, :nfc_orb, :nfc_orb, :nfc_orb] = 0
-    eris_ovoo[:nfc_orb, :, :nfc_orb, :nfc_orb] = 0
-    eris_ovov[:nfc_orb, :, :nfc_orb, :] = 0
-    eris_oovv[:nfc_orb, :nfc_orb, :, :] = 0
-    eris_ovvo[:nfc_orb, :, :, :nfc_orb] = 0"""
-    
-
-
+  
     # Compute first-order doubles t2 (tijab)
 
     v2e_oovv = eris.ovov[:].transpose(0,2,1,3).copy()
@@ -167,11 +162,12 @@ def compute_amplitudes(myadc, eris):
     D1 = D1.reshape((nocc,nvir))
 
     t2_1 = v2e_oovv/D2
+
     # Frozen core
-    print("t2_1 shape: ", t2_1.shape)
     t2_1[:nfc_orb,:,:,:] = 0
     t2_1[:,:nfc_orb,:,:] = 0
     t2_1[:nfc_orb,:nfc_orb,:,:] = 0
+
     del (v2e_oovv)
     del (D2)
 
@@ -192,9 +188,6 @@ def compute_amplitudes(myadc, eris):
         else :
             eris_ovvv = radc_ao2mo.unpack_eri_1(eris.ovvv, nvir)
         k = eris_ovvv.shape[0]
-        
-        # Frozen core
-        #eris_ovvv[:nfc_orb,:,:,:] = 0
  
         t1_2 += 0.5*lib.einsum('kdac,ikcd->ia',eris_ovvv,t2_1[:,a:a+k],optimize=True)
         t1_2 -= 0.5*lib.einsum('kdac,kicd->ia',eris_ovvv,t2_1[a:a+k,:],optimize=True)
@@ -212,8 +205,8 @@ def compute_amplitudes(myadc, eris):
     t1_2 -= lib.einsum('lcki,klac->ia',eris_ovoo,t2_1,optimize=True)
     
     # Frozen core
-    print("t1_2 shape: ", t1_2.shape)
     t1_2[:nfc_orb,:] = 0
+
     t1_2 = t1_2/D1
 
     cput0 = log.timer_debug1("Completed t1_2 amplitude calculation", *cput0)
@@ -227,10 +220,6 @@ def compute_amplitudes(myadc, eris):
 
         eris_oooo = eris.oooo 
         eris_ovvo = eris.ovvo
-        
-        # Frozen core               
-        #eris_oooo[:nfc_orb, :nfc_orb, :nfc_orb, :nfc_orb] = 0
-        #eris_ovvo[:nfc_orb, :, :, :nfc_orb] = 0 
 
         if isinstance(eris.vvvv, np.ndarray):
             eris_vvvv = eris.vvvv
@@ -258,10 +247,10 @@ def compute_amplitudes(myadc, eris):
         D2 = D2.reshape((nocc,nocc,nvir,nvir))
         
         # Frozen core
-        print("t2_2 shape", t2_2.shape)
         t2_2[:nfc_orb,:,:,:] = 0
         t2_2[:,:nfc_orb,:,:] = 0      
         t2_2[:nfc_orb,:nfc_orb,:,:] = 0
+
         t2_2 = t2_2/D2
         del (D2)
 
@@ -271,8 +260,6 @@ def compute_amplitudes(myadc, eris):
     # Compute third-order singles (tij)
 
         eris_ovoo = eris.ovoo
-        # Frozen core 
-        #eris_ovoo[:nfc_orb, :, :nfc_orb, :nfc_orb] = 0
                 
         t1_3 = lib.einsum('d,ilad,ld->ia',e[nocc:],t2_1,t1_2,optimize=True)
         t1_3 -= lib.einsum('d,liad,ld->ia',e[nocc:],t2_1,t1_2,optimize=True)
@@ -317,9 +304,6 @@ def compute_amplitudes(myadc, eris):
             else :
                 eris_ovvv = radc_ao2mo.unpack_eri_1(eris.ovvv, nvir)
             k = eris_ovvv.shape[0]
-            
-            # Frozen core            
-            #eris_ovvv[:nfc_orb,:,:,:] = 0
 
             t1_3 += 0.5*lib.einsum('ilde,lead->ia', t2_2[:,a:a+k],eris_ovvv,optimize=True)
             t1_3 -= 0.5*lib.einsum('lide,lead->ia', t2_2[a:a+k],eris_ovvv,optimize=True)
@@ -479,8 +463,8 @@ def compute_amplitudes(myadc, eris):
         t1_3 += lib.einsum('nlde,neim,mlad->ia',t2_1,eris_ovoo,t2_1,optimize=True)
         
         # Frozen core
-        print("t1_3 shape", t1_3.shape)
         t1_3[:nfc_orb,:] = 0
+
         t1_3 = t1_3/D1
       
     t1 = (t1_2, t1_3)
@@ -503,10 +487,6 @@ def compute_energy(myadc, t1, t2, eris):
     
 
     eris_ovov = eris.ovov
-    
-    """# Frozen core approximation (Default no. of frozen orbitals is zero)
-    nfc_orb = 2
-    eris_ovov[:nfc_orb,:,:nfc_orb,:] = 0"""
 
     t2_1  = t2[0]
 
@@ -526,11 +506,6 @@ def compute_energy(myadc, t1, t2, eris):
         eris_oovv = eris.oovv
         eris_ovvo = eris.ovvo
         eris_oooo = eris.oooo
-        
-        """# Frozen core
-        eris_oovv[:nfc_orb, :nfc_orb, :, :] = 0
-        eris_ovvo[:nfc_orb, :, :, :nfc_orb] = 0        
-        eris_oooo[:nfc_orb, :nfc_orb, :nfc_orb, :nfc_orb] = 0"""
 
         temp_t2_a = None
         temp_t2_ab = None
@@ -605,10 +580,7 @@ def compute_energy(myadc, t1, t2, eris):
         del temp_t2_t2
     
         e_corr += e_mp3
-        
-        print("MP2 Correlation Energy: ", e_mp2)
-        print("MP3 Correlation Energy: ", e_corr)
-        exit() 
+
     cput0 = log.timer_debug1("Completed mp energy calculation", *cput0)
 
     log.timer_debug1("Completed mpn energy calculation")
@@ -649,20 +621,16 @@ def contract_ladder(myadc,t_amp,vvvv):
 
     return t
 
-def cvs_projector(adc, r):
+def cvs_projector(myadc, r):
     
-    nfc_orb = adc.nfc_orb
+    nfc_orb = myadc.nfc_orb
 
-    nocc = adc._nocc
-    nvir = adc._nvir
+    nocc = myadc._nocc
+    nvir = myadc._nvir
 
     n_singles = nocc
     n_doubles = nvir * nocc * nocc
-    ij_ind = np.tril_indices(nocc, k=-1)
-    print("nocc: ", nocc)
-    print("nvir: ", nvir)
-    print("n_singles: ", n_singles)
-    print("n_doubles: ", n_doubles)
+    
     s1 = 0
     f1 = n_singles
     s2 = f1
@@ -670,7 +638,7 @@ def cvs_projector(adc, r):
     
     Pr = r.copy()
     
-    Pr[(s1 + nfc_orb):f1] = 0.0    
+    Pr[nfc_orb:f1] = 0.0    
     
     temp = np.zeros((nvir, nocc, nocc))
     temp = Pr[s2:f2].reshape((nvir, nocc, nocc)).copy()
@@ -2634,6 +2602,8 @@ class RADCEA(RADC):
         self.transform_integrals = adc.transform_integrals
         self.with_df = adc.with_df
         self.compute_mpn_energy = True
+        self.nfc_orb = adc.nfc_orb
+        self.nkop = adc.nkop
 
         keys = set(('conv_tol', 'e_corr', 'method', 'mo_coeff', 'mo_energy', 'max_memory', 't1', 'max_space', 't2', 'max_cycle'))
 
@@ -2666,7 +2636,7 @@ class RADCEA(RADC):
        return guess
     
 
-    def gen_matvec(self, imds=None, eris=None):
+    def gen_matvec(self, imds=None, eris=None, cvs=True):
         if imds is None: imds = self.get_imds(eris)
         diag = self.get_diag(imds, eris)
         matvec = self.matvec(imds, eris)
