@@ -46,7 +46,10 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
       
     nfc_orb = adc.nfc_orb
     nkop = adc.nkop
-   
+    cvs_npick = adc.cvs_npick
+    kop_npick = adc.kop_npick
+    #myadc = adc.ADC(mf)
+ 
     if (nfc_orb > 0) and (nkop > 0):
         raise Exception("Cannot calculate CVS and Koopman's excitations simultaneously")
 
@@ -62,8 +65,21 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         matvec, diag = adc.gen_matvec(imds, eris, cvs=True)
         guess = adc.get_init_guess(nroots, diag, ascending = True)
         conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
-        #guess = U
-        
+             
+        if cvs_npick is not False:
+            #fc_bool = adc.fc_bool = False
+            imds = adc.get_imds(eris, fc_bool=False)
+            matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False)
+            print("Number of frozen orbitals: ", nfc_orb)
+               
+            len_cvs_npick = len(cvs_npick)
+            nroots = len_cvs_npick
+            dim_guess = np.array(U).shape[1]
+            guess = np.zeros((len_cvs_npick, dim_guess))
+            for idx_guess, npick in enumerate( cvs_npick):
+                U = np.array(U)
+                guess[idx_guess,:] = U[npick,:]
+                                            
     if nkop > 0:
         #nroots = nkop
         kop_r, kop_c = np.array(guess).shape
@@ -80,8 +96,19 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         for i in range(kop_r):
             for j in range(kop_v_size):
                 guess[i,j] = kop_v[j,i]
+         
+        if kop_npick is not False:
+            len_kop_npick = len(kop_npick)
+            nroots = len_kop_npick
+            dim_guess = np.array(guess).shape[1]
+            guess_kop = np.zeros((len_kop_npick,dim_guess))
+            for idx_guess, npick in enumerate(kop_npick):
+                guess_kop[idx_guess,:] = guess[npick,:]
+                guess = guess_kop
+                #print("idx: ", idx_guess, "npick: ", npick)
+        
     
-    if (nkop > 0) or (nfc_orb > 0):
+    if ((nkop > 0) or (nfc_orb > 0)) and ((kop_npick is not False) or (cvs_npick is not False)):
 
         def eig_close_to_init_guess(w, v, nroots, envs):
             x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])
@@ -93,7 +120,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
     else:
         conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
-
+    
 ############################################
 
     U = np.array(U)
@@ -121,15 +148,15 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     return E, U, spec_factors
 
 
-def compute_amplitudes_energy(myadc, eris, verbose=None):
+def compute_amplitudes_energy(myadc, eris, verbose=None, fc_bool=True):
 
-    t1, t2 = myadc.compute_amplitudes(eris)
+    t1, t2 = myadc.compute_amplitudes(eris, fc_bool=True)
     e_corr = myadc.compute_energy(t1, t2, eris)
 
     return e_corr, t1, t2
 
 
-def compute_amplitudes(myadc, eris):
+def compute_amplitudes(myadc, eris, fc_bool=True):
 
     cput0 = (time.clock(), time.time())
     log = logger.Logger(myadc.stdout, myadc.verbose)
@@ -139,8 +166,14 @@ def compute_amplitudes(myadc, eris):
 
     nocc = myadc._nocc
     nvir = myadc._nvir
-    nfc_orb = myadc.nfc_orb
-
+    
+    #fc_bool = myadc.fc_bool
+    if fc_bool is False:
+        nfc_orb = 0
+        #myadc.nfc_orb = nfc_orb
+    else:
+        nfc_orb = myadc.nfc_orb
+        
     eris_oooo = eris.oooo
     eris_ovoo = eris.ovoo
     eris_ovov = eris.ovov
@@ -580,7 +613,7 @@ def compute_energy(myadc, t1, t2, eris):
         del temp_t2_t2
     
         e_corr += e_mp3
-
+      
     cput0 = log.timer_debug1("Completed mp energy calculation", *cput0)
 
     log.timer_debug1("Completed mpn energy calculation")
@@ -753,7 +786,10 @@ class RADC(lib.StreamObject):
         self.compute_mpn_energy = True
         self.nfc_orb = 0 
         self.nkop = 0
-
+        self.cvs_npick = False
+        self.kop_npick = False
+        self.fc_bool = True
+        
         keys = set(('conv_tol', 'e_corr', 'method', 'mo_coeff', 'mol', 'mo_energy', 'max_memory', 'incore_complete', 'scf_energy', 'e_tot', 't1', 'frozen', 'chkfile', 'max_space', 't2', 'mo_occ', 'max_cycle'))
 
         self._keys = set(self.__dict__.keys()).union(keys)
@@ -780,7 +816,7 @@ class RADC(lib.StreamObject):
                     self.max_memory, lib.current_memory()[0])
         return self
     
-    def kernel_gs(self):
+    def kernel_gs(self,adc):
         assert(self.mo_coeff is not None)
         assert(self.mo_occ is not None)
     
@@ -817,10 +853,10 @@ class RADC(lib.StreamObject):
         eris = self.transform_integrals()
         
         if self.compute_mpn_energy == True:
-            self.e_corr, self.t1, self.t2 = compute_amplitudes_energy(self, eris=eris, verbose=self.verbose)
+            self.e_corr, self.t1, self.t2 = compute_amplitudes_energy(self, eris=eris,verbose=self.verbose, fc_bool=True)
             self._finalize()
         else:
-            self.t1, self.t2 = compute_amplitudes(self, eris=eris)
+            self.t1, self.t2 = compute_amplitudes(self, eris=eris, fc_bool=True)
             self.e_corr = None
 
         return self.e_corr, self.t1, self.t2
@@ -862,10 +898,10 @@ class RADC(lib.StreamObject):
         eris = self.transform_integrals() 
             
         if self.compute_mpn_energy == True:
-            self.e_corr, self.t1, self.t2 = compute_amplitudes_energy(self, eris=eris, verbose=self.verbose)
+            self.e_corr, self.t1, self.t2 = compute_amplitudes_energy(self, eris=eris, verbose=self.verbose, fc_bool=True)
             self._finalize()
         else:
-            self.t1, self.t2 = compute_amplitudes(self, eris=eris)
+            self.t1, self.t2 = compute_amplitudes(self, eris=eris, fc_bool=True)
             self.e_corr = None
 
         self.method_type = self.method_type.lower()
@@ -1301,7 +1337,7 @@ def get_imds_ea(adc, eris=None):
     return M_ab
 
 
-def get_imds_ip(adc, eris=None):
+def get_imds_ip(adc, eris=None, fc_bool=True):
 
     cput0 = (time.clock(), time.time())
     log = logger.Logger(adc.stdout, adc.verbose)
@@ -1310,9 +1346,9 @@ def get_imds_ip(adc, eris=None):
         raise NotImplementedError(adc.method)
 
     method = adc.method
-
-    t1 = adc.t1
-    t2 = adc.t2
+    t1, t2 = adc.compute_amplitudes(eris, fc_bool)   
+    #t1 = adc.t1
+    #t2 = adc.t2
 
     t1_2 = t1[0]
     t2_1 = t2[0]
@@ -1705,7 +1741,7 @@ def ea_adc_diag(adc,M_ab=None,eris=None):
     return diag
 
 
-def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False):
+def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False,fc_bool=True):
    
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
@@ -1713,7 +1749,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False):
     method = adc.method
 
     if M_ij is None:
-        M_ij = adc.get_imds()
+        M_ij = adc.get_imds(fc_bool)
 
     nocc = adc._nocc
     nvir = adc._nvir
@@ -2076,15 +2112,20 @@ def ea_adc_matvec(adc, M_ab=None, eris=None):
     return sigma_
 
 
-def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False):
+def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
 
     method = adc.method
-
-    t2_1 = adc.t2[0]
-    t1_2 = adc.t1[0]
+    
+    t1, t2 = adc.compute_amplitudes(eris, fc_bool)
+    
+    t2_1 = t2[0]
+    t1_2 = t1[0]
+    
+    #t2_1 = adc.t2[0]
+    #t1_2 = adc.t1[0]
 
     nocc = adc._nocc
     nvir = adc._nvir
@@ -2116,7 +2157,7 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False):
     D_aij = D_n.reshape(-1)
 
     if M_ij is None:
-        M_ij = adc.get_imds()
+        M_ij = adc.get_imds(fc_bool)
 
     #Calculate sigma vector
     def sigma_(r):
@@ -2604,7 +2645,10 @@ class RADCEA(RADC):
         self.compute_mpn_energy = True
         self.nfc_orb = adc.nfc_orb
         self.nkop = adc.nkop
-
+        self.kop_pick = adc.kop_pick
+        self.cvs_pick = adc.cvs_pick
+        self.fc_bool = adc.fc_bool
+        
         keys = set(('conv_tol', 'e_corr', 'method', 'mo_coeff', 'mo_energy', 'max_memory', 't1', 'max_space', 't2', 'max_cycle'))
 
         self._keys = set(self.__dict__.keys()).union(keys)
@@ -2636,7 +2680,7 @@ class RADCEA(RADC):
        return guess
     
 
-    def gen_matvec(self, imds=None, eris=None, cvs=True):
+    def gen_matvec(self, imds=None, eris=None, cvs=True, fc_bool=True):
         if imds is None: imds = self.get_imds(eris)
         diag = self.get_diag(imds, eris)
         matvec = self.matvec(imds, eris)
@@ -2703,7 +2747,10 @@ class RADCIP(RADC):
         self.compute_mpn_energy = True
         self.nfc_orb = adc.nfc_orb
         self.nkop = adc.nkop
-                
+        self.kop_npick = adc.kop_npick
+        self.cvs_npick = adc.cvs_npick
+        self.fc_bool = adc.fc_bool
+        
         keys = set(('conv_tol', 'e_corr', 'method', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
         self._keys = set(self.__dict__.keys()).union(keys)
@@ -2734,10 +2781,10 @@ class RADCIP(RADC):
             guess.append(g[:,p])
         return guess
 
-    def gen_matvec(self, imds=None, eris=None, cvs=False):
-        if imds is None: imds = self.get_imds(eris)
-        diag = self.get_diag(imds, eris, cvs)
-        matvec = self.matvec(imds, eris, cvs)
+    def gen_matvec(self, imds=None, eris=None, cvs=False, fc_bool=True):
+        if imds is None: imds = self.get_imds(eris, fc_bool)
+        diag = self.get_diag(imds, eris, cvs, fc_bool)
+        matvec = self.matvec(imds, eris, cvs, fc_bool)
         return matvec, diag
 
 if __name__ == '__main__':
