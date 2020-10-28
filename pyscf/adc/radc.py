@@ -45,19 +45,20 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         eris = adc.transform_integrals()
       
     nfc_orb = adc.nfc_orb
-    nkop = adc.nkop
+    #nkop = adc.nkop
+    nkop_chk = adc.nkop_chk
     cvs_npick = adc.cvs_npick
     kop_npick = adc.kop_npick
-    #myadc = adc.ADC(mf)
+    Eh2ev = 27.211386245988
  
-    if (nfc_orb > 0) and (nkop > 0):
+    if ((nfc_orb > 0) and (kop_pick is not False)) or ((cvs_npick is not False) and (kop_npick is not False)):
         raise Exception("Cannot calculate CVS and Koopman's excitations simultaneously")
 
-    if ((nkop > 0) or (nfc_orb > 0)) and (adc.method_type == "ea"):
+    if  ((nfc_orb > 0) or (cvs_npick is not False) or (kop_npick is not False)) and (adc.method_type == "ea"):
        raise Exception("CVS and Koopman's aren't not implemented for EA")
 
     imds = adc.get_imds(eris)
-    if ((nkop == 0) and (nfc_orb == 0)) or (nkop > 0):
+    if (nfc_orb == 0) and (cvs_npick is False):
         matvec, diag = adc.gen_matvec(imds, eris, cvs=False)
         guess = adc.get_init_guess(nroots, diag, ascending = True)
 
@@ -70,7 +71,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
             #fc_bool = adc.fc_bool = False
             imds = adc.get_imds(eris, fc_bool=False)
             matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False)
-            print("Number of frozen orbitals: ", nfc_orb)
+            #print("Number of frozen orbitals: ", nfc_orb)
                
             len_cvs_npick = len(cvs_npick)
             nroots = len_cvs_npick
@@ -80,35 +81,28 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
                 U = np.array(U)
                 guess[idx_guess,:] = U[npick,:]
                                             
-    if nkop > 0:
-        #nroots = nkop
-        kop_r, kop_c = np.array(guess).shape
-        guess = np.zeros((kop_r, kop_c))
-        #print("number of rows of guess vector: ", kop_r)
-        #print("number of columns of guess vector: ", kop_c)
+    if (nkop_chk is True) or (kop_npick is not False):
         kop_w, kop_v = np.linalg.eigh(imds)
-        kop_w = -np.flip(kop_w)
-        kop_v_size = kop_v.shape[0]
+        kop_v = kop_v.T
+        kop_w = -kop_w
+        dim_kop = kop_v.shape[0]
 
-        for w_root, w in enumerate(kop_w):
-            print("Koopman State #", w_root, "Mij  Koopman Energy [Eh]: ", kop_w[w_root] ) ## Only works for IP; need another print statement for EA
- 
-        for i in range(kop_r):
-            for j in range(kop_v_size):
-                guess[i,j] = kop_v[j,i]
-         
+        for kop_root, w in enumerate(kop_w):
+            print("Koopman State #", kop_root, " Energy [Eh]: ", w, "  Energy [ev]: ", w*Eh2ev ) ## Only works for IP; need another print statement for EA
+
+        if nkop_chk is True:
+           print("Initial Koopman's state checkpoint... exiting calculation")
+           exit()
+
         if kop_npick is not False:
+            kroots, dim_guess = np.array(guess).shape
             len_kop_npick = len(kop_npick)
             nroots = len_kop_npick
-            dim_guess = np.array(guess).shape[1]
-            guess_kop = np.zeros((len_kop_npick,dim_guess))
+            guess = np.zeros((nroots,dim_guess))
             for idx_guess, npick in enumerate(kop_npick):
-                guess_kop[idx_guess,:] = guess[npick,:]
-                guess = guess_kop
-                #print("idx: ", idx_guess, "npick: ", npick)
+                guess[idx_guess,:dim_kop] = kop_v[npick,:] 
         
-    
-    if ((nkop > 0) or (nfc_orb > 0)) and ((kop_npick is not False) or (cvs_npick is not False)):
+    if (kop_npick is not False) or (cvs_npick is not False):
 
         def eig_close_to_init_guess(w, v, nroots, envs):
             x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])
@@ -785,7 +779,7 @@ class RADC(lib.StreamObject):
         self.with_df = None
         self.compute_mpn_energy = True
         self.nfc_orb = 0 
-        self.nkop = 0
+        self.nkop_chk = False
         self.cvs_npick = False
         self.kop_npick = False
         self.fc_bool = True
@@ -1825,14 +1819,13 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False,fc_bool=True):
 
         shift = -100000.0
         nfc_orb = adc.nfc_orb
-
         diag[nfc_orb:f1] += shift
 
         temp = np.zeros((nvir,nocc,nocc))
         temp[:,nfc_orb:,nfc_orb:] += shift
         temp[:,:nfc_orb,:nfc_orb] += shift
 
-        diag[s2:f2] = temp.reshape(-1).copy()
+        diag[s2:f2] += temp.reshape(-1).copy()
 
     diag = -diag
 
@@ -2644,7 +2637,7 @@ class RADCEA(RADC):
         self.with_df = adc.with_df
         self.compute_mpn_energy = True
         self.nfc_orb = adc.nfc_orb
-        self.nkop = adc.nkop
+        self.nkop_chk = adc.nkop_chk
         self.kop_pick = adc.kop_pick
         self.cvs_pick = adc.cvs_pick
         self.fc_bool = adc.fc_bool
@@ -2746,7 +2739,7 @@ class RADCIP(RADC):
         self.with_df = adc.with_df
         self.compute_mpn_energy = True
         self.nfc_orb = adc.nfc_orb
-        self.nkop = adc.nkop
+        self.nkop_chk = adc.nkop_chk
         self.kop_npick = adc.kop_npick
         self.cvs_npick = adc.cvs_npick
         self.fc_bool = adc.fc_bool
