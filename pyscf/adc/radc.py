@@ -1876,7 +1876,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=True, fc_bool=True, mom_skd=False, a
 
         temp = np.zeros((nvir,nocc,nocc))
         temp[:,ncore_proj:,ncore_proj:] += shift
-        #temp[:,:ncore_proj,:ncore_proj] += shift
+        temp[:,:ncore_proj,:ncore_proj] += shift
 
         diag[s2:f2] += temp.reshape(-1).copy()
    
@@ -2170,7 +2170,7 @@ def ea_adc_matvec(adc, M_ab=None, eris=None):
     return sigma_
 
 
-def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=False, alpha_proj=0):
+def ip_adc_matvec_off(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=False, alpha_proj=0):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
@@ -2299,19 +2299,19 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
         
         r1_ss = np.einsum('ij,j->ij', alpha_ij, r1, optimize = True)
                
-        s[s1:f1] = lib.einsum('ij,ij->i',M_ij,r1_ss, optimize = True)
+        s[s1:f1] = lib.einsum('ij,j,ij->i',M_ij,r1,alpha_ij, optimize = True)
 
 ############ ADC(2) i - kja block #########################
         r2_sd = lib.einsum('iajk,ajk->iajk', alpha_i_ajk, r2, optimize=True)
                          
-        s[s1:f1] += 2. * lib.einsum('jaki,iajk->i', eris_ovoo, r2_sd, optimize = True)
-        s[s1:f1] -= lib.einsum('kaji,iajk->i', eris_ovoo, r2_sd, optimize = True)
+        s[s1:f1] += 2. * lib.einsum('jaki,ajk,iajk->i', eris_ovoo, r2, alpha_i_ajk, optimize = True)
+        s[s1:f1] -= lib.einsum('kaji,ajk,iajk->i', eris_ovoo, r2,alpha_i_ajk, optimize = True)
 
 ############## ADC(2) ajk - i block ############################
         
         r1_ds = lib.einsum('ajki,i->ajki', alpha_ajk_i, r1, optimize=True) 
         
-        temp = lib.einsum('jaki,ajki->ajk', eris_ovoo, r1_ds, optimize = True).reshape(-1)
+        temp = lib.einsum('jaki,i,iajk->ajk', eris_ovoo, r1,alpha_i_ajk, optimize = True).reshape(-1)
         s[s2:f2] += temp.reshape(-1)
 
 ################ ADC(2) ajk - bil block ############################
@@ -2329,24 +2329,24 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
                eris_oovv = eris.oovv
                eris_ovvo = eris.ovvo
                
-               r2_dd = np.einsum('aijbkl,bkl->aijbkl', alpha_aij_bkl, r2, optimize=True)
+               #r2_dd = np.einsum('aijbkl,bkl->aijbkl', alpha_aij_bkl, r2, optimize=True)
                #r2_dd = r2  
-               s[s2:f2] -= 0.5*lib.einsum('kijl,ajkali->ajk',eris_oooo, r2_dd, optimize = True).reshape(-1)
-               s[s2:f2] -= 0.5*lib.einsum('klji,akjail->ajk',eris_oooo ,r2_dd, optimize = True).reshape(-1)
+               s[s2:f2] -= 0.5*lib.einsum('kijl,ali,ajkali->ajk',eris_oooo, r2,alpha_aij_bkl, optimize = True).reshape(-1)
+               s[s2:f2] -= 0.5*lib.einsum('klji,ail,ajkail->ajk',eris_oooo ,r2,alpha_aij_bkl, optimize = True).reshape(-1)
                
-               s[s2:f2] += 0.5*lib.einsum('klba,ajkbjl->ajk',eris_oovv,r2_dd, optimize = True).reshape(-1)
+               s[s2:f2] += 0.5*lib.einsum('klba,bjl,ajkbjl->ajk',eris_oovv,r2,alpha_aij_bkl, optimize = True).reshape(-1)
                
-               s[s2:f2] +=  0.5*lib.einsum('jabl,ajkbkl->ajk',eris_ovvo,r2_dd, optimize = True).reshape(-1)
-               s[s2:f2] -=  0.5*lib.einsum('jabl,ajkblk->ajk',eris_ovvo,r2_dd, optimize = True).reshape(-1)
-               s[s2:f2] +=  0.5*lib.einsum('jlba,ajkblk->ajk',eris_oovv,r2_dd, optimize = True).reshape(-1)
-               s[s2:f2] -=  0.5*lib.einsum('jabl,ajkblk->ajk',eris_ovvo,r2_dd, optimize = True).reshape(-1)
+               s[s2:f2] +=  0.5*lib.einsum('jabl,bkl,ajkbkl->ajk',eris_ovvo,r2,alpha_aij_bkl, optimize = True).reshape(-1)
+               s[s2:f2] -=  0.5*lib.einsum('jabl,blk,ajkblk->ajk',eris_ovvo,r2,alpha_aij_bkl, optimize = True).reshape(-1)
+               s[s2:f2] +=  0.5*lib.einsum('jlba,blk,ajkblk->ajk',eris_oovv,r2,alpha_aij_bkl, optimize = True).reshape(-1)
+               s[s2:f2] -=  0.5*lib.einsum('jabl,blk,ajkblk->ajk',eris_ovvo,r2,alpha_aij_bkl, optimize = True).reshape(-1)
                
-               s[s2:f2] += 0.5*lib.einsum('kiba,ajkbji->ajk',eris_oovv,r2_dd, optimize = True).reshape(-1)
+               s[s2:f2] += 0.5*lib.einsum('kiba,bji,ajkbji->ajk',eris_oovv,r2,alpha_aij_bkl, optimize = True).reshape(-1)
                
-               s[s2:f2] += 0.5*lib.einsum('jiba,ajkbik->ajk',eris_oovv,r2_dd, optimize = True).reshape(-1)
-               s[s2:f2] -= 0.5*lib.einsum('jabi,ajkbik->ajk',eris_ovvo,r2_dd, optimize = True).reshape(-1)
-               s[s2:f2] -= 0.5*lib.einsum('jabi,ajkbik->ajk',eris_ovvo,r2_dd, optimize = True).reshape(-1)
-               s[s2:f2] += 0.5*lib.einsum('jabi,akjbki->ajk',eris_ovvo,r2_dd, optimize = True).reshape(-1)
+               s[s2:f2] += 0.5*lib.einsum('jiba,bik,ajkbik->ajk',eris_oovv,r2,alpha_aij_bkl, optimize = True).reshape(-1)
+               s[s2:f2] -= 0.5*lib.einsum('jabi,bik,ajkbik->ajk',eris_ovvo,r2,alpha_aij_bkl, optimize = True).reshape(-1)
+               s[s2:f2] -= 0.5*lib.einsum('jabi,bik,ajkbik->ajk',eris_ovvo,r2,alpha_aij_bkl, optimize = True).reshape(-1)
+               s[s2:f2] += 0.5*lib.einsum('jabi,bki,ajkbki->ajk',eris_ovvo,r2,alpha_aij_bkl, optimize = True).reshape(-1)
                
         cput0 = log.timer_debug1("completed sigma vector ADC(2)-x calculation", *cput0)
         if (method == "adc(3)"):
@@ -2460,7 +2460,7 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
     return sigma_
 
 
-def ip_adc_matvec_off(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=False, alpha_proj=0):
+def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=False, alpha_proj=0):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
