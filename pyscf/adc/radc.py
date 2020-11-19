@@ -88,7 +88,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
                guess = adc.get_init_guess(nroots, diag, ascending = True)
                #guess = np.array(guess)
                #guess = adiis.update(guess)
-               conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+               conv, E, U_cvs = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
             imds = adc.get_imds(eris,fc_bool=False)
             matvec, diag = adc.gen_matvec(imds, eris, fc_bool=False, alpha_proj=skd[0])
             """len_cvs_npick = len(cvs_npick)
@@ -99,7 +99,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
             for idx_guess, npick in enumerate(cvs_npick):
                 U = np.array(U)
                 guess[idx_guess,:] = U[npick,:]"""
-            guess = U
+            guess = U_cvs
             #U = np.array(U)
             #if skd_num > 1:
                # guess = adiis.update(U)
@@ -2170,7 +2170,7 @@ def ea_adc_matvec(adc, M_ab=None, eris=None):
     return sigma_
 
 
-def ip_adc_matvec_off(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=False, alpha_proj=0):
+def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=False, alpha_proj=0):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
@@ -2460,7 +2460,7 @@ def ip_adc_matvec_off(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd
     return sigma_
 
 
-def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=False, alpha_proj=0):
+def ip_adc_matvec_off(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=False, alpha_proj=0):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
