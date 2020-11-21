@@ -1876,7 +1876,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=True, fc_bool=True, mom_skd=False, a
 
         temp = np.zeros((nvir,nocc,nocc))
         temp[:,ncore_proj:,ncore_proj:] += shift
-        temp[:,:ncore_proj,:ncore_proj] += shift
+        #temp[:,:ncore_proj,:ncore_proj] += shift
 
         diag[s2:f2] += temp.reshape(-1).copy()
    
@@ -2249,7 +2249,7 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
         # Scaling aij-bkl block
         alpha_aij_bkl = np.ones((nvir,nocc,nocc,nvir,nocc,nocc))
         #A
-         
+        """ 
         alpha_aij_bkl[:,:ncore,:ncore,:,:ncore,ncore:] *= alpha_proj
         alpha_aij_bkl[:,:ncore,:ncore,:,ncore:,:ncore] *= alpha_proj
         #B
@@ -2277,7 +2277,7 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
         alpha_aij_bkl[:,ncore:,ncore:,:,ncore:,:ncore] *= alpha_proj
         #D-b 
         alpha_aij_bkl[:,ncore:,ncore:,:,:ncore,:ncore] *= alpha_proj
-        """
+        
         # Scaling i-ajk block
         alpha_i_ajk = np.ones((n_singles,nvir,nocc,nocc))
         #A
@@ -2286,9 +2286,9 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
         alpha_i_ajk[ncore:,:,ncore:,:ncore] *= alpha_proj
         alpha_i_ajk[ncore:,:,:ncore,ncore:] *= alpha_proj
         #CVS-a
-        alpha_i_ajk[:ncore,:,:ncore,:ncore] *= alpha_proj
+        #alpha_i_ajk[:ncore,:,:ncore,:ncore] *= alpha_proj
         #CVS-b
-        #alpha_i_ajk[ncore:,:,:ncore,:ncore] *= alpha_proj
+        alpha_i_ajk[ncore:,:,:ncore,:ncore] *= alpha_proj
         
         
         # Scaling ajk-i block
