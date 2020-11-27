@@ -53,7 +53,10 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     alpha_proj = adc.alpha_proj
     mom_skd = True 
     mom_skd_iter = adc.mom_skd_iter 
-    
+    skd_1 = mom_skd_iter[0]
+    alpha_1 = skd_1[0]
+    mom_skd_iter = mom_skd_iter[1:]
+
     if ncore_proj > 0:
         cvs = True
     else:
@@ -66,52 +69,65 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
        raise Exception("CVS and Koopman's aren't not implemented for EA")
 
     imds = adc.get_imds(eris)
-    #if (ncore_proj == 0) and (alpha_proj==0):
+   
     #matvec, diag = adc.gen_matvec(imds, eris, cvs)
     #guess = adc.get_init_guess(nroots, diag, ascending = True)
-    ##################################
+   
     #conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
-    def eig_close_to_init_guess(w, v, nroots, envs):
-        x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])
-        s = np.dot(np.asarray(guess).conj(), np.asarray(x0).T)
-        snorm = np.einsum('pi,pi->i', s.conj(), s)
-        idx = np.argsort(-snorm)[:nroots]
-        return lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
     
-    adiis = lib.diis.DIIS() 
+    guess_rms = []
+    mom_rms = []
+    alpha = []
+    def vec_rms_compute(v_ref, v_target):
+        v_ref = np.sqrt(np.array(v_ref)**2)
+        v_target = np.sqrt(np.array(v_target)**2)
+        delta_sq = (v_target - v_ref)**2
+        delta_rms = np.sqrt(np.sum(delta_sq))
+        return delta_rms
+                   
     if mom_skd_iter is not False:
         skd_len = len(mom_skd_iter)
         for skd_num, skd in enumerate(mom_skd_iter):
-        
+             
             if skd_num == 0:
-               matvec, diag = adc.gen_matvec(imds, eris, mom_skd=True, alpha_proj=0)
-               guess = adc.get_init_guess(nroots, diag, ascending = True)
-               #guess = np.array(guess)
-               #guess = adiis.update(guess)
-               conv, E, U_cvs = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
-            imds = adc.get_imds(eris,fc_bool=False)
+                matvec, diag = adc.gen_matvec(imds, eris, mom_skd=True, alpha_proj=alpha_1)
+                guess = adc.get_init_guess(nroots, diag, ascending = True)
+                conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+                
+                proj_vec = U
+                alpha.append("CVS")
+                guess_rms.append(vec_rms_compute(guess,U))
+                mom_rms.append("CVS")                 
+                imds = adc.get_imds(eris,fc_bool=False)
+                guess = U
+            """   
+            if skd_num == 0:
+                matvec, diag = adc.gen_matvec(imds, eris, mom_skd=True, alpha_proj=alpha_1)
+                proj_vec = adc.get_init_guess(nroots, diag, ascending = True)        
+                guess = proj_vec
+                imds = adc.get_imds(eris,fc_bool=False)
+            """
             matvec, diag = adc.gen_matvec(imds, eris, fc_bool=False, alpha_proj=skd[0])
-            """len_cvs_npick = len(cvs_npick)
-            nroots = len_cvs_npick
-            dim_guess = np.array(U).shape[1]
-
-            guess = np.zeros((len_cvs_npick, dim_guess))
-            for idx_guess, npick in enumerate(cvs_npick):
-                U = np.array(U)
-                guess[idx_guess,:] = U[npick,:]"""
-            guess = U_cvs
-            #U = np.array(U)
-            #if skd_num > 1:
-               # guess = adiis.update(U)
+                            
             def eig_close_to_init_guess(w, v, nroots, envs):
                 x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])
-                s = np.dot(np.asarray(guess).conj(), np.asarray(x0).T)
+                s = np.dot(np.asarray(proj_vec).conj(), np.asarray(x0).T)
                 snorm = np.einsum('pi,pi->i', s.conj(), s)
                 idx = np.argsort(-snorm)[:nroots]
                 return lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
 
+            if skd_num > 0:
+                guess = U
             conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=skd[2], max_cycle=skd[1], max_space=adc.max_space)
+            alpha.append(skd[0])
+            guess_rms.append(vec_rms_compute(guess,U))
+            mom_rms.append(vec_rms_compute(proj_vec,U))
            
+     
+    print("Alpha values: ", alpha)
+    print("Delta RMS of macroiteration eigenvector w.r.t guess vector fed into the iteration: ", guess_rms)   
+    print("Delta RMS of macroiteration eigenvector w.r.t projection vector: ", mom_rms)
+    
     """
     if (ncore_proj > 0):
         matvec, diag = adc.gen_matvec(imds, eris, cvs=True)
