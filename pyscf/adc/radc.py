@@ -66,10 +66,10 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
        raise Exception("CVS and Koopman's aren't not implemented for EA")
 
     imds = adc.get_imds(eris)
-    if (ncore_proj > 0) and (mom_skd_iter == False) and (cvs_npick == False):
-        matvec, diag = adc.gen_matvec(imds, eris, cvs)
-        guess = adc.get_init_guess(nroots, diag, ascending = True)
-        conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+    #if (ncore_proj > 0) and (mom_skd_iter == False) and (cvs_npick == False):
+    #    matvec, diag = adc.gen_matvec(imds, eris, cvs)
+    #    guess = adc.get_init_guess(nroots, diag, ascending = True)
+    #    conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
     """    
     nocc = adc._nocc
     nvir = adc._nvir
@@ -188,25 +188,25 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
                 guess_rms.append(vec_rms_compute(guess,U))
                 mom_rms.append("CVS")                 
                 imds = adc.get_imds(eris,fc_bool=False)
-                #guess = U
-            """    
-            if skd_num == 0:
-                matvec, diag = adc.gen_matvec(imds, eris, mom_skd=True, alpha_proj=alpha_1)
-                proj_vec = adc.get_init_guess(nroots, diag, ascending = True)        
-                guess = proj_vec
-                imds = adc.get_imds(eris,fc_bool=False)
+                guess = U
+             
+          #  if skd_num == 0:
+          #      matvec, diag = adc.gen_matvec(imds, eris, mom_skd=True, alpha_proj=alpha_1)
+          #      proj_vec = adc.get_init_guess(nroots, diag, ascending = True)        
+          #      guess = proj_vec
+          #      imds = adc.get_imds(eris,fc_bool=False)
            
             matvec, diag = adc.gen_matvec(imds, eris, fc_bool=False, alpha_proj=skd[0])
-            """
-            """                
-            len_cvs_npick = len(cvs_npick)
-            nroots = len_cvs_npick
-            dim_guess = np.array(U).shape[1]
-            guess = np.zeros((len_cvs_npick, dim_guess))
-            for idx_guess, npick in enumerate(cvs_npick):
-                U = np.array(U)
-                guess[idx_guess,:] = U[npick,:]
-            """
+            
+                          
+          #  len_cvs_npick = len(cvs_npick)
+          #  nroots = len_cvs_npick
+          #  dim_guess = np.array(U).shape[1]
+          #  guess = np.zeros((len_cvs_npick, dim_guess))
+          #  for idx_guess, npick in enumerate(cvs_npick):
+          #      U = np.array(U)
+          #      guess[idx_guess,:] = U[npick,:]
+           
             def eig_close_to_init_guess(w, v, nroots, envs):
                 x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])
                 s = np.dot(np.asarray(guess).conj(), np.asarray(x0).T)
