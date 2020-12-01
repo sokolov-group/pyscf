@@ -28,6 +28,7 @@ from pyscf.adc import radc_ao2mo
 from pyscf.adc import dfadc
 from pyscf import __config__
 from pyscf import df
+import pandas as pd
 
 def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
@@ -51,11 +52,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     ncore_proj = adc.ncore_proj
     Eh2ev = 27.211386245988
     alpha_proj = adc.alpha_proj
-    mom_skd = True 
     mom_skd_iter = adc.mom_skd_iter 
-    skd_1 = mom_skd_iter[0]
-    alpha_1 = skd_1[0]
-    mom_skd_iter = mom_skd_iter[1:]
 
     if ncore_proj > 0:
         cvs = True
@@ -69,11 +66,99 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
        raise Exception("CVS and Koopman's aren't not implemented for EA")
 
     imds = adc.get_imds(eris)
+    if (ncore_proj > 0) and (mom_skd_iter == False) and (cvs_npick == False):
+        matvec, diag = adc.gen_matvec(imds, eris, cvs)
+        guess = adc.get_init_guess(nroots, diag, ascending = True)
+        conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+    """    
+    nocc = adc._nocc
+    nvir = adc._nvir
+    n_singles = nocc
+    n_doubles = nvir * nocc * nocc
+    dim = n_singles + n_doubles
+    
+    idn_t = np.zeros(dim)
+    M_big = np.zeros((dim,dim))
+    for i in range(dim):
+        idn_t[i] = 1
+        M_big[:,i] = matvec(idn_t)
+        idn_t[i] = 0
+    
+    M_norms_coarse = np.zeros((2,2))
+    M_norms_coarse[0,0] = np.linalg.norm(M_big[:n_singles,:n_singles])/(n_singles**2) 
+    M_norms_coarse[0,1] = np.linalg.norm(M_big[:n_singles,n_singles:])/(n_singles*n_doubles) 
+    M_norms_coarse[1,0] = M_norms_coarse[0,1] 
+    M_norms_coarse[1,1] = np.linalg.norm(M_big[n_singles:,n_singles:])/(n_doubles**2) 
    
-    #matvec, diag = adc.gen_matvec(imds, eris, cvs)
-    #guess = adc.get_init_guess(nroots, diag, ascending = True)
-   
-    #conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+    df1 = pd.DataFrame(M_norms_coarse, index =['i','bmn'], columns=['j','akl'])
+    print(adc.method, " - Normalized (w.r.t. number of orbitals spanned) norms of the 4 major sub-blocks of M")
+    print(df1)
+    
+    M_ss = M_big[:n_singles,:n_singles]
+    M_sd = M_big[:n_singles,n_singles:].reshape(nocc,nvir,nocc,nocc)
+    M_dd = M_big[n_singles:,n_singles:].reshape(nvir,nocc,nocc,nvir,nocc,nocc)
+
+    def get_M_norms_fine(M_ss, M_sd, M_dd, ncore, nocc, nvir):
+        
+        nc = ncore
+        nv = nocc - nc
+        necc = nvir * nc * nc
+        necv = nvir * nc * nv
+        nevv = nvir * nv * nv
+        
+        M_norms_fine = np.zeros((5,5))
+        M_norms_fine[0,0] = np.linalg.norm(M_ss[:ncore,:ncore])/(nc**2)
+        M_norms_fine[1,1] = np.linalg.norm(M_ss[ncore:,ncore:])/(nv**2)
+        M_norms_fine[2,2] = np.linalg.norm(M_dd[:,:ncore,:ncore,:,:ncore,:ncore])/(necc**2)
+        M_ecv_ecv = np.linalg.norm(M_dd[:,:ncore,ncore:,:,:ncore,ncore:])**2
+        M_ecv_evc = np.linalg.norm(M_dd[:,:ncore,ncore:,:,ncore:,:ncore])**2
+        M_evc_ecv = np.linalg.norm(M_dd[:,ncore:,:ncore,:,:ncore,ncore:])**2
+        M_evc_evc = np.linalg.norm(M_dd[:,ncore:,:ncore,:,ncore:,:ncore])**2
+        M_norms_fine[3,3] = np.sqrt(M_ecv_ecv + M_ecv_evc + M_evc_ecv + M_evc_evc)/(necv**2)
+        M_norms_fine[4,4] = np.linalg.norm(M_dd[:,ncore:,ncore:,:,ncore:,ncore:])/(nevv**2)
+        M_norms_fine[0,1] = np.linalg.norm(M_ss[:ncore,ncore:])/(nc*nv)
+        M_norms_fine[1,0] = M_norms_fine[0,1]
+        M_norms_fine[0,2] = np.linalg.norm(M_sd[:ncore,:,:ncore,:ncore])/(nc*necc)
+        M_norms_fine[2,0] = M_norms_fine[0,2]
+        M_c_ecv = np.linalg.norm(M_sd[:ncore,:,:ncore,ncore:])**2
+        M_c_evc = np.linalg.norm(M_sd[:ncore,:,ncore:,:ncore])**2
+        M_norms_fine[0,3] = np.sqrt(M_c_ecv + M_c_evc)/(nc*necv) 
+        M_norms_fine[3,0] = M_norms_fine[0,3]
+        M_norms_fine[0,4] = np.linalg.norm(M_sd[:ncore,:,ncore:,ncore:])/(nc*nevv)
+        M_norms_fine[4,0] = M_norms_fine[0,4]
+        M_norms_fine[1,2] = np.linalg.norm(M_sd[ncore:,:,:ncore,:ncore])/(nv*necc)
+        M_norms_fine[2,1] = M_norms_fine[1,2]
+        M_v_ecv = np.linalg.norm(M_sd[ncore:,:,:ncore,ncore:])**2
+        M_v_evc = np.linalg.norm(M_sd[ncore:,:,ncore:,:ncore])**2
+        M_norms_fine[1,3] = np.sqrt(M_v_ecv + M_v_evc)/(nv*necv) 
+        M_norms_fine[3,1] = M_norms_fine[1,3]
+        M_norms_fine[1,4] = np.linalg.norm(M_sd[ncore:,:,ncore:,ncore:])/(nv*nevv)
+        M_norms_fine[4,1] = M_norms_fine[1,4]
+        M_ecc_ecv = np.linalg.norm(M_dd[:,:ncore,:ncore,:,:ncore,ncore:])**2        
+        M_ecc_evc = np.linalg.norm(M_dd[:,:ncore,:ncore,:,ncore:,:ncore])**2
+        M_norms_fine[2,3] = np.sqrt(M_ecc_ecv + M_ecc_evc)/(necc*necv)
+        M_norms_fine[3,2] = M_norms_fine[3,2]
+        M_norms_fine[2,4] = np.linalg.norm(M_dd[:,:ncore,:ncore,:,ncore:,ncore:])/(necc*nevv) 
+        M_norms_fine[4,2] = M_norms_fine[2,4]
+        M_ecv_evv = np.linalg.norm(M_dd[:,:ncore,ncore:,:,ncore:,ncore:])**2       
+        M_evc_evv = np.linalg.norm(M_dd[:,ncore:,:ncore,:,ncore:,ncore:])**2       
+        M_norms_fine[3,4] = np.sqrt(M_ecv_evv + M_evc_evv)/(necv*nevv)
+        M_norms_fine[4,3] = M_norms_fine[3,4]  
+
+        return M_norms_fine 
+       
+    core_orb_label = ['1s', '2s', '2p', '3s', '3p']
+    core_orb_val = [1, 2, 5, 6, 9]
+
+    for cidx, corb in enumerate(core_orb_label):
+ 
+        ncore = core_orb_val[cidx]
+        M_norms_fine = get_M_norms_fine(M_ss,M_sd,M_dd,ncore,nocc,nvir)         
+        df2 = pd.DataFrame(M_norms_fine, index=['c','v','ecc','ecv','evv'], columns=['c','v','ecc','ecv','evv'])
+        print(adc.method, '-', corb, '-' , 'Normalized matrix sub-blocks norms: ')
+        print(df2)
+    exit()
+    """    
     
     guess_rms = []
     mom_rms = []
@@ -86,11 +171,15 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         return delta_rms
                    
     if mom_skd_iter is not False:
+
+        skd_1 = mom_skd_iter[0]
+        alpha_1 = skd_1[0]
+        mom_skd_iter = mom_skd_iter[1:]
         skd_len = len(mom_skd_iter)
         for skd_num, skd in enumerate(mom_skd_iter):
-             
+            
             if skd_num == 0:
-                matvec, diag = adc.gen_matvec(imds, eris, mom_skd=True, alpha_proj=alpha_1)
+                matvec, diag = adc.gen_matvec(imds, eris, cvs=True, alpha_proj=alpha_1)
                 guess = adc.get_init_guess(nroots, diag, ascending = True)
                 conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
                 
@@ -99,19 +188,28 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
                 guess_rms.append(vec_rms_compute(guess,U))
                 mom_rms.append("CVS")                 
                 imds = adc.get_imds(eris,fc_bool=False)
-                guess = U
-            """   
+                #guess = U
+            """    
             if skd_num == 0:
                 matvec, diag = adc.gen_matvec(imds, eris, mom_skd=True, alpha_proj=alpha_1)
                 proj_vec = adc.get_init_guess(nroots, diag, ascending = True)        
                 guess = proj_vec
                 imds = adc.get_imds(eris,fc_bool=False)
-            """
+           
             matvec, diag = adc.gen_matvec(imds, eris, fc_bool=False, alpha_proj=skd[0])
-                            
+            """
+            """                
+            len_cvs_npick = len(cvs_npick)
+            nroots = len_cvs_npick
+            dim_guess = np.array(U).shape[1]
+            guess = np.zeros((len_cvs_npick, dim_guess))
+            for idx_guess, npick in enumerate(cvs_npick):
+                U = np.array(U)
+                guess[idx_guess,:] = U[npick,:]
+            """
             def eig_close_to_init_guess(w, v, nroots, envs):
                 x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])
-                s = np.dot(np.asarray(proj_vec).conj(), np.asarray(x0).T)
+                s = np.dot(np.asarray(guess).conj(), np.asarray(x0).T)
                 snorm = np.einsum('pi,pi->i', s.conj(), s)
                 idx = np.argsort(-snorm)[:nroots]
                 return lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
@@ -738,7 +836,7 @@ def cvs_projector(myadc, r, alpha_proj=0):
     temp = Pr[s2:f2].reshape((nvir, nocc, nocc)).copy()
     
     temp[:,ncore_proj:,ncore_proj:] *= alpha_proj
-    temp[:,:ncore_proj,:ncore_proj] *= alpha_proj
+    #temp[:,:ncore_proj,:ncore_proj] *= alpha_proj
     
     Pr[s2:f2] = temp.reshape(-1).copy()
     
@@ -1895,18 +1993,6 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=True, fc_bool=True, mom_skd=False, a
         #temp[:,:ncore_proj,:ncore_proj] += shift
 
         diag[s2:f2] += temp.reshape(-1).copy()
-   
-    """if mom_skd is not False and alpha_proj==0:
-        
-        shift = -100000.0
-        ncore_proj = adc.ncore_proj
-        diag[ncore_proj:f1] += shift
-
-        temp = np.zeros((nvir,nocc,nocc))
-        temp[:,ncore_proj:,ncore_proj:] += shift
-        temp[:,:ncore_proj,:ncore_proj] += shift
-
-        diag[s2:f2] += temp.reshape(-1).copy()"""
 
     diag = -diag
 
@@ -2258,9 +2344,9 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
         # Scaling i-j block
         alpha_ij = np.ones((n_singles,n_singles))
         #A
-        alpha_ij[:ncore, ncore:] *= alpha_proj
+        alpha_ij[:ncore, ncore:] *= alpha_proj**3
         #B
-        alpha_ij[ncore:, :ncore] *= alpha_proj
+        alpha_ij[ncore:, :ncore] *= alpha_proj**3
         
         # Scaling aij-bkl block
         alpha_aij_bkl = np.ones((nvir,nocc,nocc,nvir,nocc,nocc))
@@ -2297,14 +2383,14 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
         # Scaling i-ajk block
         alpha_i_ajk = np.ones((n_singles,nvir,nocc,nocc))
         #A
-        alpha_i_ajk[:ncore,:,ncore:,ncore:] *= alpha_proj
+        alpha_i_ajk[:ncore,:,ncore:,ncore:] *= alpha_proj**2
         #B
-        alpha_i_ajk[ncore:,:,ncore:,:ncore] *= alpha_proj
-        alpha_i_ajk[ncore:,:,:ncore,ncore:] *= alpha_proj
+        alpha_i_ajk[ncore:,:,ncore:,:ncore] *= alpha_proj**2
+        alpha_i_ajk[ncore:,:,:ncore,ncore:] *= alpha_proj**2
         #CVS-a
         #alpha_i_ajk[:ncore,:,:ncore,:ncore] *= alpha_proj
         #CVS-b
-        alpha_i_ajk[ncore:,:,:ncore,:ncore] *= alpha_proj
+        alpha_i_ajk[ncore:,:,:ncore,:ncore] *= alpha_proj**2
         
         
         # Scaling ajk-i block
@@ -2475,6 +2561,221 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
 
     return sigma_
 
+def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=False, alpha_proj=0):
+
+    if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
+        raise NotImplementedError(adc.method)
+
+    method = adc.method
+
+    t2_1 = adc.t2[0]
+    t1_2 = adc.t1[0]
+
+    nocc = adc._nocc
+    nvir = adc._nvir
+
+    ij_ind = np.tril_indices(nocc, k=-1)
+
+    n_singles = nocc
+    n_doubles = nvir * nocc * nocc
+
+    dim = n_singles + n_doubles
+
+    e_occ = adc.mo_energy[:nocc]
+    e_vir = adc.mo_energy[nocc:]
+
+    idn_occ = np.identity(nocc)
+    idn_vir = np.identity(nvir)
+
+    if eris is None:
+        eris = adc.transform_integrals()
+
+    s1 = 0
+    f1 = n_singles
+    s2 = f1
+    f2 = s2 + n_doubles
+
+    d_ij = e_occ[:,None] + e_occ
+    d_a = e_vir[:,None]
+    D_n = -d_a + d_ij.reshape(-1)
+    D_aij = D_n.reshape(-1)
+
+    if M_ij is None:
+        M_ij = adc.get_imds()
+
+    #Calculate sigma vector
+    def sigma_(r):
+        cput0 = (time.clock(), time.time())
+        log = logger.Logger(adc.stdout, adc.verbose)
+
+        if cvs is True:
+            r = cvs_projector(adc, r)
+
+        s = np.zeros((dim))
+
+        r1 = r[s1:f1]
+        r2 = r[s2:f2]
+
+        r2 = r2.reshape(nvir,nocc,nocc)
+
+        eris_ovoo = eris.ovoo
+
+############ ADC(2) ij block ############################
+
+        s[s1:f1] = lib.einsum('ij,j->i',M_ij,r1)
+
+############ ADC(2) i - kja block #########################
+
+        s[s1:f1] += 2. * lib.einsum('jaki,ajk->i', eris_ovoo, r2, optimize = True)
+        s[s1:f1] -= lib.einsum('kaji,ajk->i', eris_ovoo, r2, optimize = True)
+
+############## ADC(2) ajk - i block ############################
+
+        temp = lib.einsum('jaki,i->ajk', eris_ovoo, r1, optimize = True).reshape(-1)
+        s[s2:f2] += temp.reshape(-1)
+
+################ ADC(2) ajk - bil block ############################
+
+        s[s2:f2] += D_aij * r2.reshape(-1)
+        cput0 = log.timer_debug1("completed sigma vector ADC(2) calculation", *cput0)
+
+############### ADC(3) ajk - bil block ############################
+
+        if (method == "adc(2)-x" or method == "adc(3)"):
+        
+               t2_2 = adc.t2[1]
+
+               eris_oooo = eris.oooo
+               eris_oovv = eris.oovv
+               eris_ovvo = eris.ovvo
+               
+               s[s2:f2] -= 0.5*lib.einsum('kijl,ali->ajk',eris_oooo, r2, optimize = True).reshape(-1)
+               s[s2:f2] -= 0.5*lib.einsum('klji,ail->ajk',eris_oooo ,r2, optimize = True).reshape(-1)
+               
+               s[s2:f2] += 0.5*lib.einsum('klba,bjl->ajk',eris_oovv,r2,optimize = True).reshape(-1)
+               
+               s[s2:f2] +=  0.5*lib.einsum('jabl,bkl->ajk',eris_ovvo,r2,optimize = True).reshape(-1)
+               s[s2:f2] -=  0.5*lib.einsum('jabl,blk->ajk',eris_ovvo,r2,optimize = True).reshape(-1)
+               s[s2:f2] +=  0.5*lib.einsum('jlba,blk->ajk',eris_oovv,r2,optimize = True).reshape(-1)
+               s[s2:f2] -=  0.5*lib.einsum('jabl,blk->ajk',eris_ovvo,r2,optimize = True).reshape(-1)
+               
+               s[s2:f2] += 0.5*lib.einsum('kiba,bji->ajk',eris_oovv,r2,optimize = True).reshape(-1)
+               
+               s[s2:f2] += 0.5*lib.einsum('jiba,bik->ajk',eris_oovv,r2,optimize = True).reshape(-1)
+               s[s2:f2] -= 0.5*lib.einsum('jabi,bik->ajk',eris_ovvo,r2,optimize = True).reshape(-1)
+               s[s2:f2] -= 0.5*lib.einsum('jabi,bik->ajk',eris_ovvo,r2,optimize = True).reshape(-1)
+               s[s2:f2] += 0.5*lib.einsum('jabi,bki->ajk',eris_ovvo,r2,optimize = True).reshape(-1)
+               
+        cput0 = log.timer_debug1("completed sigma vector ADC(2)-x calculation", *cput0)
+        if (method == "adc(3)"):
+
+               eris_ovoo = eris.ovoo
+
+################ ADC(3) i - kja block and ajk - i ############################
+
+               temp =  0.25 * lib.einsum('ijbc,aij->abc',t2_1, r2, optimize=True)
+               temp -= 0.25 * lib.einsum('ijbc,aji->abc',t2_1, r2, optimize=True)
+               temp -= 0.25 * lib.einsum('jibc,aij->abc',t2_1, r2, optimize=True)
+               temp += 0.25 * lib.einsum('jibc,aji->abc',t2_1, r2, optimize=True)
+
+               temp_1 = lib.einsum('kjcb,ajk->abc',t2_1,r2, optimize=True)
+
+               if isinstance(eris.ovvv, type(None)):
+                   chnk_size = radc_ao2mo.calculate_chunk_size(adc)
+               else :
+                   chnk_size = nocc
+               a = 0
+               temp_singles = np.zeros((nocc))
+               temp_doubles = np.zeros((nvir,nvir,nvir))
+               for p in range(0,nocc,chnk_size):
+                   if getattr(adc, 'with_df', None):
+                       eris_ovvv = dfadc.get_ovvv_df(adc, eris.Lov, eris.Lvv, p, chnk_size).reshape(-1,nvir,nvir,nvir)
+                   else :
+                       eris_ovvv = radc_ao2mo.unpack_eri_1(eris.ovvv, nvir)
+                   k = eris_ovvv.shape[0]
+
+                   temp_singles[a:a+k] += lib.einsum('abc,icab->i',temp, eris_ovvv, optimize=True)
+                   temp_singles[a:a+k] -= lib.einsum('abc,ibac->i',temp, eris_ovvv, optimize=True)
+                   temp_singles[a:a+k] += lib.einsum('abc,icab->i',temp_1, eris_ovvv, optimize=True)
+                   temp_doubles = lib.einsum('i,icab->cba',r1[a:a+k],eris_ovvv,optimize=True)
+                   s[s2:f2] += lib.einsum('cba,kjcb->ajk',temp_doubles, t2_1, optimize=True).reshape(-1)
+                   del eris_ovvv
+                   del temp_doubles
+                   a += k
+
+               s[s1:f1] += temp_singles
+               temp = np.zeros_like(r2)
+               temp =  lib.einsum('jlab,ajk->blk',t2_1,r2,optimize=True)
+               temp -= lib.einsum('jlab,akj->blk',t2_1,r2,optimize=True)
+               temp -= lib.einsum('ljab,ajk->blk',t2_1,r2,optimize=True)
+               temp += lib.einsum('ljab,akj->blk',t2_1,r2,optimize=True)
+               temp += lib.einsum('ljba,ajk->blk',t2_1,r2,optimize=True)
+
+               temp_1 = np.zeros_like(r2)
+               temp_1 =  lib.einsum('jlab,ajk->blk',t2_1,r2,optimize=True)
+               temp_1 -= lib.einsum('jlab,akj->blk',t2_1,r2,optimize=True)
+               temp_1 += lib.einsum('jlab,ajk->blk',t2_1,r2,optimize=True)
+               temp_1 -= lib.einsum('ljab,ajk->blk',t2_1,r2,optimize=True)
+
+               temp_2 = lib.einsum('jlba,akj->blk',t2_1,r2, optimize=True)
+
+               s[s1:f1] += 0.5*lib.einsum('blk,lbik->i',temp,eris_ovoo,optimize=True)
+               s[s1:f1] -= 0.5*lib.einsum('blk,iblk->i',temp,eris_ovoo,optimize=True)
+               s[s1:f1] += 0.5*lib.einsum('blk,lbik->i',temp_1,eris_ovoo,optimize=True)
+               s[s1:f1] -= 0.5*lib.einsum('blk,iblk->i',temp_2,eris_ovoo,optimize=True)
+               del temp
+               del temp_1
+               del temp_2
+
+               temp = np.zeros_like(r2)
+               temp = -lib.einsum('klab,akj->blj',t2_1,r2,optimize=True)
+               temp += lib.einsum('klab,ajk->blj',t2_1,r2,optimize=True)
+               temp += lib.einsum('lkab,akj->blj',t2_1,r2,optimize=True)
+               temp -= lib.einsum('lkab,ajk->blj',t2_1,r2,optimize=True)
+               temp -= lib.einsum('lkba,akj->blj',t2_1,r2,optimize=True)
+
+               temp_1 = np.zeros_like(r2)
+               temp_1  = -lib.einsum('klab,akj->blj',t2_1,r2,optimize=True)
+               temp_1 += lib.einsum('klab,ajk->blj',t2_1,r2,optimize=True)
+               temp_1 -= lib.einsum('klab,akj->blj',t2_1,r2,optimize=True)
+               temp_1 += lib.einsum('lkab,akj->blj',t2_1,r2,optimize=True)
+
+               temp_2 = -lib.einsum('klba,ajk->blj',t2_1,r2,optimize=True)
+
+               s[s1:f1] -= 0.5*lib.einsum('blj,lbij->i',temp,eris_ovoo,optimize=True)
+               s[s1:f1] += 0.5*lib.einsum('blj,iblj->i',temp,eris_ovoo,optimize=True)
+               s[s1:f1] -= 0.5*lib.einsum('blj,lbij->i',temp_1,eris_ovoo,optimize=True)
+               s[s1:f1] += 0.5*lib.einsum('blj,iblj->i',temp_2,eris_ovoo,optimize=True)
+               
+               del temp
+               del temp_1
+               del temp_2
+
+               temp_1  = lib.einsum('i,lbik->kbl',r1,eris_ovoo)
+               temp_1  -= lib.einsum('i,iblk->kbl',r1,eris_ovoo)
+               temp_2  = lib.einsum('i,lbik->kbl',r1,eris_ovoo)
+
+               temp  = lib.einsum('kbl,ljba->ajk',temp_1,t2_1,optimize=True)
+               temp += lib.einsum('kbl,jlab->ajk',temp_2,t2_1,optimize=True)
+               temp -= lib.einsum('kbl,ljab->ajk',temp_2,t2_1,optimize=True)
+               s[s2:f2] += temp.reshape(-1)
+
+               temp  = -lib.einsum('i,iblj->jbl',r1,eris_ovoo,optimize=True)
+               temp_1 = -lib.einsum('jbl,klba->ajk',temp,t2_1,optimize=True)
+               s[s2:f2] -= temp_1.reshape(-1)
+               cput0 = log.timer_debug1("completed sigma vector ADC(3) calculation", *cput0)
+               del temp
+               del temp_1
+               del temp_2
+
+        s *= -1.0
+
+        if cvs is True:
+            s = cvs_projector(adc, s)
+
+        return s
+
+    return sigma_
 
 def ip_adc_matvec_off(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=False, alpha_proj=0):
 
