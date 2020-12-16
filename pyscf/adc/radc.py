@@ -29,6 +29,7 @@ from pyscf.adc import dfadc
 from pyscf import __config__
 from pyscf import df
 import pandas as pd
+from linalg_helper_beta import davidson_nosym1
 
 def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
@@ -66,10 +67,10 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
        raise Exception("CVS and Koopman's aren't not implemented for EA")
 
     imds = adc.get_imds(eris)
-    #if (ncore_proj > 0) and (mom_skd_iter == False) and (cvs_npick == False):
-    #    matvec, diag = adc.gen_matvec(imds, eris, cvs)
-    #    guess = adc.get_init_guess(nroots, diag, ascending = True)
-    #    conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+    if (ncore_proj > 0) and (mom_skd_iter == False) and (cvs_npick == False):
+        matvec, diag = adc.gen_matvec(imds, eris, cvs)
+        guess = adc.get_init_guess(nroots, diag, ascending = True)
+        conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
     """    
     nocc = adc._nocc
     nvir = adc._nvir
@@ -183,7 +184,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
                 guess = adc.get_init_guess(nroots, diag, ascending = True)
                 conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
                 
-                proj_vec = U
+                #proj_vec = U
                 alpha.append("CVS")
                 guess_rms.append(vec_rms_compute(guess,U))
                 mom_rms.append("CVS")                 
@@ -198,28 +199,44 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
            
             matvec, diag = adc.gen_matvec(imds, eris, fc_bool=False, alpha_proj=skd[0])
             
-                          
-          #  len_cvs_npick = len(cvs_npick)
-          #  nroots = len_cvs_npick
-          #  dim_guess = np.array(U).shape[1]
-          #  guess = np.zeros((len_cvs_npick, dim_guess))
-          #  for idx_guess, npick in enumerate(cvs_npick):
-          #      U = np.array(U)
-          #      guess[idx_guess,:] = U[npick,:]
-           
+            
+            def cvs_pick(cvs_npick,U):          
+                len_cvs_npick = len(cvs_npick)
+                nroots = len_cvs_npick
+                dim_guess = np.array(U).shape[1]
+                guess = np.zeros((len_cvs_npick, dim_guess))
+                for idx_guess, npick in enumerate(cvs_npick):
+                    U = np.array(U)
+                    guess[idx_guess,:] = U[npick,:]
+                return guess, nroots
+                       
             def eig_close_to_init_guess(w, v, nroots, envs):
                 x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])
+                
                 s = np.dot(np.asarray(guess).conj(), np.asarray(x0).T)
                 snorm = np.einsum('pi,pi->i', s.conj(), s)
                 idx = np.argsort(-snorm)[:nroots]
+                ### Testing space ###
+            
+                print('Shape of guess vector: ')
+                print(np.array(guess).shape)
+                print('Shape of subspace:  ')
+                print(np.array(x0).shape)
+                print('Shape of overlap matrix: ')
+                print(s.shape,"S matrix: ")
+                print(s)
+                print("Norm: ")
+                print(np.sort(snorm)[::-1])
                 return lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
 
-            if skd_num > 0:
-                guess = U
-            conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=skd[2], max_cycle=skd[1], max_space=adc.max_space)
+            #if skd_num > 0:
+            #    guess = U
+            conv, E, U = davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=skd[2], max_cycle=skd[1], max_space=adc.max_space)
+            guess,nroots = cvs_pick(cvs_npick,U)           
+            conv, E, U = davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=skd[2], max_cycle=skd[1], max_space=adc.max_space)
             alpha.append(skd[0])
-            guess_rms.append(vec_rms_compute(guess,U))
-            mom_rms.append(vec_rms_compute(proj_vec,U))
+            #guess_rms.append(vec_rms_compute(guess,U))
+            #mom_rms.append(vec_rms_compute(proj_vec,U))
            
      
     print("Alpha values: ", alpha)
@@ -2272,7 +2289,7 @@ def ea_adc_matvec(adc, M_ab=None, eris=None):
     return sigma_
 
 
-def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=False, alpha_proj=0):
+def ip_adc_matvec_off(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=False, alpha_proj=0):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
