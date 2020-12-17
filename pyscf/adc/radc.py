@@ -232,8 +232,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
             #if skd_num > 0:
             #    guess = U
             conv, E, U = davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=skd[2], max_cycle=skd[1], max_space=adc.max_space)
-            guess,nroots = cvs_pick(cvs_npick,U)           
-            conv, E, U = davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=skd[2], max_cycle=skd[1], max_space=adc.max_space)
+            #guess,nroots = cvs_pick(cvs_npick,U)           
+            #conv, E, U = davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=skd[2], max_cycle=skd[1], max_space=adc.max_space)
             alpha.append(skd[0])
             #guess_rms.append(vec_rms_compute(guess,U))
             #mom_rms.append(vec_rms_compute(proj_vec,U))
