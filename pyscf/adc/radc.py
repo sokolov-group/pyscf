@@ -209,7 +209,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
                     U = np.array(U)
                     guess[idx_guess,:] = U[npick,:]
                 return guess, nroots
-                       
+            #guess,nroots = cvs_pick(cvs_npick,U)           
             def eig_close_to_init_guess(w, v, nroots, envs):
                 x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])
                 
@@ -218,15 +218,15 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
                 idx = np.argsort(-snorm)[:nroots]
                 ### Testing space ###
             
-                print('Shape of guess vector: ')
-                print(np.array(guess).shape)
-                print('Shape of subspace:  ')
-                print(np.array(x0).shape)
-                print('Shape of overlap matrix: ')
-                print(s.shape,"S matrix: ")
-                print(s)
-                print("Norm: ")
-                print(np.sort(snorm)[::-1])
+                #print('Shape of guess vector: ')
+                #print(np.array(guess).shape)
+                #print('Shape of subspace:  ')
+                #print(np.array(x0).shape)
+                #print('Shape of overlap matrix: ')
+                #print(s.shape,"S matrix: ")
+                #print(s)
+                #print("Norm: ")
+                #print(np.sort(snorm)[::-1])
                 return lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
 
             #if skd_num > 0:
