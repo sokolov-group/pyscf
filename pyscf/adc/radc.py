@@ -2335,10 +2335,10 @@ def eigenvector_analyze_ip(adc, U, nroots=1):
                 orb_d_idx = orb_idx - n_singles
                       
                 a_rem = orb_d_idx % (nocc*nocc)
-                a_idx = (orb_d_idx )//(nocc*nocc)
+                a_idx = (orb_d_idx - a_rem)//(nocc*nocc)
                 temp_doubles_idx[0] = int(a_idx + 1 + n_singles) 
                 j_rem = a_rem % nocc
-                i_idx = (a_rem)//nocc
+                i_idx = (a_rem - j_rem)//nocc
                 temp_doubles_idx[1] = int(i_idx + 1)
                 temp_doubles_idx[2] = int(j_rem + 1)
                 doubles_idx.append(temp_doubles_idx)
