@@ -67,7 +67,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
        raise Exception("CVS and Koopman's aren't not implemented for EA")
 
     imds = adc.get_imds(eris)
-    if (ncore_proj > 0) and (mom_skd_iter == False) and (cvs_npick == False):
+    if (mom_skd_iter == False) and (cvs_npick == False):
         matvec, diag = adc.gen_matvec(imds, eris, cvs)
         guess = adc.get_init_guess(nroots, diag, ascending = True)
         conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
@@ -303,6 +303,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     spec_factors = adc.get_spec_factors(T, U, nroots)
    
+    F = adc.eigenvector_analyze(U, nroots)
+
     nfalse = np.shape(conv)[0] - np.sum(conv)
     if nfalse >= 1:
         print ("*************************************************************")
@@ -2288,6 +2290,74 @@ def ea_adc_matvec(adc, M_ab=None, eris=None):
 
     return sigma_
 
+def eigenvector_analyze_ip(adc, U, nroots=1):
+    
+    nocc = adc._nocc
+    nvir = adc._nvir
+    U_thresh = 0.05
+    
+    n_singles = nocc
+    n_doubles = nvir * nocc * nocc
+    
+    
+    for I in range(U.shape[0]):
+        U1 = U[I, :n_singles]
+        U2 = U[I, n_singles:].reshape(nvir,nocc,nocc)
+        U1dotU1 = np.dot(U1, U1) 
+        U2dotU2 =  2.*np.dot(U2.ravel(), U2.ravel()) - np.dot(U2.ravel(), U2.transpose(0,2,1).ravel())
+       
+        U_sq = U[I,:].copy()**2
+        ind_idx = np.argsort(-U_sq)
+        U_sq = U_sq[ind_idx] 
+        U_sorted = U[I,ind_idx].copy()
+        
+                   
+        U_sorted = U_sorted[U_sq > U_thresh**2]
+        ind_idx = ind_idx[U_sq > U_thresh**2]
+             
+
+        temp_doubles_idx = [0,0,0]  
+        singles_idx = []
+        doubles_idx = []
+        singles_val = []
+        doubles_val = []
+        iter_num = 0
+        print(ind_idx)
+        print(nocc)
+        print(nvir)        
+        for orb_idx in ind_idx:
+            
+            if orb_idx < n_singles:
+                orb_s_idx = orb_idx + 1
+                singles_idx.append(orb_s_idx)
+                singles_val.append(U_sorted[iter_num])
+            if orb_idx >= n_singles:
+                orb_d_idx = orb_idx - n_singles
+                      
+                a_rem = orb_d_idx % (nocc*nocc)
+                a_idx = (orb_d_idx )//(nocc*nocc)
+                temp_doubles_idx[0] = int(a_idx + 1 + n_singles) 
+                j_rem = a_rem % nocc
+                i_idx = (a_rem)//nocc
+                temp_doubles_idx[1] = int(i_idx + 1)
+                temp_doubles_idx[2] = int(j_rem + 1)
+                doubles_idx.append(temp_doubles_idx)
+                doubles_val.append(U_sorted[iter_num])
+                temp_doubles_idx = [0,0,0]
+                
+            iter_num += 1      
+           
+                
+        print("Root ",I, "Singles norm: ", U1dotU1, " Doubles norm: ", U2dotU2)
+        print("Obitals # contributing to eigenvectors components with abs value > ", U_thresh)
+        print( "Singles block: ") 
+        for idx,print_singles in enumerate(singles_idx):
+            print("Occupied orbital #:", print_singles, "amplitude: ", singles_val[idx])
+        print("Doubles block: ")
+        for idx,print_doubles in enumerate(doubles_idx):
+            print("Virtual orbital #:", print_doubles[0], " Occupied orbitals #:", print_doubles[1], "and", print_doubles[2], "amplitude: ", doubles_val[idx])
+        print(doubles_val)
+    return U
 
 def ip_adc_matvec_off(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=False, alpha_proj=0):
 
@@ -3798,6 +3868,7 @@ class RADCIP(RADC):
     compute_trans_moments = ip_compute_trans_moments
     get_trans_moments = get_trans_moments
     get_spec_factors = get_spec_factors_ip
+    eigenvector_analyze = eigenvector_analyze_ip
 
     def get_init_guess(self, nroots=1, diag=None, ascending = True):
         if diag is None :
