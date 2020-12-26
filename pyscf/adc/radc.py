@@ -30,6 +30,7 @@ from pyscf import __config__
 from pyscf import df
 import pandas as pd
 from linalg_helper_beta import davidson_nosym1
+from multiroot_davidson_adapted import eighg
 
 def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
@@ -66,11 +67,27 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     if  ((ncore_proj > 0) or (cvs_npick is not False) or (kop_npick is not False)) and (adc.method_type == "ea"):
        raise Exception("CVS and Koopman's aren't not implemented for EA")
 
+    #if (mom_skd_iter == False) and (cvs_npick == False):
+
     imds = adc.get_imds(eris)
-    if (mom_skd_iter == False) and (cvs_npick == False):
-        matvec, diag = adc.gen_matvec(imds, eris, cvs)
-        guess = adc.get_init_guess(nroots, diag, ascending = True)
-        conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+    def matvec_idn(guess):
+        guess = np.array(guess)
+        dim = guess.shape[1]
+        idn_t = np.zeros(dim)
+        for i in range(dim):
+            idn_t[i] = 1
+            matvec_prod[:,i] = guess[i]*idn_t
+            idn_t[i] = 0
+        return matvec_prod
+
+ 
+
+    matvec, diag = adc.gen_matvec(imds, eris, cvs)
+    guess = adc.get_init_guess(nroots, diag, ascending = True)
+    guess_dim = np.array(guess).shape[1]
+    diag_idn = np.ones(dim)
+    E, U, conv = eighg(matvec, matvec_idn, nroots, diag, diag_idn,nguess=None, niter=100, nsvec=100, nvec=100, rthresh=1e-5, print_conv=True, highest=False, guess_random=False, disk=False
+    #conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
     """    
     nocc = adc._nocc
     nvir = adc._nvir
@@ -159,8 +176,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         print(adc.method, '-', corb, '-' , 'Normalized matrix sub-blocks norms: ')
         print(df2)
     exit()
-    """    
-    
+    """ 
     guess_rms = []
     mom_rms = []
     alpha = []
