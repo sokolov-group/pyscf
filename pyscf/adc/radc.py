@@ -30,7 +30,7 @@ from pyscf import __config__
 from pyscf import df
 import pandas as pd
 from linalg_helper_beta import davidson_nosym1
-from multiroot_davidson_adapted import eighg
+from multiroot_davidson_adapted import eighg, dummy
 
 def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
@@ -72,12 +72,13 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     imds = adc.get_imds(eris)
     def matvec_idn(guess):
         guess = np.array(guess)
-        dim = guess.shape[1]
-        idn_t = np.zeros(dim)
-        for i in range(dim):
-            idn_t[i] = 1
-            matvec_prod[:,i] = guess[i]*idn_t
-            idn_t[i] = 0
+        r_dim, c_dim = guess.shape
+        idn = np.zeros(c_dim)
+        matvec_prod = np.zeros((r_dim,c_dim))
+        for i in range(c_dim):
+            idn[i] = 1
+            matvec_prod[i,:] = guess[i]*idn
+            idn[i] = 0
         return matvec_prod
 
  
@@ -85,8 +86,9 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     matvec, diag = adc.gen_matvec(imds, eris, cvs)
     guess = adc.get_init_guess(nroots, diag, ascending = True)
     guess_dim = np.array(guess).shape[1]
-    diag_idn = np.ones(dim)
-    E, U, conv = eighg(matvec, matvec_idn, nroots, diag, diag_idn,nguess=None, niter=100, nsvec=100, nvec=100, rthresh=1e-5, print_conv=True, highest=False, guess_random=False, disk=False
+    diag_idn = np.ones(guess_dim)
+    test_var = eighg(matvec, nroots, diag, nguess=None, niter=100, nsvec=100, nvec=100, rthresh=1e-5, print_conv=True, highest=False, guess_random=False, disk=False)
+    #dummy() 
     #conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
     """    
     nocc = adc._nocc
@@ -176,7 +178,9 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         print(adc.method, '-', corb, '-' , 'Normalized matrix sub-blocks norms: ')
         print(df2)
     exit()
-    """ 
+   
+
+     
     guess_rms = []
     mom_rms = []
     alpha = []
@@ -259,7 +263,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     print("Delta RMS of macroiteration eigenvector w.r.t guess vector fed into the iteration: ", guess_rms)   
     print("Delta RMS of macroiteration eigenvector w.r.t projection vector: ", mom_rms)
     
-    """
+    
     if (ncore_proj > 0):
         matvec, diag = adc.gen_matvec(imds, eris, cvs=True)
         guess = adc.get_init_guess(nroots, diag, ascending = True)
@@ -318,8 +322,6 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     T = adc.get_trans_moments()
 
     spec_factors = adc.get_spec_factors(T, U, nroots)
-   
-    F = adc.eigenvector_analyze(U, nroots)
 
     nfalse = np.shape(conv)[0] - np.sum(conv)
     if nfalse >= 1:
@@ -2306,75 +2308,6 @@ def ea_adc_matvec(adc, M_ab=None, eris=None):
 
     return sigma_
 
-def eigenvector_analyze_ip(adc, U, nroots=1):
-    
-    nocc = adc._nocc
-    nvir = adc._nvir
-    U_thresh = 0.05
-    
-    n_singles = nocc
-    n_doubles = nvir * nocc * nocc
-    
-    
-    for I in range(U.shape[0]):
-        U1 = U[I, :n_singles]
-        U2 = U[I, n_singles:].reshape(nvir,nocc,nocc)
-        U1dotU1 = np.dot(U1, U1) 
-        U2dotU2 =  2.*np.dot(U2.ravel(), U2.ravel()) - np.dot(U2.ravel(), U2.transpose(0,2,1).ravel())
-       
-        U_sq = U[I,:].copy()**2
-        ind_idx = np.argsort(-U_sq)
-        U_sq = U_sq[ind_idx] 
-        U_sorted = U[I,ind_idx].copy()
-        
-                   
-        U_sorted = U_sorted[U_sq > U_thresh**2]
-        ind_idx = ind_idx[U_sq > U_thresh**2]
-             
-
-        temp_doubles_idx = [0,0,0]  
-        singles_idx = []
-        doubles_idx = []
-        singles_val = []
-        doubles_val = []
-        iter_num = 0
-        print(ind_idx)
-        print(nocc)
-        print(nvir)        
-        for orb_idx in ind_idx:
-            
-            if orb_idx < n_singles:
-                orb_s_idx = orb_idx + 1
-                singles_idx.append(orb_s_idx)
-                singles_val.append(U_sorted[iter_num])
-            if orb_idx >= n_singles:
-                orb_d_idx = orb_idx - n_singles
-                      
-                a_rem = orb_d_idx % (nocc*nocc)
-                a_idx = (orb_d_idx - a_rem)//(nocc*nocc)
-                temp_doubles_idx[0] = int(a_idx + 1 + n_singles) 
-                j_rem = a_rem % nocc
-                i_idx = (a_rem - j_rem)//nocc
-                temp_doubles_idx[1] = int(i_idx + 1)
-                temp_doubles_idx[2] = int(j_rem + 1)
-                doubles_idx.append(temp_doubles_idx)
-                doubles_val.append(U_sorted[iter_num])
-                temp_doubles_idx = [0,0,0]
-                
-            iter_num += 1      
-           
-                
-        print("Root ",I, "Singles norm: ", U1dotU1, " Doubles norm: ", U2dotU2)
-        print("Obitals # contributing to eigenvectors components with abs value > ", U_thresh)
-        print( "Singles block: ") 
-        for idx,print_singles in enumerate(singles_idx):
-            print("Occupied orbital #:", print_singles, "amplitude: ", singles_val[idx])
-        print("Doubles block: ")
-        for idx,print_doubles in enumerate(doubles_idx):
-            print("Virtual orbital #:", print_doubles[0], " Occupied orbitals #:", print_doubles[1], "and", print_doubles[2], "amplitude: ", doubles_val[idx])
-        print(doubles_val)
-    return U
-
 def ip_adc_matvec_off(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=False, alpha_proj=0):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -2718,13 +2651,14 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
 
         r1 = r[s1:f1]
         r2 = r[s2:f2]
-
+        
+        r1 = np.ravel(r1)
         r2 = r2.reshape(nvir,nocc,nocc)
 
         eris_ovoo = eris.ovoo
 
 ############ ADC(2) ij block ############################
-
+        
         s[s1:f1] = lib.einsum('ij,j->i',M_ij,r1)
 
 ############ ADC(2) i - kja block #########################
@@ -3884,7 +3818,6 @@ class RADCIP(RADC):
     compute_trans_moments = ip_compute_trans_moments
     get_trans_moments = get_trans_moments
     get_spec_factors = get_spec_factors_ip
-    eigenvector_analyze = eigenvector_analyze_ip
 
     def get_init_guess(self, nroots=1, diag=None, ascending = True):
         if diag is None :
