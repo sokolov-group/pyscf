@@ -30,7 +30,7 @@ from pyscf import __config__
 from pyscf import df
 import pandas as pd
 from linalg_helper_beta import davidson_nosym1
-from multiroot_davidson_adapted import eighg, dummy
+from multiroot_davidson import eighg
 
 def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
@@ -70,6 +70,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     #if (mom_skd_iter == False) and (cvs_npick == False):
 
     imds = adc.get_imds(eris)
+    """
     def matvec_idn(guess):
         guess = np.array(guess)
         r_dim, c_dim = guess.shape
@@ -80,16 +81,19 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
             matvec_prod[i,:] = guess[i]*idn
             idn[i] = 0
         return matvec_prod
-
+    """
+    def matvec_idn1(inp_vec):
+        return inp_vec
  
 
     matvec, diag = adc.gen_matvec(imds, eris, cvs)
     guess = adc.get_init_guess(nroots, diag, ascending = True)
     guess_dim = np.array(guess).shape[1]
     diag_idn = np.ones(guess_dim)
-    test_var = eighg(matvec, nroots, diag, nguess=None, niter=100, nsvec=100, nvec=100, rthresh=1e-5, print_conv=True, highest=False, guess_random=False, disk=False)
+    #E, U, conv_bad = eighg(lambda xs : [matvec(x) for x in xs], lambda xs : [matvec_idn1(x) for x in xs], nroots, diag,diag_idn ,nguess=None, niter=adc.max_cycle, nsvec=100, nvec=100, rthresh=1e-5, print_conv=True, highest=True, guess_random=False, disk=False)
     #dummy() 
-    #conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+    conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+    #conv, E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
     """    
     nocc = adc._nocc
     nvir = adc._nvir
@@ -178,9 +182,9 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         print(adc.method, '-', corb, '-' , 'Normalized matrix sub-blocks norms: ')
         print(df2)
     exit()
-   
+    """ 
 
-     
+    """     
     guess_rms = []
     mom_rms = []
     alpha = []
@@ -262,8 +266,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     print("Alpha values: ", alpha)
     print("Delta RMS of macroiteration eigenvector w.r.t guess vector fed into the iteration: ", guess_rms)   
     print("Delta RMS of macroiteration eigenvector w.r.t projection vector: ", mom_rms)
-    
-    
+    """
+    """
     if (ncore_proj > 0):
         matvec, diag = adc.gen_matvec(imds, eris, cvs=True)
         guess = adc.get_init_guess(nroots, diag, ascending = True)
@@ -322,7 +326,6 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     T = adc.get_trans_moments()
 
     spec_factors = adc.get_spec_factors(T, U, nroots)
-
     nfalse = np.shape(conv)[0] - np.sum(conv)
     if nfalse >= 1:
         print ("*************************************************************")
@@ -873,7 +876,7 @@ def cvs_projector(myadc, r, alpha_proj=0):
     temp = Pr[s2:f2].reshape((nvir, nocc, nocc)).copy()
     
     temp[:,ncore_proj:,ncore_proj:] *= alpha_proj
-    #temp[:,:ncore_proj,:ncore_proj] *= alpha_proj
+    temp[:,:ncore_proj,:ncore_proj] *= alpha_proj
     
     Pr[s2:f2] = temp.reshape(-1).copy()
     
@@ -2027,7 +2030,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=True, fc_bool=True, mom_skd=False, a
 
         temp = np.zeros((nvir,nocc,nocc))
         temp[:,ncore_proj:,ncore_proj:] += shift
-        #temp[:,:ncore_proj,:ncore_proj] += shift
+        temp[:,:ncore_proj,:ncore_proj] += shift
 
         diag[s2:f2] += temp.reshape(-1).copy()
 
@@ -2651,8 +2654,7 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
 
         r1 = r[s1:f1]
         r2 = r[s2:f2]
-        
-        r1 = np.ravel(r1)
+        #r1 = np.ravel(r1)
         r2 = r2.reshape(nvir,nocc,nocc)
 
         eris_ovoo = eris.ovoo
