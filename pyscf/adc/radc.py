@@ -90,9 +90,9 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     guess = adc.get_init_guess(nroots, diag, ascending = True)
     guess_dim = np.array(guess).shape[1]
     diag_idn = np.ones(guess_dim)
-    #E, U, conv_bad = eighg(lambda xs : [matvec(x) for x in xs], lambda xs : [matvec_idn1(x) for x in xs], nroots, diag,diag_idn ,nguess=None, niter=adc.max_cycle, nsvec=100, nvec=100, rthresh=1e-5, print_conv=True, highest=True, guess_random=False, disk=False)
+    E, U, conv_bad = eighg(lambda xs : [matvec(x) for x in xs], lambda xs : [matvec_idn1(x) for x in xs], nroots, diag,diag_idn ,guess,nguess=None, niter=adc.max_cycle, nsvec=100, nvec=100, rthresh=1e-5, print_conv=True, highest=True, guess_random=False, disk=False)
     #dummy() 
-    conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+    conv, E_, U_ = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
     #conv, E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
     """    
     nocc = adc._nocc
@@ -184,7 +184,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     exit()
     """ 
 
-    """     
+    """    
     guess_rms = []
     mom_rms = []
     alpha = []
@@ -266,7 +266,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     print("Alpha values: ", alpha)
     print("Delta RMS of macroiteration eigenvector w.r.t guess vector fed into the iteration: ", guess_rms)   
     print("Delta RMS of macroiteration eigenvector w.r.t projection vector: ", mom_rms)
-    """
+    """   
     """
     if (ncore_proj > 0):
         matvec, diag = adc.gen_matvec(imds, eris, cvs=True)
@@ -322,7 +322,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 ############################################
 
     U = np.array(U)
-
+    #adc.analyze_eigenvector_ip(U)
     T = adc.get_trans_moments()
 
     spec_factors = adc.get_spec_factors(T, U, nroots)
@@ -3638,6 +3638,116 @@ def get_spec_factors_ip(adc, T, U, nroots=1):
 
     return P
 
+def analyze_eigenvector_ip(adc, U):
+    
+    nocc = adc._nocc
+    nvir = adc._nvir
+    
+    n_singles = nocc
+    n_doubles = nvir * nocc * nocc
+    evec_print_tol = 0.05
+    
+    logger.info(adc, "Number of occupied orbitals = %d", nocc)
+    logger.info(adc, "Number of virtual orbitals =  %d", nvir)
+    logger.info(adc, "Print eigenvector elements > %f\n", evec_print_tol)
+    #U = np.array(adc.U)  
+  
+    for I in range(U.shape[0]):
+        U1 = U[I, :n_singles]
+        U2 = U[I, n_singles:].reshape(nvir,nocc,nocc)
+        U1dotU1 = np.dot(U1, U1) 
+        U2dotU2 =  2.*np.dot(U2.ravel(), U2.ravel()) - np.dot(U2.ravel(), U2.transpose(0,2,1).ravel())
+       
+        U_sq = U[I,:].copy()**2
+        ind_idx = np.argsort(-U_sq)
+        U_sq = U_sq[ind_idx] 
+        U_sorted = U[I,ind_idx].copy()
+        
+        U_sorted = U_sorted[U_sq > evec_print_tol**2]
+        ind_idx = ind_idx[U_sq > evec_print_tol**2]
+             
+        temp_doubles_idx = [0,0,0]  
+        singles_idx = []
+        doubles_idx = []
+        singles_val = []
+        doubles_val = []
+        iter_num = 0
+                
+        for orb_idx in ind_idx:
+            
+            if orb_idx < n_singles:
+                orb_s_idx = orb_idx + 1
+                singles_idx.append(orb_s_idx)
+                singles_val.append(U_sorted[iter_num])
+            if orb_idx >= n_singles:
+                orb_d_idx = orb_idx - n_singles
+                      
+                a_rem = orb_d_idx % (nocc*nocc)
+                a_idx = (orb_d_idx - a_rem )//(nocc*nocc)
+                temp_doubles_idx[0] = int(a_idx + 1 + n_singles) 
+                j_rem = a_rem % nocc
+                i_idx = (a_rem - j_rem)//nocc
+                temp_doubles_idx[1] = int(i_idx + 1)
+                temp_doubles_idx[2] = int(j_rem + 1)
+                doubles_idx.append(temp_doubles_idx)
+                doubles_val.append(U_sorted[iter_num])
+                temp_doubles_idx = [0,0,0]
+                
+            iter_num += 1 
+
+        logger.info(adc,'%s | root %d | norm(1h)  = %6.4f | norm(2h1p) = %6.4f ',adc.method ,I, U1dotU1, U2dotU2)
+
+        if singles_val:
+            logger.info(adc, "\n1h block: ") 
+            logger.info(adc, "     i     U(i)")
+            logger.info(adc, "------------------")
+            for idx, print_singles in enumerate(singles_idx):
+                logger.info(adc, '  %4d   %7.4f', print_singles, singles_val[idx])
+
+        if doubles_val:
+            logger.info(adc, "\n2h1p block: ") 
+            logger.info(adc, "     i     j     a     U(i,j,a)")
+            logger.info(adc, "-------------------------------")
+            for idx, print_doubles in enumerate(doubles_idx):
+                logger.info(adc, '  %4d  %4d  %4d     %7.4f', print_doubles[1], print_doubles[2], print_doubles[0], doubles_val[idx])
+
+        logger.info(adc, "\n*************************************************************\n")
+
+
+def analyze_spec_factor(adc):
+
+    X = adc.X
+    X_2 = (X.copy()**2)*2
+    #thresh = 0.000000001
+    thresh = adc.spec_thresh
+
+    for i in range(X_2.shape[1]):
+
+        print("----------------------------------------------------------------------------------------------------------------------------------------------")   
+        logger.info(adc, 'Root %d', i)
+        print("----------------------------------------------------------------------------------------------------------------------------------------------")   
+
+        sort = np.argsort(-X_2[:,i])
+        X_2_row = X_2[:,i]
+
+        X_2_row = X_2_row[sort]
+        
+        if adc.mol.symmetry == False:
+            sym = np.repeat(['A'], X_2_row.shape[0])
+        else:
+            sym = [symm.irrep_id2name(adc.mol.groupname, x) for x in adc._scf.mo_coeff.orbsym]
+            sym = np.array(sym)
+
+            sym = sym[sort]
+
+        spec_Contribution = X_2_row[X_2_row > thresh]
+        index_mo = sort[X_2_row > thresh]+1
+
+        for c in range(index_mo.shape[0]):
+            logger.info(adc, 'HF MO   %3.d | Spec. Contribution   %10.8f | Orbital symmetry   %s', index_mo[c], spec_Contribution[c], sym[c])
+
+        logger.info(adc, 'Partial spec. Factor sum = %10.8f', np.sum(spec_Contribution))
+        print("----------------------------------------------------------------------------------------------------------------------------------------------")   
 
 class RADCEA(RADC):
     '''restricted ADC for EA energies and spectroscopic amplitudes
@@ -3820,6 +3930,7 @@ class RADCIP(RADC):
     compute_trans_moments = ip_compute_trans_moments
     get_trans_moments = get_trans_moments
     get_spec_factors = get_spec_factors_ip
+    analyze_eigenvector_ip = analyze_eigenvector_ip
 
     def get_init_guess(self, nroots=1, diag=None, ascending = True):
         if diag is None :

@@ -54,14 +54,14 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         return inp_vec
     guess_dim = np.array(guess).shape[1]
     diag_idn = np.ones(guess_dim)
-    E, U, conv_bad = eighg(lambda xs : [matvec(x) for x in xs], lambda xs : [matvec_idn1(x) for x in xs], nroots, diag,diag_idn ,nguess=None, niter=adc.max_cycle, nsvec=100, nvec=100, rthresh=1e-5, print_conv=True, highest=False, guess_random=False, disk=False)
+    E, U, conv_bad = eighg(lambda xs : [matvec(x) for x in xs], lambda xs : [matvec_idn1(x) for x in xs], nroots, diag,diag_idn ,guess,nguess=None, niter=adc.max_cycle, nsvec=100, nvec=100, rthresh=1e-5, print_conv=True, highest=False, guess_random=False, disk=False)
     conv, E_, U_ = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
 
     U = np.array(U)
 
-    T = adc.get_trans_moments()
-
-    spec_factors = adc.get_spec_factors(T, U, nroots)
+    #T = adc.get_trans_moments()
+    spec_factors = E
+    #spec_factors = adc.get_spec_factors(T, U, nroots)
 
     nfalse = np.shape(conv)[0] - np.sum(conv)
     if nfalse >= 1:
