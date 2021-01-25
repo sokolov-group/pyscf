@@ -2607,6 +2607,7 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
 
     method = adc.method
 
+    #t1, t2 = adc.compute_amplitudes(eris, fc_bool)
     t2_1 = adc.t2[0]
     t1_2 = adc.t1[0]
 

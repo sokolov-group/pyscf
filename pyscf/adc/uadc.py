@@ -28,7 +28,8 @@ from pyscf.adc import radc_ao2mo
 from pyscf.adc import dfadc
 from pyscf import __config__
 from pyscf import df
-from multiroot_davidson import eighg
+from multiroot_davidson1 import eighg
+from linalg_helper_beta import davidson1
 
 def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
@@ -46,22 +47,56 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         eris = adc.transform_integrals()
 
     imds = adc.get_imds(eris)
-    matvec, diag = adc.gen_matvec(imds, eris)
 
+    if adc.ncore_cvs > 0:
+        cvs_bool = True
+    else:
+        cvs_bool = False
+    matvec, diag = adc.gen_matvec(imds, eris, cvs=cvs_bool)
     guess = adc.get_init_guess(nroots, diag, ascending = True)
+    
+    def guess_temp_func(numroots, ad=diag, ascending=True):
+        return adc.get_init_guess(numroots,ad,ascending) 
 
-    def matvec_idn1(inp_vec):
-        return inp_vec
+    def matvec_idn1(idn1_vec):
+        return idn1_vec
+
     guess_dim = np.array(guess).shape[1]
     diag_idn = np.ones(guess_dim)
-    E, U, conv_bad = eighg(lambda xs : [matvec(x) for x in xs], lambda xs : [matvec_idn1(x) for x in xs], nroots, diag,diag_idn ,guess,nguess=None, niter=adc.max_cycle, nsvec=100, nvec=100, rthresh=1e-5, print_conv=True, highest=False, guess_random=False, disk=False)
-    conv, E_, U_ = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+    E, U, conv_bad = eighg(lambda xs : [matvec(x) for x in xs], lambda xs : [matvec_idn1(x) for x in xs], nroots, diag,diag_idn ,guess_temp_func,nguess=None, niter=adc.max_cycle, nsvec=200, nvec=100, rthresh=1e-6, print_conv=True, highest=False, guess_random=False, disk=False)
+    conv, E_, U_ = davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual = 1e-6)
+    """
+    matvec, diag = adc.gen_matvec(imds, eris, cvs=False)
+    guess = adc.get_init_guess(nroots, diag, ascending = True)
+    E, U, conv_bad = eighg(lambda xs : [matvec(x) for x in xs], lambda xs : [matvec_idn1(x) for x in xs], nroots, diag,diag_idn ,guess_temp_func,nguess=None, niter=adc.max_cycle, nsvec=200, nvec=100, rthresh=1e-6, print_conv=True, highest=False, guess_random=False, disk=False, pick_vec=U)
 
+
+    def eig_close_to_init_guess(w, v, nroots, envs):      
+           x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])      
+           s = np.dot(np.asarray(U).conj(), np.asarray(x0).T)      
+           snorm = np.einsum('pi,pi->i', s.conj(), s)      
+           idx = np.argsort(-snorm)[:nroots]      
+           ### Testing space ###      
+                            
+           #print('Shape of guess vector: ')      
+           #print(np.array(guess).shape)      
+           print('Shape of x0:  ')                  
+           print(np.array(x0).shape)
+           print('shape of U')
+           print(np.array(U).shape)      
+           print('Shape of overlap matrix: ')                
+           print(s.shape)      
+           #print(s)                                       
+           #print("Norm: ")                             
+           #print(np.sort(snorm)[::-1])      
+           return lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)       
+    #conv, E, U = davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual = 1e-6, pick =eig_close_to_init_guess)
+    """
     U = np.array(U)
 
-    #T = adc.get_trans_moments()
-    spec_factors = E
-    #spec_factors = adc.get_spec_factors(T, U, nroots)
+    T = adc.get_trans_moments()
+    #spec_factors = E
+    spec_factors = adc.get_spec_factors(T, U, nroots)
 
     nfalse = np.shape(conv)[0] - np.sum(conv)
     if nfalse >= 1:
@@ -84,21 +119,26 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     return E, U, spec_factors
 
 
-def compute_amplitudes_energy(myadc, eris, verbose=None):
+def compute_amplitudes_energy(myadc, eris, verbose=None, fc_bool=True):
 
-    t1, t2 = myadc.compute_amplitudes(eris)
+    t1, t2 = myadc.compute_amplitudes(eris, fc_bool=True)
     e_corr = myadc.compute_energy(t1, t2, eris)
 
     return e_corr, t1, t2
 
 
-def compute_amplitudes(myadc, eris):
+def compute_amplitudes(myadc, eris, fc_bool=True):
 
     cput0 = (time.clock(), time.time())
     log = logger.Logger(myadc.stdout, myadc.verbose)
 
     if myadc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(myadc.method)
+
+    if fc_bool is False:
+        nfc_orb = 0
+    else:
+        nfc_orb = myadc.nfc_orb
 
     nocc_a = myadc._nocc[0]
     nocc_b = myadc._nocc[1]
@@ -163,6 +203,17 @@ def compute_amplitudes(myadc, eris):
     t2_1_ab = v2e_oOvV/D2_ab
     del (v2e_oOvV)
     del (D2_ab)
+
+    # Frozen core
+    t2_1_a[:nfc_orb,:,:,:] = 0
+    t2_1_a[:,:nfc_orb,:,:] = 0
+    t2_1_a[:nfc_orb,:nfc_orb,:,:] = 0
+    t2_1_ab[:nfc_orb,:,:,:] = 0
+    t2_1_ab[:,:nfc_orb,:,:] = 0
+    t2_1_ab[:nfc_orb,:nfc_orb,:,:] = 0
+    t2_1_b[:nfc_orb,:,:,:] = 0
+    t2_1_b[:,:nfc_orb,:,:] = 0
+    t2_1_b[:nfc_orb,:nfc_orb,:,:] = 0
 
     t2_1 = (t2_1_a , t2_1_ab, t2_1_b)
 
@@ -254,6 +305,10 @@ def compute_amplitudes(myadc, eris):
     t1_2_b = t1_2_b/D1_b
 
     cput0 = log.timer_debug1("Completed t1_2 amplitude calculation", *cput0)
+
+    # Frozen core
+    t1_2_a[:nfc_orb,:] = 0
+    t1_2_b[:nfc_orb,:] = 0
 
     t1_2 = (t1_2_a , t1_2_b)
     t2_2 = (None,)
@@ -360,6 +415,17 @@ def compute_amplitudes(myadc, eris):
         D2_ab = D2_ab.reshape((nocc_a,nocc_b,nvir_a,nvir_b))
         t2_2_ab = t2_2_ab/D2_ab
         del (D2_ab)
+
+        # Frozen core
+        t2_2_a[:nfc_orb,:,:,:] = 0
+        t2_2_a[:,:nfc_orb,:,:] = 0      
+        t2_2_a[:nfc_orb,:nfc_orb,:,:] = 0
+        t2_2_ab[:nfc_orb,:,:,:] = 0
+        t2_2_ab[:,:nfc_orb,:,:] = 0      
+        t2_2_ab[:nfc_orb,:nfc_orb,:,:] = 0
+        t2_2_b[:nfc_orb,:,:,:] = 0
+        t2_2_b[:,:nfc_orb,:,:] = 0      
+        t2_2_b[:nfc_orb,:nfc_orb,:,:] = 0
 
         t2_2 = (t2_2_a , t2_2_ab, t2_2_b)
     cput0 = log.timer_debug1("Completed t2_2 amplitude calculation", *cput0)
@@ -588,6 +654,10 @@ def compute_amplitudes(myadc, eris):
  
         t1_3_a = t1_3_a/D1_a
         t1_3_b = t1_3_b/D1_b
+
+        # Frozen core
+        t1_3_a[:nfc_orb,:] = 0
+        t1_3_b[:nfc_orb,:] = 0
 
         t1_3 = (t1_3_a, t1_3_b)
 
@@ -892,6 +962,9 @@ class UADC(lib.StreamObject):
         self.method_type = "ip"
         self.with_df = None
         self.compute_mpn_energy = True
+        self.fc_bool = True
+        self.nfc_orb = 0
+        self.ncore_cvs = 0
         
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mol', 'mo_energy_b', 'max_memory', 'scf_energy', 'e_tot', 't1', 'frozen', 'mo_energy_a', 'chkfile', 'max_space', 't2', 'mo_occ', 'max_cycle'))
 
@@ -956,10 +1029,10 @@ class UADC(lib.StreamObject):
         eris = self.transform_integrals() 
 
         if self.compute_mpn_energy == True:
-            self.e_corr, self.t1, self.t2 = compute_amplitudes_energy(self, eris=eris, verbose=self.verbose)
+            self.e_corr, self.t1, self.t2 = compute_amplitudes_energy(self, eris=eris, verbose=self.verbose, fc_bool=True)
             self._finalize()
         else:
-            self.t1, self.t2 = compute_amplitudes(self, eris=eris)
+            self.t1, self.t2 = compute_amplitudes(self, eris=eris, fc_bool=True)
             self.e_corr = None
 
         return self.e_corr, self.t1, self.t2
@@ -1001,10 +1074,10 @@ class UADC(lib.StreamObject):
         eris = self.transform_integrals() 
 
         if self.compute_mpn_energy == True:
-            self.e_corr, self.t1, self.t2 = compute_amplitudes_energy(self, eris=eris, verbose=self.verbose)
+            self.e_corr, self.t1, self.t2 = compute_amplitudes_energy(self, eris=eris, verbose=self.verbose, fc_bool=True)
             self._finalize()
         else:
-            self.t1, self.t2 = compute_amplitudes(self, eris=eris)
+            self.t1, self.t2 = compute_amplitudes(self, eris=eris, fc_bool=True)
             self.e_corr = None
 
         self.method_type = self.method_type.lower()
@@ -1594,7 +1667,7 @@ def get_imds_ea(adc, eris=None):
     return M_ab
 
 
-def get_imds_ip(adc, eris=None):
+def get_imds_ip(adc, eris=None, fc_bool=True):
 
     cput0 = (time.clock(), time.time())
     log = logger.Logger(adc.stdout, adc.verbose)
@@ -1605,6 +1678,7 @@ def get_imds_ip(adc, eris=None):
 
     t1 = adc.t1
     t2 = adc.t2
+    #t1, t2 = adc.compute_amplitudes(eris, fc_bool)   
 
     t1_2_a, t1_2_b = t1[0]
     t2_1_a, t2_1_ab, t2_1_b = t2[0]
@@ -2138,7 +2212,7 @@ def ea_adc_diag(adc,M_ab=None,eris=None):
     return diag
 
 
-def ip_adc_diag(adc,M_ij=None,eris=None):
+def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False):
    
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
@@ -2323,9 +2397,120 @@ def ip_adc_diag(adc,M_ij=None,eris=None):
                 temp = np.ascontiguousarray(temp.transpose(2,1,0))
                 diag[s_aba:f_aba] += temp.reshape(-1)
 
+    if cvs is True:
+        
+        shift = -100000.0
+        ncore = adc.ncore_cvs
+
+        diag[(s_a+ncore):f_a] += shift
+        diag[(s_b+ncore):f_b] += shift
+
+        temp = np.zeros((nvir_a, nocc_a, nocc_a))
+        temp[:,ij_ind_a[0],ij_ind_a[1]] = diag[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
+        temp[:,ij_ind_a[1],ij_ind_a[0]] = -diag[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
+
+        temp[:,ncore:,ncore:] += shift
+        temp[:,:ncore,:ncore] += shift
+
+        diag[s_aaa:f_aaa] = temp[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1).copy()
+
+        temp = diag[s_bab:f_bab].copy()
+        temp = temp.reshape((nvir_b, nocc_a, nocc_b))
+        temp[:,ncore:,ncore:] += shift
+        temp[:,:ncore,:ncore] += shift
+
+        diag[s_bab:f_bab] = temp.reshape(-1).copy()
+
+        temp = diag[s_aba:f_aba].copy()
+        temp = temp.reshape((nvir_a, nocc_b, nocc_a))
+        temp[:,ncore:,ncore:] += shift
+        temp[:,:ncore,:ncore] += shift
+
+        diag[s_aba:f_aba] = temp.reshape(-1).copy()
+
+        temp = np.zeros((nvir_b, nocc_b, nocc_b))
+        temp[:,ij_ind_b[0],ij_ind_b[1]] = diag[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
+        temp[:,ij_ind_b[1],ij_ind_b[0]] = -diag[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
+
+        temp[:,ncore:,ncore:] += shift
+        temp[:,:ncore,:ncore] += shift
+
+        diag[s_bbb:f_bbb] = temp[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1).copy()
+       
     diag = -diag
+
     return diag
 
+def cvs_projector(adc, r):
+
+    ncore = adc.ncore_cvs
+
+    nocc_a = adc.nocc_a
+    nocc_b = adc.nocc_b
+    nvir_a = adc.nvir_a
+    nvir_b = adc.nvir_b
+
+    n_singles_a = nocc_a
+    n_singles_b = nocc_b
+    n_doubles_aaa = nocc_a * (nocc_a - 1) * nvir_a // 2
+    n_doubles_bab = nvir_b * nocc_a * nocc_b
+    n_doubles_aba = nvir_a * nocc_b * nocc_a
+    n_doubles_bbb = nocc_b * (nocc_b - 1) * nvir_b // 2
+
+    ij_a = np.tril_indices(nocc_a, k=-1)
+    ij_b = np.tril_indices(nocc_b, k=-1)
+
+    s_a = 0
+    f_a = n_singles_a
+    s_b = f_a
+    f_b = s_b + n_singles_b
+    s_aaa = f_b
+    f_aaa = s_aaa + n_doubles_aaa
+    s_bab = f_aaa
+    f_bab = s_bab + n_doubles_bab
+    s_aba = f_bab
+    f_aba = s_aba + n_doubles_aba
+    s_bbb = f_aba
+    f_bbb = s_bbb + n_doubles_bbb
+
+    Pr = r.copy()
+
+    Pr[(s_a+ncore):f_a] = 0.0
+    Pr[(s_b+ncore):f_b] = 0.0
+
+    temp = np.zeros((nvir_a, nocc_a, nocc_a))
+    temp[:,ij_a[0],ij_a[1]] = Pr[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
+    temp[:,ij_a[1],ij_a[0]] = -Pr[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
+
+    temp[:,ncore:,ncore:] = 0.0
+    temp[:,:ncore,:ncore] = 0.0
+
+    Pr[s_aaa:f_aaa] = temp[:,ij_a[0],ij_a[1]].reshape(-1).copy()
+
+    temp = Pr[s_bab:f_bab].copy()
+    temp = temp.reshape((nvir_b, nocc_a, nocc_b))
+    temp[:,ncore:,ncore:] = 0.0
+    temp[:,:ncore,:ncore] = 0.0
+
+    Pr[s_bab:f_bab] = temp.reshape(-1).copy()
+
+    temp = Pr[s_aba:f_aba].copy()
+    temp = temp.reshape((nvir_a, nocc_b, nocc_a))
+    temp[:,ncore:,ncore:] = 0.0
+    temp[:,:ncore,:ncore] = 0.0
+
+    Pr[s_aba:f_aba] = temp.reshape(-1).copy()
+
+    temp = np.zeros((nvir_b, nocc_b, nocc_b))
+    temp[:,ij_b[0],ij_b[1]] = Pr[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
+    temp[:,ij_b[1],ij_b[0]] = -Pr[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
+
+    temp[:,ncore:,ncore:] = 0.0
+    temp[:,:ncore,:ncore] = 0.0
+
+    Pr[s_bbb:f_bbb] = temp[:,ij_b[0],ij_b[1]].reshape(-1).copy()
+
+    return Pr
 
 def ea_contract_r_vvvv_antisym(myadc,r2,vvvv_d):
 
@@ -3020,7 +3205,7 @@ def ea_adc_matvec(adc, M_ab=None, eris=None):
     return sigma_
 
 
-def ip_adc_matvec(adc, M_ij=None, eris=None):
+def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
@@ -3103,6 +3288,10 @@ def ip_adc_matvec(adc, M_ij=None, eris=None):
     def sigma_(r):
         cput0 = (time.clock(), time.time())
         log = logger.Logger(adc.stdout, adc.verbose)
+
+        if cvs is True:
+            #print("CVS Matvec")
+            r = cvs_projector(adc, r)
 
         s = np.zeros((dim))
 
@@ -3527,6 +3716,10 @@ def ip_adc_matvec(adc, M_ij=None, eris=None):
                cput0 = log.timer_debug1("completed sigma vector ADC(3) calculation", *cput0)
 
         s *= -1.0
+
+        if cvs is True:
+            #print("CVS Matvec-sigma")
+            s = cvs_projector(adc, s)
 
         return s
 
@@ -3961,6 +4154,9 @@ class UADCEA(UADC):
         self.transform_integrals = adc.transform_integrals
         self.with_df = adc.with_df
         self.compute_mpn_energy = True
+        self.fc_bool = adc.fc_bool
+        self.nfc_orb = adc.nfc_orb
+        self.ncore_cvs = adc.ncore_cvs
 
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
@@ -3992,7 +4188,7 @@ class UADCEA(UADC):
            guess.append(g[:,p])
        return guess
     
-    def gen_matvec(self, imds=None, eris=None):
+    def gen_matvec(self, imds=None, eris=None, fc_bool=True, cvs=True):
         if imds is None: imds = self.get_imds(eris)
         diag = self.get_diag(imds,eris)
         matvec = self.matvec(imds, eris)
@@ -4063,6 +4259,9 @@ class UADCIP(UADC):
         self.transform_integrals = adc.transform_integrals
         self.with_df = adc.with_df
         self.compute_mpn_energy = True
+        self.fc_bool = adc.fc_bool
+        self.nfc_orb = adc.nfc_orb
+        self.ncore_cvs = adc.ncore_cvs
 
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
@@ -4094,10 +4293,10 @@ class UADCIP(UADC):
             guess.append(g[:,p])
         return guess
 
-    def gen_matvec(self, imds=None, eris=None):
-        if imds is None: imds = self.get_imds(eris)
-        diag = self.get_diag(imds,eris)
-        matvec = self.matvec(imds, eris)
+    def gen_matvec(self, imds=None, eris=None, fc_bool=True, cvs=False):
+        if imds is None: imds = self.get_imds(eris, fc_bool)
+        diag = self.get_diag(imds,eris, cvs)
+        matvec = self.matvec(imds, eris, cvs)
         #matvec = lambda x: self.matvec()
         return matvec, diag
 
