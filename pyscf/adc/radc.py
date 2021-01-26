@@ -85,7 +85,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     def matvec_idn1(inp_vec):
         return inp_vec
  
-
+    """
     matvec, diag = adc.gen_matvec(imds, eris, cvs)
     guess = adc.get_init_guess(nroots, diag, ascending = True)
     guess_dim = np.array(guess).shape[1]
@@ -94,6 +94,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     #dummy() 
     conv, E_, U_ = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
     #conv, E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+    """
     """    
     nocc = adc._nocc
     nvir = adc._nvir
@@ -184,7 +185,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     exit()
     """ 
 
-    """    
+        
     guess_rms = []
     mom_rms = []
     alpha = []
@@ -266,7 +267,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     print("Alpha values: ", alpha)
     print("Delta RMS of macroiteration eigenvector w.r.t guess vector fed into the iteration: ", guess_rms)   
     print("Delta RMS of macroiteration eigenvector w.r.t projection vector: ", mom_rms)
-    """   
+    #"""   
     """
     if (ncore_proj > 0):
         matvec, diag = adc.gen_matvec(imds, eris, cvs=True)
