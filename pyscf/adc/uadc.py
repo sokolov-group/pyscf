@@ -63,7 +63,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     guess_dim = np.array(guess).shape[1]
     diag_idn = np.ones(guess_dim)
-    E, U, conv_bad = eighg(lambda xs : [matvec(x) for x in xs], lambda xs : [matvec_idn1(x) for x in xs], nroots, diag,diag_idn ,guess_temp_func,nguess=None, niter=adc.max_cycle, nsvec=100, nvec=500, rthresh=1e-6, print_conv=True, highest=False, guess_random=False, disk=False)
+    E, U, conv_bad = eighg(lambda xs : [matvec(x) for x in xs], lambda xs : [matvec_idn1(x) for x in xs], nroots, diag,diag_idn ,guess_temp_func,nguess=None, niter=adc.max_cycle, nsvec=1000, nvec=500, rthresh=1e-6, print_conv=True, highest=False, guess_random=False, disk=False)
     conv, E_, U_ = davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual = 1e-6)
    
     matvec, diag = adc.gen_matvec(imds, eris, cvs=False)
