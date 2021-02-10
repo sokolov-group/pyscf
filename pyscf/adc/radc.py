@@ -67,9 +67,13 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     if  ((ncore_proj > 0) or (cvs_npick is not False) or (kop_npick is not False)) and (adc.method_type == "ea"):
        raise Exception("CVS and Koopman's aren't not implemented for EA")
 
-    #if (mom_skd_iter == False) and (cvs_npick == False):
+
 
     imds = adc.get_imds(eris)
+    if (mom_skd_iter == False) and (ncore_proj > 0):
+        matvec, diag = adc.gen_matvec(imds, eris, cvs)
+        guess = adc.get_init_guess(nroots, diag, ascending = True)
+        conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
     """
     def matvec_idn(guess):
         guess = np.array(guess)
