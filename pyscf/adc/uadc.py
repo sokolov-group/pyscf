@@ -840,7 +840,7 @@ class UADC(lib.StreamObject):
         self.verbose = self.mol.verbose
         self.stdout = self.mol.stdout
         self.max_memory = mf.max_memory
-        
+
         self.max_space = getattr(__config__, 'adc_uadc_UADC_max_space', 12)
         self.max_cycle = getattr(__config__, 'adc_uadc_UADC_max_cycle', 50)
         self.conv_tol = getattr(__config__, 'adc_uadc_UADC_conv_tol', 1e-12)
@@ -857,10 +857,54 @@ class UADC(lib.StreamObject):
         self.t2 = None
         self.imds = lambda:None
         self._nocc = mf.nelec
-        self._nmo = (mo_coeff[0].shape[1], mo_coeff[1].shape[1])
-        self._nvir = (self._nmo[0] - self._nocc[0], self._nmo[1] - self._nocc[1])
-        self.mo_energy_a = mf.mo_energy[0]
-        self.mo_energy_b = mf.mo_energy[1]
+        if "ROHF" in str(type(self._scf)):
+            print ("ROHF reference detected")
+            mo_a = self.mo_coeff.copy()
+            self.nmo = mo_a.shape[1]
+            #self.name = "ROHF"
+            nalpha = mf.mol.nelec[0]
+            nbeta = mf.mol.nelec[1]
+
+            h1e = self._scf.get_hcore()
+            dm = self._scf.make_rdm1()
+            vhf = self._scf.get_veff(mf.mol, dm)
+
+            fock_a = h1e + vhf[0]
+            fock_b = h1e + vhf[1]
+
+            if nalpha > nbeta:
+                self.ndocc = nbeta
+                self.nsocc = nalpha - nbeta
+            else:
+                self.ndocc = nalpha
+                self.nsocc = nbeta - nalpha
+
+            fock_a = np.dot(mo_a.T,np.dot(fock_a, mo_a))
+            fock_b = np.dot(mo_a.T,np.dot(fock_b, mo_a))
+
+            # Semicanonicalize Ca using fock_a, nocc_a -> Ca, mo_energy_a, U_a, f_ov_a
+            C_a, mo_energy_a, f_ov_a, f_aa = self.semi_canonicalize_orbitals(fock_a, self.ndocc + self.nsocc, mo_a)
+
+            # Semicanonicalize Cb using fock_b, nocc_b -> Cb, mo_energy_b, U_b, f_ov_b
+            C_b, mo_energy_b, f_ov_b, f_bb = self.semi_canonicalize_orbitals(fock_b, self.ndocc, mo_a)
+
+            mo_a = C_a.copy()
+            mo_b = C_b.copy()
+            self.mo_coeff = np.zeros((2,self.nmo,self.nmo))
+            self.mo_coeff[0,:,:] = mo_a.copy()
+            self.mo_coeff[1,:,:] = mo_b.copy()
+
+            #f_ov = (f_ov_a, f_ov_b)
+
+            self._nmo = (self.mo_coeff[0].shape[1], self.mo_coeff[1].shape[1])
+            self._nvir = (self._nmo[0] - self._nocc[0], self._nmo[1] - self._nocc[1])
+            self.mo_energy_a = mo_energy_a.copy()
+            self.mo_energy_b = mo_energy_b.copy()
+        else:
+            self._nmo = (mo_coeff[0].shape[1], mo_coeff[1].shape[1])
+            self._nvir = (self._nmo[0] - self._nocc[0], self._nmo[1] - self._nocc[1])
+            self.mo_energy_a = mf.mo_energy[0]
+            self.mo_energy_b = mf.mo_energy[1]
         self.chkfile = mf.chkfile
         self.method = "adc(2)"
         self.method_type = "ip"
@@ -883,7 +927,29 @@ class UADC(lib.StreamObject):
     compute_energy = compute_energy
     transform_integrals = uadc_ao2mo.transform_integrals_incore
     make_rdm1s = density_matrix_so
-    
+
+    def semi_canonicalize_orbitals(self, f, nocc, C):
+
+        # Diagonalize occ-occ block
+        evals_oo, evecs_oo = np.linalg.eigh(f[:nocc, :nocc])
+
+        # Diagonalize virt-virt block
+        evals_vv, evecs_vv = np.linalg.eigh(f[nocc:, nocc:])
+
+        evals = np.hstack((evals_oo, evals_vv))
+
+        U = np.zeros_like(f)
+
+        U[:nocc, :nocc] = evecs_oo
+        U[nocc:, nocc:] = evecs_vv
+
+        C = np.dot(C, U)
+
+        transform_f = np.dot(U.T, np.dot(f, U))
+        f_ov = transform_f[:nocc, nocc:].copy()
+
+        return C, evals, f_ov, transform_f
+
     def dump_flags(self, verbose=None):
         logger.info(self, '')
         logger.info(self, '******** %s ********', self.__class__)

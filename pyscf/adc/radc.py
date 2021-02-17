@@ -2410,7 +2410,8 @@ def analyze_spec_factor(adc):
     X = adc.X
     X_2 = (X.copy()**2)*2
     thresh = adc.spec_factor_print_tol
-
+    print("hello ROHF")
+    exit()
     logger.info(adc, "Print spectroscopic factors > %E\n", adc.spec_factor_print_tol)
 
     for i in range(X_2.shape[1]):
