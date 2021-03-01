@@ -84,7 +84,7 @@ endif()
 
 include(ExternalProject)
 option(BUILD_LIBCINT "Using libcint for analytical gaussian integral" ON)
-option(WITH_F12 "Compling F12 integrals" OFF)
+option(WITH_F12 "Compling F12 integrals" ON)
 if(BUILD_LIBCINT)
 if(NOT EXISTS "${PROJECT_SOURCE_DIR}/deps/include/cint.h")
   ExternalProject_Add(libcint
@@ -141,9 +141,9 @@ add_subdirectory(extras/mbd)
 add_subdirectory(semiempirical)
 add_subdirectory(agf2)
 
-option(ENABLE_LIBXC "Using libxc for XC functional library" OFF)
+option(ENABLE_LIBXC "Using libxc for XC functional library" ON)
 option(ENABLE_XCFUN "Using xcfun for XC functional library" ON)
-option(BUILD_LIBXC "Download and build libxc library" OFF)
+option(BUILD_LIBXC "Download and build libxc library" ON)
 option(BUILD_XCFUN "Download and build xcfun library" ON)
 
 if(NOT DISABLE_DFT)
