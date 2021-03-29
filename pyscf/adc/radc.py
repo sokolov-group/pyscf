@@ -73,7 +73,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     if (mom_skd_iter == False) and (ncore_proj > 0):
         matvec, diag = adc.gen_matvec(imds, eris, cvs)
         guess = adc.get_init_guess(nroots, diag, ascending = True)
-        conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+        conv, E, U = davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-12, max_cycle=adc.max_cycle, max_space=adc.max_space)
     """
     def matvec_idn(guess):
         guess = np.array(guess)
@@ -211,7 +211,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
             if skd_num == 0:
                 matvec, diag = adc.gen_matvec(imds, eris, cvs=True, alpha_proj=alpha_1)
                 guess = adc.get_init_guess(nroots, diag, ascending = True)
-                conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+                conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=skd[2], max_cycle=adc.max_cycle, max_space=adc.max_space)
                 
                 #proj_vec = U
                 alpha.append("CVS")
@@ -231,6 +231,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
             
             def cvs_pick(cvs_npick,U):          
                 len_cvs_npick = len(cvs_npick)
+                print(len_cvs_npick)
                 nroots = len_cvs_npick
                 dim_guess = np.array(U).shape[1]
                 guess = np.zeros((len_cvs_npick, dim_guess))
@@ -238,10 +239,10 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
                     U = np.array(U)
                     guess[idx_guess,:] = U[npick,:]
                 return guess, nroots
-            #guess,nroots = cvs_pick(cvs_npick,U)           
+            guess,nroots = cvs_pick(cvs_npick,U)           
             def eig_close_to_init_guess(w, v, nroots, envs):
                 x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])
-                
+                print("shape of guess vector: ", np.asarray(guess).shape) 
                 s = np.dot(np.asarray(guess).conj(), np.asarray(x0).T)
                 snorm = np.einsum('pi,pi->i', s.conj(), s)
                 idx = np.argsort(-snorm)[:nroots]
@@ -256,11 +257,12 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
                 #print(s)
                 #print("Norm: ")
                 #print(np.sort(snorm)[::-1])
-                return lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
+                w, v, idx = lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
+                return w, v, idx
 
             #if skd_num > 0:
             #    guess = U
-            conv, E, U = davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=skd[2], max_cycle=skd[1], max_space=adc.max_space)
+            conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=skd[2], max_cycle=skd[1], max_space=adc.max_space)
             #guess,nroots = cvs_pick(cvs_npick,U)           
             #conv, E, U = davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=skd[2], max_cycle=skd[1], max_space=adc.max_space)
             alpha.append(skd[0])
@@ -327,6 +329,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 ############################################
 
     U = np.array(U)
+    for i in range(U.shape[0]):
+        print("CVS/MOM overlap: ", np.dot(np.array(guess)[i,:], U[i,:].T))
     #adc.analyze_eigenvector_ip(U)
     T = adc.get_trans_moments()
 

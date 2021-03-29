@@ -30,6 +30,9 @@ from pyscf import __config__
 from pyscf import df
 from multiroot_davidson1 import eighg
 from linalg_helper_beta import davidson1
+from scipy.sparse.linalg import eigsh, LinearOperator
+from lanczos_full_orth import compute_lanczos
+from blanczos import compute_blanczos, mom_blanczos
 
 def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
@@ -54,8 +57,36 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         cvs_bool = False
     matvec, diag = adc.gen_matvec(imds, eris, cvs=cvs_bool)
     guess = adc.get_init_guess(nroots, diag, ascending = True)
+    conv, E, U = davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+  
+    imds = adc.get_imds(eris, fc_bool=False)
+    matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False)
+    guess = U
+
+
+    def cvs_pick(cvs_npick,U):          
+        nroots = len(cvs_npick)
+        dim_guess = np.array(U).shape[1]
+        guess = np.zeros((nroots, dim_guess))
+        for idx_guess, npick in enumerate(cvs_npick):
+            U = np.array(U)
+            guess[idx_guess,:] = U[npick,:]
+        return guess, nroots
     
-    def guess_temp_func(numroots, ad=diag, ascending=True):
+    cvs_npick = adc.cvs_npick
+    if cvs_npick:
+        guess,nroots = cvs_pick(cvs_npick,U)
+        E = E[cvs_npick]
+           
+    #E, U, conv = compute_lanczos(matvec, nroots, guess)
+    max_mom_iter = 130
+    de_tol = 1e-6
+    res_tol = 1e-5
+    #ovlp_tol = 0.001
+    #max_v = 2
+    if adc.lanczos_space > 0:
+        E, U, conv = mom_blanczos(matvec, guess, adc.lanczos_space, max_mom_iter, E, de_tol, res_tol,fixed_proj=True)
+    def guess_temp_func(numroots, ad, ascending=True):
         return adc.get_init_guess(numroots,ad,ascending) 
 
     def matvec_idn1(idn1_vec):
@@ -63,12 +94,27 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     guess_dim = np.array(guess).shape[1]
     diag_idn = np.ones(guess_dim)
-    E, U, conv_bad = eighg(lambda xs : [matvec(x) for x in xs], lambda xs : [matvec_idn1(x) for x in xs], nroots, diag,diag_idn ,guess_temp_func,nguess=None, niter=adc.max_cycle, nsvec=1000, nvec=500, rthresh=1e-6, print_conv=True, highest=False, guess_random=False, disk=False)
-    conv, E_, U_ = davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual = 1e-6)
-   
-    matvec, diag = adc.gen_matvec(imds, eris, cvs=False)
-    guess = adc.get_init_guess(nroots, diag, ascending = True)
-    #E, U, conv_bad = eighg(lambda xs : [matvec(x) for x in xs], lambda xs : [matvec_idn1(x) for x in xs], nroots, diag,diag_idn ,guess_temp_func,nguess=None, niter=adc.max_cycle, nsvec=200, nvec=100, rthresh=1e-6, print_conv=True, highest=False, guess_random=False, disk=False, pick_vec=U)
+
+    nocc_a = adc.nocc_a
+    nocc_b = adc.nocc_b
+    nvir_a = adc.nvir_a
+    nvir_b = adc.nvir_b
+    n_singles_a = nocc_a
+    n_singles_b = nocc_b
+    n_doubles_aaa = nocc_a * (nocc_a - 1) * nvir_a // 2
+    n_doubles_bab = nvir_b * nocc_a * nocc_b
+    n_doubles_aba = nvir_a * nocc_b * nocc_a
+    n_doubles_bbb = nocc_b * (nocc_b - 1) * nvir_b // 2
+
+    M_dim = n_singles_a + n_singles_b + n_doubles_aaa + n_doubles_bab + n_doubles_aba + n_doubles_bbb
+    #mv = LinearOperator(shape = (M_dim,M_dim), matvec=matvec)
+    #E, U = eigsh(mv, k=nroots, which = 'SM', tol=1e-8)
+    #U = U.T
+    ev2eh = 1/27.211396641308
+
+    #guess = adc.get_init_guess(nroots, diag, ascending = True)
+    #E, U, conv_bad = eighg(lambda xs : [matvec(x) for x in xs], lambda xs : [matvec_idn1(x) for x in xs], nroots, diag,diag_idn ,guess_temp_func,nguess=None, niter=adc.max_cycle, nsvec=1000, nvec=500, rthresh=1e-6, print_conv=True, highest=False, guess_random=False, disk=False, shift=E)
+    #conv, E, U = davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual = 1e-6)
 
 
     def eig_close_to_init_guess(w, v, nroots, envs):      
@@ -93,9 +139,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     #conv, E, U = davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual = 1e-6, pick =eig_close_to_init_guess)
     
     U = np.array(U)
-
     T = adc.get_trans_moments()
-    #spec_factors = E
     spec_factors = adc.get_spec_factors(T, U, nroots)
 
     nfalse = np.shape(conv)[0] - np.sum(conv)
@@ -965,6 +1009,8 @@ class UADC(lib.StreamObject):
         self.fc_bool = True
         self.nfc_orb = 0
         self.ncore_cvs = 0
+        self.cvs_npick = []
+        self.lanczos_space = 50
         
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mol', 'mo_energy_b', 'max_memory', 'scf_energy', 'e_tot', 't1', 'frozen', 'mo_energy_a', 'chkfile', 'max_space', 't2', 'mo_occ', 'max_cycle'))
 
@@ -1676,9 +1722,9 @@ def get_imds_ip(adc, eris=None, fc_bool=True):
 
     method = adc.method
 
-    t1 = adc.t1
-    t2 = adc.t2
-    #t1, t2 = adc.compute_amplitudes(eris, fc_bool)   
+    #t1 = adc.t1
+    #t2 = adc.t2
+    t1, t2 = adc.compute_amplitudes(eris, fc_bool)   
 
     t1_2_a, t1_2_b = t1[0]
     t2_1_a, t2_1_ab, t2_1_b = t2[0]
@@ -2212,14 +2258,14 @@ def ea_adc_diag(adc,M_ab=None,eris=None):
     return diag
 
 
-def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False):
+def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
    
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
 
     method = adc.method
     if M_ij is None:
-        M_ij = adc.get_imds()
+        M_ij = adc.get_imds(fc_bool)
 
     M_ij_a, M_ij_b = M_ij[0], M_ij[1]
 
@@ -3205,7 +3251,7 @@ def ea_adc_matvec(adc, M_ab=None, eris=None):
     return sigma_
 
 
-def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False):
+def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
@@ -3281,13 +3327,15 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False):
     f_bbb = s_bbb + n_doubles_bbb
 
     if M_ij is None:
-        M_ij = adc.get_imds()
+        M_ij = adc.get_imds(fc_bool)
     M_ij_a, M_ij_b = M_ij
 
     #Calculate sigma vector
     def sigma_(r):
         cput0 = (time.clock(), time.time())
         log = logger.Logger(adc.stdout, adc.verbose)
+        #print("input trial vec shape: ", np.array(r).shape)
+        #print("expected size: ", dim)
 
         if cvs is True:
             #print("CVS Matvec")
@@ -4086,7 +4134,6 @@ def get_spec_factors(adc, T, U, nroots=1):
 
     P = lib.einsum("pi,pi->i", X_a, X_a)
     P += lib.einsum("pi,pi->i", X_b, X_b)
-
     return P
 
 
@@ -4157,6 +4204,8 @@ class UADCEA(UADC):
         self.fc_bool = adc.fc_bool
         self.nfc_orb = adc.nfc_orb
         self.ncore_cvs = adc.ncore_cvs
+        self.cvs_npick = adc.cvs_npick
+        self.lanczos_space = adc.lanczos_space
 
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
@@ -4262,6 +4311,8 @@ class UADCIP(UADC):
         self.fc_bool = adc.fc_bool
         self.nfc_orb = adc.nfc_orb
         self.ncore_cvs = adc.ncore_cvs
+        self.cvs_npick = adc.cvs_npick
+        self.lanczos_space = adc.lanczos_space
 
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
@@ -4280,7 +4331,7 @@ class UADCIP(UADC):
             diag = self.ip_adc_diag()
         idx = None
         if ascending:
-            idx = np.argsort(diag)
+            idx = np.argsort(diag**2)
         else:
             idx = np.argsort(diag)[::-1]
         guess = np.zeros((diag.shape[0], nroots))
@@ -4295,8 +4346,8 @@ class UADCIP(UADC):
 
     def gen_matvec(self, imds=None, eris=None, fc_bool=True, cvs=False):
         if imds is None: imds = self.get_imds(eris, fc_bool)
-        diag = self.get_diag(imds,eris, cvs)
-        matvec = self.matvec(imds, eris, cvs)
+        diag = self.get_diag(imds,eris, cvs, fc_bool)
+        matvec = self.matvec(imds, eris, cvs, fc_bool)
         #matvec = lambda x: self.matvec()
         return matvec, diag
 
