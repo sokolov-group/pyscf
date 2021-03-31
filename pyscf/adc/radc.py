@@ -1911,9 +1911,6 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
     diag[s2_acv:f2_acv] = D_aij[:,:ncvs,ncvs:].reshape(-1)
     diag[s2_avc:f2_avc] = D_aij[:,ncvs:,:ncvs].reshape(-1)
 
-    print("diag norm: ", np.linalg.norm(diag))
-    exit()
-
 #    ###### Additional terms for the preconditioner ####
 #    if (method == "adc(2)-x" or method == "adc(3)"):
 #
@@ -2510,31 +2507,34 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
         #s[s1:f1] += 2. * lib.einsum('jaki,ajk->i', eris_ovoo, r2, optimize = True)
         #s[s1:f1] -= lib.einsum('kaji,ajk->i', eris_ovoo, r2, optimize = True)
 
-        #s[s1:f1] += 2. * lib.einsum('jaki,ajk->i', eris_ovoo[:ncvs,:,:ncvs,:ncvs], r2_ecc, optimize = True)
-        #s[s1:f1] -= lib.einsum('kaji,ajk->i', eris_ovoo[:ncvs,:,:ncvs,:ncvs], r2_ecc, optimize = True)
-        #s[s1:f1] += 2. * lib.einsum('jaki,ajk->i', eris_ovoo[:ncvs,:,ncvs:,:ncvs], r2_ecv, optimize = True)
-        #s[s1:f1] -= lib.einsum('kaji,ajk->i', eris_ovoo[ncvs:,:,:ncvs,:ncvs], r2_ecv, optimize = True)
-        #s[s1:f1] += 2. * lib.einsum('jaki,ajk->i', eris_ovoo[ncvs:,:,:ncvs,:ncvs], r2_evc, optimize = True)
-        #s[s1:f1] -= lib.einsum('kaji,ajk->i', eris_ovoo[:ncvs,:,ncvs:,:ncvs], r2_evc, optimize = True)
+        s[s1:f1] += 2. * lib.einsum('jaki,ajk->i', eris_ovoo[:ncvs,:,:ncvs,:ncvs], r2_ecc, optimize = True)
+        s[s1:f1] -= lib.einsum('kaji,ajk->i', eris_ovoo[:ncvs,:,:ncvs,:ncvs], r2_ecc, optimize = True)
+        s[s1:f1] += 2. * lib.einsum('jaki,ajk->i', eris_ovoo[:ncvs,:,ncvs:,:ncvs], r2_ecv, optimize = True)
+        s[s1:f1] -= lib.einsum('kaji,ajk->i', eris_ovoo[ncvs:,:,:ncvs,:ncvs], r2_ecv, optimize = True)
+        s[s1:f1] += 2. * lib.einsum('jaki,ajk->i', eris_ovoo[ncvs:,:,:ncvs,:ncvs], r2_evc, optimize = True)
+        s[s1:f1] -= lib.einsum('kaji,ajk->i', eris_ovoo[:ncvs,:,ncvs:,:ncvs], r2_evc, optimize = True)
 ############## ADC(2) ajk - i block ############################
 
         #temp = lib.einsum('jaki,i->ajk', eris_ovoo, r1, optimize = True).reshape(-1)
         #s[s2:f2] += temp.reshape(-1)
 
-        #temp_ecc = lib.einsum('jaki,i->ajk', eris_ovoo[:ncvs,:,:ncvs,:ncvs], r1, optimize = True).reshape(-1)
-        #s[s2_ecc:f2_ecc] += temp_ecc.reshape(-1)
-        #temp_ecv = lib.einsum('jaki,i->ajk', eris_ovoo[:ncvs,:,ncvs:,:ncvs], r1, optimize = True).reshape(-1)
-        #s[s2_ecv:f2_ecv] += temp_ecv.reshape(-1)
-        #temp_evc = lib.einsum('jaki,i->ajk', eris_ovoo[ncvs:,:,:ncvs,:ncvs], r1, optimize = True).reshape(-1)
-        #s[s2_evc:f2_evc] += temp_evc.reshape(-1)
+        temp_ecc = lib.einsum('jaki,i->ajk', eris_ovoo[:ncvs,:,:ncvs,:ncvs], r1, optimize = True).reshape(-1)
+        s[s2_ecc:f2_ecc] += temp_ecc.reshape(-1)
+        temp_ecv = lib.einsum('jaki,i->ajk', eris_ovoo[:ncvs,:,ncvs:,:ncvs], r1, optimize = True).reshape(-1)
+        s[s2_ecv:f2_ecv] += temp_ecv.reshape(-1)
+        temp_evc = lib.einsum('jaki,i->ajk', eris_ovoo[ncvs:,:,:ncvs,:ncvs], r1, optimize = True).reshape(-1)
+        s[s2_evc:f2_evc] += temp_evc.reshape(-1)
 
 ################ ADC(2) ajk - bil block ############################
 
         #s[s2:f2] += D_aij * r2.reshape(-1)
 
-        #s[s2_ecc:f2_ecc] = D_aij[:,:ncvs,:ncvs].reshape(-1)
-        #s[s2_ecv:f2_ecv] = D_aij[:,:ncvs,ncvs:].reshape(-1)
-        #s[s2_evc:f2_evc] = D_aij[:,ncvs:,:ncvs].reshape(-1)
+        temp_ecc = D_aij[:,:ncvs,:ncvs].reshape(-1)
+        s[s2_ecc:f2_ecc] += temp_ecc*r2_ecc.reshape(-1)
+        temp_ecv = D_aij[:,:ncvs,ncvs:].reshape(-1)
+        s[s2_ecv:f2_ecv] += temp_ecv*r2_ecv.reshape(-1)
+        temp_evc = D_aij[:,ncvs:,:ncvs].reshape(-1)
+        s[s2_evc:f2_evc] += temp_evc*r2_evc.reshape(-1)
 
 ############### ADC(3) ajk - bil block ############################
 
