@@ -38,8 +38,8 @@ myadc = adc.ADC(mf)
 #IP-UADC(2) for 4 roots
 myadc.verbose = 4
 #..eip,vip,pip = myadc.kernel(nroots=10)
-myadc.method = "ADC(2)"
-myadc.method_type = "ip"
+myadc.method = "ADC(3)"
+myadc.method_type = "ip-cvs"
 myadc.ncvs = 2
 data = myadc.kernel(nroots=5)
 
