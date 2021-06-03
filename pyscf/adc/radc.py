@@ -47,7 +47,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     imds = adc.get_imds(eris)
     matvec, diag = adc.gen_matvec(imds, eris)
 
-    guess = adc.get_init_guess(nroots, diag, ascending = True)
+    guess = adc.get_init_guess(nroots, diag, imds, ascending = True)
 
     conv, adc.E, U = lib.linalg_helper.davidson_nosym1(
         lambda xs : [matvec(x) for x in xs],
@@ -2446,6 +2446,66 @@ def renormalize_eigenvectors_ip(adc, nroots=1):
     return U
 
 
+def get_init_guess_ip(self, nroots, diag, M_00, ascending = True):
+
+    n_singles = self._nocc
+    diag_11 = diag[n_singles:]
+
+    evals, evecs = np.linalg.eigh(-M_00)
+
+    diag = np.hstack((evals, diag_11))
+
+    idx = None
+
+    if ascending:
+        idx = np.argsort(diag)
+    else:
+        idx = np.argsort(diag)[::-1]
+
+    guess = np.zeros((diag.shape[0], nroots))
+    min_shape = min(diag.shape[0], nroots)
+    guess[:min_shape,:min_shape] = np.identity(min_shape)
+    g = np.zeros((diag.shape[0], nroots))
+    g[idx] = guess.copy()
+
+    guess = []
+    for p in range(g.shape[1]):
+        g[:n_singles,p] = np.dot(evecs, g[:n_singles,p])
+        guess.append(g[:,p])
+
+    return guess
+
+
+def get_init_guess_ea(self, nroots, diag, M_00, ascending = True):
+
+    n_singles = self._nvir
+    diag_11 = diag[n_singles:]
+
+    evals, evecs = np.linalg.eigh(M_00)
+
+    diag = np.hstack((evals, diag_11))
+
+    idx = None
+
+    if ascending:
+        idx = np.argsort(diag)
+    else:
+        idx = np.argsort(diag)[::-1]
+
+    guess = np.zeros((diag.shape[0], nroots))
+    min_shape = min(diag.shape[0], nroots)
+    guess[:min_shape,:min_shape] = np.identity(min_shape)
+    g = np.zeros((diag.shape[0], nroots))
+    g[idx] = guess.copy()
+
+    guess = []
+    for p in range(g.shape[1]):
+        g[:n_singles,p] = np.dot(evecs, g[:n_singles,p])
+        guess.append(g[:,p])
+
+    return guess
+
+
 def get_properties(adc, nroots=1):
 
     #Transition moments
@@ -2549,24 +2609,25 @@ class RADCEA(RADC):
     analyze_eigenvector = analyze_eigenvector_ea
     analyze = analyze
     compute_dyson_mo = compute_dyson_mo
+    get_init_guess = get_init_guess_ea
 
-    def get_init_guess(self, nroots=1, diag=None, ascending = True):
-        if diag is None :
-            diag = self.ea_adc_diag()
-        idx = None
-        if ascending:
-            idx = np.argsort(diag)
-        else:
-            idx = np.argsort(diag)[::-1]
-        guess = np.zeros((diag.shape[0], nroots))
-        min_shape = min(diag.shape[0], nroots)
-        guess[:min_shape,:min_shape] = np.identity(min_shape)
-        g = np.zeros((diag.shape[0], nroots))
-        g[idx] = guess.copy()
-        guess = []
-        for p in range(g.shape[1]):
-            guess.append(g[:,p])
-        return guess
+#    def get_init_guess(self, nroots=1, diag=None, ascending = True):
+#        if diag is None :
+#            diag = self.ea_adc_diag()
+#        idx = None
+#        if ascending:
+#            idx = np.argsort(diag)
+#        else:
+#            idx = np.argsort(diag)[::-1]
+#        guess = np.zeros((diag.shape[0], nroots))
+#        min_shape = min(diag.shape[0], nroots)
+#        guess[:min_shape,:min_shape] = np.identity(min_shape)
+#        g = np.zeros((diag.shape[0], nroots))
+#        g[idx] = guess.copy()
+#        guess = []
+#        for p in range(g.shape[1]):
+#            guess.append(g[:,p])
+#        return guess
 
 
     def gen_matvec(self, imds=None, eris=None):
@@ -2662,24 +2723,25 @@ class RADCIP(RADC):
     analyze_eigenvector = analyze_eigenvector_ip
     analyze = analyze
     compute_dyson_mo = compute_dyson_mo
+    get_init_guess = get_init_guess_ip
 
-    def get_init_guess(self, nroots=1, diag=None, ascending = True):
-        if diag is None :
-            diag = self.ip_adc_diag()
-        idx = None
-        if ascending:
-            idx = np.argsort(diag)
-        else:
-            idx = np.argsort(diag)[::-1]
-        guess = np.zeros((diag.shape[0], nroots))
-        min_shape = min(diag.shape[0], nroots)
-        guess[:min_shape,:min_shape] = np.identity(min_shape)
-        g = np.zeros((diag.shape[0], nroots))
-        g[idx] = guess.copy()
-        guess = []
-        for p in range(g.shape[1]):
-            guess.append(g[:,p])
-        return guess
+#    def get_init_guess(self, nroots=1, diag=None, ascending = True):
+#        if diag is None :
+#            diag = self.ip_adc_diag()
+#        idx = None
+#        if ascending:
+#            idx = np.argsort(diag)
+#        else:
+#            idx = np.argsort(diag)[::-1]
+#        guess = np.zeros((diag.shape[0], nroots))
+#        min_shape = min(diag.shape[0], nroots)
+#        guess[:min_shape,:min_shape] = np.identity(min_shape)
+#        g = np.zeros((diag.shape[0], nroots))
+#        g[idx] = guess.copy()
+#        guess = []
+#        for p in range(g.shape[1]):
+#            guess.append(g[:,p])
+#        return guess
 
     def gen_matvec(self, imds=None, eris=None):
         if imds is None: imds = self.get_imds(eris)
