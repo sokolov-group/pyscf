@@ -52,6 +52,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     cvs_npick = adc.cvs_npick
     kop_npick = adc.kop_npick
     ncore_proj = adc.ncore_proj
+    ncore_proj_valence = adc.ncore_proj_valence
     Eh2ev = 27.211386245988
     alpha_proj = adc.alpha_proj
     mom_skd_iter = adc.mom_skd_iter 
@@ -73,217 +74,19 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     if (mom_skd_iter == False) and (ncore_proj > 0):
         matvec, diag = adc.gen_matvec(imds, eris, cvs)
         guess = adc.get_init_guess(nroots, diag, ascending = True)
-        conv, E, U = davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-12, max_cycle=adc.max_cycle, max_space=adc.max_space)
-    """
-    def matvec_idn(guess):
-        guess = np.array(guess)
-        r_dim, c_dim = guess.shape
-        idn = np.zeros(c_dim)
-        matvec_prod = np.zeros((r_dim,c_dim))
-        for i in range(c_dim):
-            idn[i] = 1
-            matvec_prod[i,:] = guess[i]*idn
-            idn[i] = 0
-        return matvec_prod
-    """
-    def matvec_idn1(inp_vec):
-        return inp_vec
- 
-    """
-    matvec, diag = adc.gen_matvec(imds, eris, cvs)
-    guess = adc.get_init_guess(nroots, diag, ascending = True)
-    guess_dim = np.array(guess).shape[1]
-    diag_idn = np.ones(guess_dim)
-    E, U, conv_bad = eighg(lambda xs : [matvec(x) for x in xs], lambda xs : [matvec_idn1(x) for x in xs], nroots, diag,diag_idn ,guess,nguess=None, niter=adc.max_cycle, nsvec=100, nvec=100, rthresh=1e-5, print_conv=True, highest=True, guess_random=False, disk=False)
-    #dummy() 
-    conv, E_, U_ = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
-    #conv, E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
-    """
-    """    
-    nocc = adc._nocc
-    nvir = adc._nvir
-    n_singles = nocc
-    n_doubles = nvir * nocc * nocc
-    dim = n_singles + n_doubles
+        conv, E, U = davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-14, max_cycle=adc.max_cycle, max_space=adc.max_space)
+
+    elif (mom_skd_iter == True) and (ncore_proj > 0):
     
-    idn_t = np.zeros(dim)
-    M_big = np.zeros((dim,dim))
-    for i in range(dim):
-        idn_t[i] = 1
-        M_big[:,i] = matvec(idn_t)
-        idn_t[i] = 0
-    
-    M_norms_coarse = np.zeros((2,2))
-    M_norms_coarse[0,0] = np.linalg.norm(M_big[:n_singles,:n_singles])/(n_singles**2) 
-    M_norms_coarse[0,1] = np.linalg.norm(M_big[:n_singles,n_singles:])/(n_singles*n_doubles) 
-    M_norms_coarse[1,0] = M_norms_coarse[0,1] 
-    M_norms_coarse[1,1] = np.linalg.norm(M_big[n_singles:,n_singles:])/(n_doubles**2) 
-   
-    df1 = pd.DataFrame(M_norms_coarse, index =['i','bmn'], columns=['j','akl'])
-    print(adc.method, " - Normalized (w.r.t. number of orbitals spanned) norms of the 4 major sub-blocks of M")
-    print(df1)
-    
-    M_ss = M_big[:n_singles,:n_singles]
-    M_sd = M_big[:n_singles,n_singles:].reshape(nocc,nvir,nocc,nocc)
-    M_dd = M_big[n_singles:,n_singles:].reshape(nvir,nocc,nocc,nvir,nocc,nocc)
-
-    def get_M_norms_fine(M_ss, M_sd, M_dd, ncore, nocc, nvir):
-        
-        nc = ncore
-        nv = nocc - nc
-        necc = nvir * nc * nc
-        necv = nvir * nc * nv
-        nevv = nvir * nv * nv
-        
-        M_norms_fine = np.zeros((5,5))
-        M_norms_fine[0,0] = np.linalg.norm(M_ss[:ncore,:ncore])/(nc**2)
-        M_norms_fine[1,1] = np.linalg.norm(M_ss[ncore:,ncore:])/(nv**2)
-        M_norms_fine[2,2] = np.linalg.norm(M_dd[:,:ncore,:ncore,:,:ncore,:ncore])/(necc**2)
-        M_ecv_ecv = np.linalg.norm(M_dd[:,:ncore,ncore:,:,:ncore,ncore:])**2
-        M_ecv_evc = np.linalg.norm(M_dd[:,:ncore,ncore:,:,ncore:,:ncore])**2
-        M_evc_ecv = np.linalg.norm(M_dd[:,ncore:,:ncore,:,:ncore,ncore:])**2
-        M_evc_evc = np.linalg.norm(M_dd[:,ncore:,:ncore,:,ncore:,:ncore])**2
-        M_norms_fine[3,3] = np.sqrt(M_ecv_ecv + M_ecv_evc + M_evc_ecv + M_evc_evc)/(necv**2)
-        M_norms_fine[4,4] = np.linalg.norm(M_dd[:,ncore:,ncore:,:,ncore:,ncore:])/(nevv**2)
-        M_norms_fine[0,1] = np.linalg.norm(M_ss[:ncore,ncore:])/(nc*nv)
-        M_norms_fine[1,0] = M_norms_fine[0,1]
-        M_norms_fine[0,2] = np.linalg.norm(M_sd[:ncore,:,:ncore,:ncore])/(nc*necc)
-        M_norms_fine[2,0] = M_norms_fine[0,2]
-        M_c_ecv = np.linalg.norm(M_sd[:ncore,:,:ncore,ncore:])**2
-        M_c_evc = np.linalg.norm(M_sd[:ncore,:,ncore:,:ncore])**2
-        M_norms_fine[0,3] = np.sqrt(M_c_ecv + M_c_evc)/(nc*necv) 
-        M_norms_fine[3,0] = M_norms_fine[0,3]
-        M_norms_fine[0,4] = np.linalg.norm(M_sd[:ncore,:,ncore:,ncore:])/(nc*nevv)
-        M_norms_fine[4,0] = M_norms_fine[0,4]
-        M_norms_fine[1,2] = np.linalg.norm(M_sd[ncore:,:,:ncore,:ncore])/(nv*necc)
-        M_norms_fine[2,1] = M_norms_fine[1,2]
-        M_v_ecv = np.linalg.norm(M_sd[ncore:,:,:ncore,ncore:])**2
-        M_v_evc = np.linalg.norm(M_sd[ncore:,:,ncore:,:ncore])**2
-        M_norms_fine[1,3] = np.sqrt(M_v_ecv + M_v_evc)/(nv*necv) 
-        M_norms_fine[3,1] = M_norms_fine[1,3]
-        M_norms_fine[1,4] = np.linalg.norm(M_sd[ncore:,:,ncore:,ncore:])/(nv*nevv)
-        M_norms_fine[4,1] = M_norms_fine[1,4]
-        M_ecc_ecv = np.linalg.norm(M_dd[:,:ncore,:ncore,:,:ncore,ncore:])**2        
-        M_ecc_evc = np.linalg.norm(M_dd[:,:ncore,:ncore,:,ncore:,:ncore])**2
-        M_norms_fine[2,3] = np.sqrt(M_ecc_ecv + M_ecc_evc)/(necc*necv)
-        M_norms_fine[3,2] = M_norms_fine[3,2]
-        M_norms_fine[2,4] = np.linalg.norm(M_dd[:,:ncore,:ncore,:,ncore:,ncore:])/(necc*nevv) 
-        M_norms_fine[4,2] = M_norms_fine[2,4]
-        M_ecv_evv = np.linalg.norm(M_dd[:,:ncore,ncore:,:,ncore:,ncore:])**2       
-        M_evc_evv = np.linalg.norm(M_dd[:,ncore:,:ncore,:,ncore:,ncore:])**2       
-        M_norms_fine[3,4] = np.sqrt(M_ecv_evv + M_evc_evv)/(necv*nevv)
-        M_norms_fine[4,3] = M_norms_fine[3,4]  
-
-        return M_norms_fine 
-       
-    core_orb_label = ['1s', '2s', '2p', '3s', '3p']
-    core_orb_val = [1, 2, 5, 6, 9]
-
-    for cidx, corb in enumerate(core_orb_label):
- 
-        ncore = core_orb_val[cidx]
-        M_norms_fine = get_M_norms_fine(M_ss,M_sd,M_dd,ncore,nocc,nvir)         
-        df2 = pd.DataFrame(M_norms_fine, index=['c','v','ecc','ecv','evv'], columns=['c','v','ecc','ecv','evv'])
-        print(adc.method, '-', corb, '-' , 'Normalized matrix sub-blocks norms: ')
-        print(df2)
-    exit()
-    """ 
-
-        
-    guess_rms = []
-    mom_rms = []
-    alpha = []
-    def vec_rms_compute(v_ref, v_target):
-        v_ref = np.sqrt(np.array(v_ref)**2)
-        v_target = np.sqrt(np.array(v_target)**2)
-        delta_sq = (v_target - v_ref)**2
-        delta_rms = np.sqrt(np.sum(delta_sq))
-        return delta_rms
-                   
-    if mom_skd_iter is not False:
-
-        skd_1 = mom_skd_iter[0]
-        alpha_1 = skd_1[0]
-        mom_skd_iter = mom_skd_iter[1:]
-        skd_len = len(mom_skd_iter)
-        for skd_num, skd in enumerate(mom_skd_iter):
-            
-            if skd_num == 0:
-                matvec, diag = adc.gen_matvec(imds, eris, cvs=True, alpha_proj=alpha_1)
-                guess = adc.get_init_guess(nroots, diag, ascending = True)
-                conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=skd[2], max_cycle=adc.max_cycle, max_space=adc.max_space)
-                
-                #proj_vec = U
-                alpha.append("CVS")
-                guess_rms.append(vec_rms_compute(guess,U))
-                mom_rms.append("CVS")                 
-                imds = adc.get_imds(eris,fc_bool=False)
-                guess = U
-             
-          #  if skd_num == 0:
-          #      matvec, diag = adc.gen_matvec(imds, eris, mom_skd=True, alpha_proj=alpha_1)
-          #      proj_vec = adc.get_init_guess(nroots, diag, ascending = True)        
-          #      guess = proj_vec
-          #      imds = adc.get_imds(eris,fc_bool=False)
-           
-            matvec, diag = adc.gen_matvec(imds, eris, fc_bool=False, alpha_proj=skd[0])
-            
-            
-            def cvs_pick(cvs_npick,U):          
-                len_cvs_npick = len(cvs_npick)
-                print(len_cvs_npick)
-                nroots = len_cvs_npick
-                dim_guess = np.array(U).shape[1]
-                guess = np.zeros((len_cvs_npick, dim_guess))
-                for idx_guess, npick in enumerate(cvs_npick):
-                    U = np.array(U)
-                    guess[idx_guess,:] = U[npick,:]
-                return guess, nroots
-            guess,nroots = cvs_pick(cvs_npick,U)           
-            def eig_close_to_init_guess(w, v, nroots, envs):
-                x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])
-                print("shape of guess vector: ", np.asarray(guess).shape) 
-                s = np.dot(np.asarray(guess).conj(), np.asarray(x0).T)
-                snorm = np.einsum('pi,pi->i', s.conj(), s)
-                idx = np.argsort(-snorm)[:nroots]
-                ### Testing space ###
-            
-                #print('Shape of guess vector: ')
-                #print(np.array(guess).shape)
-                #print('Shape of subspace:  ')
-                #print(np.array(x0).shape)
-                #print('Shape of overlap matrix: ')
-                #print(s.shape,"S matrix: ")
-                #print(s)
-                #print("Norm: ")
-                #print(np.sort(snorm)[::-1])
-                w, v, idx = lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
-                return w, v, idx
-
-            #if skd_num > 0:
-            #    guess = U
-            conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=skd[2], max_cycle=skd[1], max_space=adc.max_space)
-            #guess,nroots = cvs_pick(cvs_npick,U)           
-            #conv, E, U = davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=skd[2], max_cycle=skd[1], max_space=adc.max_space)
-            alpha.append(skd[0])
-            #guess_rms.append(vec_rms_compute(guess,U))
-            #mom_rms.append(vec_rms_compute(proj_vec,U))
-           
-     
-    print("Alpha values: ", alpha)
-    print("Delta RMS of macroiteration eigenvector w.r.t guess vector fed into the iteration: ", guess_rms)   
-    print("Delta RMS of macroiteration eigenvector w.r.t projection vector: ", mom_rms)
-    #"""   
-    """
-    if (ncore_proj > 0):
-        matvec, diag = adc.gen_matvec(imds, eris, cvs=True)
+        matvec, diag = adc.gen_matvec(imds, eris, cvs=True, alpha_proj=0)
         guess = adc.get_init_guess(nroots, diag, ascending = True)
         conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
-             
-        if cvs_npick is not False:
-            imds = adc.get_imds(eris, fc_bool=False)
-            matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False)
-               
+        guess = U
+        imds = adc.get_imds(eris,fc_bool=False)
+        matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False, alpha_proj=1)
+            
+            
+        def cvs_pick(cvs_npick,U):          
             len_cvs_npick = len(cvs_npick)
             nroots = len_cvs_npick
             dim_guess = np.array(U).shape[1]
@@ -291,41 +94,31 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
             for idx_guess, npick in enumerate(cvs_npick):
                 U = np.array(U)
                 guess[idx_guess,:] = U[npick,:]
-                                            
-    if (nkop_chk is True) or (kop_npick is not False):
-        kop_w, kop_v = np.linalg.eigh(imds)
-        kop_v = kop_v.T
-        kop_w = -kop_w
-        dim_kop = kop_v.shape[0]
-
-        for kop_root, w in enumerate(kop_w):
-            print("Koopman State #", kop_root, " Energy [Eh]: ", w, "  Energy [ev]: ", w*Eh2ev ) ## Only works for IP; need another print statement for EA
-
-        if nkop_chk is True:
-           print("Initial Koopman's states checkpoint... exiting calculation")
-           exit()
-
-        if kop_npick is not False:
-            kroots, dim_guess = np.array(guess).shape
-            len_kop_npick = len(kop_npick)
-            nroots = len_kop_npick
-            guess = np.zeros((nroots,dim_guess))
-            for idx_guess, npick in enumerate(kop_npick):
-                guess[idx_guess,:dim_kop] = kop_v[npick,:] 
-        
-    if (kop_npick is not False) or (cvs_npick is not False):
-
+            return guess, nroots
+           
+        if cvs_npick:
+            guess,nroots = cvs_pick(cvs_npick,U)
+           
         def eig_close_to_init_guess(w, v, nroots, envs):
             x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])
             s = np.dot(np.asarray(guess).conj(), np.asarray(x0).T)
             snorm = np.einsum('pi,pi->i', s.conj(), s)
             idx = np.argsort(-snorm)[:nroots]
-            return lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
-     
+            w, v, idx = lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
+            return w, v, idx
+
         conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
-    else:
-        conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
-    """
+        #conv, E, U = davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=skd[2], max_cycle=skd[1], max_space=adc.max_space)
+    elif (mom_skd_iter == False) and (ncore_proj == 0):
+        matvec, diag = adc.gen_matvec(imds, eris, cvs)
+        guess = adc.get_init_guess(nroots, diag, ascending = True)
+        conv, E, U = davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-14, max_cycle=adc.max_cycle, max_space=adc.max_space)
+           
+    elif (ncore_proj_valence > 0):
+        matvec, diag = adc.gen_matvec(imds, eris, cvs)
+        guess = adc.get_init_guess(nroots, diag, ascending = True)
+        conv, E, U = davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-14, max_cycle=adc.max_cycle, max_space=adc.max_space)
+     
 ############################################
 
     U = np.array(U)
@@ -885,7 +678,37 @@ def cvs_projector(myadc, r, alpha_proj=0):
     temp = Pr[s2:f2].reshape((nvir, nocc, nocc)).copy()
     
     temp[:,ncore_proj:,ncore_proj:] *= alpha_proj
-    temp[:,:ncore_proj,:ncore_proj] *= alpha_proj
+    #temp[:,:ncore_proj,:ncore_proj] *= alpha_proj
+    
+    Pr[s2:f2] = temp.reshape(-1).copy()
+    
+    return Pr
+
+def cvs_proj_valence(myadc, r):
+    
+    ncore_proj = myadc.ncore_proj_valence
+    
+    nocc = myadc._nocc
+    nvir = myadc._nvir
+
+    n_singles = nocc
+    n_doubles = nvir * nocc * nocc
+    
+    s1 = 0
+    f1 = n_singles
+    s2 = f1
+    f2 = s2 + n_doubles 
+    
+    Pr = r.copy()
+    
+    Pr[s1:ncore_proj] = 0    
+    
+    temp = np.zeros((nvir, nocc, nocc))
+    temp = Pr[s2:f2].reshape((nvir, nocc, nocc)).copy()
+    
+    temp[:,:ncore_proj:,:ncore_proj] = 0
+    temp[:,:ncore_proj,ncore_proj:] = 0
+    temp[:,ncore_proj:,:ncore_proj] = 0
     
     Pr[s2:f2] = temp.reshape(-1).copy()
     
@@ -998,6 +821,7 @@ class RADC(lib.StreamObject):
         self.kop_npick = False
         self.fc_bool = True
         self.ncore_proj = 0
+        self.ncore_proj_valence = 0
         self.alpha_proj = 0
         self.mom_skd_iter = []
         keys = set(('conv_tol', 'e_corr', 'method', 'mo_coeff', 'mol', 'mo_energy', 'max_memory', 'incore_complete', 'scf_energy', 'e_tot', 't1', 'frozen', 'chkfile', 'max_space', 't2', 'mo_occ', 'max_cycle'))
@@ -1997,6 +1821,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=True, fc_bool=True, mom_skd=False, a
     diag[s2:f2] = D_aij.copy()
 
     ###### Additional terms for the preconditioner ####
+    """
     if (method == "adc(2)-x" or method == "adc(3)"):
 
         if eris is None:
@@ -2030,7 +1855,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=True, fc_bool=True, mom_skd=False, a
                 temp[:] += np.diagonal(eris_ovov_p).reshape(nocc, nvir)
                 temp = np.ascontiguousarray(temp.transpose(2,0,1))
                 diag[s2:f2] += temp.reshape(-1)
-    
+    """
     if (cvs is True) or ((mom_skd is True) and (alpha_proj==0)):
 
         shift = -100000.0
@@ -2039,7 +1864,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=True, fc_bool=True, mom_skd=False, a
 
         temp = np.zeros((nvir,nocc,nocc))
         temp[:,ncore_proj:,ncore_proj:] += shift
-        temp[:,:ncore_proj,:ncore_proj] += shift
+        #temp[:,:ncore_proj,:ncore_proj] += shift
 
         diag[s2:f2] += temp.reshape(-1).copy()
 
@@ -2650,7 +2475,7 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
     D_aij = D_n.reshape(-1)
 
     if M_ij is None:
-        M_ij = adc.get_imds()
+        M_ij = adc.get_imds(fc_bool)
 
     #Calculate sigma vector
     def sigma_(r):
@@ -2659,6 +2484,9 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
 
         if cvs is True:
             r = cvs_projector(adc, r)
+
+        if adc.ncore_proj_valence > 0:
+            r = cvs_proj_valence(adc, r)
 
         s = np.zeros((dim))
 
@@ -2821,6 +2649,10 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
 
         if cvs is True:
             s = cvs_projector(adc, s)
+
+
+        if adc.ncore_proj_valence > 0:
+            s = cvs_proj_valence(adc, s)
 
         return s
 
@@ -3823,6 +3655,7 @@ class RADCEA(RADC):
         self.cvs_pick = adc.cvs_pick
         self.fc_bool = adc.fc_bool
         self.ncore_proj = adc.ncore_proj
+        self.ncore_proj_valence = adc.ncore_proj_valence
         self.alpha_proj = adc.alpha_proj
         self.mom_skd_iter = adc.mom_skd_iter
         keys = set(('conv_tol', 'e_corr', 'method', 'mo_coeff', 'mo_energy', 'max_memory', 't1', 'max_space', 't2', 'max_cycle'))
@@ -3927,6 +3760,7 @@ class RADCIP(RADC):
         self.cvs_npick = adc.cvs_npick
         self.fc_bool = adc.fc_bool
         self.ncore_proj = adc.ncore_proj
+        self.ncore_proj_valence = adc.ncore_proj_valence
         self.alpha_proj = adc.alpha_proj
         self.mom_skd_iter = adc.mom_skd_iter 
         keys = set(('conv_tol', 'e_corr', 'method', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))

@@ -51,17 +51,32 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     imds = adc.get_imds(eris)
 
-    if adc.ncore_cvs > 0:
-        cvs_bool = True
-    else:
-        cvs_bool = False
-    matvec, diag = adc.gen_matvec(imds, eris, cvs=cvs_bool)
+    matvec, diag = adc.gen_matvec(imds, eris, cvs=True)
     guess = adc.get_init_guess(nroots, diag, ascending = True)
-    conv, E, U = davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
-  
-    imds = adc.get_imds(eris, fc_bool=False)
-    matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False)
+    conv, E, U = davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-12, max_cycle=adc.max_cycle, max_space=adc.max_space)
+    """"
+    U = np.array(U)
+    print("shape of U: ", U.shape)
+    for i in range(U.shape[0]):
+        U_sq = U[i,:].copy()**2
+        U_sq_idx = np.argsort(-U_sq)
+        U_sq_sorted = U_sq[U_sq_idx].copy()
+        counter = 0
+        U2_sum = 0
+        print(U_sq_sorted[:100])
+        for j in U_sq_sorted:
+            U2_sum += j
+            if U2_sum < 0.9999:
+                counter += 1
+            elif U2_sum >= 0.9999:
+                break
+        print("there are ", counter, "imp elements in root ", i, " ratio: ", counter/U.shape[1]) 
+    exit() 
+    """
     guess = U
+    #imds = adc.get_imds(eris, fc_bool=False)
+    matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False)
+
 
 
     def cvs_pick(cvs_npick,U):          
@@ -79,66 +94,32 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         E = E[cvs_npick]
            
     #E, U, conv = compute_lanczos(matvec, nroots, guess)
-    max_mom_iter = 130
+    max_mom_iter = 100
     de_tol = 1e-6
-    res_tol = 1e-5
-    #ovlp_tol = 0.001
-    #max_v = 2
+    res_tol = 1e-3
+    ovlp_tol = 0.01
+    max_v = 30
     if adc.lanczos_space > 0:
-        E, U, conv = mom_blanczos(matvec, guess, adc.lanczos_space, max_mom_iter, E, de_tol, res_tol,fixed_proj=True)
+        E, U, conv, nroots = mom_blanczos(matvec, guess, adc.lanczos_space, max_mom_iter, E, de_tol, res_tol,ovlp_tol=ovlp_tol,max_v=max_v,fixed_proj=True)
     def guess_temp_func(numroots, ad, ascending=True):
         return adc.get_init_guess(numroots,ad,ascending) 
 
     def matvec_idn1(idn1_vec):
         return idn1_vec
 
-    guess_dim = np.array(guess).shape[1]
-    diag_idn = np.ones(guess_dim)
-
-    nocc_a = adc.nocc_a
-    nocc_b = adc.nocc_b
-    nvir_a = adc.nvir_a
-    nvir_b = adc.nvir_b
-    n_singles_a = nocc_a
-    n_singles_b = nocc_b
-    n_doubles_aaa = nocc_a * (nocc_a - 1) * nvir_a // 2
-    n_doubles_bab = nvir_b * nocc_a * nocc_b
-    n_doubles_aba = nvir_a * nocc_b * nocc_a
-    n_doubles_bbb = nocc_b * (nocc_b - 1) * nvir_b // 2
-
-    M_dim = n_singles_a + n_singles_b + n_doubles_aaa + n_doubles_bab + n_doubles_aba + n_doubles_bbb
-    #mv = LinearOperator(shape = (M_dim,M_dim), matvec=matvec)
-    #E, U = eigsh(mv, k=nroots, which = 'SM', tol=1e-8)
-    #U = U.T
-    ev2eh = 1/27.211396641308
-
-    #guess = adc.get_init_guess(nroots, diag, ascending = True)
-    #E, U, conv_bad = eighg(lambda xs : [matvec(x) for x in xs], lambda xs : [matvec_idn1(x) for x in xs], nroots, diag,diag_idn ,guess_temp_func,nguess=None, niter=adc.max_cycle, nsvec=1000, nvec=500, rthresh=1e-6, print_conv=True, highest=False, guess_random=False, disk=False, shift=E)
-    #conv, E, U = davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual = 1e-6)
-
-
     def eig_close_to_init_guess(w, v, nroots, envs):      
            x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])      
            s = np.dot(np.asarray(U).conj(), np.asarray(x0).T)      
            snorm = np.einsum('pi,pi->i', s.conj(), s)      
            idx = np.argsort(-snorm)[:nroots]      
-           ### Testing space ###      
-                            
-           #print('Shape of guess vector: ')      
-           #print(np.array(guess).shape)      
-           print('Shape of x0:  ')                  
-           print(np.array(x0).shape)
-           print('shape of U')
-           print(np.array(U).shape)      
-           print('Shape of overlap matrix: ')                
-           print(s.shape)      
-           #print(s)                                       
-           #print("Norm: ")                             
-           #print(np.sort(snorm)[::-1])      
-           return lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)       
-    #conv, E, U = davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual = 1e-6, pick =eig_close_to_init_guess)
+           return lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
+       
+    #conv, E, U = davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick =eig_close_to_init_guess)
     
     U = np.array(U)
+    print("shape of Lanczos array: ", U.shape)
+    #for i in range(U.shape[0]):
+    #    print("CVS/MOM overlap: ", np.dot(np.array(guess)[i,:], U[i,:].T))
     T = adc.get_trans_moments()
     spec_factors = adc.get_spec_factors(T, U, nroots)
 
@@ -160,7 +141,190 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     log.timer('ADC', *cput0)
 
+    analyze_eigenvector_ip(adc, U)
+
     return E, U, spec_factors
+
+def analyze_eigenvector_ip(adc, U):
+
+    nocc_a = adc.nocc_a
+    nocc_b = adc.nocc_b
+    nvir_a = adc.nvir_a
+    nvir_b = adc.nvir_b
+    evec_print_tol = 0.05
+
+    logger.info(adc, "Number of alpha occupied orbitals = %d", nocc_a)
+    logger.info(adc, "Number of beta occupied orbitals = %d", nocc_b)
+    logger.info(adc, "Number of alpha virtual orbitals =  %d", nvir_a)
+    logger.info(adc, "Number of beta virtual orbitals =  %d", nvir_b)
+    logger.info(adc, "Print eigenvector elements > %f\n", evec_print_tol)
+
+    ij_a = np.tril_indices(nocc_a, k=-1)
+    ij_b = np.tril_indices(nocc_b, k=-1)
+
+    n_singles_a = nocc_a
+    n_singles_b = nocc_b
+    n_doubles_aaa = nocc_a* (nocc_a - 1) * nvir_a // 2
+    n_doubles_bab = nvir_b * nocc_a* nocc_b
+    n_doubles_aba = nvir_a * nocc_b* nocc_a
+    n_doubles_bbb = nocc_b* (nocc_b - 1) * nvir_b // 2
+
+    s_a = 0
+    f_a = n_singles_a
+    s_b = f_a
+    f_b = s_b + n_singles_b
+    s_aaa = f_b
+    f_aaa = s_aaa + n_doubles_aaa
+    s_bab = f_aaa
+    f_bab = s_bab + n_doubles_bab
+    s_aba = f_bab
+    f_aba = s_aba + n_doubles_aba
+    s_bbb = f_aba
+    f_bbb = s_bbb + n_doubles_bbb
+
+
+    for I in range(U.shape[0]):
+        U1 = U[I,:f_b]
+        U2 = U[I,f_b:]
+        U1dotU1 = np.dot(U1, U1) 
+        U2dotU2 = np.dot(U2, U2) 
+
+        temp_aaa = np.zeros((nvir_a, nocc_a, nocc_a))
+        temp_aaa[:,ij_a[0],ij_a[1]] =  U[I,s_aaa:f_aaa].reshape(nvir_a,-1).copy()
+        temp_aaa[:,ij_a[1],ij_a[0]] = -U[I,s_aaa:f_aaa].reshape(nvir_a,-1).copy()
+        U_aaa = temp_aaa.reshape(-1).copy()
+
+        temp_bbb = np.zeros((nvir_b, nocc_b, nocc_b))
+        temp_bbb[:,ij_b[0],ij_b[1]] =  U[I,s_bbb:f_bbb].reshape(nvir_b,-1).copy()
+        temp_bbb[:,ij_b[1],ij_b[0]] = -U[I,s_bbb:f_bbb].reshape(nvir_b,-1).copy()
+        U_bbb = temp_bbb.reshape(-1).copy()
+
+        U_sq = U[I,:].copy()**2
+        ind_idx = np.argsort(-U_sq)
+        U_sq = U_sq[ind_idx] 
+        U_sorted = U[I,ind_idx].copy()
+
+        U_sq_aaa = U_aaa.copy()**2
+        U_sq_bbb = U_bbb.copy()**2
+        ind_idx_aaa = np.argsort(-U_sq_aaa)
+        ind_idx_bbb = np.argsort(-U_sq_bbb)
+        U_sq_aaa = U_sq_aaa[ind_idx_aaa]
+        U_sq_bbb = U_sq_bbb[ind_idx_bbb]
+        U_sorted_aaa = U_aaa[ind_idx_aaa].copy()
+        U_sorted_bbb = U_bbb[ind_idx_bbb].copy()
+
+        U_sorted = U_sorted[U_sq > evec_print_tol**2]
+        ind_idx = ind_idx[U_sq > evec_print_tol**2]
+        U_sorted_aaa = U_sorted_aaa[U_sq_aaa > evec_print_tol**2]
+        U_sorted_bbb = U_sorted_bbb[U_sq_bbb > evec_print_tol**2]
+        ind_idx_aaa = ind_idx_aaa[U_sq_aaa > evec_print_tol**2]
+        ind_idx_bbb = ind_idx_bbb[U_sq_bbb > evec_print_tol**2]
+        
+        singles_a_idx = []
+        singles_b_idx = []
+        doubles_aaa_idx = []
+        doubles_bab_idx = []
+        doubles_aba_idx = []
+        doubles_bbb_idx = []  
+        singles_a_val = []
+        singles_b_val = []
+        doubles_bab_val = []
+        doubles_aba_val = []  
+        iter_idx = 0
+        for orb_idx in ind_idx:
+
+            if orb_idx in range(s_a,f_a):
+                i_idx = orb_idx + 1
+                singles_a_idx.append(i_idx)
+                singles_a_val.append(U_sorted[iter_idx])
+               
+            if orb_idx in range(s_b,f_b):
+                i_idx = orb_idx - s_b + 1
+                singles_b_idx.append(i_idx)
+                singles_b_val.append(U_sorted[iter_idx])
+
+            if orb_idx in range(s_bab,f_bab):
+                aij_idx = orb_idx - s_bab       
+                ij_rem = aij_idx % (nocc_a*nocc_b)
+                a_idx = aij_idx//(nocc_a*nocc_b)
+                i_idx = ij_rem//nocc_a
+                j_idx = ij_rem % nocc_a
+                doubles_bab_idx.append((a_idx + 1 + nocc_b, i_idx + 1, j_idx + 1))
+                doubles_bab_val.append(U_sorted[iter_idx])
+          
+            if orb_idx in range(s_aba,f_aba):
+                aij_idx = orb_idx - s_aba     
+                ij_rem = aij_idx % (nocc_b*nocc_a)
+                a_idx = aij_idx//(nocc_b*nocc_a)
+                i_idx = ij_rem//nocc_b
+                j_idx = ij_rem % nocc_b
+                doubles_aba_idx.append((a_idx + 1 + nocc_a, i_idx + 1, j_idx + 1))
+                doubles_aba_val.append(U_sorted[iter_idx])
+
+            iter_idx += 1
+             
+        for orb_aaa in ind_idx_aaa:              
+            ij_rem = orb_aaa % (nocc_a*nocc_a)
+            a_idx = orb_aaa//(nocc_a*nocc_a)
+            i_idx = ij_rem//nocc_a
+            j_idx = ij_rem % nocc_a
+            doubles_aaa_idx.append((a_idx + 1 + nocc_a, i_idx + 1, j_idx + 1))
+
+        for orb_bbb in ind_idx_bbb:                
+            ij_rem = orb_bbb % (nocc_b*nocc_b)
+            a_idx = orb_bbb//(nocc_b*nocc_b)
+            i_idx = ij_rem//nocc_b
+            j_idx = ij_rem % nocc_b
+            doubles_bbb_idx.append((a_idx + 1 + nocc_b, i_idx + 1, j_idx + 1))
+
+        doubles_aaa_val = list(U_sorted_aaa)
+        doubles_bbb_val = list(U_sorted_bbb)
+        
+        logger.info(adc,'%s | root %d | norm(1h)  = %6.4f | norm(2h1p) = %6.4f ',adc.method ,I, U1dotU1, U2dotU2)
+
+        if singles_a_val:
+            logger.info(adc, "\n1h(alpha) block: ") 
+            logger.info(adc, "     i     U(i)")
+            logger.info(adc, "------------------")
+            for idx, print_singles in enumerate(singles_a_idx):
+                logger.info(adc, '  %4d   %7.4f', print_singles, singles_a_val[idx])
+
+        if singles_b_val:
+            logger.info(adc, "\n1h(beta) block: ") 
+            logger.info(adc, "     i     U(i)")
+            logger.info(adc, "------------------")
+            for idx, print_singles in enumerate(singles_b_idx):
+                logger.info(adc, '  %4d   %7.4f', print_singles, singles_b_val[idx])
+
+        if doubles_aaa_val:
+            logger.info(adc, "\n2h1p(alpha|alpha|alpha) block: ") 
+            logger.info(adc, "     i     j     a     U(i,j,a)")
+            logger.info(adc, "-------------------------------")
+            for idx, print_doubles in enumerate(doubles_aaa_idx):
+                logger.info(adc, '  %4d  %4d  %4d     %7.4f', print_doubles[1], print_doubles[2], print_doubles[0], doubles_aaa_val[idx])
+
+        if doubles_bab_val:
+            logger.info(adc, "\n2h1p(beta|alpha|beta) block: ") 
+            logger.info(adc, "     i     j     a     U(i,j,a)")
+            logger.info(adc, "-------------------------------")
+            for idx, print_doubles in enumerate(doubles_bab_idx):
+                logger.info(adc, '  %4d  %4d  %4d     %7.4f', print_doubles[1], print_doubles[2], print_doubles[0], doubles_bab_val[idx])
+
+        if doubles_aba_val:
+            logger.info(adc, "\n2h1p(alpha|beta|alpha) block: ") 
+            logger.info(adc, "     i     j     a     U(i,j,a)")
+            logger.info(adc, "-------------------------------")
+            for idx, print_doubles in enumerate(doubles_aba_idx):
+                logger.info(adc, '  %4d  %4d  %4d     %7.4f', print_doubles[1], print_doubles[2], print_doubles[0], doubles_aba_val[idx])
+
+        if doubles_bbb_val:
+            logger.info(adc, "\n2h1p(beta|beta|beta) block: ") 
+            logger.info(adc, "     i     j     a     U(i,j,a)")
+            logger.info(adc, "-------------------------------")
+            for idx, print_doubles in enumerate(doubles_bbb_idx):
+                logger.info(adc, '  %4d  %4d  %4d     %7.4f', print_doubles[1], print_doubles[2], print_doubles[0], doubles_bbb_val[idx])
+
+        logger.info(adc, "\n*************************************************************\n")
 
 
 def compute_amplitudes_energy(myadc, eris, verbose=None, fc_bool=True):
@@ -1010,7 +1174,7 @@ class UADC(lib.StreamObject):
         self.nfc_orb = 0
         self.ncore_cvs = 0
         self.cvs_npick = []
-        self.lanczos_space = 50
+        self.lanczos_space = 0
         
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mol', 'mo_energy_b', 'max_memory', 'scf_energy', 'e_tot', 't1', 'frozen', 'mo_energy_a', 'chkfile', 'max_space', 't2', 'mo_occ', 'max_cycle'))
 
@@ -2348,6 +2512,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
     diag[s_bbb:f_bbb] = D_aij_b.copy()
 
     ###### Additional terms for the preconditioner ####
+     
     if (method == "adc(2)-x" or method == "adc(3)"):
         if eris is None:
             eris = adc.transform_integrals()
@@ -2442,10 +2607,10 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
                 temp[:] += np.diagonal(eris_OvOv_p).reshape(nocc_b,nvir_a)
                 temp = np.ascontiguousarray(temp.transpose(2,1,0))
                 diag[s_aba:f_aba] += temp.reshape(-1)
-
+      
     if cvs is True:
         
-        shift = -100000.0
+        shift = -100000000.0
         ncore = adc.ncore_cvs
 
         diag[(s_a+ncore):f_a] += shift
@@ -2456,21 +2621,21 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         temp[:,ij_ind_a[1],ij_ind_a[0]] = -diag[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
 
         temp[:,ncore:,ncore:] += shift
-        temp[:,:ncore,:ncore] += shift
+        #temp[:,:ncore,:ncore] += shift
 
         diag[s_aaa:f_aaa] = temp[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1).copy()
 
         temp = diag[s_bab:f_bab].copy()
         temp = temp.reshape((nvir_b, nocc_a, nocc_b))
         temp[:,ncore:,ncore:] += shift
-        temp[:,:ncore,:ncore] += shift
+        #temp[:,:ncore,:ncore] += shift
 
         diag[s_bab:f_bab] = temp.reshape(-1).copy()
 
         temp = diag[s_aba:f_aba].copy()
         temp = temp.reshape((nvir_a, nocc_b, nocc_a))
         temp[:,ncore:,ncore:] += shift
-        temp[:,:ncore,:ncore] += shift
+        #temp[:,:ncore,:ncore] += shift
 
         diag[s_aba:f_aba] = temp.reshape(-1).copy()
 
@@ -2479,7 +2644,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         temp[:,ij_ind_b[1],ij_ind_b[0]] = -diag[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
 
         temp[:,ncore:,ncore:] += shift
-        temp[:,:ncore,:ncore] += shift
+        #temp[:,:ncore,:ncore] += shift
 
         diag[s_bbb:f_bbb] = temp[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1).copy()
        
@@ -2529,21 +2694,21 @@ def cvs_projector(adc, r):
     temp[:,ij_a[1],ij_a[0]] = -Pr[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
 
     temp[:,ncore:,ncore:] = 0.0
-    temp[:,:ncore,:ncore] = 0.0
+    #temp[:,:ncore,:ncore] = 0.0
 
     Pr[s_aaa:f_aaa] = temp[:,ij_a[0],ij_a[1]].reshape(-1).copy()
 
     temp = Pr[s_bab:f_bab].copy()
     temp = temp.reshape((nvir_b, nocc_a, nocc_b))
     temp[:,ncore:,ncore:] = 0.0
-    temp[:,:ncore,:ncore] = 0.0
+    #temp[:,:ncore,:ncore] = 0.0
 
     Pr[s_bab:f_bab] = temp.reshape(-1).copy()
 
     temp = Pr[s_aba:f_aba].copy()
     temp = temp.reshape((nvir_a, nocc_b, nocc_a))
     temp[:,ncore:,ncore:] = 0.0
-    temp[:,:ncore,:ncore] = 0.0
+    #temp[:,:ncore,:ncore] = 0.0
 
     Pr[s_aba:f_aba] = temp.reshape(-1).copy()
 
@@ -2552,7 +2717,7 @@ def cvs_projector(adc, r):
     temp[:,ij_b[1],ij_b[0]] = -Pr[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
 
     temp[:,ncore:,ncore:] = 0.0
-    temp[:,:ncore,:ncore] = 0.0
+    #temp[:,:ncore,:ncore] = 0.0
 
     Pr[s_bbb:f_bbb] = temp[:,ij_b[0],ij_b[1]].reshape(-1).copy()
 
