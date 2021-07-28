@@ -1910,7 +1910,7 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
     diag[s2_acc:f2_acc] = D_aij[:,:ncvs,:ncvs].reshape(-1)
     diag[s2_acv:f2_acv] = D_aij[:,:ncvs,ncvs:].reshape(-1)
     diag[s2_avc:f2_avc] = D_aij[:,ncvs:,:ncvs].reshape(-1)
-
+    
 #    ###### Additional terms for the preconditioner ####
 #    if (method == "adc(2)-x" or method == "adc(3)"):
 #
