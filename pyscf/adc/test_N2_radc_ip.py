@@ -30,7 +30,7 @@ mol.atom = [
 mol.basis = {'N':'aug-cc-pvdz'}
 mol.verbose = 0
 mol.build()
-mf = scf.RHF(mol)
+mf = scf.UHF(mol)
 mf.conv_tol = 1e-12
 mf.kernel()
 myadc = adc.ADC(mf)
