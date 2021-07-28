@@ -1869,7 +1869,6 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=True, fc_bool=True, mom_skd=False, a
         diag[s2:f2] += temp.reshape(-1).copy()
 
     diag = -diag
-
     return diag
 
 def ea_contract_r_vvvv(myadc,r2,vvvv):
