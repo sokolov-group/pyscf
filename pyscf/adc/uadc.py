@@ -1975,6 +1975,12 @@ def get_imds_ip(adc, eris=None, fc_bool=True):
     M_ij_b -= 0.5 *  lib.einsum('jlde,ldie->ij',t2_1_b, eris_OVOV, optimize=True)
     M_ij_b += lib.einsum('ljed,leid->ij',t2_1_ab, eris_ovOV, optimize=True)
 
+    e_a, _ = np.linalg.eigh(M_ij_a[:2,:2])
+    e_b, _ = np.linalg.eigh(M_ij_b[:2,:2])
+    print("e_a: ", e_a)
+    print("e_b: ", e_b)
+    exit()
+
     # Third-order terms
 
     if (method == "adc(3)"):
@@ -2501,8 +2507,8 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
     M_ij_a_diag = np.diagonal(M_ij_a)
     M_ij_b_diag = np.diagonal(M_ij_b)
 
-    diag[s_a:f_a] = M_ij_a_diag.copy()
-    diag[s_b:f_b] = M_ij_b_diag.copy()
+    #diag[s_a:f_a] = M_ij_a_diag.copy()
+    #diag[s_b:f_b] = M_ij_b_diag.copy()
 
     # Compute precond in 2p1h-2p1h block
 
@@ -2610,46 +2616,65 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
       
     if cvs is True:
         
-        shift = -100000000.0
+        #shift = -100000000.0
+        shift = 0
         ncore = adc.ncore_cvs
 
-        diag[(s_a+ncore):f_a] += shift
-        diag[(s_b+ncore):f_b] += shift
+        diag[(s_a+ncore):f_a] = shift
+        diag[(s_b+ncore):f_b] = shift
 
         temp = np.zeros((nvir_a, nocc_a, nocc_a))
         temp[:,ij_ind_a[0],ij_ind_a[1]] = diag[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
         temp[:,ij_ind_a[1],ij_ind_a[0]] = -diag[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
-
-        temp[:,ncore:,ncore:] += shift
-        #temp[:,:ncore,:ncore] += shift
+        temp1 = temp[:, :ncore, ncore:].reshape(-1)
+        #temp[:,ncore:,ncore:] = shift
+        #temp[:,ncore:,:ncore] = shift
+        #temp[:,:ncore,ncore:] = shift
+        #temp[:,:ncore,:ncore] = shift#
 
         diag[s_aaa:f_aaa] = temp[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1).copy()
 
         temp = diag[s_bab:f_bab].copy()
         temp = temp.reshape((nvir_b, nocc_a, nocc_b))
-        temp[:,ncore:,ncore:] += shift
-        #temp[:,:ncore,:ncore] += shift
+        temp2 = temp[:, :ncore, ncore:].reshape(-1)
+        #temp[:,ncore:,ncore:] = shift
+        #temp[:,ncore:,:ncore] = shift
+        #temp[:,:ncore,ncore:] = shift
+        #temp[:,:ncore,:ncore] = shift#
 
         diag[s_bab:f_bab] = temp.reshape(-1).copy()
 
         temp = diag[s_aba:f_aba].copy()
         temp = temp.reshape((nvir_a, nocc_b, nocc_a))
-        temp[:,ncore:,ncore:] += shift
-        #temp[:,:ncore,:ncore] += shift
+        temp3 = temp[:, :ncore, ncore:].reshape(-1)
+        temp[:,ncore:,ncore:] = shift
+        #temp[:,ncore:,:ncore] = shift
+        #temp[:,:ncore,ncore:] = shift
+        temp[:,:ncore,:ncore] = shift
 
         diag[s_aba:f_aba] = temp.reshape(-1).copy()
 
         temp = np.zeros((nvir_b, nocc_b, nocc_b))
         temp[:,ij_ind_b[0],ij_ind_b[1]] = diag[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
         temp[:,ij_ind_b[1],ij_ind_b[0]] = -diag[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
+        temp4 = temp[:, :ncore, ncore:].reshape(-1)
 
-        temp[:,ncore:,ncore:] += shift
-        #temp[:,:ncore,:ncore] += shift
+        temp[:,ncore:,ncore:] = shift
+        #temp[:,ncore:,:ncore] = shift
+        #temp[:,:ncore,ncore:] = shift
+        temp[:,:ncore,:ncore] = shift
 
         diag[s_bbb:f_bbb] = temp[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1).copy()
-       
+        test_a = np.zeros(1560)
+        test_a[:390] = temp1
+        test_a[390:780] = temp2
+        test_a[780:1170] = temp3
+        test_a[1170:] = temp4
+        print("test_a: ", np.linalg.norm(test_a))
+    
     diag = -diag
-
+    print("aaa: ", np.linalg.norm(temp1), " bab: ",np.linalg.norm(temp2),"aba: ",np.linalg.norm(temp3), "bbb: ", np.linalg.norm(temp4))
+    #exit()
     return diag
 
 def cvs_projector(adc, r):
