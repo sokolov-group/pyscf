@@ -50,7 +50,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     guess = adc.get_init_guess(nroots, diag, ascending = True)
 
     conv, adc.E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space,tol_residual=adc.tol_residual)
-    print("Davidson CVS energies: :, E")
+    print("Davidson CVS energies: :", adc.E)
     exit()
     adc.U = np.array(U).T.copy()
 
@@ -3025,8 +3025,8 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
 #           raise Exception("Precond not available for out-of-core and density-fitted algo")
 
     diag = -diag
-    print("Norm of diag vector: ", np.linalg.norm(diag))
-    exit()
+    #print("Norm of diag vector: ", np.linalg.norm(diag))
+    #exit()
     return diag
 
 def ea_contract_r_vvvv_antisym(myadc,r2,vvvv_d):
@@ -3730,6 +3730,8 @@ def ea_adc_matvec(adc, M_ab=None, eris=None):
     return sigma_
 
 
+
+
 def ip_adc_matvec(adc, M_ij=None, eris=None):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -4264,7 +4266,6 @@ def ip_adc_matvec(adc, M_ij=None, eris=None):
 
     return sigma_
 
-
 def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -4276,18 +4277,22 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
     nocc_b = adc.nocc_b
     nvir_a = adc.nvir_a
     nvir_b = adc.nvir_b
+    ncvs = adc.ncvs
+    nval_a = nocc_a - ncvs
+    nval_b = nocc_b - ncvs
 
-    ij_ind_a = np.tril_indices(nocc_a, k=-1)
-    ij_ind_b = np.tril_indices(nocc_b, k=-1)
+    n_singles_a = ncvs
+    n_singles_b = ncvs
+    n_doubles_aaa_ecc = ncvs * (ncvs - 1) * nvir_a // 2
+    n_doubles_bab_ecc = nvir_b * ncvs * ncvs
+    n_doubles_aba_ecc = nvir_a * ncvs * ncvs
+    n_doubles_bbb_ecc = ncvs * (ncvs - 1) * nvir_b // 2
+    n_doubles_aaa_ecv = ncvs * nval_a * nvir_a 
+    n_doubles_bab_ecv = nvir_b * ncvs * nval_b
+    n_doubles_aba_ecv = nvir_a * ncvs * nval_a
+    n_doubles_bbb_ecv = ncvs * nval_b * nvir_b
 
-    n_singles_a = nocc_a
-    n_singles_b = nocc_b
-    n_doubles_aaa = nocc_a * (nocc_a - 1) * nvir_a // 2
-    n_doubles_bab = nvir_b * nocc_a * nocc_b
-    n_doubles_aba = nvir_a * nocc_b * nocc_a
-    n_doubles_bbb = nocc_b * (nocc_b - 1) * nvir_b // 2
-
-    dim = n_singles_a + n_singles_b + n_doubles_aaa + n_doubles_bab + n_doubles_aba + n_doubles_bbb
+    dim = n_singles_a + n_singles_b + n_doubles_aaa_ecc + n_doubles_bab_ecc + n_doubles_aba_ecc + n_doubles_bbb_ecc + n_doubles_aaa_ecv + n_doubles_bab_ecv + n_doubles_aba_ecv + n_doubles_bbb_ecv
 
     e_occ_a = adc.mo_energy_a[:nocc_a]
     e_occ_b = adc.mo_energy_b[:nocc_b]
@@ -4299,6 +4304,8 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
     idn_vir_a = np.identity(nvir_a)
     idn_vir_b = np.identity(nvir_b)
 
+    ij_ind_ncvs = np.tril_indices(ncvs, k=-1)
+
     if eris is None:
         eris = adc.transform_integrals()
 
@@ -4306,36 +4313,53 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
     d_a_a = e_vir_a[:,None]
     D_n_a = -d_a_a + d_ij_a.reshape(-1)
     D_n_a = D_n_a.reshape((nvir_a,nocc_a,nocc_a))
-    D_aij_a = D_n_a.copy()[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1)
+    D_n_a_ecc = D_n_a[:, :ncvs, :ncvs].copy()
+    D_aij_a_ecv = D_n_a[:, :ncvs, ncvs:].copy().reshape(-1)
+    D_aij_a_ecc = D_n_a_ecc.copy()[:,ij_ind_ncvs[0],ij_ind_ncvs[1]].reshape(-1)
 
     d_ij_b = e_occ_b[:,None] + e_occ_b
     d_a_b = e_vir_b[:,None]
     D_n_b = -d_a_b + d_ij_b.reshape(-1)
     D_n_b = D_n_b.reshape((nvir_b,nocc_b,nocc_b))
-    D_aij_b = D_n_b.copy()[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1)
+    D_n_b_ecc = D_n_b[:, :ncvs, :ncvs].copy()
+    D_aij_b_ecv = D_n_b[:, :ncvs, ncvs:].copy().reshape(-1)
+    D_aij_b_ecc = D_n_b_ecc.copy()[:,ij_ind_ncvs[0],ij_ind_ncvs[1]].reshape(-1)
 
     d_ij_ab = e_occ_b[:,None] + e_occ_a
     d_a_b = e_vir_b[:,None]
     D_n_bab = -d_a_b + d_ij_ab.reshape(-1)
-    D_aij_bab = D_n_bab.reshape(-1)
+    D_n_bab = D_n_bab.reshape((nvir_b,nocc_a,nocc_b))
+    D_aij_bab_ecc = D_n_bab[:, :ncvs, :ncvs].reshape(-1)
+    D_aij_bab_ecv = D_n_bab[:, :ncvs, ncvs:].reshape(-1)
 
     d_ij_ab = e_occ_a[:,None] + e_occ_b
     d_a_a = e_vir_a[:,None]
     D_n_aba = -d_a_a + d_ij_ab.reshape(-1)
-    D_aij_aba = D_n_aba.reshape(-1)
+    D_n_aba = D_n_aba.reshape(-1)
+    D_n_aba = D_n_aba.reshape((nvir_a,nocc_b,nocc_a))
+    D_aij_aba_ecc = D_n_aba[:, :ncvs, :ncvs].reshape(-1)
+    D_aij_aba_ecv = D_n_aba[:, :ncvs, ncvs:].reshape(-1)
 
     s_a = 0
     f_a = n_singles_a
     s_b = f_a
     f_b = s_b + n_singles_b
-    s_aaa = f_b
-    f_aaa = s_aaa + n_doubles_aaa
-    s_bab = f_aaa
-    f_bab = s_bab + n_doubles_bab
-    s_aba = f_bab
-    f_aba = s_aba + n_doubles_aba
-    s_bbb = f_aba
-    f_bbb = s_bbb + n_doubles_bbb
+    s_aaa_ecc = f_b
+    f_aaa_ecc = s_aaa_ecc + n_doubles_aaa_ecc
+    s_aaa_ecv = f_aaa_ecc
+    f_aaa_ecv = s_aaa_ecv + n_doubles_aaa_ecv
+    s_bab_ecc = f_aaa_ecv
+    f_bab_ecc = s_bab_ecc + n_doubles_bab_ecc
+    s_bab_ecv = f_bab_ecc
+    f_bab_ecv = s_bab_ecv + n_doubles_bab_ecv
+    s_aba_ecc = f_bab_ecv
+    f_aba_ecc = s_aba_ecc + n_doubles_aba_ecc
+    s_aba_ecv = f_aba_ecc
+    f_aba_ecv = s_aba_ecv + n_doubles_aba_ecv
+    s_bbb_ecc = f_aba_ecv
+    f_bbb_ecc = s_bbb_ecc + n_doubles_bbb_ecc
+    s_bbb_ecv = f_bbb_ecc
+    f_bbb_ecv = s_bbb_ecv + n_doubles_bbb_ecv
 
     if M_ij is None:
         M_ij = adc.get_imds()
@@ -4347,29 +4371,38 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
         log = logger.Logger(adc.stdout, adc.verbose)
 
         s = np.zeros((dim))
+        print("r shape: ", np.shape(r))
 
         r_a = r[s_a:f_a]
         r_b = r[s_b:f_b]
-        r_aaa = r[s_aaa:f_aaa]
-        r_bab = r[s_bab:f_bab]
-        r_aba = r[s_aba:f_aba]
-        r_bbb = r[s_bbb:f_bbb]
+        r_aaa_ecc = r[s_aaa_ecc:f_aaa_ecc]
+        r_aaa_ecv = r[s_aaa_ecv:f_aaa_ecv]
+        r_bab_ecc = r[s_bab_ecc:f_bab_ecc]
+        r_bab_ecv = r[s_bab_ecv:f_bab_ecv]
+        r_aba_ecc = r[s_aba_ecc:f_aba_ecc]
+        r_aba_ecv = r[s_aba_ecv:f_aba_ecv]
+        r_bbb_ecc = r[s_bbb_ecc:f_bbb_ecc]
+        r_bbb_ecv = r[s_bbb_ecv:f_bbb_ecv]
 
-        r_aaa = r_aaa.reshape(nvir_a,-1)
-        r_bbb = r_bbb.reshape(nvir_b,-1)
+        r_aaa_ecc = r_aaa_ecc.reshape(nvir_a,-1)
+        r_bbb_ecc = r_bbb_ecc.reshape(nvir_b,-1)
 
-        r_aaa_u = None
-        r_aaa_u = np.zeros((nvir_a,nocc_a,nocc_a))
-        r_aaa_u[:,ij_ind_a[0],ij_ind_a[1]]= r_aaa.copy()
-        r_aaa_u[:,ij_ind_a[1],ij_ind_a[0]]= -r_aaa.copy()
+        r_aaa_u_ecc = None
+        r_aaa_u_ecc = np.zeros((nvir_a,ncvs,ncvs))
+        r_aaa_u_ecc[:,ij_ind_ncvs[0],ij_ind_ncvs[1]]= r_aaa_ecc.copy()
+        r_aaa_u_ecc[:,ij_ind_ncvs[1],ij_ind_ncvs[0]]= -r_aaa_ecc.copy()
 
-        r_bbb_u = None
-        r_bbb_u = np.zeros((nvir_b,nocc_b,nocc_b))
-        r_bbb_u[:,ij_ind_b[0],ij_ind_b[1]]= r_bbb.copy()
-        r_bbb_u[:,ij_ind_b[1],ij_ind_b[0]]= -r_bbb.copy()
+        r_bbb_u_ecc = None
+        r_bbb_u_ecc = np.zeros((nvir_b,ncvs,ncvs))
+        r_bbb_u_ecc[:,ij_ind_ncvs[0],ij_ind_ncvs[1]]= r_bbb_ecc.copy()
+        r_bbb_u_ecc[:,ij_ind_ncvs[1],ij_ind_ncvs[0]]= -r_bbb_ecc.copy()
 
-        r_aba = r_aba.reshape(nvir_a,nocc_a,nocc_b)
-        r_bab = r_bab.reshape(nvir_b,nocc_b,nocc_a)
+        r_aaa_ecv = r_aaa_ecv.reshape(nvir_a,ncvs,nval_a)
+        r_aba_ecc = r_aba_ecc.reshape(nvir_a,ncvs,ncvs)
+        r_aba_ecv = r_aba_ecv.reshape(nvir_a,ncvs,nval_a)
+        r_bab_ecc = r_bab_ecc.reshape(nvir_b,ncvs,ncvs)
+        r_bab_ecv = r_bab_ecv.reshape(nvir_b,ncvs,nval_b)
+        r_bbb_ecv = r_bbb_ecv.reshape(nvir_b,ncvs,nval_b)
 
         eris_ovoo = eris.ovoo
         eris_OVOO = eris.OVOO
@@ -4798,6 +4831,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
         return s
 
     return sigma_
+
 
 def ea_compute_trans_moments(adc, orb, spin="alpha"):
 
