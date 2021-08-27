@@ -54,6 +54,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     matvec, diag = adc.gen_matvec(imds, eris, cvs=True)
     guess = adc.get_init_guess(nroots, diag, ascending = True)
     conv, E, U = davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-12, max_cycle=adc.max_cycle, max_space=adc.max_space)
+    print("Davidson energies: ", E)
+    exit()
     """"
     U = np.array(U)
     print("shape of U: ", U.shape)
@@ -3577,7 +3579,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
         s[s_b:f_b] += lib.einsum('jaki,ajk->i', eris_ovOO, r_aba, optimize = True)
 
 ############## ADC(2) ajk - i block ############################
-
+        """
         temp = lib.einsum('jaki,i->ajk', eris_ovoo, r_a, optimize = True)
         temp -= lib.einsum('kaji,i->ajk', eris_ovoo, r_a, optimize = True)
         s[s_aaa:f_aaa] += temp[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1)
@@ -3596,6 +3598,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
         s[s_bab:f_bab] += D_aij_bab * r_bab.reshape(-1)
         s[s_aba:f_aba] += D_aij_aba * r_aba.reshape(-1)
         s[s_bbb:f_bbb] += D_aij_b * r_bbb
+        """
 
 ############### ADC(3) ajk - bil block ############################
 
