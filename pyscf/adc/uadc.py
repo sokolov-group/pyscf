@@ -51,7 +51,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     conv, adc.E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space,tol_residual=adc.tol_residual)
     print("Davidson CVS energies: :", adc.E)
-    exit()
+    #exit()
     adc.U = np.array(U).T.copy()
 
     if adc.compute_properties:
