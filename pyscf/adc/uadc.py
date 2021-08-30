@@ -4464,13 +4464,13 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
         """
         print("D_aij_a_ecc: ", D_aij_a_ecc.shape)
         print("r_aaa_u_ecc.reshape(-1): ",np.shape(r_aaa_u_ecc.reshape(-1)) ) 
-        s[s_aaa_ecc:f_aaa_ecc] += D_aij_a_ecc * r_aaa_u_ecc[:,ij_ind_ncvs[0],ij_ind_ncvs[1]].reshape(-1)
+        s[s_aaa_ecc:f_aaa_ecc] += D_aij_a_ecc * r_aaa_ecc.reshape(-1)
         s[s_aaa_ecv:f_aaa_ecv] += D_aij_a_ecv * r_aaa_ecv.reshape(-1)
         s[s_bab_ecc:f_bab_ecc] += D_aij_bab_ecc * r_bab_ecc.reshape(-1)
         s[s_bab_ecv:f_bab_ecv] += D_aij_bab_ecv * r_bab_ecv.reshape(-1)
         s[s_aba_ecc:f_aba_ecc] += D_aij_aba_ecc * r_aba_ecc.reshape(-1)
         s[s_aba_ecv:f_aba_ecv] += D_aij_aba_ecv * r_aba_ecv.reshape(-1)
-        s[s_bbb_ecc:f_bbb_ecc] += D_aij_b_ecc * r_bbb_u_ecc[:,ij_ind_ncvs[0],ij_ind_ncvs[1]].reshape(-1)
+        s[s_bbb_ecc:f_bbb_ecc] += D_aij_b_ecc * r_bbb_ecc.reshape(-1)
         s[s_bbb_ecv:f_bbb_ecv] += D_aij_b_ecv * r_bbb_ecv.reshape(-1)
         
 ############### ADC(3) ajk - bil block ############################
