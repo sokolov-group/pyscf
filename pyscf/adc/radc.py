@@ -31,6 +31,7 @@ from pyscf import df
 import pandas as pd
 from linalg_helper_beta import davidson_nosym1
 from multiroot_davidson import eighg
+from remove_mo_r2_pyscf import complex_shift 
 
 def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
@@ -118,7 +119,6 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         matvec, diag = adc.gen_matvec(imds, eris, cvs)
         guess = adc.get_init_guess(nroots, diag, ascending = True)
         conv, E, U = davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-14, max_cycle=adc.max_cycle, max_space=adc.max_space)
-     
 ############################################
 
     U = np.array(U)
@@ -824,6 +824,8 @@ class RADC(lib.StreamObject):
         self.ncore_proj_valence = 0
         self.alpha_proj = 0
         self.mom_skd_iter = []
+        self.imaginary_shift = 0
+        self.energy_thresh = 10000
         keys = set(('conv_tol', 'e_corr', 'method', 'mo_coeff', 'mol', 'mo_energy', 'max_memory', 'incore_complete', 'scf_energy', 'e_tot', 't1', 'frozen', 'chkfile', 'max_space', 't2', 'mo_occ', 'max_cycle'))
 
         self._keys = set(self.__dict__.keys()).union(keys)
@@ -1389,9 +1391,12 @@ def get_imds_ip(adc, eris=None, fc_bool=True):
 
     nocc = adc._nocc
     nvir = adc._nvir
+    imaginary_shift = adc.imaginary_shift
+    energy_thresh = adc.energy_thresh
 
     e_occ = adc.mo_energy[:nocc]
     e_vir = adc.mo_energy[nocc:]
+    e_vir = complex_shift(e_vir, energy_thresh, imaginary_shift)
 
     idn_occ = np.identity(nocc)
     idn_vir = np.identity(nvir)
@@ -1410,7 +1415,7 @@ def get_imds_ip(adc, eris=None, fc_bool=True):
         e_occ = e_occ[nfc_orb:]
         idn_occ = np.identity(nocc-nfc_orb)"""
 
-    M_ij = lib.einsum('ij,j->ij', idn_occ ,e_occ)
+    M_ij = lib.einsum('ij,j->ij', idn_occ ,e_occ).astype(complex)
 
     # Second-order terms
 
@@ -1787,6 +1792,8 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=True, fc_bool=True, mom_skd=False, a
 
     nocc = adc._nocc
     nvir = adc._nvir
+    imaginary_shift = adc.imaginary_shift
+    energy_thresh = adc.energy_thresh
 
     n_singles = nocc
     n_doubles = nvir * nocc * nocc
@@ -1795,6 +1802,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=True, fc_bool=True, mom_skd=False, a
 
     e_occ = adc.mo_energy[:nocc]
     e_vir = adc.mo_energy[nocc:]
+    e_vir = complex_shift(e_vir, energy_thresh, imaginary_shift)
 
     idn_occ = np.identity(nocc)
     idn_vir = np.identity(nvir)
@@ -1809,7 +1817,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=True, fc_bool=True, mom_skd=False, a
     D_n = -d_a + d_ij.reshape(-1)
     D_aij = D_n.reshape(-1)
 
-    diag = np.zeros(dim)
+    diag = np.zeros(dim).astype(complex)
 
     # Compute precond in h1-h1 block
     M_ij_diag = np.diagonal(M_ij)
@@ -2446,6 +2454,8 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
 
     nocc = adc._nocc
     nvir = adc._nvir
+    imaginary_shift = adc.imaginary_shift
+    energy_thresh = adc.energy_thresh
 
     ij_ind = np.tril_indices(nocc, k=-1)
 
@@ -2456,6 +2466,7 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
 
     e_occ = adc.mo_energy[:nocc]
     e_vir = adc.mo_energy[nocc:]
+    e_vir = complex_shift(e_vir, energy_thresh, imaginary_shift)
 
     idn_occ = np.identity(nocc)
     idn_vir = np.identity(nvir)
@@ -2487,7 +2498,7 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
         if adc.ncore_proj_valence > 0:
             r = cvs_proj_valence(adc, r)
 
-        s = np.zeros((dim))
+        s = np.zeros((dim)).astype(complex)
 
         r1 = r[s1:f1]
         r2 = r[s2:f2]
@@ -3475,7 +3486,7 @@ def get_spec_factors_ip(adc, T, U, nroots=1):
 
     X = np.dot(T, U.T).reshape(-1, nroots)
 
-    P = 2.0*lib.einsum("pi,pi->i", X, X)
+    P = 2.0*lib.einsum("pi,pi->i", X.conj(), X).real
 
     return P
 
@@ -3657,6 +3668,8 @@ class RADCEA(RADC):
         self.ncore_proj_valence = adc.ncore_proj_valence
         self.alpha_proj = adc.alpha_proj
         self.mom_skd_iter = adc.mom_skd_iter
+        self.imaginary_shift = adc.imaginary_shift
+        self.energy_thresh = adc.energy_thresh
         keys = set(('conv_tol', 'e_corr', 'method', 'mo_coeff', 'mo_energy', 'max_memory', 't1', 'max_space', 't2', 'max_cycle'))
 
         self._keys = set(self.__dict__.keys()).union(keys)
@@ -3762,6 +3775,8 @@ class RADCIP(RADC):
         self.ncore_proj_valence = adc.ncore_proj_valence
         self.alpha_proj = adc.alpha_proj
         self.mom_skd_iter = adc.mom_skd_iter 
+        self.imaginary_shift = adc.imaginary_shift
+        self.energy_thresh = adc.energy_thresh
         keys = set(('conv_tol', 'e_corr', 'method', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
         self._keys = set(self.__dict__.keys()).union(keys)
