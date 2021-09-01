@@ -2244,7 +2244,12 @@ def get_imds_ip(adc, eris=None, fc_bool=True):
         M_ij_b -= lib.einsum('nled,mled,nmji->ij',t2_1_ab, t2_1_ab, eris_ooOO, optimize = True)
         M_ij_b -= 0.5 * lib.einsum('lnde,lmde,nmji->ij',t2_1_a, t2_1_a, eris_ooOO, optimize = True)
 
-
+    E_a, _ = np.linalg.eigh(M_ij_a[:5,:5])
+    E_b, _ = np.linalg.eigh(M_ij_b[:5,:5])
+    print("E_a: ", E_a)
+    print("E_b: ", E_b)
+    exit()
+    
     M_ij = (M_ij_a, M_ij_b)
     cput0 = log.timer_debug1("Completed M_ab ADC(3) calculation", *cput0)
 
