@@ -2922,8 +2922,8 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
     M_ij_a_diag = np.diagonal(M_ij_a)
     M_ij_b_diag = np.diagonal(M_ij_b)
 
-    #diag[s_a:f_a] = M_ij_a_diag.copy()
-    #diag[s_b:f_b] = M_ij_b_diag.copy()
+    diag[s_a:f_a] = M_ij_a_diag.copy()
+    diag[s_b:f_b] = M_ij_b_diag.copy()
 
     # Compute precond in 2p1h-2p1h block
 
@@ -3035,9 +3035,9 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
 #        else :
 #           raise Exception("Precond not available for out-of-core and density-fitted algo")
 
+    print("Norm of diag vector: ", np.linalg.norm(diag**-1))
+    exit()
     diag = -diag
-    #print("Norm of diag vector: ", np.linalg.norm(diag))
-    #exit()
     return diag
 
 def ea_contract_r_vvvv_antisym(myadc,r2,vvvv_d):
