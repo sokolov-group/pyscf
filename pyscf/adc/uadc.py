@@ -3579,7 +3579,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
         s[s_b:f_b] += lib.einsum('jaki,ajk->i', eris_ovOO, r_aba, optimize = True)
 
 ############## ADC(2) ajk - i block ############################
-        """
+        """ 
         temp = lib.einsum('jaki,i->ajk', eris_ovoo, r_a, optimize = True)
         temp -= lib.einsum('kaji,i->ajk', eris_ovoo, r_a, optimize = True)
         s[s_aaa:f_aaa] += temp[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1)
