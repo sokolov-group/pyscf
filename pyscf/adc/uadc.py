@@ -2628,7 +2628,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         temp[:,ij_ind_a[0],ij_ind_a[1]] = diag[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
         temp[:,ij_ind_a[1],ij_ind_a[0]] = -diag[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
         temp[:,ncore:,ncore:] += shift
-        temp[:,ncore:,:ncore] += shift
+        #temp[:,ncore:,:ncore] += shift
         #temp[:,:ncore,:ncore] += shift
 
 
@@ -2637,7 +2637,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         temp = diag[s_bab:f_bab].copy()
         temp = temp.reshape((nvir_b, nocc_a, nocc_b))
         temp[:,ncore:,ncore:] += shift
-        temp[:,ncore:,:ncore] += shift
+        #temp[:,ncore:,:ncore] += shift
         #temp[:,:ncore,:ncore] += shift
 
         diag[s_bab:f_bab] = temp.reshape(-1).copy()
@@ -2645,7 +2645,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         temp = diag[s_aba:f_aba].copy()
         temp = temp.reshape((nvir_a, nocc_b, nocc_a))
         temp[:,ncore:,ncore:] += shift
-        temp[:,ncore:,:ncore] += shift
+        #temp[:,ncore:,:ncore] += shift
         #temp[:,:ncore,:ncore] += shift
 
         diag[s_aba:f_aba] = temp.reshape(-1).copy()
@@ -2655,12 +2655,12 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         temp[:,ij_ind_b[1],ij_ind_b[0]] = -diag[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
 
         temp[:,ncore:,ncore:] += shift
-        temp[:,ncore:,:ncore] += shift
+        #temp[:,ncore:,:ncore] += shift
         #temp[:,:ncore,:ncore] += shift
 
         diag[s_bbb:f_bbb] = temp[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1).copy()
-        print("diag^-1: ", np.linalg.norm(diag**-1))
-        exit()
+        #print("diag^-1: ", np.linalg.norm(diag**-1))
+        #exit()
 
     diag = -diag
 
