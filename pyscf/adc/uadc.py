@@ -2435,7 +2435,7 @@ def get_imds_ip_cvs(adc, eris=None):
     M_ij = (M_ij_a, M_ij_b)
     cput0 = log.timer_debug1("Completed M_ab ADC(3) calculation", *cput0)
 
-    """
+    """ 
     E_a,_ = np.linalg.eigh(M_ij_a)
     E_b,_ = np.linalg.eigh(M_ij_b)
     print("Mij_a: ", E_a)
