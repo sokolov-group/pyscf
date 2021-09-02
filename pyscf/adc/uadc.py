@@ -2666,7 +2666,9 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         #temp[:,:ncore,:ncore] += shift
 
         diag[s_bbb:f_bbb] = temp[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1).copy()
-        print("diag: ", np.linalg.norm(diag))
+        print("shape: ", diag.shape)
+        print("# of nonzeros: ", np.count_nonzero(diag))
+        print("diag: ", diag)
         exit()
 
     diag = -diag
