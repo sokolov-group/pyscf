@@ -2243,12 +2243,13 @@ def get_imds_ip(adc, eris=None, fc_bool=True):
         M_ij_b += lib.einsum('lnde,lmde,jmni->ij',t2_1_ab, t2_1_ab, eris_OOOO, optimize = True)
         M_ij_b -= lib.einsum('nled,mled,nmji->ij',t2_1_ab, t2_1_ab, eris_ooOO, optimize = True)
         M_ij_b -= 0.5 * lib.einsum('lnde,lmde,nmji->ij',t2_1_a, t2_1_a, eris_ooOO, optimize = True)
-
+    """
     E_a, _ = np.linalg.eigh(M_ij_a[:5,:5])
     E_b, _ = np.linalg.eigh(M_ij_b[:5,:5])
     print("E_a: ", E_a)
     print("E_b: ", E_b)
     exit()
+    """
     
     M_ij = (M_ij_a, M_ij_b)
     cput0 = log.timer_debug1("Completed M_ab ADC(3) calculation", *cput0)
@@ -2623,7 +2624,8 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
       
     if cvs is True:
         
-        shift = -100000000.0
+        #shift = -100000000.0
+        shift = 0
         ncore = adc.ncore_cvs
 
         diag[(s_a+ncore):f_a] += shift
@@ -2632,8 +2634,8 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         temp = np.zeros((nvir_a, nocc_a, nocc_a))
         temp[:,ij_ind_a[0],ij_ind_a[1]] = diag[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
         temp[:,ij_ind_a[1],ij_ind_a[0]] = -diag[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
-        temp[:,ncore:,ncore:] += shift
-        #temp[:,ncore:,:ncore] += shift
+        temp[:,ncore:,ncore:] = shift
+        temp[:,ncore:,:ncore] = shift
         #temp[:,:ncore,:ncore] += shift
 
 
@@ -2641,16 +2643,16 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
 
         temp = diag[s_bab:f_bab].copy()
         temp = temp.reshape((nvir_b, nocc_a, nocc_b))
-        temp[:,ncore:,ncore:] += shift
-        #temp[:,ncore:,:ncore] += shift
+        temp[:,ncore:,ncore:] = shift
+        temp[:,ncore:,:ncore] = shift
         #temp[:,:ncore,:ncore] += shift
 
         diag[s_bab:f_bab] = temp.reshape(-1).copy()
 
         temp = diag[s_aba:f_aba].copy()
         temp = temp.reshape((nvir_a, nocc_b, nocc_a))
-        temp[:,ncore:,ncore:] += shift
-        #temp[:,ncore:,:ncore] += shift
+        temp[:,ncore:,ncore:] = shift
+        temp[:,ncore:,:ncore] = shift
         #temp[:,:ncore,:ncore] += shift
 
         diag[s_aba:f_aba] = temp.reshape(-1).copy()
@@ -2659,13 +2661,13 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         temp[:,ij_ind_b[0],ij_ind_b[1]] = diag[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
         temp[:,ij_ind_b[1],ij_ind_b[0]] = -diag[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
 
-        temp[:,ncore:,ncore:] += shift
-        #temp[:,ncore:,:ncore] += shift
+        temp[:,ncore:,ncore:] = shift
+        temp[:,ncore:,:ncore] = shift
         #temp[:,:ncore,:ncore] += shift
 
         diag[s_bbb:f_bbb] = temp[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1).copy()
-        #print("diag^-1: ", np.linalg.norm(diag**-1))
-        #exit()
+        print("diag: ", np.linalg.norm(diag))
+        exit()
 
     diag = -diag
 
