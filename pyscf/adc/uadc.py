@@ -2666,8 +2666,13 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         #temp[:,:ncore,:ncore] += shift
 
         diag[s_bbb:f_bbb] = temp[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1).copy()
-        print("shape: ", diag.shape)
+
+        print("shape w/ zeros: ", diag.shape)
         print("# of nonzeros: ", np.count_nonzero(diag))
+        diag = diag[diag != 0]
+        print("shape w/o zeros: ", diag.shape)
+        idx = np.argsort(diag)
+        diag = diag[idx]
         print("diag: ", diag)
         exit()
 
