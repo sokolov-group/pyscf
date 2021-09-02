@@ -3035,7 +3035,9 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
 #        else :
 #           raise Exception("Precond not available for out-of-core and density-fitted algo")
 
-    print("Norm of diag vector: ", np.linalg.norm(diag))
+    print("shape: ", diag.shape)
+    print("# of nonzeros: ", np.count_nonzero(diag))
+    print("diag: ", diag)
     exit()
     diag = -diag
     return diag
