@@ -2936,6 +2936,17 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
     diag[s_bbb_ecc:f_bbb_ecc] = D_aij_b_ecc.copy()
     diag[s_bbb_ecv:f_bbb_ecv] = D_aij_b_ecv.copy()
 
+    print("M_ij_a_diag: ", M_ij_a_diag)
+    print("M_ij_b_diag: ", M_ij_b_diag)
+    print("D_aij_a_ecc: ", D_aij_a_ecc)
+    print("D_aij_a_ecv: ", D_aij_a_ecv)
+    print("D_aij_bab_ecc: ", D_aij_bab_ecc)
+    print("D_aij_bab_ecv: ", D_aij_bab_ecv)
+    print("D_aij_aba_ecc: ", D_aij_aba_ecc)
+    print("D_aij_aba_ecv: ", D_aij_aba_ecv)
+    print("D_aij_b_ecc: ", D_aij_b_ecc)
+    print("D_aij_b_ecv: ", D_aij_b_ecv)
+
     ###### Additional terms for the preconditioner ####
 #    if (method == "adc(2)-x" or method == "adc(3)"):
 #
@@ -3037,6 +3048,8 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
 
     print("shape: ", diag.shape)
     print("# of nonzeros: ", np.count_nonzero(diag))
+    idx = np.argsort(diag)
+    diag = diag[idx]
     print("diag: ", diag)
     exit()
     diag = -diag
