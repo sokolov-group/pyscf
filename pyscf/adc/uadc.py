@@ -2961,7 +2961,7 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
     print("diag norm: ", np.linalg.norm(diag))
     from numpy import linalg as ln 
     print("sum norm: ", ln.norm(M_ij_a_diag) + ln.norm(M_ij_b_diag) + ln.norm(D_aij_a_ecc) + ln.norm(D_aij_a_ecv) + ln.norm(D_aij_bab_ecc) + ln.norm(D_aij_bab_ecv) + ln.norm(D_aij_aba_ecc) + ln.norm(D_aij_aba_ecv) + ln.norm(D_aij_b_ecc) + ln.norm(D_aij_b_ecv))
-    exit()
+    #exit()
     ###### Additional terms for the preconditioner ####
 #    if (method == "adc(2)-x" or method == "adc(3)"):
 #
@@ -4475,7 +4475,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
         s[s_b:f_b] += lib.einsum('jaki,ajk->i', eris_ovOO[:ncvs,:,ncvs:,:ncvs], r_aba_ecv, optimize = True)
 
 ############## ADC(2) ajk - i block ############################
-        
+         
         temp_aaa_ecc = lib.einsum('jaki,i->ajk', eris_ovoo[:ncvs,:,:ncvs,:ncvs], r_a, optimize = True)
         temp_aaa_ecc -= lib.einsum('kaji,i->ajk', eris_ovoo[:ncvs,:,:ncvs,:ncvs], r_a, optimize = True)
         temp_aaa_ecv = lib.einsum('jaki,i->ajk', eris_ovoo[:ncvs,:,ncvs:,:ncvs], r_a, optimize = True)
