@@ -2946,7 +2946,22 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
     print("D_aij_aba_ecv: ", D_aij_aba_ecv)
     print("D_aij_b_ecc: ", D_aij_b_ecc)
     print("D_aij_b_ecv: ", D_aij_b_ecv)
+    print("diag: ", diag)    
 
+    print("diag[s_a:f_a]",  np.linalg.norm(diag[s_a:f_a]), np.linalg.norm(M_ij_a_diag))
+    print("diag[s_b:f_b]",  np.linalg.norm(diag[s_b:f_b]), np.linalg.norm(M_ij_b_diag))
+    print("diag[s_aaa_ecc:f_aaa_ecc]", np.linalg.norm(diag[s_aaa_ecc:f_aaa_ecc]), np.linalg.norm(D_aij_a_ecc))
+    print("diag[s_aaa_ecv:f_aaa_ecv]", np.linalg.norm(diag[s_aaa_ecv:f_aaa_ecv]), np.linalg.norm(D_aij_a_ecv))
+    print("diag[s_bab_ecc:f_bab_ecc]", np.linalg.norm(diag[s_bab_ecc:f_bab_ecc]), np.linalg.norm(D_aij_bab_ecc))
+    print("diag[s_bab_ecv:f_bab_ecv]", np.linalg.norm(diag[s_bab_ecv:f_bab_ecv]), np.linalg.norm(D_aij_bab_ecv))
+    print("diag[s_aba_ecc:f_aba_ecc]", np.linalg.norm(diag[s_aba_ecc:f_aba_ecc]), np.linalg.norm(D_aij_aba_ecc))
+    print("diag[s_aba_ecv:f_aba_ecv]", np.linalg.norm(diag[s_aba_ecv:f_aba_ecv]), np.linalg.norm(D_aij_aba_ecv))
+    print("diag[s_bbb_ecc:f_bbb_ecc]", np.linalg.norm(diag[s_bbb_ecc:f_bbb_ecc]), np.linalg.norm(D_aij_b_ecc))
+    print("diag[s_bbb_ecv:f_bbb_ecv]", np.linalg.norm(diag[s_bbb_ecv:f_bbb_ecv]), np.linalg.norm(D_aij_b_ecv))
+    print("diag norm: ", np.linalg.norm(diag))
+    from numpy import linalg as ln 
+    print("sum norm: ", ln.norm(M_ij_a_diag) + ln.norm(M_ij_b_diag) + ln.norm(D_aij_a_ecc) + ln.norm(D_aij_a_ecv) + ln.norm(D_aij_bab_ecc) + ln.norm(D_aij_bab_ecv) + ln.norm(D_aij_aba_ecc) + ln.norm(D_aij_aba_ecv) + ln.norm(D_aij_b_ecc) + ln.norm(D_aij_b_ecv))
+    exit()
     ###### Additional terms for the preconditioner ####
 #    if (method == "adc(2)-x" or method == "adc(3)"):
 #
@@ -3046,12 +3061,15 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
 #        else :
 #           raise Exception("Precond not available for out-of-core and density-fitted algo")
 
+    """
     print("shape: ", diag.shape)
     print("# of nonzeros: ", np.count_nonzero(diag))
     idx = np.argsort(diag)
     diag = diag[idx]
     print("diag: ", diag)
     exit()
+    """
+
     diag = -diag
     return diag
 
