@@ -2629,11 +2629,11 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         ncore = adc.ncore_cvs
         ij_ind_cvs = np.tril_indices(ncore, k=-1)
 
-        diag[(s_a+ncore):f_a] += shift
-        diag[(s_b+ncore):f_b] += shift
+        diag[(s_a+ncore):f_a] = shift
+        diag[(s_b+ncore):f_b] = shift
 
-        print("M_ij_a_diag: ", diag[s_a:ncore])
-        print("M_ij_b_diag: ", diag[s_b:(s_b+ncore)])
+        print("M_ij_a_diag: ", diag[s_a:ncore].shape ,np.linalg.norm(diag[s_a:ncore]) ,diag[s_a:ncore])
+        print("M_ij_b_diag: ", diag[s_b:(s_b+ncore)].shape ,np.linalg.norm(diag[s_b:(s_b+ncore)]) ,diag[s_b:(s_b+ncore)])
 
         temp = np.zeros((nvir_a, nocc_a, nocc_a))
         temp[:,ij_ind_a[0],ij_ind_a[1]] = diag[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
@@ -2642,8 +2642,8 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         #temp[:,ncore:,:ncore] = shift
         #temp[:,:ncore,:ncore] += shift
         temp_ecc = temp[:,:ncore,:ncore]
-        print("D_aij_a_ecc: ", temp_ecc[:,ij_ind_cvs[0],ij_ind_cvs[1]].reshape(-1))
-        print("D_aij_a_ecv: ", temp[:,:ncore,ncore:].reshape(-1))
+        print("D_aij_a_ecc: ",np.linalg.norm(temp_ecc[:,ij_ind_cvs[0],ij_ind_cvs[1]].reshape(-1)) ,temp_ecc[:,ij_ind_cvs[0],ij_ind_cvs[1]].reshape(-1))
+        print("D_aij_a_ecv: ", np.linalg.norm(temp[:,:ncore,ncore:].reshape(-1)),temp[:,:ncore,ncore:].reshape(-1))
 
         diag[s_aaa:f_aaa] = temp[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1).copy()
 
@@ -2652,8 +2652,8 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         temp[:,ncore:,ncore:] += shift
         #temp[:,ncore:,:ncore] = shift
         #temp[:,:ncore,:ncore] += shift
-        print("D_aij_bab_ecc: ", temp[:,:ncore,:ncore].reshape(-1))
-        print("D_aij_bab_ecv: ", temp[:,:ncore,ncore:].reshape(-1))
+        print("D_aij_bab_ecc: ", np.linalg.norm(temp[:,:ncore,:ncore].reshape(-1)),temp[:,:ncore,:ncore].reshape(-1))
+        print("D_aij_bab_ecv: ", np.linalg.norm(temp[:,:ncore,ncore:].reshape(-1)),temp[:,:ncore,ncore:].reshape(-1))
 
         diag[s_bab:f_bab] = temp.reshape(-1).copy()
 
@@ -2662,8 +2662,8 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         temp[:,ncore:,ncore:] += shift
         #temp[:,ncore:,:ncore] = shift
         #temp[:,:ncore,:ncore] += shift
-        print("D_aij_aba_ecc: ", temp[:,:ncore,:ncore].reshape(-1))
-        print("D_aij_aba_ecv: ", temp[:,:ncore,ncore:].reshape(-1))
+        print("D_aij_aba_ecc: ", np.linalg.norm(temp[:,:ncore,:ncore].reshape(-1)),temp[:,:ncore,:ncore].reshape(-1))
+        print("D_aij_aba_ecv: ", np.linalg.norm(temp[:,:ncore,ncore:].reshape(-1)),temp[:,:ncore,ncore:].reshape(-1))
 
         diag[s_aba:f_aba] = temp.reshape(-1).copy()
 
@@ -2675,19 +2675,19 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         #temp[:,ncore:,:ncore] = shift
         #temp[:,:ncore,:ncore] += shift
         temp_ecc = temp[:,:ncore,:ncore]
-        print("D_aij_b_ecc: ", temp_ecc[:,ij_ind_cvs[0],ij_ind_cvs[1]].reshape(-1))
-        print("D_aij_b_ecv: ", temp[:,:ncore,ncore:].reshape(-1))
+        print("D_aij_b_ecc: ", np.linalg.norm(temp_ecc[:,ij_ind_cvs[0],ij_ind_cvs[1]].reshape(-1)),temp_ecc[:,ij_ind_cvs[0],ij_ind_cvs[1]].reshape(-1))
+        print("D_aij_b_ecv: ", np.linalg.norm(temp[:,:ncore,ncore:].reshape(-1)),temp[:,:ncore,ncore:].reshape(-1))
 
         diag[s_bbb:f_bbb] = temp[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1).copy()
-        """
+        
         print("shape w/ zeros: ", diag.shape)
         print("# of nonzeros: ", np.count_nonzero(diag))
         diag = diag[diag != 0]
         idx = np.argsort(diag)
-        diag = diag[idx]
+        #diag = diag[idx]
         print("diag w/o zeros: ", diag)
-        exit()
-        """
+        #exit()
+        
     diag = -diag
 
     return diag
@@ -3592,7 +3592,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
         s[s_b:f_b] += lib.einsum('jaki,ajk->i', eris_ovOO, r_aba, optimize = True)
 
 ############## ADC(2) ajk - i block ############################
-        
+        """ 
         temp = lib.einsum('jaki,i->ajk', eris_ovoo, r_a, optimize = True)
         temp -= lib.einsum('kaji,i->ajk', eris_ovoo, r_a, optimize = True)
         s[s_aaa:f_aaa] += temp[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1)
@@ -3601,7 +3601,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
         temp = lib.einsum('jaki,i->ajk', eris_OVOO, r_b, optimize = True)
         temp -= lib.einsum('kaji,i->ajk', eris_OVOO, r_b, optimize = True)
         s[s_bbb:f_bbb] += temp[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1)
-        
+        """
 ############ ADC(2) ajk - bil block ############################
 
         r_aaa = r_aaa.reshape(-1)
