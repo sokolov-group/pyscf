@@ -2624,36 +2624,46 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
       
     if cvs is True:
         
-        #shift = -100000000.0
-        shift = 0
+        shift = -100000000.0
+        #shift = 0
         ncore = adc.ncore_cvs
+        ij_ind_cvs = np.tril_indices(ncore, k=-1)
 
         diag[(s_a+ncore):f_a] += shift
         diag[(s_b+ncore):f_b] += shift
 
+        print("M_ij_a_diag: ", diag[s_a:ncore])
+        print("M_ij_b_diag: ", diag[s_b:(s_b+ncore)])
+
         temp = np.zeros((nvir_a, nocc_a, nocc_a))
         temp[:,ij_ind_a[0],ij_ind_a[1]] = diag[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
         temp[:,ij_ind_a[1],ij_ind_a[0]] = -diag[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
-        temp[:,ncore:,ncore:] = shift
-        temp[:,ncore:,:ncore] = shift
+        temp[:,ncore:,ncore:] += shift
+        #temp[:,ncore:,:ncore] = shift
         #temp[:,:ncore,:ncore] += shift
-
+        temp_ecc = temp[:,:ncore,:ncore]
+        print("D_aij_a_ecc: ", temp_ecc[:,ij_ind_cvs[0],ij_ind_cvs[1]].reshape(-1))
+        print("D_aij_a_ecv: ", temp[:,:ncore,ncore:].reshape(-1))
 
         diag[s_aaa:f_aaa] = temp[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1).copy()
 
         temp = diag[s_bab:f_bab].copy()
         temp = temp.reshape((nvir_b, nocc_a, nocc_b))
-        temp[:,ncore:,ncore:] = shift
-        temp[:,ncore:,:ncore] = shift
+        temp[:,ncore:,ncore:] += shift
+        #temp[:,ncore:,:ncore] = shift
         #temp[:,:ncore,:ncore] += shift
+        print("D_aij_bab_ecc: ", temp[:,:ncore,:ncore].reshape(-1))
+        print("D_aij_bab_ecv: ", temp[:,:ncore,ncore:].reshape(-1))
 
         diag[s_bab:f_bab] = temp.reshape(-1).copy()
 
         temp = diag[s_aba:f_aba].copy()
         temp = temp.reshape((nvir_a, nocc_b, nocc_a))
-        temp[:,ncore:,ncore:] = shift
-        temp[:,ncore:,:ncore] = shift
+        temp[:,ncore:,ncore:] += shift
+        #temp[:,ncore:,:ncore] = shift
         #temp[:,:ncore,:ncore] += shift
+        print("D_aij_aba_ecc: ", temp[:,:ncore,:ncore].reshape(-1))
+        print("D_aij_aba_ecv: ", temp[:,:ncore,ncore:].reshape(-1))
 
         diag[s_aba:f_aba] = temp.reshape(-1).copy()
 
@@ -2661,21 +2671,23 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         temp[:,ij_ind_b[0],ij_ind_b[1]] = diag[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
         temp[:,ij_ind_b[1],ij_ind_b[0]] = -diag[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
 
-        temp[:,ncore:,ncore:] = shift
-        temp[:,ncore:,:ncore] = shift
+        temp[:,ncore:,ncore:] += shift
+        #temp[:,ncore:,:ncore] = shift
         #temp[:,:ncore,:ncore] += shift
+        temp_ecc = temp[:,:ncore,:ncore]
+        print("D_aij_b_ecc: ", temp_ecc[:,ij_ind_cvs[0],ij_ind_cvs[1]].reshape(-1))
+        print("D_aij_b_ecv: ", temp[:,:ncore,ncore:].reshape(-1))
 
         diag[s_bbb:f_bbb] = temp[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1).copy()
-
+        """
         print("shape w/ zeros: ", diag.shape)
         print("# of nonzeros: ", np.count_nonzero(diag))
         diag = diag[diag != 0]
-        print("shape w/o zeros: ", diag.shape)
         idx = np.argsort(diag)
         diag = diag[idx]
-        print("diag: ", diag)
+        print("diag w/o zeros: ", diag)
         exit()
-
+        """
     diag = -diag
 
     return diag
