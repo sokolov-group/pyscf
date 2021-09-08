@@ -2845,10 +2845,12 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
     n_doubles_bbb_ecc = ncvs * (ncvs - 1) * nvir_b // 2
     n_doubles_aaa_ecv = ncvs * nval_a * nvir_a 
     n_doubles_bab_ecv = nvir_b * ncvs * nval_b
+    n_doubles_bab_evc = nvir_b * nval_a * ncvs
     n_doubles_aba_ecv = nvir_a * ncvs * nval_a
+    n_doubles_aba_evc = nvir_a * nval_b * ncvs
     n_doubles_bbb_ecv = ncvs * nval_b * nvir_b
 
-    dim = n_singles_a + n_singles_b + n_doubles_aaa_ecc + n_doubles_bab_ecc + n_doubles_aba_ecc + n_doubles_bbb_ecc + n_doubles_aaa_ecv + n_doubles_bab_ecv + n_doubles_aba_ecv + n_doubles_bbb_ecv
+    dim = n_singles_a + n_singles_b + n_doubles_aaa_ecc + n_doubles_bab_ecc + n_doubles_aba_ecc + n_doubles_bbb_ecc + n_doubles_aaa_ecv + n_doubles_bab_ecv + n_doubles_aba_ecv + n_doubles_bbb_ecv + n_doubles_bab_evc + n_doubles_aba_evc
 
     e_occ_a = adc.mo_energy_a[:nocc_a]
     e_occ_b = adc.mo_energy_b[:nocc_b]
@@ -2876,11 +2878,15 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
     f_bab_ecc = s_bab_ecc + n_doubles_bab_ecc
     s_bab_ecv = f_bab_ecc
     f_bab_ecv = s_bab_ecv + n_doubles_bab_ecv
-    s_aba_ecc = f_bab_ecv
+    s_bab_evc = f_bab_ecv
+    f_bab_evc = s_bab_evc + n_doubles_bab_evc
+    s_aba_ecc = f_bab_evc
     f_aba_ecc = s_aba_ecc + n_doubles_aba_ecc
     s_aba_ecv = f_aba_ecc
     f_aba_ecv = s_aba_ecv + n_doubles_aba_ecv
-    s_bbb_ecc = f_aba_ecv
+    s_aba_evc = f_aba_ecv
+    f_aba_evc = s_aba_evc + n_doubles_aba_evc
+    s_bbb_ecc = f_aba_evc
     f_bbb_ecc = s_bbb_ecc + n_doubles_bbb_ecc
     s_bbb_ecv = f_bbb_ecc
     f_bbb_ecv = s_bbb_ecv + n_doubles_bbb_ecv
@@ -2907,6 +2913,7 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
     D_n_bab = D_n_bab.reshape((nvir_b,nocc_a,nocc_b))
     D_aij_bab_ecc = D_n_bab[:, :ncvs, :ncvs].reshape(-1)
     D_aij_bab_ecv = D_n_bab[:, :ncvs, ncvs:].reshape(-1)
+    D_aij_bab_evc = D_n_bab[:, ncvs:, :ncvs].reshape(-1)
 
     d_ij_ab = e_occ_a[:,None] + e_occ_b
     d_a_a = e_vir_a[:,None]
@@ -2915,6 +2922,7 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
     D_n_aba = D_n_aba.reshape((nvir_a,nocc_b,nocc_a))
     D_aij_aba_ecc = D_n_aba[:, :ncvs, :ncvs].reshape(-1)
     D_aij_aba_ecv = D_n_aba[:, :ncvs, ncvs:].reshape(-1)
+    D_aij_aba_evc = D_n_aba[:, ncvs:, :ncvs].reshape(-1)
 
     diag = np.zeros(dim)
 
@@ -2931,8 +2939,10 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
     diag[s_aaa_ecv:f_aaa_ecv] = D_aij_a_ecv.copy()
     diag[s_bab_ecc:f_bab_ecc] = D_aij_bab_ecc.copy()
     diag[s_bab_ecv:f_bab_ecv] = D_aij_bab_ecv.copy()
+    diag[s_bab_evc:f_bab_evc] = D_aij_bab_evc.copy()
     diag[s_aba_ecc:f_aba_ecc] = D_aij_aba_ecc.copy()
     diag[s_aba_ecv:f_aba_ecv] = D_aij_aba_ecv.copy()
+    diag[s_aba_evc:f_aba_evc] = D_aij_aba_evc.copy()
     diag[s_bbb_ecc:f_bbb_ecc] = D_aij_b_ecc.copy()
     diag[s_bbb_ecv:f_bbb_ecv] = D_aij_b_ecv.copy()
 
@@ -3069,7 +3079,8 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
     print("diag: ", diag)
     exit()
     """
-
+    print("NO SYNTAX ERROS")
+    exit()
     diag = -diag
     return diag
 
