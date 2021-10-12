@@ -124,7 +124,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     U = np.array(U)
     for i in range(U.shape[0]):
         print("CVS/MOM overlap: ", np.dot(np.array(guess)[i,:], U[i,:].T))
-    #adc.analyze_eigenvector_ip(U)
+    adc.analyze_eigenvector_ip(U)
     T = adc.get_trans_moments()
 
     spec_factors = adc.get_spec_factors(T, U, nroots)
@@ -1396,7 +1396,7 @@ def get_imds_ip(adc, eris=None, fc_bool=True):
 
     e_occ = adc.mo_energy[:nocc]
     e_vir = adc.mo_energy[nocc:]
-    e_vir = complex_shift(e_vir, energy_thresh, imaginary_shift)
+    #e_vir = complex_shift(e_vir, energy_thresh, imaginary_shift)
 
     idn_occ = np.identity(nocc)
     idn_vir = np.identity(nvir)
@@ -1415,7 +1415,7 @@ def get_imds_ip(adc, eris=None, fc_bool=True):
         e_occ = e_occ[nfc_orb:]
         idn_occ = np.identity(nocc-nfc_orb)"""
 
-    M_ij = lib.einsum('ij,j->ij', idn_occ ,e_occ).astype(complex)
+    M_ij = lib.einsum('ij,j->ij', idn_occ ,e_occ)#.astype(complex)
 
     # Second-order terms
 
@@ -1802,7 +1802,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=True, fc_bool=True, mom_skd=False, a
 
     e_occ = adc.mo_energy[:nocc]
     e_vir = adc.mo_energy[nocc:]
-    e_vir = complex_shift(e_vir, energy_thresh, imaginary_shift)
+    #e_vir = complex_shift(e_vir, energy_thresh, imaginary_shift)
 
     idn_occ = np.identity(nocc)
     idn_vir = np.identity(nvir)
@@ -1817,7 +1817,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=True, fc_bool=True, mom_skd=False, a
     D_n = -d_a + d_ij.reshape(-1)
     D_aij = D_n.reshape(-1)
 
-    diag = np.zeros(dim).astype(complex)
+    diag = np.zeros(dim)#.astype(complex)
 
     # Compute precond in h1-h1 block
     M_ij_diag = np.diagonal(M_ij)
@@ -2466,7 +2466,7 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
 
     e_occ = adc.mo_energy[:nocc]
     e_vir = adc.mo_energy[nocc:]
-    e_vir = complex_shift(e_vir, energy_thresh, imaginary_shift)
+    #e_vir = complex_shift(e_vir, energy_thresh, imaginary_shift)
 
     idn_occ = np.identity(nocc)
     idn_vir = np.identity(nvir)
@@ -2498,7 +2498,7 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
         if adc.ncore_proj_valence > 0:
             r = cvs_proj_valence(adc, r)
 
-        s = np.zeros((dim)).astype(complex)
+        s = np.zeros((dim))#.astype(complex)
 
         r1 = r[s1:f1]
         r2 = r[s2:f2]
