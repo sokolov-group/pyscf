@@ -93,7 +93,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
      
     print('s_matvec norm: ', np.linalg.norm(s_matvec))
     E,eig_vec = np.linalg.eig(M)
-    P, X = get_properties(adc, diag.size ,eig_vec)
+    
     
     print("ADC Method Type: ", adc.method_type)
     print(np.column_stack(np.unique(np.around(E, decimals=8), return_counts=True))) 
@@ -101,12 +101,14 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     E = E[E != 0]
     idx_E_sort = np.argsort(E)
     E = E[idx_E_sort]
-    #eig_vec[:, idx_E_sort]
+    eig_vec[:, idx_E_sort]
     P, X = get_properties(adc, E.size ,eig_vec)
-    P = P[idx_E_sort]
+    #P = P[idx_E_sort]
     print("ADC Method Type: ", adc.method_type)
     print("shape of P: ", P.shape)
     print("norm of P: ", np.linalg.norm(P))
+    idx_P_sort = np.argsort(P)
+    P = P[idx_P_sort]
     print(np.column_stack(np.unique(np.around(P, decimals=8), return_counts=True))) 
     '''
     U = np.zeros((E.size, E.size))
@@ -118,7 +120,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         if eig_vec[0,i] < 0: 
             eig_vec[:,i] *= -1
     '''
-    return E 
+    E_P = (E, P)
+    return E_P  
 
     #count = 0
     #indicies = []
@@ -1738,6 +1741,7 @@ def get_imds_ip(adc, eris=None):
     nocc_b = adc.nocc_b
     nvir_a = adc.nvir_a
     nvir_b = adc.nvir_b
+    ncvs = adc.ncvs
 
     ab_ind_a = np.tril_indices(nvir_a, k=-1)
     ab_ind_b = np.tril_indices(nvir_b, k=-1)
@@ -2118,18 +2122,21 @@ def get_imds_ip(adc, eris=None):
 
         del t2_1_ab
 
-    M_ij = (M_ij_a, M_ij_b)
-    cput0 = log.timer_debug1("Completed M_ab ADC(3) calculation", *cput0)
-    M_ij = (M_ij_a, M_ij_b)
-    cput0 = log.timer_debug1("Completed M_ab ADC(3) calculation", *cput0)
+    if adc.method_type == 'ip-cvs':
+        M_ij_a = M_ij_a[:ncvs,:ncvs]
+        M_ij_b = M_ij_b[:ncvs,:ncvs]
     
-    """
+    M_ij = (M_ij_a, M_ij_b)
+    cput0 = log.timer_debug1("Completed M_ij ADC(3) calculation", *cput0)
+    
+    '''
     E_a,_ = np.linalg.eigh(M_ij_a[:2,:2])
     E_b,_ = np.linalg.eigh(M_ij_b[:2,:2])
     print("Mij_a: ", E_a)
     print("Mij_b: ", E_b)
     exit()
-    """
+    '''
+    
     return M_ij
 
 def get_imds_ip_cvs(adc, eris=None):
@@ -3987,7 +3994,7 @@ def cvs_projector(adc, r):
     Pr[s_aaa:f_aaa] = temp[:,ij_a[0],ij_a[1]].reshape(-1).copy()
 
     temp = Pr[s_bab:f_bab].copy()
-    temp = temp.reshape((nvir_b, nocc_a, nocc_b))
+    temp = temp.reshape((nvir_b, nocc_b, nocc_a))
     temp[:,ncore:,ncore:] = 0.0
     #temp[:,:ncore,ncore:] = 0.0
     #temp[:,ncore:,:ncore] = 0.0
@@ -3996,7 +4003,7 @@ def cvs_projector(adc, r):
     Pr[s_bab:f_bab] = temp.reshape(-1).copy()
 
     temp = Pr[s_aba:f_aba].copy()
-    temp = temp.reshape((nvir_a, nocc_b, nocc_a))
+    temp = temp.reshape((nvir_a, nocc_a, nocc_b))
     temp[:,ncore:,ncore:] = 0.0
     #temp[:,:ncore,ncore:] = 0.0
     #temp[:,ncore:,:ncore] = 0.0
@@ -4156,7 +4163,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None):
         temp = lib.einsum('jaki,i->ajk', eris_OVOO, r_b, optimize = True)
         temp -= lib.einsum('kaji,i->ajk', eris_OVOO, r_b, optimize = True)
         s[s_bbb:f_bbb] += temp[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1)
-
+        
 ############ ADC(2) ajk - bil block ############################
         r_aaa = r_aaa.reshape(-1)
         r_bbb = r_bbb.reshape(-1)
@@ -4586,8 +4593,10 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
     ncvs = adc.ncvs
     nval_a = nocc_a - ncvs
     nval_b = nocc_b - ncvs
-
+    print('orbitals sizes')
+    print(nocc_a, nocc_b, nvir_a, nvir_b ,ncvs, nval_a, nval_b)
     ij_ind_ncvs = np.tril_indices(ncvs, k=-1)
+    ij_ind_a = np.tril_indices(nocc_a, k=-1)
 
     n_singles_a = ncvs
     n_singles_b = ncvs
@@ -4660,7 +4669,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
     d_ij_ba = e_occ_b[:,None] + e_occ_a
     d_a_b = e_vir_b[:,None]
     D_n_bba = -d_a_b + d_ij_ba.reshape(-1)
-    D_n_bba = D_n_bba.reshape((nvir_b,nocc_a,nocc_b))
+    D_n_bba = D_n_bba.reshape((nvir_b,nocc_b,nocc_a))
     D_aij_bba_ecc = D_n_bba[:, :ncvs, :ncvs].reshape(-1)
     D_aij_bba_ecv = D_n_bba[:, :ncvs, ncvs:].reshape(-1)
     D_aij_bba_evc = D_n_bba[:, ncvs:, :ncvs].reshape(-1)
@@ -4669,7 +4678,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
     d_a_a = e_vir_a[:,None]
     D_n_aab = -d_a_a + d_ij_ab.reshape(-1)
     #D_n_aba = D_n_aba.reshape(-1)
-    D_n_aab = D_n_aab.reshape((nvir_a,nocc_b,nocc_a))
+    D_n_aab = D_n_aab.reshape((nvir_a,nocc_a,nocc_b))
     D_aij_aab_ecc = D_n_aab[:, :ncvs, :ncvs].reshape(-1)
     D_aij_aab_ecv = D_n_aab[:, :ncvs, ncvs:].reshape(-1)
     D_aij_aab_evc = D_n_aab[:, ncvs:, :ncvs].reshape(-1)
@@ -4736,6 +4745,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
 
 ############# ADC(2) i - kja block #########################
         # ECC Block
+         
         s[s_a:f_a] += 0.5*lib.einsum('jaki,ajk->i', eris_ovoo[:ncvs,:,:ncvs,:ncvs], r_aaa_ecc_u, optimize = True)
         s[s_a:f_a] -= 0.5*lib.einsum('kaji,ajk->i', eris_ovoo[:ncvs,:,:ncvs,:ncvs], r_aaa_ecc_u, optimize = True)
         s[s_a:f_a] += lib.einsum('jaki,ajk->i', eris_ovoo[:ncvs,:,ncvs:,:ncvs], r_aaa_ecv, optimize = True)
@@ -4770,7 +4780,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
         s[s_bbb_ecc:f_bbb_ecc] += temp_bbb_ecc[:,ij_ind_ncvs[0],ij_ind_ncvs[1]].reshape(-1)
         s[s_bbb_ecv:f_bbb_ecv] += lib.einsum('jaki,i->ajk', eris_OVOO[:ncvs,:,ncvs:,:ncvs], r_b, optimize = True).reshape(-1)
         s[s_bbb_ecv:f_bbb_ecv] -= lib.einsum('kaji,i->ajk', eris_OVOO[ncvs:,:,:ncvs,:ncvs], r_b, optimize = True).reshape(-1)
-         
+        
 ############ ADC(2) ajk - bil block ############################
 
         r_aaa_ecc = r_aaa_ecc.reshape(-1)
@@ -5175,17 +5185,25 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
 ################ ADC(3) i - kja and ajk - i block ############################
                t2_1_a = adc.t2[0][0][:]
                t2_1_ab = adc.t2[0][1][:]
-
+               
                if isinstance(eris.ovvv, type(None)):
                    chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
                else :
                    chnk_size = nocc_a
 
                a = 0
-               temp_singles = np.zeros((nocc_a))
-               temp_doubles = np.zeros((nvir_a, nvir_a, nvir_a))
-               r_aaa = r_aaa.reshape(nvir_a,-1)
+               #temp_singles = np.zeros((nocc_a))
+               #temp_doubles = np.zeros((nvir_a, nvir_a, nvir_a))
+               #r_aaa = r_aaa.reshape(nvir_a,-1)
+               #t2_1_a_t = t2_1_a[ij_ind_a[0],ij_ind_a[1],:,:]
+
+               temp_singles = np.zeros((ncvs))
+               temp_doubles_ecc = np.zeros((nvir_a, ncvs, ncvs))
+               temp_doubles_ecv = np.zeros((nvir_a, ncvs, nval_a))
+               r_aaa_ecc = r_aaa_ecc.reshape(nvir_a,-1)
+               
                t2_1_a_t = t2_1_a[ij_ind_a[0],ij_ind_a[1],:,:]
+               
                temp_1 = lib.einsum('pbc,ap->abc',t2_1_a_t,r_aaa, optimize=True)
                for p in range(0,nocc_a,chnk_size):
                    if getattr(adc, 'with_df', None):
@@ -6393,18 +6411,18 @@ def ip_compute_trans_moments(adc, orb, spin="alpha"):
             T[s_a:f_a] += t1_2_a[:,(orb-nocc_a)]
 
 ######## ADC(2) 2h-1p  part  ############################################
-
+            '''
             t2_1_t = t2_1_a[ij_ind_a[0],ij_ind_a[1],:,:]
             t2_1_t_a = t2_1_t.transpose(2,1,0)
             t2_1_t_ab = t2_1_ab.transpose(2,3,1,0)
 
             T[s_aaa:f_aaa] = t2_1_t_a[(orb-nocc_a),:,:].reshape(-1)
             T[s_bab:f_bab] = t2_1_t_ab[(orb-nocc_a),:,:,:].reshape(-1)
-
+            '''
 ######## ADC(3) 2h-1p  part  ############################################
 
         if(method=='adc(2)-x'or method=='adc(3)'):
-
+            '''
             t2_2_a = adc.t2[1][0][:]
             t2_2_ab = adc.t2[1][1][:]
 
@@ -6415,7 +6433,7 @@ def ip_compute_trans_moments(adc, orb, spin="alpha"):
 
                 T[s_aaa:f_aaa] += t2_2_t_a[(orb-nocc_a),:,:].reshape(-1)
                 T[s_bab:f_bab] += t2_2_t_ab[(orb-nocc_a),:,:,:].reshape(-1)
-
+            '''
 ######## ADC(3) 1h part  ############################################
 
         if(method=='adc(3)'):
@@ -6475,18 +6493,18 @@ def ip_compute_trans_moments(adc, orb, spin="alpha"):
             T[s_b:f_b] += t1_2_b[:,(orb-nocc_b)]
 
 ######## ADC(2) 2h-1p part  ############################################
-
+            '''
             t2_1_t = t2_1_b[ij_ind_b[0],ij_ind_b[1],:,:]
             t2_1_t_b = t2_1_t.transpose(2,1,0)
             t2_1_t_ab = t2_1_ab.transpose(2,3,0,1)
 
             T[s_bbb:f_bbb] = t2_1_t_b[(orb-nocc_b),:,:].reshape(-1)
             T[s_aba:f_aba] = t2_1_t_ab[:,(orb-nocc_b),:,:].reshape(-1)
-
+            '''
 ######## ADC(3) 2h-1p part  ############################################
 
         if(method=='adc(2)-x'or method=='adc(3)'):
-
+            '''
             t2_2_a = adc.t2[1][0][:]
             t2_2_ab = adc.t2[1][1][:]
             t2_2_b = adc.t2[1][2][:]
@@ -6499,7 +6517,7 @@ def ip_compute_trans_moments(adc, orb, spin="alpha"):
 
                 T[s_bbb:f_bbb] += t2_2_t_b[(orb-nocc_b),:,:].reshape(-1)
                 T[s_aba:f_aba] += t2_2_t_ab[:,(orb-nocc_b),:,:].reshape(-1)
-
+             '''
 ######## ADC(3) 1h part  ############################################
 
         if(method=='adc(3)'):
@@ -6643,7 +6661,7 @@ def ip_cvs_compute_trans_moments(adc, orb, spin="alpha"):
             T[s_a:f_a] += t1_2_a[:ncvs,(orb-nocc_a)]
 
 ######## ADC(2) 2h-1p  part  ############################################
-
+            ''' 
             #t2_1_t = t2_1_a[ij_ind_a[0],ij_ind_a[1],:,:]
             t2_1_t_ecc = t2_1_a[:ncvs,:ncvs,:,:].copy()
             t2_1_t_ecc = t2_1_t_ecc[ij_ind_ncvs[0],ij_ind_ncvs[1],:,:]
@@ -6660,11 +6678,11 @@ def ip_cvs_compute_trans_moments(adc, orb, spin="alpha"):
             T[s_bba_ecc:f_bba_ecc] = t2_1_t_ab[(orb-nocc_a),:,:ncvs,:ncvs].reshape(-1)
             T[s_bba_ecv:f_bba_ecv] = t2_1_t_ab[(orb-nocc_a),:,:ncvs,ncvs:].reshape(-1)
             T[s_bba_evc:f_bba_evc] = t2_1_t_ab[(orb-nocc_a),:,:ncvs,ncvs:].reshape(-1)
-
+            '''
 ######## ADC(3) 2h-1p  part  ############################################
 
         if(method=='adc(2)-x'or method=='adc(3)'):
-
+            '''
             t2_2_a = adc.t2[1][0][:]
             t2_2_ab = adc.t2[1][1][:]
 
@@ -6675,7 +6693,7 @@ def ip_cvs_compute_trans_moments(adc, orb, spin="alpha"):
 
                 T[s_aaa:f_aaa] += t2_2_t_a[(orb-nocc_a),:,:].reshape(-1)
                 T[s_bab:f_bab] += t2_2_t_ab[(orb-nocc_a),:,:,:].reshape(-1)
-
+           '''
 ######## ADC(3) 1h part  ############################################
 
         if(method=='adc(3)'):
@@ -6687,27 +6705,27 @@ def ip_cvs_compute_trans_moments(adc, orb, spin="alpha"):
                 t2_1_a_tmp = np.ascontiguousarray(t2_1_a[:,orb,:,:])
                 t2_1_ab_tmp = np.ascontiguousarray(t2_1_ab[orb,:,:,:])
 
-                T[s_a:f_a] += 0.25*lib.einsum('kdc,ikdc->i',t2_1_a_tmp, t2_2_a, optimize = True)
-                T[s_a:f_a] -= 0.25*lib.einsum('kdc,ikdc->i',t2_1_ab_tmp, t2_2_ab, optimize = True)
-                T[s_a:f_a] -= 0.25*lib.einsum('kcd,ikcd->i',t2_1_ab_tmp, t2_2_ab, optimize = True)
+                T[s_a:f_a] += 0.25*lib.einsum('kdc,ikdc->i',t2_1_a_tmp, t2_2_a[:ncvs,:,:,:], optimize = True)
+                T[s_a:f_a] -= 0.25*lib.einsum('kdc,ikdc->i',t2_1_ab_tmp, t2_2_ab[:ncvs,:,:,:], optimize = True)
+                T[s_a:f_a] -= 0.25*lib.einsum('kcd,ikcd->i',t2_1_ab_tmp, t2_2_ab[:ncvs,:,:,:], optimize = True)
        
                 del t2_1_a_tmp, t2_1_ab_tmp
 
                 t2_2_a_tmp = np.ascontiguousarray(t2_2_a[:,orb,:,:])
                 t2_2_ab_tmp = np.ascontiguousarray(t2_2_ab[orb,:,:,:])
 
-                T[s_a:f_a] += 0.25*lib.einsum('ikdc,kdc->i',t2_1_a,  t2_2_a_tmp,optimize = True)
-                T[s_a:f_a] -= 0.25*lib.einsum('ikcd,kcd->i',t2_1_ab, t2_2_ab_tmp,optimize = True)
-                T[s_a:f_a] -= 0.25*lib.einsum('ikdc,kdc->i',t2_1_ab, t2_2_ab_tmp,optimize = True)
+                T[s_a:f_a] += 0.25*lib.einsum('ikdc,kdc->i',t2_1_a[:ncvs,:,:,:],  t2_2_a_tmp,optimize = True)
+                T[s_a:f_a] -= 0.25*lib.einsum('ikcd,kcd->i',t2_1_ab[:ncvs,:,:,:], t2_2_ab_tmp,optimize = True)
+                T[s_a:f_a] -= 0.25*lib.einsum('ikdc,kdc->i',t2_1_ab[:ncvs,:,:,:], t2_2_ab_tmp,optimize = True)
 
                 del t2_2_a_tmp, t2_2_ab_tmp
             else:
                 t2_1_a_tmp =  np.ascontiguousarray(t2_1_a[:,:,(orb-nocc_a),:])
                 t2_1_ab_tmp = np.ascontiguousarray(t2_1_ab[:,:,(orb-nocc_a),:])
 
-                T[s_a:f_a] += 0.5*lib.einsum('ikc,kc->i',t2_1_a_tmp, t1_2_a,optimize = True)
-                T[s_a:f_a] += 0.5*lib.einsum('ikc,kc->i',t2_1_ab_tmp, t1_2_b,optimize = True)
-                T[s_a:f_a] += t1_3_a[:,(orb-nocc_a)]
+                T[s_a:f_a] += 0.5*lib.einsum('ikc,kc->i',t2_1_a_tmp[:ncvs,:,:], t1_2_a,optimize = True)
+                T[s_a:f_a] += 0.5*lib.einsum('ikc,kc->i',t2_1_ab_tmp[:ncvs,:,:], t1_2_b,optimize = True)
+                T[s_a:f_a] += t1_3_a[:ncvs,(orb-nocc_a)]
                 del t2_1_a_tmp, t2_1_ab_tmp
 
                 del t2_2_a
@@ -6742,7 +6760,7 @@ def ip_cvs_compute_trans_moments(adc, orb, spin="alpha"):
 
             #T[s_bbb:f_bbb] = t2_1_t_b[(orb-nocc_b),:,:].reshape(-1)
             #T[s_aba:f_aba] = t2_1_t_ab[:,(orb-nocc_b),:,:].reshape(-1)
-
+            '''
             t2_1_t_ecc = t2_1_b[:ncvs,:ncvs,:,:].copy()
             t2_1_t_ecc = t2_1_t_ecc[ij_ind_ncvs[0],ij_ind_ncvs[1],:,:]
             t2_1_t_b_ecc = t2_1_t_ecc.transpose(2,1,0)
@@ -6754,10 +6772,11 @@ def ip_cvs_compute_trans_moments(adc, orb, spin="alpha"):
             T[s_bba_ecc:f_bba_ecc] = t2_1_t_ab[(orb-nocc_a),:,:ncvs,:ncvs].reshape(-1)
             T[s_bba_ecv:f_bba_ecv] = t2_1_t_ab[(orb-nocc_a),:,:ncvs,ncvs:].reshape(-1)
             T[s_bba_evc:f_bba_evc] = t2_1_t_ab[(orb-nocc_a),:,ncvs:,:ncvs].reshape(-1)
+            '''
 ######## ADC(3) 2h-1p part  ############################################
 
         if(method=='adc(2)-x'or method=='adc(3)'):
-
+            '''
             t2_2_a = adc.t2[1][0][:]
             t2_2_ab = adc.t2[1][1][:]
             t2_2_b = adc.t2[1][2][:]
@@ -6770,7 +6789,7 @@ def ip_cvs_compute_trans_moments(adc, orb, spin="alpha"):
 
                 T[s_bbb:f_bbb] += t2_2_t_b[(orb-nocc_b),:,:].reshape(-1)
                 T[s_aba:f_aba] += t2_2_t_ab[:,(orb-nocc_b),:,:].reshape(-1)
-
+            '''
 ######## ADC(3) 1h part  ############################################
 
         if(method=='adc(3)'):
@@ -6782,18 +6801,18 @@ def ip_cvs_compute_trans_moments(adc, orb, spin="alpha"):
                 t2_1_b_tmp = np.ascontiguousarray(t2_1_b[:,orb,:,:])
                 t2_1_ab_tmp = np.ascontiguousarray(t2_1_ab[:,orb,:,:])
 
-                T[s_b:f_b] += 0.25*lib.einsum('kdc,ikdc->i',t2_1_b_tmp, t2_2_b, optimize = True)
-                T[s_b:f_b] -= 0.25*lib.einsum('kdc,kidc->i',t2_1_ab_tmp, t2_2_ab, optimize = True)
-                T[s_b:f_b] -= 0.25*lib.einsum('kcd,kicd->i',t2_1_ab_tmp, t2_2_ab, optimize = True)
+                T[s_b:f_b] += 0.25*lib.einsum('kdc,ikdc->i',t2_1_b_tmp, t2_2_b[:ncvs,:,:,:], optimize = True)
+                T[s_b:f_b] -= 0.25*lib.einsum('kdc,kidc->i',t2_1_ab_tmp, t2_2_ab[:,:ncvs,:,:], optimize = True)
+                T[s_b:f_b] -= 0.25*lib.einsum('kcd,kicd->i',t2_1_ab_tmp, t2_2_ab[:,:ncvs,:,:], optimize = True)
 
                 del t2_1_b_tmp, t2_1_ab_tmp
 
                 t2_2_b_tmp = np.ascontiguousarray(t2_2_b[:,orb,:,:])
                 t2_2_ab_tmp = np.ascontiguousarray(t2_2_ab[:,orb,:,:])
 
-                T[s_b:f_b] += 0.25*lib.einsum('ikdc,kdc->i',t2_1_b,  t2_2_b_tmp ,optimize = True)
-                T[s_b:f_b] -= 0.25*lib.einsum('kicd,kcd->i',t2_1_ab, t2_2_ab_tmp,optimize = True)
-                T[s_b:f_b] -= 0.25*lib.einsum('kidc,kdc->i',t2_1_ab, t2_2_ab_tmp,optimize = True)
+                T[s_b:f_b] += 0.25*lib.einsum('ikdc,kdc->i',t2_1_b[:ncvs,:,:,:],  t2_2_b_tmp ,optimize = True)
+                T[s_b:f_b] -= 0.25*lib.einsum('kicd,kcd->i',t2_1_ab[:,:ncvs,:,:], t2_2_ab_tmp,optimize = True)
+                T[s_b:f_b] -= 0.25*lib.einsum('kidc,kdc->i',t2_1_ab[:,:ncvs,:,:], t2_2_ab_tmp,optimize = True)
                 
                 del t2_2_b_tmp, t2_2_ab_tmp
 
@@ -6801,9 +6820,9 @@ def ip_cvs_compute_trans_moments(adc, orb, spin="alpha"):
                 t2_1_b_tmp  = np.ascontiguousarray(t2_1_b[:,:,(orb-nocc_b),:])
                 t2_1_ab_tmp = np.ascontiguousarray(t2_1_ab[:,:,:,(orb-nocc_b)])
 
-                T[s_b:f_b] += 0.5*lib.einsum('ikc,kc->i',t2_1_b_tmp, t1_2_b,optimize = True)
-                T[s_b:f_b] += 0.5*lib.einsum('kic,kc->i',t2_1_ab_tmp, t1_2_a,optimize = True)
-                T[s_b:f_b] += t1_3_b[:,(orb-nocc_b)]
+                T[s_b:f_b] += 0.5*lib.einsum('ikc,kc->i',t2_1_b_tmp[:ncvs,:,:], t1_2_b,optimize = True)
+                T[s_b:f_b] += 0.5*lib.einsum('kic,kc->i',t2_1_ab_tmp[:,:ncvs,:], t1_2_a,optimize = True)
+                T[s_b:f_b] += t1_3_b[:ncvs,(orb-nocc_b)]
                 del t2_1_b_tmp, t2_1_ab_tmp
                 del t2_2_b
                 del t2_2_ab
@@ -7703,7 +7722,8 @@ class UADCIPCVS(UADC):
         self._keys = set(self.__dict__.keys()).union(keys)
 
     kernel = kernel
-    get_imds = get_imds_ip_cvs
+    #get_imds = get_imds_ip_cvs
+    get_imds = get_imds_ip
     get_diag = ip_cvs_adc_diag
     matvec = ip_cvs_adc_matvec
     compute_trans_moments = ip_cvs_compute_trans_moments
