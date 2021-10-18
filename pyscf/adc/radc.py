@@ -70,8 +70,18 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
        raise Exception("CVS and Koopman's aren't not implemented for EA")
 
 
-
     imds = adc.get_imds(eris)
+    if nroots == 'full':
+        matvec, diag = adc.gen_matvec(imds, eris, cvs)
+        identity = np.identity(diag.size)
+        M = np.zeros((diag.size,diag.size),dtype=complex)
+        for i in range(diag.size):
+            M[:,i] = matvec(identity[:,i])
+
+        E, _ = np.linalg.eig(M) 
+        print(np.column_stack(np.unique(np.around(E, decimals=8), return_counts=True))) 
+        exit()
+
     if (mom_skd_iter == False) and (ncore_proj > 0):
         matvec, diag = adc.gen_matvec(imds, eris, cvs)
         guess = adc.get_init_guess(nroots, diag, ascending = True)
@@ -1396,7 +1406,7 @@ def get_imds_ip(adc, eris=None, fc_bool=True):
 
     e_occ = adc.mo_energy[:nocc]
     e_vir = adc.mo_energy[nocc:]
-    #e_vir = complex_shift(e_vir, energy_thresh, imaginary_shift)
+    e_vir = complex_shift(e_vir, energy_thresh, imaginary_shift)
 
     idn_occ = np.identity(nocc)
     idn_vir = np.identity(nvir)
@@ -1415,7 +1425,7 @@ def get_imds_ip(adc, eris=None, fc_bool=True):
         e_occ = e_occ[nfc_orb:]
         idn_occ = np.identity(nocc-nfc_orb)"""
 
-    M_ij = lib.einsum('ij,j->ij', idn_occ ,e_occ)#.astype(complex)
+    M_ij = lib.einsum('ij,j->ij', idn_occ ,e_occ).astype(complex)
 
     # Second-order terms
 
@@ -1425,7 +1435,7 @@ def get_imds_ip(adc, eris=None, fc_bool=True):
     M_ij +=  lib.einsum('d,lide,ljde->ij',e_vir,t2_1, t2_1, optimize=True)
     M_ij +=  lib.einsum('d,ilde,jlde->ij',e_vir,t2_1, t2_1, optimize=True)
     M_ij +=  lib.einsum('d,iled,jled->ij',e_vir,t2_1, t2_1, optimize=True)
-
+    
     M_ij -= 0.5 *  lib.einsum('l,ilde,jlde->ij',e_occ,t2_1, t2_1, optimize=True)
     M_ij += 0.5 *  lib.einsum('l,ilde,ljde->ij',e_occ,t2_1, t2_1, optimize=True)
     M_ij += 0.5 *  lib.einsum('l,lide,jlde->ij',e_occ,t2_1, t2_1, optimize=True)
@@ -1462,7 +1472,7 @@ def get_imds_ip(adc, eris=None, fc_bool=True):
     M_ij -= 0.5 *  lib.einsum('jlde,ldie->ij',t2_1, eris_ovov,optimize=True)
     M_ij += 0.5 *  lib.einsum('ljde,ldie->ij',t2_1, eris_ovov,optimize=True)
     M_ij += lib.einsum('jlde,idle->ij',t2_1, eris_ovov,optimize=True)
-    
+     
     cput0 = log.timer_debug1("Completed M_ij second-order terms ADC(2) calculation", *cput0)
     # Third-order terms
 
@@ -1802,7 +1812,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=True, fc_bool=True, mom_skd=False, a
 
     e_occ = adc.mo_energy[:nocc]
     e_vir = adc.mo_energy[nocc:]
-    #e_vir = complex_shift(e_vir, energy_thresh, imaginary_shift)
+    e_vir = complex_shift(e_vir, energy_thresh, imaginary_shift)
 
     idn_occ = np.identity(nocc)
     idn_vir = np.identity(nvir)
@@ -1816,8 +1826,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=True, fc_bool=True, mom_skd=False, a
     d_a = e_vir[:,None]
     D_n = -d_a + d_ij.reshape(-1)
     D_aij = D_n.reshape(-1)
-
-    diag = np.zeros(dim)#.astype(complex)
+    diag = np.zeros(dim).astype(complex)
 
     # Compute precond in h1-h1 block
     M_ij_diag = np.diagonal(M_ij)
@@ -2466,7 +2475,7 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
 
     e_occ = adc.mo_energy[:nocc]
     e_vir = adc.mo_energy[nocc:]
-    #e_vir = complex_shift(e_vir, energy_thresh, imaginary_shift)
+    e_vir = complex_shift(e_vir, energy_thresh, imaginary_shift)
 
     idn_occ = np.identity(nocc)
     idn_vir = np.identity(nvir)
@@ -2498,7 +2507,7 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
         if adc.ncore_proj_valence > 0:
             r = cvs_proj_valence(adc, r)
 
-        s = np.zeros((dim))#.astype(complex)
+        s = np.zeros((dim)).astype(complex)
 
         r1 = r[s1:f1]
         r2 = r[s2:f2]
