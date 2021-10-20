@@ -78,7 +78,7 @@ def transform_integrals_incore(myadc):
     eris.OVvo = ao2mo.general(myadc._scf._eri, (occ_b, vir_b, vir_a, occ_a), compact=False).reshape(nocc_b, nvir_b, nvir_a, nocc_a).copy()
     eris.OVvv = ao2mo.general(myadc._scf._eri, (occ_b, vir_b, vir_a, vir_a), compact=True).reshape(nocc_b, nvir_b, -1).copy()
 
-    # CVS integrals (c: core, e: external, v: valence)
+    # CVS integrals (c: core, e: external, v: valence, o: all occupied orbitals)
     
     #----- ADC(2) integrals --------
     eris.cecc = ao2mo.general(myadc._scf._eri, (core_a, vir_a, core_a, core_a), compact=False).reshape(ncvs, nvir_a, ncvs, ncvs).copy()
@@ -131,6 +131,28 @@ def transform_integrals_incore(myadc):
     eris.CCee = ao2mo.general(myadc._scf._eri, (core_b, core_b, vir_a, vir_a), compact=False).reshape(ncvs, ncvs, nvir_a, nvir_a).copy()
     eris.VCee = ao2mo.general(myadc._scf._eri, (val_b, core_b, vir_a, vir_a), compact=False).reshape(nval_b, ncvs, nvir_a, nvir_a).copy()
     eris.VVee = ao2mo.general(myadc._scf._eri, (val_b, val_b, vir_a, vir_a), compact=False).reshape(nval_b, nval_b, nvir_a, nvir_a).copy()
+
+    #----- ADC(3) integrals --------
+    eris.oecc = ao2mo.general(myadc._scf._eri, (occ_a, vir_a, core_a, core_a), compact=False).reshape(nocc_a, nvir_a, ncvs, ncvs).copy()
+    eris.ceoc = ao2mo.general(myadc._scf._eri, (core_a, vir_a, occ_a, core_a), compact=False).reshape(ncvs, nvir_a, nocc_a, ncvs).copy()
+    eris.oecv = ao2mo.general(myadc._scf._eri, (occ_a, vir_a, core_a, val_a), compact=False).reshape(nocc_a, nvir_a, ncvs, nval_a).copy()
+    eris.ceov = ao2mo.general(myadc._scf._eri, (core_a, vir_a, occ_a, val_a), compact=False).reshape(ncvs, nvir_a, nocc_a, nval_a).copy()
+    eris.OECC = ao2mo.general(myadc._scf._eri, (occ_b, vir_b, core_b, core_b), compact=False).reshape(nocc_b, nvir_b, ncvs, ncvs).copy()
+    eris.CEOC = ao2mo.general(myadc._scf._eri, (core_b, vir_b, occ_b, core_b), compact=False).reshape(ncvs, nvir_b, nocc_b, ncvs).copy()
+    eris.OECV = ao2mo.general(myadc._scf._eri, (occ_b, vir_b, core_b, val_b), compact=False).reshape(nocc_b, nvir_b, ncvs, nval_b).copy()
+    eris.CEOV = ao2mo.general(myadc._scf._eri, (core_b, vir_b, occ_b, val_b), compact=False).reshape(ncvs, nvir_b, nocc_b, nval_b).copy()
+    eris.OEcc = ao2mo.general(myadc._scf._eri, (occ_b, vir_b, core_a, core_a), compact=False).reshape(nocc_b, nvir_b, ncvs, ncvs).copy()
+    eris.CEoc = ao2mo.general(myadc._scf._eri, (core_b, vir_b, occ_a, core_a), compact=False).reshape(ncvs, nvir_b, nocc_a, ncvs).copy()
+    eris.OEcv = ao2mo.general(myadc._scf._eri, (occ_b, vir_b, core_a, val_a), compact=False).reshape(nocc_b, nvir_b, ncvs, nval_a).copy()
+    eris.CEov = ao2mo.general(myadc._scf._eri, (core_b, vir_b, occ_a, val_a), compact=False).reshape(ncvs, nvir_b, nocc_a, nval_a).copy()
+    eris.oeCC = ao2mo.general(myadc._scf._eri, (occ_a, vir_a, core_b, core_b), compact=False).reshape(nocc_a, nvir_a, ncvs, ncvs).copy()
+    eris.ceOC = ao2mo.general(myadc._scf._eri, (core_a, vir_a, occ_b, core_b), compact=False).reshape(ncvs, nvir_a, nocc_b, ncvs).copy()
+    eris.oeCV = ao2mo.general(myadc._scf._eri, (occ_a, vir_a, core_b, val_b), compact=False).reshape(nocc_a, nvir_a, ncvs, nval_b).copy()
+    eris.ceOV = ao2mo.general(myadc._scf._eri, (core_a, vir_a, occ_b, val_b), compact=False).reshape(ncvs, nvir_a, nocc_b, nval_b).copy()
+    eris.cvvv = ao2mo.general(myadc._scf._eri, (core_a, vir_a, vir_a, vir_a), compact=True).reshape(ncvs, nvir_a, -1).copy()
+    eris.CVVV = ao2mo.general(myadc._scf._eri, (core_b, vir_b, vir_b, vir_b), compact=True).reshape(ncvs, nvir_b, -1).copy()
+    eris.cvVV = ao2mo.general(myadc._scf._eri, (core_a, vir_a, vir_b, vir_b), compact=True).reshape(ncvs, nvir_a, -1).copy()
+    eris.CVvv = ao2mo.general(myadc._scf._eri, (core_b, vir_b, vir_a, vir_a), compact=True).reshape(ncvs, nvir_b, -1).copy()
 
     if (myadc.method == "adc(2)-x" or myadc.method == "adc(3)"):
 
