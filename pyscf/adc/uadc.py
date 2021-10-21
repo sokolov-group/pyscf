@@ -2264,7 +2264,7 @@ def get_imds_ip_cvs(adc, eris=None):
         M_ij_a += 0.5 * 0.5* lib.einsum('ilde,jdel->ij',t2_2_a_coee, eris_ovvo[:ncvs,:,:,:], optimize=True)
         M_ij_a -= 0.5 * 0.5* lib.einsum('ilde,jedl->ij',t2_2_a_coee, eris_ovvo[:ncvs,:,:,:], optimize=True)
 
-        M_ij_a += 0.5 * 0.5* lib.einsum('jlde,ledi->ij',t2_2_a_coee, eris_ovvo[:,:,:,:ncvs], optimize=True)
+        M_ij_a += 0.5 * 0.5* lib.einsum('jlde,idel->ij',t2_2_a_coee, eris_ovvo[:ncvs,:,:,:], optimize=True)
         M_ij_a -= 0.5 * 0.5* lib.einsum('jlde,iedl->ij',t2_2_a_coee, eris_ovvo[:ncvs,:,:,:], optimize=True)
 
         t2_1_b = t2[0][2][:]
@@ -2290,8 +2290,8 @@ def get_imds_ip_cvs(adc, eris=None):
         M_ij_b += 0.5 * lib.einsum('ljed,ledi->ij',t2_2_ab_ocee, eris_ovVO[:,:,:,:ncvs], optimize=True)
 
         M_ij_t = lib.einsum('lmde,jldf->mejf', t2_1_a, t2_1_a_coee, optimize=True)
-        M_ij_a -= 0.5 * lib.einsum('mejf,mefi->ij',M_ij_t, eris_ovvo[:,:,:,:ncvs], optimize=True)
-        M_ij_a -= 0.5 * lib.einsum('mejf,mefi->ji',M_ij_t, eris_ovvo[:,:,:,:ncvs], optimize=True)
+        M_ij_a -= 0.5 * lib.einsum('mejf,ifem->ij',M_ij_t, eris_ovvo[:ncvs,:,:,:], optimize=True)
+        M_ij_a -= 0.5 * lib.einsum('mejf,ifem->ji',M_ij_t, eris_ovvo[:ncvs,:,:,:], optimize=True)
         M_ij_a += 0.5 * lib.einsum('mejf,mife->ij',M_ij_t, eris_oovv[:,:ncvs,:,:], optimize=True)
         M_ij_a += 0.5 * lib.einsum('mejf,mife->ji',M_ij_t, eris_oovv[:,:ncvs,:,:], optimize=True)
         del M_ij_t
@@ -2348,7 +2348,7 @@ def get_imds_ip_cvs(adc, eris=None):
         del t2_1_b
         del t2_1_b_coee
 
-        M_ij_a += 0.5 * lib.einsum('mled,jlfd,mefi->ij',t2_1_ab, t2_1_ab_coee, eris_ovvo[:,:,:,:ncvs] ,optimize = True)
+        M_ij_a += 0.5 * lib.einsum('mled,jlfd,ifem->ij',t2_1_ab, t2_1_ab_coee, eris_ovvo[:ncvs,:,:,:] ,optimize = True)
         M_ij_a -= 0.5 * lib.einsum('mled,jlfd,mife->ij',t2_1_ab, t2_1_ab_coee, eris_oovv[:,:ncvs,:,:] ,optimize = True)
         M_ij_a -= 0.5 * lib.einsum('mlde,jldf,mife->ij',t2_1_ab, t2_1_ab_coee, eris_ooVV[:,:ncvs,:,:] ,optimize = True)
 
@@ -2356,7 +2356,7 @@ def get_imds_ip_cvs(adc, eris=None):
         M_ij_b -= 0.5 * lib.einsum('lmde,ljdf,mife->ij',t2_1_ab, t2_1_ab_ocee, eris_OOVV[:,:ncvs,:,:],optimize = True)
         M_ij_b -= 0.5 * lib.einsum('lmed,ljfd,mife->ij',t2_1_ab, t2_1_ab_ocee, eris_OOvv[:,:ncvs,:,:] ,optimize = True)
 
-        M_ij_a += 0.5 * lib.einsum('mled,ilfd,mefj->ij',t2_1_ab, t2_1_ab_coee, eris_ovvo[:,:,:,:ncvs] ,optimize = True)
+        M_ij_a += 0.5 * lib.einsum('mled,ilfd,jfem->ij',t2_1_ab, t2_1_ab_coee, eris_ovvo[:ncvs,:,:,:] ,optimize = True)
         M_ij_a -= 0.5 * lib.einsum('mled,ilfd,mjfe->ij',t2_1_ab, t2_1_ab_coee, eris_oovv[:,:ncvs,:,:] ,optimize = True)
         M_ij_a -= 0.5 * lib.einsum('mlde,ildf,mjfe->ij',t2_1_ab, t2_1_ab_coee, eris_ooVV[:,:ncvs,:,:] ,optimize = True)
 
@@ -5369,7 +5369,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                t2_1_a_ccee = t2_1_a[:ncvs,:ncvs,:,:].copy()
                t2_1_a_ccee_t = t2_1_a_ccee[ij_ind_ncvs[0],ij_ind_ncvs[1],:,:] 
  
-               if isinstance(eris.cvvv, type(None)):
+               if isinstance(eris.ceee, type(None)):
                    chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
                else :
                    chnk_size = ncvs
@@ -5386,16 +5386,16 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                    if getattr(adc, 'with_df', None):
                        eris_ovvv = dfadc.get_ovvv_spin_df(adc, eris.Lov, eris.Lvv, p, chnk_size).reshape(-1,nvir_a,nvir_a,nvir_a)
                    else :       
-                       eris_cvvv = radc_ao2mo.unpack_eri_1(eris.cvvv, nvir_a)
-                   k = eris_cvvv.shape[0]
-                   temp_singles[a:a+k] += 0.5*lib.einsum('abc,icab->i',temp_1_ecc, eris_cvvv, optimize=True)
-                   temp_singles[a:a+k] -= 0.5*lib.einsum('abc,ibac->i',temp_1_ecc, eris_cvvv, optimize=True)
-                   temp_singles[a:a+k] += 0.5*lib.einsum('abc,icab->i',temp_1_ecv, eris_cvvv, optimize=True)
-                   temp_singles[a:a+k] -= 0.5*lib.einsum('abc,ibac->i',temp_1_ecv, eris_cvvv, optimize=True)
+                       eris_ceee = radc_ao2mo.unpack_eri_1(eris.ceee, nvir_a)
+                   k = eris_ceee.shape[0]
+                   temp_singles[a:a+k] += 0.5*lib.einsum('abc,icab->i',temp_1_ecc, eris_ceee, optimize=True)
+                   temp_singles[a:a+k] -= 0.5*lib.einsum('abc,ibac->i',temp_1_ecc, eris_ceee, optimize=True)
+                   temp_singles[a:a+k] += 0.5*lib.einsum('abc,icab->i',temp_1_ecv, eris_ceee, optimize=True)
+                   temp_singles[a:a+k] -= 0.5*lib.einsum('abc,ibac->i',temp_1_ecv, eris_ceee, optimize=True)
 
-                   temp_doubles += lib.einsum('i,icab->bca',r_a[a:a+k],eris_cvvv,optimize=True)
-                   temp_doubles -= lib.einsum('i,ibac->bca',r_a[a:a+k],eris_cvvv,optimize=True)
-                   del eris_cvvv
+                   temp_doubles += lib.einsum('i,icab->bca',r_a[a:a+k],eris_ceee,optimize=True)
+                   temp_doubles -= lib.einsum('i,ibac->bca',r_a[a:a+k],eris_ceee,optimize=True)
+                   del eris_ceee
                    a += k
 
                s[s_a:f_a] += temp_singles
@@ -5483,7 +5483,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                t2_1_ab_cvee = t2_1_ab[:ncvs,ncvs:,:,:].copy()
                t2_1_ab_vcee = t2_1_ab[ncvs:,:ncvs,:,:].copy()
 
-               if isinstance(eris.OVVV, type(None)):
+               if isinstance(eris.CEEE, type(None)):
                    chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
                else :
                    chnk_size = ncvs
@@ -5497,16 +5497,16 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                    if getattr(adc, 'with_df', None):
                        eris_OVVV = dfadc.get_ovvv_spin_df(adc, eris.LOV, eris.LVV, p, chnk_size).reshape(-1,nvir_b,nvir_b,nvir_b)
                    else :
-                       eris_CVVV = radc_ao2mo.unpack_eri_1(eris.CVVV, nvir_b)
-                   k = eris_CVVV.shape[0]
-                   temp_singles[a:a+k] += 0.5*lib.einsum('abc,icab->i',temp_1_ecc, eris_CVVV, optimize=True)
-                   temp_singles[a:a+k] -= 0.5*lib.einsum('abc,ibac->i',temp_1_ecc, eris_CVVV, optimize=True)
-                   temp_singles[a:a+k] += 0.5*lib.einsum('abc,icab->i',temp_1_ecv, eris_CVVV, optimize=True)
-                   temp_singles[a:a+k] -= 0.5*lib.einsum('abc,ibac->i',temp_1_ecv, eris_CVVV, optimize=True)
+                       eris_CEEE = radc_ao2mo.unpack_eri_1(eris.CEEE, nvir_b)
+                   k = eris_CEEE.shape[0]
+                   temp_singles[a:a+k] += 0.5*lib.einsum('abc,icab->i',temp_1_ecc, eris_CEEE, optimize=True)
+                   temp_singles[a:a+k] -= 0.5*lib.einsum('abc,ibac->i',temp_1_ecc, eris_CEEE, optimize=True)
+                   temp_singles[a:a+k] += 0.5*lib.einsum('abc,icab->i',temp_1_ecv, eris_CEEE, optimize=True)
+                   temp_singles[a:a+k] -= 0.5*lib.einsum('abc,ibac->i',temp_1_ecv, eris_CEEE, optimize=True)
 
-                   temp_doubles += lib.einsum('i,icab->bca',r_b[a:a+k],eris_CVVV,optimize=True)
-                   temp_doubles -= lib.einsum('i,ibac->bca',r_b[a:a+k],eris_CVVV,optimize=True)
-                   del eris_CVVV
+                   temp_doubles += lib.einsum('i,icab->bca',r_b[a:a+k],eris_CEEE,optimize=True)
+                   temp_doubles -= lib.einsum('i,ibac->bca',r_b[a:a+k],eris_CEEE,optimize=True)
+                   del eris_CEEE
                    a += k
 
                s[s_b:f_b] += temp_singles
@@ -5579,7 +5579,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                del t2_1_b_coee
                del t2_1_b_voee
                  
-               if isinstance(eris.ovVV, type(None)):
+               if isinstance(eris.ceEE, type(None)):
                    chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
                else :
                    chnk_size = ncvs
@@ -5592,15 +5592,15 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                    if getattr(adc, 'with_df', None):
                        eris_ovVV = dfadc.get_ovvv_spin_df(adc, eris.Lov, eris.LVV, p, chnk_size).reshape(-1,nvir_a,nvir_b,nvir_b)
                    else :
-                       eris_cvVV = radc_ao2mo.unpack_eri_1(eris.cvVV, nvir_b)
-                   k = eris_cvVV.shape[0]
+                       eris_ceEE = radc_ao2mo.unpack_eri_1(eris.ceEE, nvir_b)
+                   k = eris_ceEE.shape[0]
 
-                   s[s_a:f_a][a:a+k] += lib.einsum('abc,icab->i',temp_1_ecc, eris_cvVV, optimize=True)
-                   s[s_a:f_a][a:a+k] += lib.einsum('abc,icab->i',temp_1_ecv, eris_cvVV, optimize=True)
-                   s[s_a:f_a][a:a+k] += lib.einsum('abc,icab->i',temp_1_evc, eris_cvVV, optimize=True)
+                   s[s_a:f_a][a:a+k] += lib.einsum('abc,icab->i',temp_1_ecc, eris_ceEE, optimize=True)
+                   s[s_a:f_a][a:a+k] += lib.einsum('abc,icab->i',temp_1_ecv, eris_ceEE, optimize=True)
+                   s[s_a:f_a][a:a+k] += lib.einsum('abc,icab->i',temp_1_evc, eris_ceEE, optimize=True)
 
-                   temp_2 += lib.einsum('i,icab->cba',r_a[a:a+k],eris_cvVV,optimize=True)
-                   del eris_cvVV
+                   temp_2 += lib.einsum('i,icab->cba',r_a[a:a+k],eris_ceEE,optimize=True)
+                   del eris_ceEE
                    a += k
 
                s[s_bba_ecc:f_bba_ecc] += lib.einsum('cba,kjcb->ajk',temp_2, t2_1_ab_ccee, optimize=True).reshape(-1)
@@ -5611,7 +5611,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                del temp_1_evc
                del temp_2
                 
-               if isinstance(eris.OVvv, type(None)):
+               if isinstance(eris.CEee, type(None)):
                    chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
                else :
                    chnk_size = ncvs
@@ -5625,14 +5625,14 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                    if getattr(adc, 'with_df', None):
                        eris_OVvv = dfadc.get_ovvv_spin_df(adc, eris.LOV, eris.Lvv, p, chnk_size).reshape(-1,nvir_b,nvir_a,nvir_a)
                    else :
-                       eris_CVvv = radc_ao2mo.unpack_eri_1(eris.CVvv, nvir_a)
-                   k = eris_CVvv.shape[0]
-                   s[s_b:f_b][a:a+k] += lib.einsum('abc,icab->i',temp_1_ecc, eris_CVvv, optimize=True)
-                   s[s_b:f_b][a:a+k] += lib.einsum('abc,icab->i',temp_1_ecv, eris_CVvv, optimize=True)
-                   s[s_b:f_b][a:a+k] += lib.einsum('abc,icab->i',temp_1_evc, eris_CVvv, optimize=True)
+                       eris_CEee = radc_ao2mo.unpack_eri_1(eris.CEee, nvir_a)
+                   k = eris_CEee.shape[0]
+                   s[s_b:f_b][a:a+k] += lib.einsum('abc,icab->i',temp_1_ecc, eris_CEee, optimize=True)
+                   s[s_b:f_b][a:a+k] += lib.einsum('abc,icab->i',temp_1_ecv, eris_CEee, optimize=True)
+                   s[s_b:f_b][a:a+k] += lib.einsum('abc,icab->i',temp_1_evc, eris_CEee, optimize=True)
 
-                   temp_2 += lib.einsum('i,icab->bca',r_b[a:a+k],eris_CVvv,optimize=True)
-                   del eris_CVvv
+                   temp_2 += lib.einsum('i,icab->bca',r_b[a:a+k],eris_CEee,optimize=True)
+                   del eris_CEee
                    a += k
 
                s[s_aab_ecc:f_aab_ecc] += lib.einsum('bca,jkbc->ajk',temp_2, t2_1_ab_ccee, optimize=True).reshape(-1)

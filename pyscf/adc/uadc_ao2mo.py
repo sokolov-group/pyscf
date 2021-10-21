@@ -149,10 +149,10 @@ def transform_integrals_incore(myadc):
     eris.ceOC = ao2mo.general(myadc._scf._eri, (core_a, vir_a, occ_b, core_b), compact=False).reshape(ncvs, nvir_a, nocc_b, ncvs).copy()
     eris.oeCV = ao2mo.general(myadc._scf._eri, (occ_a, vir_a, core_b, val_b), compact=False).reshape(nocc_a, nvir_a, ncvs, nval_b).copy()
     eris.ceOV = ao2mo.general(myadc._scf._eri, (core_a, vir_a, occ_b, val_b), compact=False).reshape(ncvs, nvir_a, nocc_b, nval_b).copy()
-    eris.cvvv = ao2mo.general(myadc._scf._eri, (core_a, vir_a, vir_a, vir_a), compact=True).reshape(ncvs, nvir_a, -1).copy()
-    eris.CVVV = ao2mo.general(myadc._scf._eri, (core_b, vir_b, vir_b, vir_b), compact=True).reshape(ncvs, nvir_b, -1).copy()
-    eris.cvVV = ao2mo.general(myadc._scf._eri, (core_a, vir_a, vir_b, vir_b), compact=True).reshape(ncvs, nvir_a, -1).copy()
-    eris.CVvv = ao2mo.general(myadc._scf._eri, (core_b, vir_b, vir_a, vir_a), compact=True).reshape(ncvs, nvir_b, -1).copy()
+    eris.ceee = ao2mo.general(myadc._scf._eri, (core_a, vir_a, vir_a, vir_a), compact=True).reshape(ncvs, nvir_a, -1).copy()
+    eris.CEEE = ao2mo.general(myadc._scf._eri, (core_b, vir_b, vir_b, vir_b), compact=True).reshape(ncvs, nvir_b, -1).copy()
+    eris.ceEE = ao2mo.general(myadc._scf._eri, (core_a, vir_a, vir_b, vir_b), compact=True).reshape(ncvs, nvir_a, -1).copy()
+    eris.CEee = ao2mo.general(myadc._scf._eri, (core_b, vir_b, vir_a, vir_a), compact=True).reshape(ncvs, nvir_b, -1).copy()
 
     if (myadc.method == "adc(2)-x" or myadc.method == "adc(3)"):
 
