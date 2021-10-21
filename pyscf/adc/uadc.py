@@ -7003,11 +7003,13 @@ def ip_cvs_compute_trans_moments(adc, orb, spin="alpha"):
 
         t2_1_a = adc.t2[0][0][:]
         t2_1_ab = adc.t2[0][1][:]
+        t2_1_a_coee = t2_1_a[:ncvs,:,:,:].copy()
+        t2_1_ab_coee = t2_1_ab[:ncvs,:,:,:].copy()
         if orb < nocc_a:
             T[s_a:f_a]  = idn_occ_a[orb, :ncvs]
-            T[s_a:f_a] += 0.25*lib.einsum('kdc,ikdc->i',t2_1_a[:,orb,:,:], t2_1_a[:ncvs,:,:,:], optimize = True)
-            T[s_a:f_a] -= 0.25*lib.einsum('kdc,ikdc->i',t2_1_ab[orb,:,:,:], t2_1_ab[:ncvs,:,:,:], optimize = True)
-            T[s_a:f_a] -= 0.25*lib.einsum('kcd,ikcd->i',t2_1_ab[orb,:,:,:], t2_1_ab[:ncvs,:,:,:], optimize = True)
+            T[s_a:f_a] += 0.25*lib.einsum('kdc,ikdc->i',t2_1_a[:,orb,:,:], t2_1_a_coee, optimize = True)
+            T[s_a:f_a] -= 0.25*lib.einsum('kdc,ikdc->i',t2_1_ab[orb,:,:,:], t2_1_ab_coee, optimize = True)
+            T[s_a:f_a] -= 0.25*lib.einsum('kcd,ikcd->i',t2_1_ab[orb,:,:,:], t2_1_ab_coee, optimize = True)
         else :
             T[s_a:f_a] += t1_2_a[:ncvs,(orb-nocc_a)]
 
@@ -7062,27 +7064,29 @@ def ip_cvs_compute_trans_moments(adc, orb, spin="alpha"):
                      
                 t2_1_a_tmp = np.ascontiguousarray(t2_1_a[:,orb,:,:])
                 t2_1_ab_tmp = np.ascontiguousarray(t2_1_ab[orb,:,:,:])
+                t2_2_a_coee = t2_2_a[:ncvs,:,:,:].copy()
+                t2_2_ab_coee = t2_2_ab[:ncvs,:,:,:].copy()
 
-                T[s_a:f_a] += 0.25*lib.einsum('kdc,ikdc->i',t2_1_a_tmp, t2_2_a[:ncvs,:,:,:], optimize = True)
-                T[s_a:f_a] -= 0.25*lib.einsum('kdc,ikdc->i',t2_1_ab_tmp, t2_2_ab[:ncvs,:,:,:], optimize = True)
-                T[s_a:f_a] -= 0.25*lib.einsum('kcd,ikcd->i',t2_1_ab_tmp, t2_2_ab[:ncvs,:,:,:], optimize = True)
+                T[s_a:f_a] += 0.25*lib.einsum('kdc,ikdc->i',t2_1_a_tmp, t2_2_a_coee, optimize = True)
+                T[s_a:f_a] -= 0.25*lib.einsum('kdc,ikdc->i',t2_1_ab_tmp, t2_2_ab_coee, optimize = True)
+                T[s_a:f_a] -= 0.25*lib.einsum('kcd,ikcd->i',t2_1_ab_tmp, t2_2_ab_coee, optimize = True)
        
                 del t2_1_a_tmp, t2_1_ab_tmp
 
                 t2_2_a_tmp = np.ascontiguousarray(t2_2_a[:,orb,:,:])
                 t2_2_ab_tmp = np.ascontiguousarray(t2_2_ab[orb,:,:,:])
 
-                T[s_a:f_a] += 0.25*lib.einsum('ikdc,kdc->i',t2_1_a[:ncvs,:,:,:],  t2_2_a_tmp,optimize = True)
-                T[s_a:f_a] -= 0.25*lib.einsum('ikcd,kcd->i',t2_1_ab[:ncvs,:,:,:], t2_2_ab_tmp,optimize = True)
-                T[s_a:f_a] -= 0.25*lib.einsum('ikdc,kdc->i',t2_1_ab[:ncvs,:,:,:], t2_2_ab_tmp,optimize = True)
+                T[s_a:f_a] += 0.25*lib.einsum('ikdc,kdc->i',t2_1_a_coee,  t2_2_a_tmp,optimize = True)
+                T[s_a:f_a] -= 0.25*lib.einsum('ikcd,kcd->i',t2_1_ab_coee, t2_2_ab_tmp,optimize = True)
+                T[s_a:f_a] -= 0.25*lib.einsum('ikdc,kdc->i',t2_1_ab_coee, t2_2_ab_tmp,optimize = True)
 
                 del t2_2_a_tmp, t2_2_ab_tmp
             else:
-                t2_1_a_tmp =  np.ascontiguousarray(t2_1_a[:,:,(orb-nocc_a),:])
-                t2_1_ab_tmp = np.ascontiguousarray(t2_1_ab[:,:,(orb-nocc_a),:])
+                t2_1_a_tmp =  np.ascontiguousarray(t2_1_a[:ncvs,:,(orb-nocc_a),:])
+                t2_1_ab_tmp = np.ascontiguousarray(t2_1_ab[:ncvs,:,(orb-nocc_a),:])
 
-                T[s_a:f_a] += 0.5*lib.einsum('ikc,kc->i',t2_1_a_tmp[:ncvs,:,:], t1_2_a,optimize = True)
-                T[s_a:f_a] += 0.5*lib.einsum('ikc,kc->i',t2_1_ab_tmp[:ncvs,:,:], t1_2_b,optimize = True)
+                T[s_a:f_a] += 0.5*lib.einsum('ikc,kc->i',t2_1_a_tmp, t1_2_a,optimize = True)
+                T[s_a:f_a] += 0.5*lib.einsum('ikc,kc->i',t2_1_ab_tmp, t1_2_b,optimize = True)
                 T[s_a:f_a] += t1_3_a[:ncvs,(orb-nocc_a)]
                 del t2_1_a_tmp, t2_1_ab_tmp
 
@@ -7097,15 +7101,17 @@ def ip_cvs_compute_trans_moments(adc, orb, spin="alpha"):
 
         t2_1_b = adc.t2[0][2][:]
         t2_1_ab = adc.t2[0][1][:]
+        t2_1_b_coee = t2_1_b[:ncvs,:,:,:].copy()
+        t2_1_ab_ocee = t2_1_ab[:,:ncvs,:,:].copy()
         if orb < nocc_b:
             
             t2_1_b_tmp = np.ascontiguousarray(t2_1_b[:,orb,:,:])
             t2_1_ab_tmp = np.ascontiguousarray(t2_1_ab[:,orb,:,:])
 
             T[s_b:f_b] = idn_occ_b[orb, :ncvs]
-            T[s_b:f_b]+= 0.25*lib.einsum('kdc,ikdc->i',t2_1_b_tmp, t2_1_b[:ncvs,:,:,:], optimize = True)
-            T[s_b:f_b]-= 0.25*lib.einsum('kdc,kidc->i',t2_1_ab_tmp, t2_1_ab[:,:ncvs,:,:], optimize = True)
-            T[s_b:f_b]-= 0.25*lib.einsum('kcd,kicd->i',t2_1_ab_tmp, t2_1_ab[:,:ncvs,:,:], optimize = True)
+            T[s_b:f_b]+= 0.25*lib.einsum('kdc,ikdc->i',t2_1_b_tmp, t2_1_b_coee, optimize = True)
+            T[s_b:f_b]-= 0.25*lib.einsum('kdc,kidc->i',t2_1_ab_tmp, t2_1_ab_ocee, optimize = True)
+            T[s_b:f_b]-= 0.25*lib.einsum('kcd,kicd->i',t2_1_ab_tmp, t2_1_ab_ocee, optimize = True)
             del t2_1_b_tmp, t2_1_ab_tmp
         else :
             T[s_b:f_b] += t1_2_b[:ncvs,(orb-nocc_b)]
@@ -7162,28 +7168,31 @@ def ip_cvs_compute_trans_moments(adc, orb, spin="alpha"):
 
                 t2_1_b_tmp = np.ascontiguousarray(t2_1_b[:,orb,:,:])
                 t2_1_ab_tmp = np.ascontiguousarray(t2_1_ab[:,orb,:,:])
+                t2_2_b_coee = t2_2_b[:ncvs,:,:,:].copy()
+                t2_2_ab_ocee = t2_2_ab[:,:ncvs,:,:].copy()
+                
 
-                T[s_b:f_b] += 0.25*lib.einsum('kdc,ikdc->i',t2_1_b_tmp, t2_2_b[:ncvs,:,:,:], optimize = True)
-                T[s_b:f_b] -= 0.25*lib.einsum('kdc,kidc->i',t2_1_ab_tmp, t2_2_ab[:,:ncvs,:,:], optimize = True)
-                T[s_b:f_b] -= 0.25*lib.einsum('kcd,kicd->i',t2_1_ab_tmp, t2_2_ab[:,:ncvs,:,:], optimize = True)
+                T[s_b:f_b] += 0.25*lib.einsum('kdc,ikdc->i',t2_1_b_tmp, t2_2_b_coee, optimize = True)
+                T[s_b:f_b] -= 0.25*lib.einsum('kdc,kidc->i',t2_1_ab_tmp, t2_2_ab_ocee, optimize = True)
+                T[s_b:f_b] -= 0.25*lib.einsum('kcd,kicd->i',t2_1_ab_tmp, t2_2_ab_ocee, optimize = True)
 
                 del t2_1_b_tmp, t2_1_ab_tmp
 
                 t2_2_b_tmp = np.ascontiguousarray(t2_2_b[:,orb,:,:])
                 t2_2_ab_tmp = np.ascontiguousarray(t2_2_ab[:,orb,:,:])
 
-                T[s_b:f_b] += 0.25*lib.einsum('ikdc,kdc->i',t2_1_b[:ncvs,:,:,:],  t2_2_b_tmp ,optimize = True)
-                T[s_b:f_b] -= 0.25*lib.einsum('kicd,kcd->i',t2_1_ab[:,:ncvs,:,:], t2_2_ab_tmp,optimize = True)
-                T[s_b:f_b] -= 0.25*lib.einsum('kidc,kdc->i',t2_1_ab[:,:ncvs,:,:], t2_2_ab_tmp,optimize = True)
+                T[s_b:f_b] += 0.25*lib.einsum('ikdc,kdc->i',t2_1_b_coee,  t2_2_b_tmp ,optimize = True)
+                T[s_b:f_b] -= 0.25*lib.einsum('kicd,kcd->i',t2_1_ab_ocee, t2_2_ab_tmp,optimize = True)
+                T[s_b:f_b] -= 0.25*lib.einsum('kidc,kdc->i',t2_1_ab_ocee, t2_2_ab_tmp,optimize = True)
                 
                 del t2_2_b_tmp, t2_2_ab_tmp
 
             else:
-                t2_1_b_tmp  = np.ascontiguousarray(t2_1_b[:,:,(orb-nocc_b),:])
-                t2_1_ab_tmp = np.ascontiguousarray(t2_1_ab[:,:,:,(orb-nocc_b)])
+                t2_1_b_tmp  = np.ascontiguousarray(t2_1_b[:ncvs,:,(orb-nocc_b),:])
+                t2_1_ab_tmp = np.ascontiguousarray(t2_1_ab[:,:ncvs,:,(orb-nocc_b)])
 
-                T[s_b:f_b] += 0.5*lib.einsum('ikc,kc->i',t2_1_b_tmp[:ncvs,:,:], t1_2_b,optimize = True)
-                T[s_b:f_b] += 0.5*lib.einsum('kic,kc->i',t2_1_ab_tmp[:,:ncvs,:], t1_2_a,optimize = True)
+                T[s_b:f_b] += 0.5*lib.einsum('ikc,kc->i',t2_1_b_tmp, t1_2_b,optimize = True)
+                T[s_b:f_b] += 0.5*lib.einsum('kic,kc->i',t2_1_ab_tmp, t1_2_a,optimize = True)
                 T[s_b:f_b] += t1_3_b[:ncvs,(orb-nocc_b)]
                 del t2_1_b_tmp, t2_1_ab_tmp
                 del t2_2_b
