@@ -102,14 +102,14 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     idx_E_sort = np.argsort(E)
     E = E[idx_E_sort]
     eig_vec[:, idx_E_sort]
-    """P, X = get_properties(adc, E.size ,eig_vec)
+    P, X = get_properties(adc, E.size ,eig_vec)
     #P = P[idx_E_sort]
     print("ADC Method Type: ", adc.method_type)
     print("shape of P: ", P.shape)
     print("norm of P: ", np.linalg.norm(P))
     idx_P_sort = np.argsort(P)
     P = P[idx_P_sort]
-    print(np.column_stack(np.unique(np.around(P, decimals=8), return_counts=True))) 
+    print(np.column_stack(np.unique(np.around(P, decimals=14), return_counts=True))) 
     '''
     U = np.zeros((E.size, E.size))
     for i in range(E.size):
@@ -120,8 +120,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         if eig_vec[0,i] < 0: 
             eig_vec[:,i] *= -1
     '''
-    E_P = (E, P)"""
-    E_P = E
+    E_P = (E, P)
+    #E_P = E
     return E_P  
 
     #count = 0
@@ -6779,21 +6779,21 @@ def ip_compute_trans_moments(adc, orb, spin="alpha"):
             T[s_a:f_a] += t1_2_a[:,(orb-nocc_a)]
 
 ######## ADC(2) 2h-1p  part  ############################################
-            '''
+            
             t2_1_t = t2_1_a[ij_ind_a[0],ij_ind_a[1],:,:]
             t2_1_t_a = t2_1_t.transpose(2,1,0)
             t2_1_t_ab = t2_1_ab.transpose(2,3,1,0)
 
             T[s_aaa:f_aaa] = t2_1_t_a[(orb-nocc_a),:,:].reshape(-1)
             T[s_bab:f_bab] = t2_1_t_ab[(orb-nocc_a),:,:,:].reshape(-1)
-            '''
+           
 ######## ADC(3) 2h-1p  part  ############################################
 
         if(method=='adc(2)-x'or method=='adc(3)'):
-            '''
+            
             t2_2_a = adc.t2[1][0][:]
             t2_2_ab = adc.t2[1][1][:]
-
+          
             if orb >= nocc_a:
                 t2_2_t = t2_2_a[ij_ind_a[0],ij_ind_a[1],:,:]
                 t2_2_t_a = t2_2_t.transpose(2,1,0)
@@ -6801,7 +6801,7 @@ def ip_compute_trans_moments(adc, orb, spin="alpha"):
 
                 T[s_aaa:f_aaa] += t2_2_t_a[(orb-nocc_a),:,:].reshape(-1)
                 T[s_bab:f_bab] += t2_2_t_ab[(orb-nocc_a),:,:,:].reshape(-1)
-            '''
+            
 ######## ADC(3) 1h part  ############################################
 
         if(method=='adc(3)'):
@@ -6861,22 +6861,22 @@ def ip_compute_trans_moments(adc, orb, spin="alpha"):
             T[s_b:f_b] += t1_2_b[:,(orb-nocc_b)]
 
 ######## ADC(2) 2h-1p part  ############################################
-            '''
+            
             t2_1_t = t2_1_b[ij_ind_b[0],ij_ind_b[1],:,:]
             t2_1_t_b = t2_1_t.transpose(2,1,0)
             t2_1_t_ab = t2_1_ab.transpose(2,3,0,1)
 
             T[s_bbb:f_bbb] = t2_1_t_b[(orb-nocc_b),:,:].reshape(-1)
             T[s_aba:f_aba] = t2_1_t_ab[:,(orb-nocc_b),:,:].reshape(-1)
-            '''
+            
 ######## ADC(3) 2h-1p part  ############################################
 
         if(method=='adc(2)-x'or method=='adc(3)'):
-            '''
+            
             t2_2_a = adc.t2[1][0][:]
             t2_2_ab = adc.t2[1][1][:]
             t2_2_b = adc.t2[1][2][:]
-
+            
             if orb >= nocc_b:
                 t2_2_t = t2_2_b[ij_ind_b[0],ij_ind_b[1],:,:]
                 t2_2_t_b = t2_2_t.transpose(2,1,0)
@@ -6885,7 +6885,7 @@ def ip_compute_trans_moments(adc, orb, spin="alpha"):
 
                 T[s_bbb:f_bbb] += t2_2_t_b[(orb-nocc_b),:,:].reshape(-1)
                 T[s_aba:f_aba] += t2_2_t_ab[:,(orb-nocc_b),:,:].reshape(-1)
-             '''
+             
 ######## ADC(3) 1h part  ############################################
 
         if(method=='adc(3)'):
@@ -6947,6 +6947,7 @@ def ip_cvs_compute_trans_moments(adc, orb, spin="alpha"):
     ncvs = adc.ncvs
     nval_a = nocc_a - ncvs
     nval_b = nocc_b - ncvs
+   
 
     ij_ind_ncvs = np.tril_indices(ncvs, k=-1)
 
@@ -6964,28 +6965,10 @@ def ip_cvs_compute_trans_moments(adc, orb, spin="alpha"):
     n_doubles_bbb_ecv = nvir_b * ncvs * nval_b
     dim = n_singles_a + n_singles_b + n_doubles_aaa_ecc + n_doubles_aaa_ecv + n_doubles_bba_ecc + n_doubles_bba_ecv + n_doubles_bba_evc + n_doubles_aab_ecc + n_doubles_aab_ecv + n_doubles_aab_evc + n_doubles_bbb_ecc + n_doubles_bbb_ecv
 
-    ij_ind_a = np.tril_indices(nocc_a, k=-1)
-    ij_ind_b = np.tril_indices(nocc_b, k=-1)
-
     idn_occ_a = np.identity(nocc_a)
     idn_occ_b = np.identity(nocc_b)
     idn_vir_a = np.identity(nvir_a)
     idn_vir_b = np.identity(nvir_b)
-
-    '''   
-    s_a = 0
-    f_a = n_singles_a
-    s_b = f_a
-    f_b = s_b + n_singles_b
-    s_aaa = f_b
-    f_aaa = s_aaa + n_doubles_aaa
-    s_bab = f_aaa
-    f_bab = s_bab + n_doubles_bab
-    s_aba = f_bab
-    f_aba = s_aba + n_doubles_aba
-    s_bbb = f_aba
-    f_bbb = s_bbb + n_doubles_bbb
-    '''
 
     s_a = 0
     f_a = n_singles_a
@@ -7029,39 +7012,46 @@ def ip_cvs_compute_trans_moments(adc, orb, spin="alpha"):
             T[s_a:f_a] += t1_2_a[:ncvs,(orb-nocc_a)]
 
 ######## ADC(2) 2h-1p  part  ############################################
-            ''' 
-            #t2_1_t = t2_1_a[ij_ind_a[0],ij_ind_a[1],:,:]
-            t2_1_t_ecc = t2_1_a[:ncvs,:ncvs,:,:].copy()
-            t2_1_t_ecc = t2_1_t_ecc[ij_ind_ncvs[0],ij_ind_ncvs[1],:,:]
-            t2_1_t_a_ecc = t2_1_t_ecc.transpose(2,1,0)
-             
-            t2_1_t_a_ecv = t2_1_a.transpose(2,3,1,0)
-            t2_1_t_ab = t2_1_ab.transpose(2,3,1,0)
 
-            print('t2_1_a shape: ',t2_1_a.shape )
-            print('T[s_bba_ecc:f_bba_ecc]: ', T[s_bba_ecc:f_bba_ecc].shape)
-             
-            T[s_aaa_ecc:f_aaa_ecc] = t2_1_t_a_ecc[(orb-nocc_a),:,:].reshape(-1)
-            T[s_aaa_ecv:f_aaa_ecv] = t2_1_t_a_ecv[(orb-nocc_a),:,:ncvs,ncvs:].reshape(-1)
-            T[s_bba_ecc:f_bba_ecc] = t2_1_t_ab[(orb-nocc_a),:,:ncvs,:ncvs].reshape(-1)
-            T[s_bba_ecv:f_bba_ecv] = t2_1_t_ab[(orb-nocc_a),:,:ncvs,ncvs:].reshape(-1)
-            T[s_bba_evc:f_bba_evc] = t2_1_t_ab[(orb-nocc_a),:,:ncvs,ncvs:].reshape(-1)
-            '''
+            t2_1_a_t = t2_1_a.transpose(2,3,1,0)
+            t2_1_ab_t = t2_1_ab.transpose(2,3,1,0)
+            t2_1_a_eecc = t2_1_a_t[:,:,:ncvs,:ncvs].copy()
+            t2_1_a_eecv = t2_1_a_t[:,:,:ncvs,ncvs:].copy()
+            t2_1_a_ecc = t2_1_a_eecc[:,:,ij_ind_ncvs[0],ij_ind_ncvs[1]]
+            t2_1_ab_eecc = t2_1_ab_t[:,:,:ncvs,:ncvs].copy()
+            t2_1_ab_eecv = t2_1_ab_t[:,:,:ncvs,ncvs:].copy()
+            t2_1_ab_eevc = t2_1_ab_t[:,:,ncvs:,:ncvs].copy()
+
+            T[s_aaa_ecc:f_aaa_ecc] = t2_1_a_ecc[(orb-nocc_a),:,:].reshape(-1)
+            T[s_aaa_ecv:f_aaa_ecv] = t2_1_a_eecv[(orb-nocc_a),:,:,:].reshape(-1)
+            T[s_bba_ecc:f_bba_ecc] = t2_1_ab_eecc[(orb-nocc_a),:,:,:].reshape(-1)
+            T[s_bba_ecv:f_bba_ecv] = t2_1_ab_eecv[(orb-nocc_a),:,:,:].reshape(-1)
+            T[s_bba_evc:f_bba_evc] = t2_1_ab_eevc[(orb-nocc_a),:,:,:].reshape(-1)
+
 ######## ADC(3) 2h-1p  part  ############################################
 
         if(method=='adc(2)-x'or method=='adc(3)'):
-            '''
+            
             t2_2_a = adc.t2[1][0][:]
             t2_2_ab = adc.t2[1][1][:]
-
+            
             if orb >= nocc_a:
-                t2_2_t = t2_2_a[ij_ind_a[0],ij_ind_a[1],:,:]
-                t2_2_t_a = t2_2_t.transpose(2,1,0)
-                t2_2_t_ab = t2_2_ab.transpose(2,3,1,0)
 
-                T[s_aaa:f_aaa] += t2_2_t_a[(orb-nocc_a),:,:].reshape(-1)
-                T[s_bab:f_bab] += t2_2_t_ab[(orb-nocc_a),:,:,:].reshape(-1)
-           '''
+                t2_2_a_t = t2_2_a.transpose(2,3,1,0)
+                t2_2_ab_t = t2_2_ab.transpose(2,3,1,0)
+                t2_2_a_eecc = t2_2_a_t[:,:,:ncvs,:ncvs].copy()
+                t2_2_a_eecv = t2_2_a_t[:,:,:ncvs,ncvs:].copy()
+                t2_2_a_ecc = t2_2_a_eecc[:,:,ij_ind_ncvs[0],ij_ind_ncvs[1]]
+                t2_2_ab_eecc = t2_2_ab_t[:,:,:ncvs,:ncvs].copy()
+                t2_2_ab_eecv = t2_2_ab_t[:,:,:ncvs,ncvs:].copy()
+                t2_2_ab_eevc = t2_2_ab_t[:,:,ncvs:,:ncvs].copy()
+
+                T[s_aaa_ecc:f_aaa_ecc] += t2_2_a_ecc[(orb-nocc_a),:,:].reshape(-1)
+                T[s_aaa_ecv:f_aaa_ecv] += t2_2_a_eecv[(orb-nocc_a),:,:,:].reshape(-1)
+                T[s_bba_ecc:f_bba_ecc] += t2_2_ab_eecc[(orb-nocc_a),:,:,:].reshape(-1)
+                T[s_bba_ecv:f_bba_ecv] += t2_2_ab_eecv[(orb-nocc_a),:,:,:].reshape(-1)
+                T[s_bba_evc:f_bba_evc] += t2_2_ab_eevc[(orb-nocc_a),:,:,:].reshape(-1)
+
 ######## ADC(3) 1h part  ############################################
 
         if(method=='adc(3)'):
@@ -7122,42 +7112,46 @@ def ip_cvs_compute_trans_moments(adc, orb, spin="alpha"):
 
 ######## ADC(2) 2h-1p part  ############################################
 
-            #t2_1_t = t2_1_b[ij_ind_b[0],ij_ind_b[1],:,:]
-            #t2_1_t_b = t2_1_t.transpose(2,1,0)
-            #t2_1_t_ab = t2_1_ab.transpose(2,3,0,1)
+            t2_1_b_t = t2_1_b.transpose(2,3,1,0)
+            t2_1_ab_t = t2_1_ab.transpose(2,3,0,1)
+            t2_1_b_eecc = t2_1_b_t[:,:,:ncvs,:ncvs].copy()
+            t2_1_b_eecv = t2_1_b_t[:,:,:ncvs,ncvs:].copy()
+            t2_1_b_ecc = t2_1_b_eecc[:,:,ij_ind_ncvs[0],ij_ind_ncvs[1]]
+            t2_1_ab_eecc = t2_1_ab_t[:,:,:ncvs,:ncvs].copy()
+            t2_1_ab_eecv = t2_1_ab_t[:,:,:ncvs,ncvs:].copy()
+            t2_1_ab_eevc = t2_1_ab_t[:,:,ncvs:,:ncvs].copy()
 
-            #T[s_bbb:f_bbb] = t2_1_t_b[(orb-nocc_b),:,:].reshape(-1)
-            #T[s_aba:f_aba] = t2_1_t_ab[:,(orb-nocc_b),:,:].reshape(-1)
-            '''
-            t2_1_t_ecc = t2_1_b[:ncvs,:ncvs,:,:].copy()
-            t2_1_t_ecc = t2_1_t_ecc[ij_ind_ncvs[0],ij_ind_ncvs[1],:,:]
-            t2_1_t_b_ecc = t2_1_t_ecc.transpose(2,1,0)
-            t2_1_t_b_ecv = t2_1_b.transpose(2,3,0,1)
-            t2_1_t_ab = t2_1_ab.transpose(2,3,0,1)
-             
-            T[s_bbb_ecc:f_bbb_ecc] = t2_1_t_b_ecc[(orb-nocc_a),:,:].reshape(-1)
-            T[s_bbb_ecv:f_bbb_ecv] = t2_1_t_b_ecv[:,(orb-nocc_a),:ncvs,ncvs:].reshape(-1)
-            T[s_bba_ecc:f_bba_ecc] = t2_1_t_ab[(orb-nocc_a),:,:ncvs,:ncvs].reshape(-1)
-            T[s_bba_ecv:f_bba_ecv] = t2_1_t_ab[(orb-nocc_a),:,:ncvs,ncvs:].reshape(-1)
-            T[s_bba_evc:f_bba_evc] = t2_1_t_ab[(orb-nocc_a),:,ncvs:,:ncvs].reshape(-1)
-            '''
+            T[s_bbb_ecc:f_bbb_ecc] = t2_1_b_ecc[(orb-nocc_b),:,:].reshape(-1)
+            T[s_bbb_ecv:f_bbb_ecv] = t2_1_b_eecv[(orb-nocc_b),:,:,:].reshape(-1)
+            T[s_aab_ecc:f_aab_ecc] = t2_1_ab_eecc[:,(orb-nocc_b),:,:].reshape(-1)
+            T[s_aab_ecv:f_aab_ecv] = t2_1_ab_eecv[:,(orb-nocc_b),:,:].reshape(-1)
+            T[s_aab_evc:f_aab_evc] = t2_1_ab_eevc[:,(orb-nocc_b),:,:].reshape(-1)
+
 ######## ADC(3) 2h-1p part  ############################################
 
         if(method=='adc(2)-x'or method=='adc(3)'):
-            '''
+
             t2_2_a = adc.t2[1][0][:]
             t2_2_ab = adc.t2[1][1][:]
             t2_2_b = adc.t2[1][2][:]
-
+            
             if orb >= nocc_b:
-                t2_2_t = t2_2_b[ij_ind_b[0],ij_ind_b[1],:,:]
-                t2_2_t_b = t2_2_t.transpose(2,1,0)
 
-                t2_2_t_ab = t2_2_ab.transpose(2,3,0,1)
+                t2_2_b_t = t2_2_b.transpose(2,3,1,0)
+                t2_2_ab_t = t2_2_ab.transpose(2,3,0,1)
+                t2_2_b_eecc = t2_2_b_t[:,:,:ncvs,:ncvs].copy()
+                t2_2_b_eecv = t2_2_b_t[:,:,:ncvs,ncvs:].copy()
+                t2_2_b_ecc = t2_2_b_eecc[:,:,ij_ind_ncvs[0],ij_ind_ncvs[1]]
+                t2_2_ab_eecc = t2_2_ab_t[:,:,:ncvs,:ncvs].copy()
+                t2_2_ab_eecv = t2_2_ab_t[:,:,:ncvs,ncvs:].copy()
+                t2_2_ab_eevc = t2_2_ab_t[:,:,ncvs:,:ncvs].copy()
 
-                T[s_bbb:f_bbb] += t2_2_t_b[(orb-nocc_b),:,:].reshape(-1)
-                T[s_aba:f_aba] += t2_2_t_ab[:,(orb-nocc_b),:,:].reshape(-1)
-            '''
+                T[s_bbb_ecc:f_bbb_ecc] += t2_2_b_ecc[(orb-nocc_b),:,:].reshape(-1)
+                T[s_bbb_ecv:f_bbb_ecv] += t2_2_b_eecv[(orb-nocc_b),:,:,:].reshape(-1)
+                T[s_aab_ecc:f_aab_ecc] += t2_2_ab_eecc[:,(orb-nocc_b),:,:].reshape(-1)
+                T[s_aab_ecv:f_aab_ecv] += t2_2_ab_eecv[:,(orb-nocc_b),:,:].reshape(-1)
+                T[s_aab_evc:f_aab_evc] += t2_2_ab_eevc[:,(orb-nocc_b),:,:].reshape(-1)
+
 ######## ADC(3) 1h part  ############################################
 
         if(method=='adc(3)'):
