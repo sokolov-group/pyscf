@@ -2629,8 +2629,8 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         ncore = adc.ncore_cvs
         ij_ind_cvs = np.tril_indices(ncore, k=-1)
 
-        diag[(s_a+ncore):f_a] = shift
-        diag[(s_b+ncore):f_b] = shift
+        diag[(s_a+ncore):f_a] += shift
+        diag[(s_b+ncore):f_b] += shift
 
         print("M_ij_a_diag: ", diag[s_a:ncore].shape ,np.linalg.norm(diag[s_a:ncore]) ,diag[s_a:ncore])
         print("M_ij_b_diag: ", diag[s_b:(s_b+ncore)].shape ,np.linalg.norm(diag[s_b:(s_b+ncore)]) ,diag[s_b:(s_b+ncore)])
