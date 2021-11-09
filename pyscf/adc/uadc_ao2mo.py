@@ -25,6 +25,7 @@ import time
 import tempfile
 
 ### Integral transformation for integrals in Chemists' notation###
+#@profile
 def transform_integrals_incore(myadc):
 
     cput0 = (time.clock(), time.time())
@@ -198,6 +199,7 @@ def transform_integrals_incore(myadc):
     return eris
 
 
+#@profile
 def transform_integrals_outcore(myadc):
 
     cput0 = (time.clock(), time.time())
