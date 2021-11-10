@@ -65,7 +65,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         for i in range(diag.size):
             M[:,i] = matvec(identity[:,i])
 
-        E, _ = np.linalg.eig(imds)
+        E, _ = np.linalg.eig(M)
         print("Dimmension of M: ", E.size) 
         print(np.column_stack(np.unique(np.around(E, decimals=8), return_counts=True))) 
     exit()
