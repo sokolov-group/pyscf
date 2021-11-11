@@ -51,6 +51,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     print("ADC Method Type: ", adc.method_type)
     
     if nroots == 'full':
+        print("If statement pass check")
         r = np.identity(diag.size)
         M = np.zeros((diag.size, diag.size))
         for i in range(diag.size):
@@ -65,7 +66,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         P, X = get_properties(adc, E.size ,U)
         idx_P_sort = np.argsort(-P)
         P = P[idx_P_sort]
-        P_100 = P[:100]
+        #P_100 = P[:100]
         E_P = (E, P)
         return E_P  
 
@@ -2196,6 +2197,34 @@ def get_imds_ip_cvs(adc, eris=None):
         eris_coOO = eris.coOO
         eris_ooOC = eris.ooOC
 
+        #print("eris_ceec: ", np.linalg.norm(eris_ceec.value))        
+        #print("eris_CEEC: ", np.linalg.norm(eris_CEEC.value))
+        #print("eris_ocee: ", np.linalg.norm(eris_ocee.value))
+        #print("eris_ccee: ", np.linalg.norm(eris_ccee.value))
+        #print("eris_OCEE: ", np.linalg.norm(eris_OCEE.value))
+        #print("eris_CCEE: ", np.linalg.norm(eris_CCEE.value))
+        #print("eris_ocEE: ", np.linalg.norm(eris_ocEE.value))
+        #print("eris_ccEE: ", np.linalg.norm(eris_ccEE.value))
+        #print("eris_OCee: ", np.linalg.norm(eris_OCee.value))
+        #print("eris_CCee: ", np.linalg.norm(eris_CCee.value))
+        #print("eris_oecc: ", np.linalg.norm(eris_oecc.value))
+        #print("eris_ceoc: ", np.linalg.norm(eris_ceoc.value))
+        #print("eris_OECC: ", np.linalg.norm(eris_OECC.value))
+        #print("eris_CEOC: ", np.linalg.norm(eris_CEOC.value))
+        #print("eris_oeCC: ", np.linalg.norm(eris_oeCC.value))
+        #print("eris_OEcc: ", np.linalg.norm(eris_OEcc.value))
+        #print("eris_cooo: ", np.linalg.norm(eris_cooo.value))
+        #print("eris_ccoo: ", np.linalg.norm(eris_ccoo.value))
+        #print("eris_cooc: ", np.linalg.norm(eris_cooc.value))
+        #print("eris_COOO: ", np.linalg.norm(eris_COOO.value))
+        #print("eris_CCOO: ", np.linalg.norm(eris_CCOO.value))
+        #print("eris_COOC: ", np.linalg.norm(eris_COOC.value))
+        #print("eris_ccOO: ", np.linalg.norm(eris_ccOO.value))
+        #print("eris_ooCC: ", np.linalg.norm(eris_ooCC.value))
+        #print("eris_coOO: ", np.linalg.norm(eris_coOO.value))
+        #print("eris_ooOC: ", np.linalg.norm(eris_ooOC.value))
+        #exit()
+
         t1 = adc.t1
         t1_2_a, t1_2_b = t1[0]
 
@@ -4316,7 +4345,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None):
     if M_ij is None:
         M_ij = adc.get_imds()
     M_ij_a, M_ij_b = M_ij
-    @profile
+    #@profile
     #Calculate sigma vector
     def sigma_(r):
         #r = np.ones(dim)
@@ -4917,7 +4946,7 @@ def ip_cvs_adc_matvec_off_np(adc, M_ij=None, eris=None):
     if M_ij is None:
         M_ij = adc.get_imds()
     M_ij_a, M_ij_b = M_ij
-    #@profile
+    @profile
     #Calculate sigma vector
     def sigma_(r):
         #r = np.ones(dim)
@@ -5933,7 +5962,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
     if M_ij is None:
         M_ij = adc.get_imds()
     M_ij_a, M_ij_b = M_ij
-    @profile
+    #@profile
     #Calculate sigma vector
     def sigma_(r):
         #r = np.ones(dim)
@@ -6363,6 +6392,23 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                eris_oeCV = eris.oeCV
                eris_ceOV = eris.ceOV
 
+               #print("eris_oecc: ", np.linalg.norm(eris_oecc))
+               #print("eris_ceoc: ", np.linalg.norm(eris_ceoc))
+               #print("eris_oecv: ", np.linalg.norm(eris_oecv))
+               #print("eris_ceov: ", np.linalg.norm(eris_ceov))
+               #print("eris_OECC: ", np.linalg.norm(eris_OECC))
+               #print("eris_CEOC: ", np.linalg.norm(eris_CEOC))
+               #print("eris_OECV: ", np.linalg.norm(eris_OECV))
+               #print("eris_CEOV: ", np.linalg.norm(eris_CEOV))
+               #print("eris_OEcc: ", np.linalg.norm(eris_OEcc))
+               #print("eris_CEoc: ", np.linalg.norm(eris_CEoc))
+               #print("eris_OEcv: ", np.linalg.norm(eris_OEcv))
+               #print("eris_CEov: ", np.linalg.norm(eris_CEov))
+               #print("eris_oeCC: ", np.linalg.norm(eris_oeCC))
+               #print("eris_ceOC: ", np.linalg.norm(eris_ceOC))
+               #print("eris_oeCV: ", np.linalg.norm(eris_oeCV))
+               #print("eris_ceOV: ", np.linalg.norm(eris_ceOV))
+               #exit() 
 
 ################ ADC(3) i - kja and ajk - i block ############################
                t2_1_a = adc.t2[0][0][:]

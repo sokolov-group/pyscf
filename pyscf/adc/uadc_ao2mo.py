@@ -223,6 +223,16 @@ def transform_integrals_outcore(myadc):
     nvpair_a = nvir_a * (nvir_a+1) // 2
     nvpair_b = nvir_b * (nvir_b+1) // 2
 
+    # Number of CVS orbital (it is assumed that the number of ionized core alpha electrons equals the number of ionized core beta electrons)
+    ncvs = myadc.ncvs
+    # Slices of occupied MO coeffcients needed for forming CVS integrals
+    nval_a = nocc_a - ncvs
+    nval_b = nocc_b - ncvs
+    core_a = occ_a[:,:ncvs]
+    core_b = occ_b[:,:ncvs]
+    val_a = occ_a[:,ncvs:]
+    val_b = occ_b[:,ncvs:]    
+
     eris = lambda:None
 
     eris.feri1 = lib.H5TmpFile()
@@ -249,55 +259,260 @@ def transform_integrals_outcore(myadc):
     eris.OVvo = eris.feri1.create_dataset('OVvo', (nocc_b,nvir_b,nvir_a,nocc_a), 'f8', chunks=(nocc_b,1,nvir_a,nocc_a))
     eris.OVvv = eris.feri1.create_dataset('OVvv', (nocc_b,nvir_b,nvpair_a), 'f8')
 
+    # CVS integrals for matvec function (c: core, e: external, v: valence, o: all occupied orbitals)
+
+    ncore_a = ncore_b = ncvs # This is unecessary. ncore_a and ncore_b can be simply replaced with ncvs
+
+    #----- ADC(2) integrals --------
+    eris.cecc = eris.feri1.create_dataset( 'cecc', (ncore_a, nvir_a, ncore_a, ncore_a), 'f8', chunks=(ncore_a, 1, ncore_a, ncore_a))
+    eris.cevc = eris.feri1.create_dataset( 'cevc', (ncore_a, nvir_a, nval_a,  ncore_a), 'f8', chunks=(ncore_a, 1, nval_a,  ncore_a))
+    eris.vecc = eris.feri1.create_dataset( 'vecc', (nval_a,  nvir_a, ncore_a, ncore_a), 'f8', chunks=(nval_a,  1, ncore_a, ncore_a))
+    eris.CECC = eris.feri1.create_dataset( 'CECC', (ncore_b, nvir_b, ncore_b, ncore_b), 'f8', chunks=(ncore_b, 1, ncore_b, ncore_b))
+    eris.CEVC = eris.feri1.create_dataset( 'CEVC', (ncore_b, nvir_b, nval_b,  ncore_b), 'f8', chunks=(ncore_b, 1, nval_b,  ncore_b))
+    eris.VECC = eris.feri1.create_dataset( 'VECC', (nval_b,  nvir_b, ncore_b, ncore_b), 'f8', chunks=(nval_b,  1, ncore_b, ncore_b))
+    eris.ceCC = eris.feri1.create_dataset( 'ceCC', (ncore_a, nvir_a, ncore_b, ncore_b), 'f8', chunks=(ncore_a, 1, ncore_b, ncore_b))
+    eris.ceVC = eris.feri1.create_dataset( 'ceVC', (ncore_a, nvir_a, nval_b,  ncore_b), 'f8', chunks=(ncore_a, 1, nval_b,  ncore_b))
+    eris.veCC = eris.feri1.create_dataset( 'veCC', (nval_a,  nvir_a, ncore_b, ncore_b), 'f8', chunks=(nval_a,  1, ncore_b, ncore_b))
+    eris.CEcc = eris.feri1.create_dataset( 'CEcc', (ncore_b, nvir_b, ncore_a, ncore_a), 'f8', chunks=(ncore_b, 1, ncore_a, ncore_a))
+    eris.CEvc = eris.feri1.create_dataset( 'CEvc', (ncore_b, nvir_b, nval_a,  ncore_a), 'f8', chunks=(ncore_b, 1, nval_a,  ncore_a))
+    eris.VEcc = eris.feri1.create_dataset( 'VEcc', (nval_b,  nvir_b, ncore_a, ncore_a), 'f8', chunks=(nval_b,  1, ncore_a, ncore_a))
+    #----- ADC(2)-x integrals --------
+    eris.cccc =  eris.feri1.create_dataset( 'cccc', (ncore_a, ncore_a, ncore_a, ncore_a), 'f8') 
+    eris.cccv =  eris.feri1.create_dataset( 'cccv', (ncore_a, ncore_a, ncore_a, nval_a ), 'f8') 
+    eris.cvvc =  eris.feri1.create_dataset( 'cvvc', (ncore_a, nval_a,  nval_a,  ncore_a), 'f8') 
+    eris.ccvv =  eris.feri1.create_dataset( 'ccvv', (ncore_a, ncore_a, nval_a,  nval_a ), 'f8') 
+    eris.CCCC =  eris.feri1.create_dataset( 'CCCC', (ncore_b, ncore_b, ncore_b, ncore_b), 'f8') 
+    eris.CCCV =  eris.feri1.create_dataset( 'CCCV', (ncore_b, ncore_b, ncore_b, nval_b ), 'f8') 
+    eris.CVVC =  eris.feri1.create_dataset( 'CVVC', (ncore_b, nval_b,  nval_b,  ncore_b), 'f8') 
+    eris.CCVV =  eris.feri1.create_dataset( 'CCVV', (ncore_b, ncore_b, nval_b,  nval_b ), 'f8') 
+    eris.ccCC =  eris.feri1.create_dataset( 'ccCC', (ncore_a, ncore_a, ncore_b, ncore_b), 'f8') 
+    eris.vcCC =  eris.feri1.create_dataset( 'vcCC', (nval_a,  ncore_a, ncore_b, ncore_b), 'f8') 
+    eris.ccCV =  eris.feri1.create_dataset( 'ccCV', (ncore_a, ncore_a, ncore_b, nval_b ), 'f8') 
+    eris.vvCC =  eris.feri1.create_dataset( 'vvCC', (nval_a,  nval_a,  ncore_b, ncore_b), 'f8') 
+    eris.vcCV =  eris.feri1.create_dataset( 'vcCV', (nval_a,  ncore_a, ncore_b, nval_b ), 'f8') 
+    eris.ccVV =  eris.feri1.create_dataset( 'ccVV', (ncore_a, ncore_a, nval_b,  nval_b ), 'f8') 
+    eris.ceec =  eris.feri1.create_dataset( 'ceec', (ncore_a, nvir_a,  nvir_a,  ncore_a), 'f8', chunks=(ncore_a, 1,  nvir_a,  ncore_a)) 
+    eris.veec =  eris.feri1.create_dataset( 'veec', (nval_a,  nvir_a,  nvir_a,  ncore_a), 'f8', chunks=(nval_a,  1,  nvir_a,  ncore_a)) 
+    eris.veev =  eris.feri1.create_dataset( 'veev', (nval_a,  nvir_a,  nvir_a,  nval_a ), 'f8', chunks=(nval_a,  1,  nvir_a,  nval_a )) 
+    eris.CEEC =  eris.feri1.create_dataset( 'CEEC', (ncore_b, nvir_b,  nvir_b,  ncore_b), 'f8', chunks=(ncore_b, 1,  nvir_b,  ncore_b)) 
+    eris.VEEC =  eris.feri1.create_dataset( 'VEEC', (nval_b,  nvir_b,  nvir_b,  ncore_b), 'f8', chunks=(nval_b,  1,  nvir_b,  ncore_b)) 
+    eris.VEEV =  eris.feri1.create_dataset( 'VEEV', (nval_b,  nvir_b,  nvir_b,  nval_b ), 'f8', chunks=(nval_b,  1,  nvir_b,  nval_b )) 
+    eris.CEec =  eris.feri1.create_dataset( 'CEec', (ncore_b, nvir_b,  nvir_a,  ncore_a), 'f8', chunks=(ncore_b, 1,  nvir_a,  ncore_a)) 
+    eris.VEec =  eris.feri1.create_dataset( 'VEec', (nval_b,  nvir_b,  nvir_a,  ncore_a), 'f8', chunks=(nval_b,  1,  nvir_a,  ncore_a)) 
+    eris.CEev =  eris.feri1.create_dataset( 'CEev', (ncore_b, nvir_b,  nvir_a,  nval_a ), 'f8', chunks=(ncore_b, 1,  nvir_a,  nval_a )) 
+    eris.VEev =  eris.feri1.create_dataset( 'VEev', (nval_b,  nvir_b,  nvir_a,  nval_a ), 'f8', chunks=(nval_b,  1,  nvir_a,  nval_a )) 
+    eris.ccee =  eris.feri1.create_dataset( 'ccee', (ncore_a, ncore_a, nvir_a,  nvir_a ), 'f8', chunks=(ncore_a, ncore_a, 1,  nvir_a )) 
+    eris.vcee =  eris.feri1.create_dataset( 'vcee', (nval_a,  ncore_a, nvir_a,  nvir_a ), 'f8', chunks=(nval_a,  ncore_a, 1,  nvir_a )) 
+    eris.vvee =  eris.feri1.create_dataset( 'vvee', (nval_a,  nval_a,  nvir_a,  nvir_a ), 'f8', chunks=(nval_a,  nval_a,  1,  nvir_a )) 
+    eris.CCEE =  eris.feri1.create_dataset( 'CCEE', (ncore_b, ncore_b, nvir_b,  nvir_b ), 'f8', chunks=(ncore_b, ncore_b, 1,  nvir_b )) 
+    eris.VCEE =  eris.feri1.create_dataset( 'VCEE', (nval_b,  ncore_b, nvir_b,  nvir_b ), 'f8', chunks=(nval_b,  ncore_b, 1,  nvir_b )) 
+    eris.VVEE =  eris.feri1.create_dataset( 'VVEE', (nval_b,  nval_b,  nvir_b,  nvir_b ), 'f8', chunks=(nval_b,  nval_b,  1,  nvir_b )) 
+    eris.ccEE =  eris.feri1.create_dataset( 'ccEE', (ncore_a, ncore_a, nvir_b,  nvir_b ), 'f8', chunks=(ncore_a, ncore_a, 1,  nvir_b )) 
+    eris.vcEE =  eris.feri1.create_dataset( 'vcEE', (nval_a,  ncore_a, nvir_b,  nvir_b ), 'f8', chunks=(nval_a,  ncore_a, 1,  nvir_b )) 
+    eris.vvEE =  eris.feri1.create_dataset( 'vvEE', (nval_a,  nval_a,  nvir_b,  nvir_b),  'f8', chunks=(nval_a,  nval_a,  1,  nvir_b),) 
+    eris.CCee =  eris.feri1.create_dataset( 'CCee', (ncore_b, ncore_b, nvir_a,  nvir_a),  'f8', chunks=(ncore_b, ncore_b, 1,  nvir_a)) 
+    eris.VCee =  eris.feri1.create_dataset( 'VCee', (nval_b,  ncore_b, nvir_a,  nvir_a),  'f8', chunks=(nval_b,  ncore_b, 1,  nvir_a)) 
+    eris.VVee =  eris.feri1.create_dataset( 'VVee', (nval_b,  nval_b,  nvir_a,  nvir_a),  'f8', chunks=(nval_b,  nval_b,  1,  nvir_a)) 
+    #----- ADC(3) integrals --------
+    eris.oecc = eris.feri1.create_dataset( 'oecc', (nocc_a,  nvir_a, ncore_a, ncore_a), 'f8', chunks=(nocc_a,  1, ncore_a, ncore_a)) 
+    eris.ceoc = eris.feri1.create_dataset( 'ceoc', (ncore_a, nvir_a, nocc_a,  ncore_a), 'f8', chunks=(ncore_a, 1, nocc_a,  ncore_a)) 
+    eris.oecv = eris.feri1.create_dataset( 'oecv', (nocc_a,  nvir_a, ncore_a, nval_a ), 'f8', chunks=(nocc_a,  1, ncore_a, nval_a )) 
+    eris.ceov = eris.feri1.create_dataset( 'ceov', (ncore_a, nvir_a, nocc_a,  nval_a ), 'f8', chunks=(ncore_a, 1, nocc_a,  nval_a )) 
+    eris.OECC = eris.feri1.create_dataset( 'OECC', (nocc_b,  nvir_b, ncore_b, ncore_b), 'f8', chunks=(nocc_b,  1, ncore_b, ncore_b)) 
+    eris.CEOC = eris.feri1.create_dataset( 'CEOC', (ncore_b, nvir_b, nocc_b,  ncore_b), 'f8', chunks=(ncore_b, 1, nocc_b,  ncore_b)) 
+    eris.OECV = eris.feri1.create_dataset( 'OECV', (nocc_b,  nvir_b, ncore_b, nval_b ), 'f8', chunks=(nocc_b,  1, ncore_b, nval_b )) 
+    eris.CEOV = eris.feri1.create_dataset( 'CEOV', (ncore_b, nvir_b, nocc_b,  nval_b ), 'f8', chunks=(ncore_b, 1, nocc_b,  nval_b )) 
+    eris.OEcc = eris.feri1.create_dataset( 'OEcc', (nocc_b,  nvir_b, ncore_a, ncore_a), 'f8', chunks=(nocc_b,  1, ncore_a, ncore_a)) 
+    eris.CEoc = eris.feri1.create_dataset( 'CEoc', (ncore_b, nvir_b, nocc_a,  ncore_a), 'f8', chunks=(ncore_b, 1, nocc_a,  ncore_a)) 
+    eris.OEcv = eris.feri1.create_dataset( 'OEcv', (nocc_b,  nvir_b, ncore_a, nval_a ), 'f8', chunks=(nocc_b,  1, ncore_a, nval_a )) 
+    eris.CEov = eris.feri1.create_dataset( 'CEov', (ncore_b, nvir_b, nocc_a,  nval_a ), 'f8', chunks=(ncore_b, 1, nocc_a,  nval_a )) 
+    eris.oeCC = eris.feri1.create_dataset( 'oeCC', (nocc_a,  nvir_a, ncore_b, ncore_b), 'f8', chunks=(nocc_a,  1, ncore_b, ncore_b)) 
+    eris.ceOC = eris.feri1.create_dataset( 'ceOC', (ncore_a, nvir_a, nocc_b,  ncore_b), 'f8', chunks=(ncore_a, 1, nocc_b,  ncore_b)) 
+    eris.oeCV = eris.feri1.create_dataset( 'oeCV', (nocc_a,  nvir_a, ncore_b, nval_b ), 'f8', chunks=(nocc_a,  1, ncore_b, nval_b )) 
+    eris.ceOV = eris.feri1.create_dataset( 'ceOV', (ncore_a, nvir_a, nocc_b,  nval_b ), 'f8', chunks=(ncore_a, 1, nocc_b,  nval_b )) 
+    eris.ceee = eris.feri1.create_dataset( 'ceee', (ncore_a, nvir_a, nvpair_a ), 'f8') 
+    eris.CEEE = eris.feri1.create_dataset( 'CEEE', (ncore_b, nvir_b, nvpair_b ), 'f8') 
+    eris.ceEE = eris.feri1.create_dataset( 'ceEE', (ncore_a, nvir_a, nvpair_b ), 'f8') 
+    eris.CEee = eris.feri1.create_dataset( 'CEee', (ncore_b, nvir_b, nvpair_a ), 'f8') 
+    # Addtional CVS integrals for get_imds function (c: core, e: external, o: all occupied orbitals)
+    eris.ceeo = eris.feri1.create_dataset( 'ceeo', (ncore_a, nvir_a,  nvir_a,  nocc_a ), 'f8', chunks=(ncore_a, 1,  nvir_a,  nocc_a )) 
+    eris.CEEO = eris.feri1.create_dataset( 'CEEO', (ncore_b, nvir_b,  nvir_b,  nocc_b ), 'f8', chunks=(ncore_b, 1,  nvir_b,  nocc_b )) 
+    eris.ocee = eris.feri1.create_dataset( 'ocee', (nocc_a,  ncore_a, nvir_a,  nvir_a ), 'f8', chunks=(nocc_a,  ncore_a, 1,  nvir_a )) 
+    eris.OCEE = eris.feri1.create_dataset( 'OCEE', (nocc_b,  ncore_b, nvir_b,  nvir_b ), 'f8', chunks=(nocc_b,  ncore_b, 1,  nvir_b )) 
+    eris.ocEE = eris.feri1.create_dataset( 'ocEE', (nocc_a,  ncore_a, nvir_b,  nvir_b ), 'f8', chunks=(nocc_a,  ncore_a, 1,  nvir_b )) 
+    eris.OCee = eris.feri1.create_dataset( 'OCee', (nocc_b,  ncore_b, nvir_a,  nvir_a ), 'f8', chunks=(nocc_b,  ncore_b, 1,  nvir_a )) 
+    eris.ceEO = eris.feri1.create_dataset( 'ceEO', (ncore_a, nvir_a,  nvir_b,  nocc_b ), 'f8', chunks=(ncore_a, 1,  nvir_b,  nocc_b )) 
+    eris.oeEC = eris.feri1.create_dataset( 'oeEC', (nocc_a,  nvir_a,  nvir_b,  ncore_b), 'f8', chunks=(nocc_a,  1,  nvir_b,  ncore_b)) 
+    eris.cooo = eris.feri1.create_dataset( 'cooo', (ncore_a, nocc_a,  nocc_a,  nocc_a ), 'f8') 
+    eris.ccoo = eris.feri1.create_dataset( 'ccoo', (ncore_a, ncore_a, nocc_a,  nocc_a ), 'f8') 
+    eris.cooc = eris.feri1.create_dataset( 'cooc', (ncore_a, nocc_a,  nocc_a,  ncore_a), 'f8') 
+    eris.COOO = eris.feri1.create_dataset( 'COOO', (ncore_b, nocc_b,  nocc_b,  nocc_b ), 'f8') 
+    eris.CCOO = eris.feri1.create_dataset( 'CCOO', (ncore_b, ncore_b, nocc_b,  nocc_b ), 'f8') 
+    eris.COOC = eris.feri1.create_dataset( 'COOC', (ncore_b, nocc_b,  nocc_b,  ncore_b), 'f8') 
+    eris.ccOO = eris.feri1.create_dataset( 'ccOO', (ncore_a, ncore_a, nocc_b,  nocc_b ), 'f8') 
+    eris.ooCC = eris.feri1.create_dataset( 'ooCC', (nocc_a,  nocc_a,  ncore_b, ncore_b), 'f8') 
+    eris.coOO = eris.feri1.create_dataset( 'coOO', (ncore_a, nocc_a,  nocc_b,  nocc_b ), 'f8') 
+    eris.ooOC = eris.feri1.create_dataset( 'ooOC', (nocc_a,  nocc_a,  nocc_b,  ncore_b), 'f8') 
+    
+
     cput1 = time.clock(), time.time()
     mol = myadc.mol
     tmpf = lib.H5TmpFile()
-    if nocc_a > 0:
-        ao2mo.general(mol, (occ_a,mo_a,mo_a,mo_a), tmpf, 'aa')
-        buf = np.empty((nmo_a,nmo_a,nmo_a))
-        for i in range(nocc_a):
-            lib.unpack_tril(tmpf['aa'][i*nmo_a:(i+1)*nmo_a], out=buf)
-            eris.oooo[i] = buf[:nocc_a,:nocc_a,:nocc_a]
-            eris.ovoo[i] = buf[nocc_a:,:nocc_a,:nocc_a]
-            eris.oovv[i] = buf[:nocc_a,nocc_a:,nocc_a:]
-            eris.ovvo[i] = buf[nocc_a:,nocc_a:,:nocc_a]
-            eris.ovvv[i] = lib.pack_tril(buf[nocc_a:,nocc_a:,nocc_a:])
-        del(tmpf['aa'])
+    nval_a_s = slice(ncvs,nocc_a)
+    nval_b_s = slice(ncvs,nocc_b)
 
-    if nocc_b > 0:
-        buf = np.empty((nmo_b,nmo_b,nmo_b))
-        ao2mo.general(mol, (occ_b,mo_b,mo_b,mo_b), tmpf, 'bb')
-        for i in range(nocc_b):
-            lib.unpack_tril(tmpf['bb'][i*nmo_b:(i+1)*nmo_b], out=buf)
-            eris.OOOO[i] = buf[:nocc_b,:nocc_b,:nocc_b]
-            eris.OVOO[i] = buf[nocc_b:,:nocc_b,:nocc_b]
-            eris.OOVV[i] = buf[:nocc_b,nocc_b:,nocc_b:]
-            eris.OVVO[i] = buf[nocc_b:,nocc_b:,:nocc_b]
-            eris.OVVV[i] = lib.pack_tril(buf[nocc_b:,nocc_b:,nocc_b:])
-        del(tmpf['bb'])
+    ao2mo.general(mol, (occ_a,mo_a,mo_a,mo_a), tmpf, 'aa')
+    buf = np.empty((nmo_a,nmo_a,nmo_a))
+    for i in range(nocc_a):
+        lib.unpack_tril(tmpf['aa'][i*nmo_a:(i+1)*nmo_a], out=buf)
+        eris.oooo[i] = buf[:nocc_a,:nocc_a,:nocc_a]
+        eris.ovoo[i] = buf[nocc_a:,:nocc_a,:nocc_a]
+        eris.oovv[i] = buf[:nocc_a,nocc_a:,nocc_a:]
+        eris.ovvo[i] = buf[nocc_a:,nocc_a:,:nocc_a]
+        eris.ovvv[i] = lib.pack_tril(buf[nocc_a:,nocc_a:,nocc_a:])
 
-    if nocc_a > 0:
-        buf = np.empty((nmo_a,nmo_b,nmo_b))
-        ao2mo.general(mol, (occ_a,mo_a,mo_b,mo_b), tmpf, 'ab')
-        for i in range(nocc_a):
-            lib.unpack_tril(tmpf['ab'][i*nmo_a:(i+1)*nmo_a], out=buf)
-            eris.ooOO[i] = buf[:nocc_a,:nocc_b,:nocc_b]
-            eris.ovOO[i] = buf[nocc_a:,:nocc_b,:nocc_b]
-            eris.ooVV[i] = buf[:nocc_a,nocc_b:,nocc_b:]
-            eris.ovVO[i] = buf[nocc_a:,nocc_b:,:nocc_b]
-            eris.ovVV[i] = lib.pack_tril(buf[nocc_a:,nocc_b:,nocc_b:])
-        del(tmpf['ab'])
+        if myadc.method_type == 'ip-cvs':
+            eris.oecc[i] = buf[nocc_a:,:ncvs,:ncvs]    
+            eris.oecv[i] = buf[nocc_a:,:ncvs,nval_a_s]    
+            eris.ocee[i] = buf[:ncvs,nocc_a:,nocc_a:]
+            if i <  ncvs:
+                eris.cecc[i] = buf[nocc_a:,:ncvs,:ncvs]
+                eris.cevc[i] = buf[nocc_a:,nval_a_s,:ncvs]
+                eris.ceeo[i] = buf[nocc_a:,nocc_a:,:nocc_a]
+                eris.cccc[i] = buf[:ncvs,:ncvs,:ncvs]   
+                eris.cccv[i] = buf[:ncvs,:ncvs,nval_a_s]
+                eris.cvvc[i] = buf[nval_a_s,nval_a_s,:ncvs]
+                eris.ccvv[i] = buf[:ncvs,nval_a_s,nval_a_s]
+                eris.ceec[i] = buf[nocc_a:,nocc_a:,:ncvs]
+                eris.ccee[i] = buf[:ncvs,nocc_a:,nocc_a:]
+                eris.ceoc[i] = buf[nocc_a:,:nocc_a,:ncvs]  
+                eris.ceov[i] = buf[nocc_a:,:nocc_a,nval_a_s]    
+                eris.ceeo[i] = buf[nocc_a:,nocc_a:,:nocc_a]
+                eris.cooo[i] = buf[:nocc_a,:nocc_a,:nocc_a]
+                eris.ccoo[i] = buf[:ncvs,:nocc_a,:nocc_a]
+                eris.cooc[i] = buf[:nocc_a,:nocc_a,:ncvs]
+                eris.ceee[i] = lib.pack_tril(buf[nocc_a:,nocc_a:,nocc_a:])
+            if i >= ncvs:
+                i -= ncvs
+                eris.vecc[i] = buf[nocc_a:,:ncvs,:ncvs]
+                eris.veec[i] = buf[nocc_a:,nocc_a:,:ncvs] 
+                eris.veev[i] = buf[nocc_a:,nocc_a:,nval_a_s]
+                eris.vcee[i] = buf[:ncvs,nocc_a:,nocc_a:]
+                eris.vvee[i] = buf[nval_a_s,nocc_a:,nocc_a:]
+    del(tmpf['aa'])
 
-    if nocc_b > 0:
-        buf = np.empty((nmo_b,nmo_a,nmo_a))
-        ao2mo.general(mol, (occ_b,mo_b,mo_a,mo_a), tmpf, 'ba')
-        for i in range(nocc_b):
-            lib.unpack_tril(tmpf['ba'][i*nmo_b:(i+1)*nmo_b], out=buf)
-            eris.OVoo[i] = buf[nocc_b:,:nocc_a,:nocc_a]
-            eris.OOvv[i] = buf[:nocc_b,nocc_a:,nocc_a:]
-            eris.OVvo[i] = buf[nocc_b:,nocc_a:,:nocc_a]
-            eris.OVvv[i] = lib.pack_tril(buf[nocc_b:,nocc_a:,nocc_a:])
-        del(tmpf['ba'])
+    buf = np.empty((nmo_b,nmo_b,nmo_b))
+    ao2mo.general(mol, (occ_b,mo_b,mo_b,mo_b), tmpf, 'bb')
+    for i in range(nocc_b):
+        lib.unpack_tril(tmpf['bb'][i*nmo_b:(i+1)*nmo_b], out=buf)
+        eris.OOOO[i] = buf[:nocc_b,:nocc_b,:nocc_b]
+        eris.OVOO[i] = buf[nocc_b:,:nocc_b,:nocc_b]
+        eris.OOVV[i] = buf[:nocc_b,nocc_b:,nocc_b:]
+        eris.OVVO[i] = buf[nocc_b:,nocc_b:,:nocc_b]
+        eris.OVVV[i] = lib.pack_tril(buf[nocc_b:,nocc_b:,nocc_b:])
+
+        if myadc.method_type == 'ip-cvs':
+            eris.OECC[i] = buf[nocc_b:,:ncvs,:ncvs]     
+            eris.OECV[i] = buf[nocc_b:,:ncvs,nval_b_s]    
+            eris.OCEE[i] = buf[:ncvs,nocc_b:,nocc_b:]
+            if i < ncvs:
+                eris.CECC[i] = buf[nocc_b:,:ncvs,:ncvs]
+                eris.CEVC[i] = buf[nocc_b:,nval_b_s,:ncvs]
+                eris.CEEO[i] = buf[nocc_b:,nocc_b:,:nocc_b]
+                eris.CCCC[i] = buf[:ncvs,:ncvs,:ncvs] 
+                eris.CCCV[i] = buf[:ncvs,:ncvs,nval_b_s]
+                eris.CVVC[i] = buf[nval_b_s,nval_b_s,:ncvs]
+                eris.CCVV[i] = buf[:ncvs,nval_b_s,nval_b_s]
+                eris.CEEC[i] = buf[nocc_b:,nocc_b:,:ncvs]
+                eris.CCEE[i] = buf[:ncvs,nocc_b:,nocc_b:]
+                eris.CEOC[i] = buf[nocc_b:,:nocc_b:,:ncvs]     
+                eris.CEOV[i] = buf[nocc_b:,:nocc_b,nval_b_s]    
+                eris.CEEO[i] = buf[nocc_b:,nocc_b:,:nocc_b]
+                eris.COOO[i] = buf[:nocc_b,:nocc_b,:nocc_b]
+                eris.CCOO[i] = buf[:ncvs,:nocc_b,:nocc_b]
+                eris.COOC[i] = buf[:nocc_b,:nocc_b,:ncvs]
+                eris.CEEE[i] = lib.pack_tril(buf[nocc_b:,nocc_b:,nocc_b:])
+            if i >= ncvs:
+                i -= ncvs
+                eris.VECC[i] = buf[nocc_b:,:ncvs,:ncvs]
+                eris.VEEC[i] = buf[nocc_b:,nocc_b:,:ncvs] 
+                eris.VEEV[i] = buf[nocc_b:,nocc_b:,nval_b_s]
+                eris.VCEE[i] = buf[:ncvs,nocc_b:,nocc_b:]
+                eris.VVEE[i] = buf[nval_b_s,nocc_b:,nocc_b:]
+    del(tmpf['bb'])
+
+    buf = np.empty((nmo_a,nmo_b,nmo_b))
+    ao2mo.general(mol, (occ_a,mo_a,mo_b,mo_b), tmpf, 'ab')
+    for i in range(nocc_a):
+        lib.unpack_tril(tmpf['ab'][i*nmo_a:(i+1)*nmo_a], out=buf)
+        eris.ooOO[i] = buf[:nocc_a,:nocc_b,:nocc_b]
+        eris.ovOO[i] = buf[nocc_a:,:nocc_b,:nocc_b]
+        eris.ooVV[i] = buf[:nocc_a,nocc_b:,nocc_b:]
+        eris.ovVO[i] = buf[nocc_a:,nocc_b:,:nocc_b]
+        eris.ovVV[i] = lib.pack_tril(buf[nocc_a:,nocc_b:,nocc_b:])
+
+        if myadc.method_type == 'ip-cvs':
+            eris.oeEC[i] = buf[nocc_a:,nocc_b:,:ncvs]
+            eris.oeCC[i] = buf[nocc_a:,:ncvs,:ncvs] 
+            eris.oeCV[i] = buf[nocc_a:,:ncvs,nval_b_s]
+            eris.ooCC[i] = buf[:nocc_a,:ncvs,:ncvs]
+            eris.ooOC[i] = buf[:nocc_a,:nocc_b,:ncvs]
+            eris.ocEE[i] = buf[:ncvs,nocc_b:,nocc_b:]
+            eris.oeEC[i] = buf[nocc_a:,nocc_b:,:ncvs]
+            if i < ncvs:
+                eris.ceCC[i] = buf[nocc_a:,:ncvs,:ncvs]
+                eris.ceVC[i] = buf[nocc_a:,nval_b_s,:ncvs]
+                eris.ceEO[i] = buf[nocc_a:,nocc_b:,:nocc_b]
+                eris.ccCC[i] = buf[:ncvs,:ncvs,:ncvs] 
+                eris.ccCV[i] = buf[:ncvs,:ncvs,nval_b_s]
+                eris.ccVV[i] = buf[:ncvs,nval_b_s,nval_b_s]
+                eris.ccEE[i] = buf[:ncvs,nocc_b:,nocc_b:]
+                eris.ceOC[i] = buf[nocc_a:,:nocc_b,:ncvs] 
+                eris.ceOV[i] = buf[nocc_a:,:nocc_b,nval_b_s]
+                eris.ccOO[i] = buf[:ncvs,:nocc_b,:nocc_b]
+                eris.coOO[i] = buf[:nocc_a,:nocc_b,:nocc_b]
+                eris.ceEO[i] = buf[nocc_a:,nocc_b:,:nocc_b]
+                eris.ceEE[i] = lib.pack_tril(buf[nocc_a:,nocc_b:,nocc_b:])
+            if i >= ncvs:
+                i -= ncvs
+                eris.veCC[i] = buf[nocc_a:,:ncvs,:ncvs]
+                eris.vcCC[i] = buf[:ncvs,:ncvs,:ncvs] 
+                eris.vvCC[i] = buf[nval_a_s,:ncvs,:ncvs]
+                eris.vcCV[i] = buf[:ncvs,:ncvs,nval_b_s]
+                eris.vcEE[i] = buf[:ncvs,nocc_b:,nocc_b:]
+                eris.vvEE[i] = buf[nval_a_s,nocc_b:,nocc_b:]
+    del(tmpf['ab'])
+
+    buf = np.empty((nmo_b,nmo_a,nmo_a))
+    ao2mo.general(mol, (occ_b,mo_b,mo_a,mo_a), tmpf, 'ba')
+    for i in range(nocc_b):
+        lib.unpack_tril(tmpf['ba'][i*nmo_b:(i+1)*nmo_b], out=buf)
+        eris.OVoo[i] = buf[nocc_b:,:nocc_a,:nocc_a]
+        eris.OOvv[i] = buf[:nocc_b,nocc_a:,nocc_a:]
+        eris.OVvo[i] = buf[nocc_b:,nocc_a:,:nocc_a]
+        eris.OVvv[i] = lib.pack_tril(buf[nocc_b:,nocc_a:,nocc_a:])
+
+        if myadc.method_type == 'ip-cvs':
+            eris.OEcc[i] = buf[nocc_b:,:ncvs,:ncvs]    
+            eris.OEcv[i] = buf[nocc_b:,:ncvs,nval_a_s]
+            eris.OCee[i] = buf[:ncvs,nocc_a:,nocc_a:]
+            if i < ncvs:
+                eris.CEcc[i] = buf[nocc_b:,:ncvs,:ncvs]
+                eris.CEvc[i] = buf[nocc_b:,nval_a_s,:ncvs]
+                eris.CEec[i] = buf[nocc_b:,nocc_a:,:ncvs] 
+                eris.CEev[i] = buf[nocc_b:,nocc_a:,nval_a_s]
+                eris.CCee[i] = buf[:ncvs,nocc_a:,nocc_a:]
+                eris.CEoc[i] = buf[nocc_b:,:nocc_a,:ncvs]     
+                eris.CEov[i] = buf[nocc_b:,:nocc_a,nval_a_s]
+                eris.CEee[i] = lib.pack_tril(buf[nocc_b:,nocc_a:,nocc_a:])
+            if i >= ncvs:
+                i -= ncvs
+                eris.VEcc[i] = buf[nocc_b:,:ncvs,:ncvs]
+                eris.VEec[i] = buf[nocc_b:,nocc_a:,:ncvs]  
+                eris.VEev[i] = buf[nocc_b:,nocc_a:,nval_a_s]
+                eris.VCee[i] = buf[:ncvs,nocc_a:,nocc_a:]
+                eris.VVee[i] = buf[nval_b_s,nocc_a:,nocc_a:]
+    del(tmpf['ba'])
 
     buf = None
     cput1 = logger.timer_debug1(myadc, 'transforming oopq, ovpq', *cput1)
