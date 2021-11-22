@@ -2149,15 +2149,15 @@ def get_imds_ip_cvs(adc, eris=None):
     if eris is None:
         eris = adc.transform_integrals()
 
-    eris_ceeo = eris.ceeo
-    eris_CEEO = eris.CEEO
-    eris_ceEO = eris.ceEO
-    eris_oeEC = eris.oeEC
+    eris_ceoe = eris.ceoe
+    eris_CEOE = eris.CEOE
+    eris_ceOE = eris.ceOE
+    eris_oeCE = eris.oeCE
     
-    #print("eris_ceeo: ", eris_ceeo.flags.c_contiguous)  
-    #print("eris_CEEO: ", eris_CEEO.flags.c_contiguous)
-    #print("eris_ceEO: ", eris_ceEO.flags.c_contiguous)
-    #print("eris_oeEC: ", eris_oeEC.flags.c_contiguous)
+    #print("eris_ceoe: ", eris_ceoe.flags.c_contiguous)  
+    #print("eris_CEOE: ", eris_CEOE.flags.c_contiguous)
+    #print("eris_ceOE: ", eris_ceOE.flags.c_contiguous)
+    #print("eris_oeCE: ", eris_oeCE.flags.c_contiguous)
     #exit()
     
     # i-j block
@@ -2170,25 +2170,25 @@ def get_imds_ip_cvs(adc, eris=None):
 
     t2_1_a = t2[0][0][:]
     t2_1_a_coee = t2_1_a[:ncvs,:,:,:].copy()
-    M_ij_a += 0.5 * 0.5 *  lib.einsum('ilde,jdel->ij',t2_1_a_coee, eris_ceeo, optimize=True)
-    M_ij_a -= 0.5 * 0.5 *  lib.einsum('ilde,jedl->ij',t2_1_a_coee, eris_ceeo, optimize=True)
-    M_ij_a += 0.5 * 0.5 *  lib.einsum('jlde,idel->ij',t2_1_a_coee, eris_ceeo, optimize=True)
-    M_ij_a -= 0.5 * 0.5 *  lib.einsum('jlde,iedl->ij',t2_1_a_coee, eris_ceeo, optimize=True)
+    M_ij_a += 0.5 * 0.5 *  lib.einsum('ilde,jdle->ij',t2_1_a_coee, eris_ceoe, optimize=True)
+    M_ij_a -= 0.5 * 0.5 *  lib.einsum('ilde,jeld->ij',t2_1_a_coee, eris_ceoe, optimize=True)
+    M_ij_a += 0.5 * 0.5 *  lib.einsum('jlde,idle->ij',t2_1_a_coee, eris_ceoe, optimize=True)
+    M_ij_a -= 0.5 * 0.5 *  lib.einsum('jlde,ield->ij',t2_1_a_coee, eris_ceoe, optimize=True)
 
     t2_1_b = t2[0][2][:]
     t2_1_b_coee = t2_1_b[:ncvs,:,:,:].copy()
-    M_ij_b += 0.5 * 0.5 *  lib.einsum('ilde,jdel->ij',t2_1_b_coee, eris_CEEO, optimize=True)
-    M_ij_b -= 0.5 * 0.5 *  lib.einsum('ilde,jedl->ij',t2_1_b_coee, eris_CEEO, optimize=True)
-    M_ij_b += 0.5 * 0.5 *  lib.einsum('jlde,idel->ij',t2_1_b_coee, eris_CEEO, optimize=True)
-    M_ij_b -= 0.5 * 0.5 *  lib.einsum('jlde,iedl->ij',t2_1_b_coee, eris_CEEO, optimize=True)
+    M_ij_b += 0.5 * 0.5 *  lib.einsum('ilde,jdle->ij',t2_1_b_coee, eris_CEOE, optimize=True)
+    M_ij_b -= 0.5 * 0.5 *  lib.einsum('ilde,jeld->ij',t2_1_b_coee, eris_CEOE, optimize=True)
+    M_ij_b += 0.5 * 0.5 *  lib.einsum('jlde,idle->ij',t2_1_b_coee, eris_CEOE, optimize=True)
+    M_ij_b -= 0.5 * 0.5 *  lib.einsum('jlde,ield->ij',t2_1_b_coee, eris_CEOE, optimize=True)
 
     t2_1_ab = t2[0][1][:]
     t2_1_ab_coee = t2_1_ab[:ncvs,:,:,:].copy()
     t2_1_ab_ocee = t2_1_ab[:,:ncvs,:,:].copy()
-    M_ij_a += 0.5 * lib.einsum('ilde,jdel->ij',t2_1_ab_coee, eris_ceEO, optimize=True)
-    M_ij_b += 0.5 * lib.einsum('lied,ledj->ij',t2_1_ab_ocee, eris_oeEC, optimize=True)
-    M_ij_a += 0.5 * lib.einsum('jlde,idel->ij',t2_1_ab_coee, eris_ceEO, optimize=True)
-    M_ij_b += 0.5 * lib.einsum('ljed,ledi->ij',t2_1_ab_ocee, eris_oeEC, optimize=True)
+    M_ij_a += 0.5 * lib.einsum('ilde,jdle->ij',t2_1_ab_coee, eris_ceOE, optimize=True)
+    M_ij_b += 0.5 * lib.einsum('lied,lejd->ij',t2_1_ab_ocee, eris_oeCE, optimize=True)
+    M_ij_a += 0.5 * lib.einsum('jlde,idle->ij',t2_1_ab_coee, eris_ceOE, optimize=True)
+    M_ij_b += 0.5 * lib.einsum('ljed,leid->ij',t2_1_ab_ocee, eris_oeCE, optimize=True)
 
     del t2_1_a
     del t2_1_a_coee
@@ -2202,78 +2202,79 @@ def get_imds_ip_cvs(adc, eris=None):
 
     if (method == "adc(3)"):
 
-        eris_ceec = eris.ceec
-        eris_CEEC = eris.CEEC
-        eris_ocee = eris.ocee
         eris_ccee = eris.ccee
-        eris_OCEE = eris.OCEE
         eris_CCEE = eris.CCEE
-        eris_ocEE = eris.ocEE
         eris_ccEE = eris.ccEE
-        eris_OCee = eris.OCee
         eris_CCee = eris.CCee
         eris_oecc = eris.oecc
-        eris_ceoc = eris.ceoc
         eris_OECC = eris.OECC
-        eris_CEOC = eris.CEOC
         eris_oeCC = eris.oeCC
         eris_OEcc = eris.OEcc
         eris_cooo = eris.cooo
         eris_ccoo = eris.ccoo
-        eris_cooc = eris.cooc
         eris_COOO = eris.COOO
         eris_CCOO = eris.CCOO
-        eris_COOC = eris.COOC
         eris_ccOO = eris.ccOO
         eris_ooCC = eris.ooCC
         eris_coOO = eris.coOO
-        eris_ooOC = eris.ooOC
 
-        #print("eris_ceec: ", eris_ceec.flags.c_contiguous)        
-        #print("eris_CEEC: ", eris_CEEC.flags.c_contiguous)
-        #print("eris_ocee: ", eris_ocee.flags.c_contiguous)
+        eris_cece = eris.cece
+        eris_CECE = eris.CECE
+        eris_coee = eris.coee
+        eris_COEE = eris.COEE
+        eris_coEE = eris.coEE
+        eris_COee = eris.COee
+        eris_ceco = eris.ceco
+        eris_CECO = eris.CECO
+        eris_coco = eris.coco
+        eris_COCO = eris.COCO
+        eris_ooCO = eris.ooCO
+
+        #print("eris_cece: ", eris_cece.flags.c_contiguous)        
+        #print("eris_CECE: ", eris_CECE.flags.c_contiguous)
+        #print("eris_coee: ", eris_coee.flags.c_contiguous)
         #print("eris_ccee: ", eris_ccee.flags.c_contiguous)
-        #print("eris_OCEE: ", eris_OCEE.flags.c_contiguous)
+        #print("eris_COEE: ", eris_COEE.flags.c_contiguous)
         #print("eris_CCEE: ", eris_CCEE.flags.c_contiguous)
-        #print("eris_ocEE: ", eris_ocEE.flags.c_contiguous)
+        #print("eris_coEE: ", eris_coEE.flags.c_contiguous)
         #print("eris_ccEE: ", eris_ccEE.flags.c_contiguous)
-        #print("eris_OCee: ", eris_OCee.flags.c_contiguous)
+        #print("eris_COee: ", eris_COee.flags.c_contiguous)
         #print("eris_CCee: ", eris_CCee.flags.c_contiguous)
         #print("eris_oecc: ", eris_oecc.flags.c_contiguous)
-        #print("eris_ceoc: ", eris_ceoc.flags.c_contiguous)
+        #print("eris_ceco: ", eris_ceco.flags.c_contiguous)
         #print("eris_OECC: ", eris_OECC.flags.c_contiguous)
-        #print("eris_CEOC: ", eris_CEOC.flags.c_contiguous)
+        #print("eris_CECO: ", eris_CECO.flags.c_contiguous)
         #print("eris_oeCC: ", eris_oeCC.flags.c_contiguous)
         #print("eris_OEcc: ", eris_OEcc.flags.c_contiguous)
         #print("eris_cooo: ", eris_cooo.flags.c_contiguous)
         #print("eris_ccoo: ", eris_ccoo.flags.c_contiguous)
-        #print("eris_cooc: ", eris_cooc.flags.c_contiguous)
+        #print("eris_coco: ", eris_coco.flags.c_contiguous)
         #print("eris_COOO: ", eris_COOO.flags.c_contiguous)
         #print("eris_CCOO: ", eris_CCOO.flags.c_contiguous)
-        #print("eris_COOC: ", eris_COOC.flags.c_contiguous)
+        #print("eris_COCO: ", eris_COCO.flags.c_contiguous)
         #print("eris_ccOO: ", eris_ccOO.flags.c_contiguous)
         #print("eris_ooCC: ", eris_ooCC.flags.c_contiguous)
         #print("eris_coOO: ", eris_coOO.flags.c_contiguous)
-        #print("eris_ooOC: ", eris_ooOC.flags.c_contiguous)
+        #print("eris_ooCO: ", eris_ooCO.flags.c_contiguous)
         #exit()
 
         t1 = adc.t1
         t1_2_a, t1_2_b = t1[0]
 
         M_ij_a += lib.einsum('ld,ldji->ij',t1_2_a, eris_oecc, optimize=True)
-        M_ij_a -= lib.einsum('ld,jdli->ij',t1_2_a, eris_ceoc, optimize=True)
+        M_ij_a -= lib.einsum('ld,jdil->ij',t1_2_a, eris_ceco, optimize=True)
         M_ij_a += lib.einsum('ld,ldji->ij',t1_2_b, eris_OEcc, optimize=True)
 
         M_ij_b += lib.einsum('ld,ldji->ij',t1_2_b, eris_OECC, optimize=True)
-        M_ij_b -= lib.einsum('ld,jdli->ij',t1_2_b, eris_CEOC, optimize=True)
+        M_ij_b -= lib.einsum('ld,jdil->ij',t1_2_b, eris_CECO, optimize=True)
         M_ij_b += lib.einsum('ld,ldji->ij',t1_2_a, eris_oeCC, optimize=True)
 
         M_ij_a += lib.einsum('ld,ldij->ij',t1_2_a, eris_oecc, optimize=True)
-        M_ij_a -= lib.einsum('ld,idlj->ij',t1_2_a, eris_ceoc, optimize=True)
+        M_ij_a -= lib.einsum('ld,idjl->ij',t1_2_a, eris_ceco, optimize=True)
         M_ij_a += lib.einsum('ld,ldij->ij',t1_2_b, eris_OEcc, optimize=True)
 
         M_ij_b += lib.einsum('ld,ldij->ij',t1_2_b, eris_OECC, optimize=True)
-        M_ij_b -= lib.einsum('ld,idlj->ij',t1_2_b, eris_CEOC, optimize=True)
+        M_ij_b -= lib.einsum('ld,idjl->ij',t1_2_b, eris_CECO, optimize=True)
         M_ij_b += lib.einsum('ld,ldij->ij',t1_2_a, eris_oeCC, optimize=True)
        
         del t1_2_a
@@ -2284,21 +2285,21 @@ def get_imds_ip_cvs(adc, eris=None):
         t2_2_a = t2[1][0][:]
         t2_2_a_coee = t2_2_a[:ncvs,:,:,:].copy()
 
-        M_ij_a += 0.5 * 0.5* lib.einsum('ilde,jdel->ij',t2_2_a_coee, eris_ceeo, optimize=True)
-        M_ij_a -= 0.5 * 0.5* lib.einsum('ilde,jedl->ij',t2_2_a_coee, eris_ceeo, optimize=True)
+        M_ij_a += 0.5 * 0.5* lib.einsum('ilde,jdle->ij',t2_2_a_coee, eris_ceoe, optimize=True)
+        M_ij_a -= 0.5 * 0.5* lib.einsum('ilde,jeld->ij',t2_2_a_coee, eris_ceoe, optimize=True)
 
-        M_ij_a += 0.5 * 0.5* lib.einsum('jlde,idel->ij',t2_2_a_coee, eris_ceeo, optimize=True)
-        M_ij_a -= 0.5 * 0.5* lib.einsum('jlde,iedl->ij',t2_2_a_coee, eris_ceeo, optimize=True)
+        M_ij_a += 0.5 * 0.5* lib.einsum('jlde,idle->ij',t2_2_a_coee, eris_ceoe, optimize=True)
+        M_ij_a -= 0.5 * 0.5* lib.einsum('jlde,ield->ij',t2_2_a_coee, eris_ceoe, optimize=True)
 
         t2_1_b = t2[0][2][:]
         t2_1_b_coee = t2_1_b[:ncvs,:,:,:].copy()
         t2_2_b = t2[1][2][:]
         t2_2_b_coee = t2_2_b[:ncvs,:,:,:].copy()
 
-        M_ij_b += 0.5 * 0.5* lib.einsum('ilde,jdel->ij',t2_2_b_coee, eris_CEEO, optimize=True)
-        M_ij_b -= 0.5 * 0.5* lib.einsum('ilde,jedl->ij',t2_2_b_coee, eris_CEEO, optimize=True)
-        M_ij_b += 0.5 * 0.5* lib.einsum('jlde,idel->ij',t2_2_b_coee, eris_CEEO, optimize=True)
-        M_ij_b -= 0.5 * 0.5* lib.einsum('jlde,iedl->ij',t2_2_b_coee, eris_CEEO, optimize=True)
+        M_ij_b += 0.5 * 0.5* lib.einsum('ilde,jdle->ij',t2_2_b_coee, eris_CEOE, optimize=True)
+        M_ij_b -= 0.5 * 0.5* lib.einsum('ilde,jeld->ij',t2_2_b_coee, eris_CEOE, optimize=True)
+        M_ij_b += 0.5 * 0.5* lib.einsum('jlde,idle->ij',t2_2_b_coee, eris_CEOE, optimize=True)
+        M_ij_b -= 0.5 * 0.5* lib.einsum('jlde,ield->ij',t2_2_b_coee, eris_CEOE, optimize=True)
 
         t2_1_ab = t2[0][1][:]
         t2_1_ab_coee = t2_1_ab[:ncvs,:,:,:].copy()
@@ -2307,16 +2308,16 @@ def get_imds_ip_cvs(adc, eris=None):
         t2_2_ab_coee = t2_2_ab[:ncvs,:,:,:].copy()
         t2_2_ab_ocee = t2_2_ab[:,:ncvs,:,:].copy()
 
-        M_ij_a += 0.5 * lib.einsum('ilde,jdel->ij',t2_2_ab_coee, eris_ceEO, optimize=True)
-        M_ij_b += 0.5 * lib.einsum('lied,ledj->ij',t2_2_ab_ocee, eris_oeEC, optimize=True)
-        M_ij_a += 0.5 * lib.einsum('jlde,idel->ij',t2_2_ab_coee, eris_ceEO, optimize=True)
-        M_ij_b += 0.5 * lib.einsum('ljed,ledi->ij',t2_2_ab_ocee, eris_oeEC, optimize=True)
+        M_ij_a += 0.5 * lib.einsum('ilde,jdle->ij',t2_2_ab_coee, eris_ceOE, optimize=True)
+        M_ij_b += 0.5 * lib.einsum('lied,lejd->ij',t2_2_ab_ocee, eris_oeCE, optimize=True)
+        M_ij_a += 0.5 * lib.einsum('jlde,idle->ij',t2_2_ab_coee, eris_ceOE, optimize=True)
+        M_ij_b += 0.5 * lib.einsum('ljed,leid->ij',t2_2_ab_ocee, eris_oeCE, optimize=True)
 
         M_ij_t = lib.einsum('lmde,jldf->mejf', t2_1_a, t2_1_a_coee, optimize=True)
-        M_ij_a -= 0.5 * lib.einsum('mejf,ifem->ij',M_ij_t, eris_ceeo, optimize=True)
-        M_ij_a -= 0.5 * lib.einsum('mejf,ifem->ji',M_ij_t, eris_ceeo, optimize=True)
-        M_ij_a += 0.5 * lib.einsum('mejf,mife->ij',M_ij_t, eris_ocee, optimize=True)
-        M_ij_a += 0.5 * lib.einsum('mejf,mife->ji',M_ij_t, eris_ocee, optimize=True)
+        M_ij_a -= 0.5 * lib.einsum('mejf,ifme->ij',M_ij_t, eris_ceoe, optimize=True)
+        M_ij_a -= 0.5 * lib.einsum('mejf,ifme->ji',M_ij_t, eris_ceoe, optimize=True)
+        M_ij_a += 0.5 * lib.einsum('mejf,imfe->ij',M_ij_t, eris_coee, optimize=True)
+        M_ij_a += 0.5 * lib.einsum('mejf,imfe->ji',M_ij_t, eris_coee, optimize=True)
         del M_ij_t
 
         M_ij_a += 0.5 * 0.25*lib.einsum('lmde,jnde,ilmn->ij',t2_1_a, t2_1_a_coee,eris_cooo, optimize = True)
@@ -2326,33 +2327,33 @@ def get_imds_ip_cvs(adc, eris=None):
         M_ij_a -= 0.5 *0.25*lib.einsum('inde,lmde,jmnl->ij',t2_1_a_coee, t2_1_a,eris_cooo, optimize = True)
 
         M_ij_a += 0.5*lib.einsum('lmdf,lmde,jief->ij',t2_1_a, t2_1_a, eris_ccee, optimize = True)
-        M_ij_a -= 0.5*lib.einsum('lmdf,lmde,jfei->ij',t2_1_a, t2_1_a, eris_ceec, optimize = True)
+        M_ij_a -= 0.5*lib.einsum('lmdf,lmde,jfie->ij',t2_1_a, t2_1_a, eris_cece, optimize = True)
         M_ij_b +=0.5*lib.einsum('lmdf,lmde,jief->ij',t2_1_a, t2_1_a, eris_CCee , optimize = True)
 
         M_ij_a -= 0.5*lib.einsum('lnde,lmde,jinm->ij',t2_1_a, t2_1_a, eris_ccoo, optimize = True)
-        M_ij_a += 0.5*lib.einsum('lnde,lmde,jmni->ij',t2_1_a, t2_1_a, eris_cooc, optimize = True)
+        M_ij_a += 0.5*lib.einsum('lnde,lmde,jmin->ij',t2_1_a, t2_1_a, eris_coco, optimize = True)
         M_ij_b -= 0.5 * lib.einsum('lnde,lmde,nmji->ij',t2_1_a, t2_1_a, eris_ooCC, optimize = True)
 
         t2_1_ab = t2[0][1][:]
         t2_1_ab_coee = t2_1_ab[:ncvs,:,:,:].copy()
         t2_1_ab_ocee = t2_1_ab[:,:ncvs,:,:].copy()
-        M_ij_a -= 0.5 * lib.einsum('lmde,jldf,ifem->ij',t2_1_ab, t2_1_a_coee, eris_ceEO,optimize = True)
-        M_ij_b += 0.5 * lib.einsum('lmde,ljdf,mefi->ij',t2_1_a, t2_1_ab_ocee, eris_oeEC ,optimize = True)
-        M_ij_a -= 0.5 * lib.einsum('lmde,ildf,jfem->ij',t2_1_ab, t2_1_a_coee, eris_ceEO,optimize = True)
-        M_ij_b += 0.5 * lib.einsum('lmde,lidf,mefj->ij',t2_1_a, t2_1_ab_ocee, eris_oeEC ,optimize = True)
+        M_ij_a -= 0.5 * lib.einsum('lmde,jldf,ifme->ij',t2_1_ab, t2_1_a_coee, eris_ceOE,optimize = True)
+        M_ij_b += 0.5 * lib.einsum('lmde,ljdf,meif->ij',t2_1_a, t2_1_ab_ocee, eris_oeCE ,optimize = True)
+        M_ij_a -= 0.5 * lib.einsum('lmde,ildf,jfme->ij',t2_1_ab, t2_1_a_coee, eris_ceOE,optimize = True)
+        M_ij_b += 0.5 * lib.einsum('lmde,lidf,mejf->ij',t2_1_a, t2_1_ab_ocee, eris_oeCE ,optimize = True)
         del t2_1_a
         del t2_1_a_coee
 
-        M_ij_a += 0.5 * lib.einsum('lmde,jlfd,ifem->ij',t2_1_b, t2_1_ab_coee, eris_ceEO ,optimize = True)
-        M_ij_b -= 0.5 * lib.einsum('mled,jldf,mefi->ij',t2_1_ab, t2_1_b_coee, eris_oeEC,optimize = True)
-        M_ij_a += 0.5 * lib.einsum('lmde,ilfd,jfem->ij',t2_1_b, t2_1_ab_coee, eris_ceEO ,optimize = True)
-        M_ij_b -= 0.5 * lib.einsum('mled,ildf,mefj->ij',t2_1_ab, t2_1_b_coee, eris_oeEC,optimize = True)
+        M_ij_a += 0.5 * lib.einsum('lmde,jlfd,ifme->ij',t2_1_b, t2_1_ab_coee, eris_ceOE ,optimize = True)
+        M_ij_b -= 0.5 * lib.einsum('mled,jldf,meif->ij',t2_1_ab, t2_1_b_coee, eris_oeCE,optimize = True)
+        M_ij_a += 0.5 * lib.einsum('lmde,ilfd,jfme->ij',t2_1_b, t2_1_ab_coee, eris_ceOE ,optimize = True)
+        M_ij_b -= 0.5 * lib.einsum('mled,ildf,mejf->ij',t2_1_ab, t2_1_b_coee, eris_oeCE,optimize = True)
 
         M_ij_t = lib.einsum('lmde,jldf->mejf', t2_1_b, t2_1_b_coee, optimize=True)
-        M_ij_b -= 0.5 * lib.einsum('mejf,ifem->ij',M_ij_t, eris_CEEO, optimize=True)
-        M_ij_b -= 0.5 * lib.einsum('mejf,ifem->ji',M_ij_t, eris_CEEO, optimize=True)
-        M_ij_b += 0.5 * lib.einsum('mejf,mife->ij',M_ij_t, eris_OCEE, optimize=True)
-        M_ij_b += 0.5 * lib.einsum('mejf,mife->ji',M_ij_t, eris_OCEE, optimize=True)
+        M_ij_b -= 0.5 * lib.einsum('mejf,ifme->ij',M_ij_t, eris_CEOE, optimize=True)
+        M_ij_b -= 0.5 * lib.einsum('mejf,ifme->ji',M_ij_t, eris_CEOE, optimize=True)
+        M_ij_b += 0.5 * lib.einsum('mejf,imfe->ij',M_ij_t, eris_COEE, optimize=True)
+        M_ij_b += 0.5 * lib.einsum('mejf,imfe->ji',M_ij_t, eris_COEE, optimize=True)
         del M_ij_t
 
         M_ij_b += 0.5 * 0.25*lib.einsum('lmde,jnde,ilmn->ij',t2_1_b, t2_1_b_coee,eris_COOO, optimize = True)
@@ -2363,49 +2364,49 @@ def get_imds_ip_cvs(adc, eris=None):
 
         M_ij_a += 0.5*lib.einsum('lmdf,lmde,jief->ij',t2_1_b, t2_1_b, eris_ccEE , optimize = True)
         M_ij_b += 0.5*lib.einsum('lmdf,lmde,jief->ij',t2_1_b, t2_1_b, eris_CCEE , optimize = True)
-        M_ij_b -= 0.5*lib.einsum('lmdf,lmde,jfei->ij',t2_1_b, t2_1_b, eris_CEEC , optimize = True)
+        M_ij_b -= 0.5*lib.einsum('lmdf,lmde,jfie->ij',t2_1_b, t2_1_b, eris_CECE , optimize = True)
 
         M_ij_a -= 0.5 * lib.einsum('lnde,lmde,jinm->ij',t2_1_b, t2_1_b, eris_ccOO, optimize = True)
         M_ij_b -= 0.5*lib.einsum('lnde,lmde,jinm->ij',t2_1_b, t2_1_b, eris_CCOO, optimize = True)
-        M_ij_b += 0.5*lib.einsum('lnde,lmde,jmni->ij',t2_1_b, t2_1_b, eris_COOC, optimize = True)
+        M_ij_b += 0.5*lib.einsum('lnde,lmde,jmin->ij',t2_1_b, t2_1_b, eris_COCO, optimize = True)
         del t2_1_b
         del t2_1_b_coee
 
-        M_ij_a += 0.5 * lib.einsum('mled,jlfd,ifem->ij',t2_1_ab, t2_1_ab_coee, eris_ceeo ,optimize = True)
-        M_ij_a -= 0.5 * lib.einsum('mled,jlfd,mife->ij',t2_1_ab, t2_1_ab_coee, eris_ocee ,optimize = True)
-        M_ij_a -= 0.5 * lib.einsum('mlde,jldf,mife->ij',t2_1_ab, t2_1_ab_coee, eris_ocEE ,optimize = True)
+        M_ij_a += 0.5 * lib.einsum('mled,jlfd,ifme->ij',t2_1_ab, t2_1_ab_coee, eris_ceoe ,optimize = True)
+        M_ij_a -= 0.5 * lib.einsum('mled,jlfd,imfe->ij',t2_1_ab, t2_1_ab_coee, eris_coee ,optimize = True)
+        M_ij_a -= 0.5 * lib.einsum('mlde,jldf,imfe->ij',t2_1_ab, t2_1_ab_coee, eris_coEE ,optimize = True)
 
-        M_ij_b += 0.5 * lib.einsum('lmde,ljdf,ifem->ij',t2_1_ab, t2_1_ab_ocee, eris_CEEO,optimize = True)
-        M_ij_b -= 0.5 * lib.einsum('lmde,ljdf,mife->ij',t2_1_ab, t2_1_ab_ocee, eris_OCEE,optimize = True)
-        M_ij_b -= 0.5 * lib.einsum('lmed,ljfd,mife->ij',t2_1_ab, t2_1_ab_ocee, eris_OCee ,optimize = True)
+        M_ij_b += 0.5 * lib.einsum('lmde,ljdf,ifme->ij',t2_1_ab, t2_1_ab_ocee, eris_CEOE,optimize = True)
+        M_ij_b -= 0.5 * lib.einsum('lmde,ljdf,imfe->ij',t2_1_ab, t2_1_ab_ocee, eris_COEE,optimize = True)
+        M_ij_b -= 0.5 * lib.einsum('lmed,ljfd,imfe->ij',t2_1_ab, t2_1_ab_ocee, eris_COee ,optimize = True)
 
-        M_ij_a += 0.5 * lib.einsum('mled,ilfd,jfem->ij',t2_1_ab, t2_1_ab_coee, eris_ceeo ,optimize = True)
-        M_ij_a -= 0.5 * lib.einsum('mled,ilfd,mjfe->ij',t2_1_ab, t2_1_ab_coee, eris_ocee ,optimize = True)
-        M_ij_a -= 0.5 * lib.einsum('mlde,ildf,mjfe->ij',t2_1_ab, t2_1_ab_coee, eris_ocEE ,optimize = True)
+        M_ij_a += 0.5 * lib.einsum('mled,ilfd,jfme->ij',t2_1_ab, t2_1_ab_coee, eris_ceoe ,optimize = True)
+        M_ij_a -= 0.5 * lib.einsum('mled,ilfd,jmfe->ij',t2_1_ab, t2_1_ab_coee, eris_coee ,optimize = True)
+        M_ij_a -= 0.5 * lib.einsum('mlde,ildf,jmfe->ij',t2_1_ab, t2_1_ab_coee, eris_coEE ,optimize = True)
 
-        M_ij_b += 0.5 * lib.einsum('lmde,lidf,jfem->ij',t2_1_ab, t2_1_ab_ocee, eris_CEEO ,optimize = True)
-        M_ij_b -= 0.5 * lib.einsum('lmde,lidf,mjfe->ij',t2_1_ab, t2_1_ab_ocee, eris_OCEE ,optimize = True)
-        M_ij_b -= 0.5 * lib.einsum('lmed,lifd,mjfe->ij',t2_1_ab, t2_1_ab_ocee, eris_OCee ,optimize = True)
+        M_ij_b += 0.5 * lib.einsum('lmde,lidf,jfme->ij',t2_1_ab, t2_1_ab_ocee, eris_CEOE ,optimize = True)
+        M_ij_b -= 0.5 * lib.einsum('lmde,lidf,jmfe->ij',t2_1_ab, t2_1_ab_ocee, eris_COEE ,optimize = True)
+        M_ij_b -= 0.5 * lib.einsum('lmed,lifd,jmfe->ij',t2_1_ab, t2_1_ab_ocee, eris_COee ,optimize = True)
 
         M_ij_a += 0.5 * lib.einsum('lmde,jnde,ilmn->ij',t2_1_ab ,t2_1_ab_coee,eris_coOO, optimize = True)
-        M_ij_b += 0.5 * lib.einsum('mled,njed,mnli->ij',t2_1_ab ,t2_1_ab_ocee,eris_ooOC, optimize = True)
+        M_ij_b += 0.5 * lib.einsum('mled,njed,mnil->ij',t2_1_ab ,t2_1_ab_ocee,eris_ooCO, optimize = True)
 
         M_ij_a +=0.5 * lib.einsum('inde,lmde,jlnm->ij',t2_1_ab_coee, t2_1_ab,eris_coOO, optimize = True)
 
-        M_ij_b +=0.5 * lib.einsum('nied,mled,nmlj->ij',t2_1_ab_ocee, t2_1_ab,eris_ooOC, optimize = True)
+        M_ij_b +=0.5 * lib.einsum('nied,mled,nmjl->ij',t2_1_ab_ocee, t2_1_ab,eris_ooCO, optimize = True)
 
         M_ij_a +=lib.einsum('mlfd,mled,jief->ij',t2_1_ab, t2_1_ab, eris_ccee , optimize = True)
-        M_ij_a -=lib.einsum('mlfd,mled,jfei->ij',t2_1_ab, t2_1_ab, eris_ceec , optimize = True)
+        M_ij_a -=lib.einsum('mlfd,mled,jfie->ij',t2_1_ab, t2_1_ab, eris_cece , optimize = True)
         M_ij_a +=lib.einsum('lmdf,lmde,jief->ij',t2_1_ab, t2_1_ab, eris_ccEE , optimize = True)
         M_ij_b +=lib.einsum('lmdf,lmde,jief->ij',t2_1_ab, t2_1_ab, eris_CCEE , optimize = True)
-        M_ij_b -=lib.einsum('lmdf,lmde,jfei->ij',t2_1_ab, t2_1_ab, eris_CEEC , optimize = True)
+        M_ij_b -=lib.einsum('lmdf,lmde,jfie->ij',t2_1_ab, t2_1_ab, eris_CECE , optimize = True)
         M_ij_b +=lib.einsum('lmfd,lmed,jief->ij',t2_1_ab, t2_1_ab, eris_CCee , optimize = True)
 
         M_ij_a -= lib.einsum('nled,mled,jinm->ij',t2_1_ab, t2_1_ab, eris_ccoo, optimize = True)
-        M_ij_a += lib.einsum('nled,mled,jmni->ij',t2_1_ab, t2_1_ab, eris_cooc, optimize = True)
+        M_ij_a += lib.einsum('nled,mled,jmin->ij',t2_1_ab, t2_1_ab, eris_coco, optimize = True)
         M_ij_a -= lib.einsum('lnde,lmde,jinm->ij',t2_1_ab, t2_1_ab, eris_ccOO, optimize = True)
         M_ij_b -= lib.einsum('lnde,lmde,jinm->ij',t2_1_ab, t2_1_ab, eris_CCOO, optimize = True)
-        M_ij_b += lib.einsum('lnde,lmde,jmni->ij',t2_1_ab, t2_1_ab, eris_COOC, optimize = True)
+        M_ij_b += lib.einsum('lnde,lmde,jmin->ij',t2_1_ab, t2_1_ab, eris_COCO, optimize = True)
         M_ij_b -= lib.einsum('nled,mled,nmji->ij',t2_1_ab, t2_1_ab, eris_ooCC, optimize = True)
 
         del t2_1_ab
@@ -6077,10 +6078,10 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
         eris_CEcc = eris.CEcc
         eris_VEcc = eris.VEcc
 
-        eris_cecv = eris.cecv#   
-        eris_CECV = eris.CECV#   
-        eris_ceCV = eris.ceCV#   
-        eris_CEcv = eris.CEcv#   
+        eris_cecv = eris.cecv   
+        eris_CECV = eris.CECV   
+        eris_ceCV = eris.ceCV   
+        eris_CEcv = eris.CEcv   
         
 
         #print("eris_cecc: ", eris_cecc.flags.c_contiguous)        
@@ -6176,24 +6177,24 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                eris_CCee = eris.CCee
                eris_VVee = eris.VVee
 
-               eris_cvcv = eris.cvcv#   
-               eris_CVCV = eris.CVCV#  
-               eris_cvCC = eris.cvCC#  
-               eris_cvCV = eris.cvCV#  
-               eris_cece = eris.cece#  
-               eris_vece = eris.vece#  
-               eris_veve = eris.veve#  
-               eris_CECE = eris.CECE#  
-               eris_VECE = eris.VECE#  
-               eris_VEVE = eris.VEVE#  
-               eris_CEce = eris.CEce#  
-               eris_VEce = eris.VEce#  
-               eris_CEve = eris.CEve#  
-               eris_VEve = eris.VEve#  
-               eris_cvee = eris.cvee#  
-               eris_CVEE = eris.CVEE#  
-               eris_cvEE = eris.cvEE#  
-               eris_CVee = eris.CVee#  
+               eris_cvcv = eris.cvcv   
+               eris_CVCV = eris.CVCV  
+               eris_cvCC = eris.cvCC  
+               eris_cvCV = eris.cvCV  
+               eris_cece = eris.cece  
+               eris_vece = eris.vece  
+               eris_veve = eris.veve  
+               eris_CECE = eris.CECE  
+               eris_VECE = eris.VECE  
+               eris_VEVE = eris.VEVE  
+               eris_CEce = eris.CEce  
+               eris_VEce = eris.VEce  
+               eris_CEve = eris.CEve  
+               eris_VEve = eris.VEve  
+               eris_cvee = eris.cvee  
+               eris_CVEE = eris.CVEE  
+               eris_cvEE = eris.cvEE  
+               eris_CVee = eris.CVee  
 
                #print("eris_cccc: ", eris_cccc.flags.c_contiguous)               
                #print("eris_cccv: ", eris_cccv.flags.c_contiguous)
@@ -6496,29 +6497,13 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
         if (method == "adc(3)"):
 
                eris_oecc = eris.oecc
-               eris_ceoc = eris.ceoc
-               #eris_ceco = eris.ceco
                eris_oecv = eris.oecv
-               eris_ceov = eris.ceov
-               #eris_cevo = eris.cevo
                eris_OECC = eris.OECC
-               eris_CEOC = eris.CEOC
-               #eris_CECO = eris.CECO
                eris_OECV = eris.OECV
-               eris_CEOV = eris.CEOV
-               #eris_CEVO = eris.CEVO
                eris_OEcc = eris.OEcc
-               eris_CEoc = eris.CEoc
-               #eris_CEco = eris.CEco
                eris_OEcv = eris.OEcv
-               eris_CEov = eris.CEov
-               #eris_CEvo = eris.CEvo
                eris_oeCC = eris.oeCC
-               eris_ceOC = eris.ceOC
-               #eris_ceCO = eris.ceCO
                eris_oeCV = eris.oeCV
-               eris_ceOV = eris.ceOV
-               #eris_ceVO = eris.ceVO
 
                eris_ceco = eris.ceco
                eris_cevo = eris.cevo
@@ -6531,21 +6516,21 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
 
 
                #print("eris_oecc: ", eris_oecc.flags.c_contiguous)
-               #print("eris_ceoc: ", eris_ceoc.flags.c_contiguous)
+               #print("eris_ceco: ", eris_ceco.flags.c_contiguous)
                #print("eris_oecv: ", eris_oecv.flags.c_contiguous)
-               #print("eris_ceov: ", eris_ceov.flags.c_contiguous)
+               #print("eris_cevo: ", eris_cevo.flags.c_contiguous)
                #print("eris_OECC: ", eris_OECC.flags.c_contiguous)
-               #print("eris_CEOC: ", eris_CEOC.flags.c_contiguous)
+               #print("eris_CECO: ", eris_CECO.flags.c_contiguous)
                #print("eris_OECV: ", eris_OECV.flags.c_contiguous)
-               #print("eris_CEOV: ", eris_CEOV.flags.c_contiguous)
+               #print("eris_CEVO: ", eris_CEVO.flags.c_contiguous)
                #print("eris_OEcc: ", eris_OEcc.flags.c_contiguous)
-               #print("eris_CEoc: ", eris_CEoc.flags.c_contiguous)
+               #print("eris_CEco: ", eris_CEco.flags.c_contiguous)
                #print("eris_OEcv: ", eris_OEcv.flags.c_contiguous)
-               #print("eris_CEov: ", eris_CEov.flags.c_contiguous)
+               #print("eris_CEvo: ", eris_CEvo.flags.c_contiguous)
                #print("eris_oeCC: ", eris_oeCC.flags.c_contiguous)
-               #print("eris_ceOC: ", eris_ceOC.flags.c_contiguous)
+               #print("eris_ceCO: ", eris_ceCO.flags.c_contiguous)
                #print("eris_oeCV: ", eris_oeCV.flags.c_contiguous)
-               #print("eris_ceOV: ", eris_ceOV.flags.c_contiguous)
+               #print("eris_ceVO: ", eris_ceVO.flags.c_contiguous)
                #exit() 
 
 ################ ADC(3) i - kja and ajk - i block ############################
@@ -6571,7 +6556,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                temp_1_ecv = lib.einsum('Pqbc,aPq->abc',t2_1_a_cvee,r_aaa_ecv, optimize=True)
                for p in range(0,ncvs,chnk_size):
                    if getattr(adc, 'with_df', None):
-                       eris_ovvv = dfadc.get_ovvv_spin_df(adc, eris.Lov, eris.Lvv, p, chnk_size).reshape(-1,nvir_a,nvir_a,nvir_a)
+                       eris_ceee = dfadc.get_ceee_spin_df(adc, eris.L_ce_t, eris.L_ee_t, p, chnk_size).reshape(-1,nvir_a,nvir_a,nvir_a)
                    else :       
                        eris_ceee = radc_ao2mo.unpack_eri_1(eris.ceee, nvir_a)
                    k = eris_ceee.shape[0]
@@ -6596,11 +6581,11 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                temp_ecv_2 = -lib.einsum('jlab,aKj->blK',t2_1_a_voee,r_aaa_ecv,optimize=True)
 
                s[s_a:f_a] += 0.5*lib.einsum('blK,lbIK->I',temp_ecc,eris_oecc,optimize=True)
-               s[s_a:f_a] -= 0.5*lib.einsum('blK,IblK->I',temp_ecc,eris_ceoc,optimize=True)
+               s[s_a:f_a] -= 0.5*lib.einsum('blK,IbKl->I',temp_ecc,eris_ceco,optimize=True)
                s[s_a:f_a] += 0.5*lib.einsum('blk,lbIk->I',temp_ecv_1,eris_oecv,optimize=True)
-               s[s_a:f_a] -= 0.5*lib.einsum('blk,Iblk->I',temp_ecv_1,eris_ceov,optimize=True)
+               s[s_a:f_a] -= 0.5*lib.einsum('blk,Ibkl->I',temp_ecv_1,eris_cevo,optimize=True)
                s[s_a:f_a] += 0.5*lib.einsum('blK,lbIK->I',temp_ecv_2,eris_oecc,optimize=True)
-               s[s_a:f_a] -= 0.5*lib.einsum('blK,IblK->I',temp_ecv_2,eris_ceoc,optimize=True)
+               s[s_a:f_a] -= 0.5*lib.einsum('blK,IbKl->I',temp_ecv_2,eris_ceco,optimize=True)
                 
                temp_1_ecc = lib.einsum('Jlab,aJK->blK',t2_1_a_coee,r_aab_ecc,optimize=True)
                temp_1_ecv = lib.einsum('Jlab,aJk->blk',t2_1_a_coee,r_aab_ecv,optimize=True)
@@ -6614,11 +6599,11 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                temp_ecv_2 = lib.einsum('klab,ajk->blj',t2_1_a_voee,r_aaa_ecv,optimize=True)
 
                s[s_a:f_a] -= 0.5*lib.einsum('blJ,lbIJ->I',temp_ecc,eris_oecc,optimize=True)
-               s[s_a:f_a] +=0.5*lib.einsum('blJ,IblJ->I',temp_ecc,eris_ceoc,optimize=True)
+               s[s_a:f_a] +=0.5*lib.einsum('blJ,IbJl->I',temp_ecc,eris_ceco,optimize=True)
                s[s_a:f_a] -= 0.5*lib.einsum('blj,lbIj->I',temp_ecv_1,eris_oecv,optimize=True)
-               s[s_a:f_a] +=0.5*lib.einsum('blj,Iblj->I',temp_ecv_1,eris_ceov,optimize=True)
+               s[s_a:f_a] +=0.5*lib.einsum('blj,Ibjl->I',temp_ecv_1,eris_cevo,optimize=True)
                s[s_a:f_a] -= 0.5*lib.einsum('blJ,lbIJ->I',temp_ecv_2,eris_oecc,optimize=True)
-               s[s_a:f_a] +=0.5*lib.einsum('blJ,IblJ->I',temp_ecv_2,eris_ceoc,optimize=True)
+               s[s_a:f_a] +=0.5*lib.einsum('blJ,IbJl->I',temp_ecv_2,eris_ceco,optimize=True)
 
                temp_1_ecc = -lib.einsum('Klab,aKJ->blJ',t2_1_a_coee,r_aab_ecc,optimize=True)
                temp_1_ecv = -lib.einsum('Klab,aKj->blj',t2_1_a_coee,r_aab_ecv,optimize=True)
@@ -6628,9 +6613,9 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                s[s_b:f_b] -= 0.5*lib.einsum('blJ,lbIJ->I',temp_1_evc,eris_oeCC,optimize=True)
 
                temp_1 = lib.einsum('I,lbIK->Kbl',r_a, eris_oecc)
-               temp_1 -= lib.einsum('I,IblK->Kbl',r_a, eris_ceoc)
+               temp_1 -= lib.einsum('I,IbKl->Kbl',r_a, eris_ceco)
                temp_2 = lib.einsum('I,lbIk->kbl',r_a, eris_oecv)
-               temp_2 -= lib.einsum('I,Iblk->kbl',r_a, eris_ceov)
+               temp_2 -= lib.einsum('I,Ibkl->kbl',r_a, eris_cevo)
 
                temp_ecc  = lib.einsum('kbl,jlab->ajk',temp_1,t2_1_a_coee,optimize=True)
                temp_ecv  = lib.einsum('kbl,jlab->ajk',temp_2,t2_1_a_coee,optimize=True)
@@ -6647,7 +6632,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                s[s_aab_evc:f_aab_evc] += temp_evc.reshape(-1)
 
                temp_1 = lib.einsum('I,lbIJ->Jbl',r_a, eris_oecc)
-               temp_1 -= lib.einsum('I,IblJ->Jbl',r_a, eris_ceoc)
+               temp_1 -= lib.einsum('I,IbJl->Jbl',r_a, eris_ceco)
 
                temp_ecc  = lib.einsum('Jbl,Klab->aJK',temp_1,t2_1_a_coee,optimize=True)
                temp_ecv  = lib.einsum('Jbl,klab->aJk',temp_1,t2_1_a_voee,optimize=True)
@@ -6684,7 +6669,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                temp_1_ecv = lib.einsum('Pqbc,aPq->abc',t2_1_b_cvee,r_bbb_ecv, optimize=True)
                for p in range(0,ncvs,chnk_size):
                    if getattr(adc, 'with_df', None):
-                       eris_OVVV = dfadc.get_ovvv_spin_df(adc, eris.LOV, eris.LVV, p, chnk_size).reshape(-1,nvir_b,nvir_b,nvir_b)
+                       eris_CEEE = dfadc.get_ceee_spin_df(adc, eris.L_CE_t, eris.L_EE_t, p, chnk_size).reshape(-1,nvir_b,nvir_b,nvir_b)
                    else :
                        eris_CEEE = radc_ao2mo.unpack_eri_1(eris.CEEE, nvir_b)
                    k = eris_CEEE.shape[0]
@@ -6716,11 +6701,11 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                temp_ecv_2 = -lib.einsum('jlab,aKj->blK',t2_1_b_voee,r_bbb_ecv,optimize=True)
 
                s[s_b:f_b] += 0.5*lib.einsum('blK,lbIK->I',temp_ecc,eris_OECC,optimize=True)
-               s[s_b:f_b] -= 0.5*lib.einsum('blK,IblK->I',temp_ecc,eris_CEOC,optimize=True)
+               s[s_b:f_b] -= 0.5*lib.einsum('blK,IbKl->I',temp_ecc,eris_CECO,optimize=True)
                s[s_b:f_b] += 0.5*lib.einsum('blk,lbIk->I',temp_ecv_1,eris_OECV,optimize=True)
-               s[s_b:f_b] -= 0.5*lib.einsum('blk,Iblk->I',temp_ecv_1,eris_CEOV,optimize=True)
+               s[s_b:f_b] -= 0.5*lib.einsum('blk,Ibkl->I',temp_ecv_1,eris_CEVO,optimize=True)
                s[s_b:f_b] += 0.5*lib.einsum('blK,lbIK->I',temp_ecv_2,eris_OECC,optimize=True)
-               s[s_b:f_b] -= 0.5*lib.einsum('blK,IblK->I',temp_ecv_2,eris_CEOC,optimize=True)
+               s[s_b:f_b] -= 0.5*lib.einsum('blK,IbKl->I',temp_ecv_2,eris_CECO,optimize=True)
 
                temp_1_ecc = -lib.einsum('Klab,aKJ->blJ',t2_1_b_coee,r_bba_ecc,optimize=True)
                temp_1_ecv = -lib.einsum('Klab,aKj->blj',t2_1_b_coee,r_bba_ecv,optimize=True)
@@ -6733,11 +6718,11 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                temp_ecv_1 = -lib.einsum('Klab,aKj->blj',t2_1_b_coee,r_bbb_ecv,optimize=True)
                temp_ecv_2 = lib.einsum('klab,aJk->blJ',t2_1_b_voee,r_bbb_ecv,optimize=True)
                s[s_b:f_b] -= 0.5*lib.einsum('blJ,lbIJ->I',temp_ecc,eris_OECC,optimize=True)
-               s[s_b:f_b] += 0.5*lib.einsum('blJ,IblJ->I',temp_ecc,eris_CEOC,optimize=True)
+               s[s_b:f_b] += 0.5*lib.einsum('blJ,IbJl->I',temp_ecc,eris_CECO,optimize=True)
                s[s_b:f_b] -= 0.5*lib.einsum('blj,lbIj->I',temp_ecv_1,eris_OECV,optimize=True)
-               s[s_b:f_b] += 0.5*lib.einsum('blj,Iblj->I',temp_ecv_1,eris_CEOV,optimize=True)
+               s[s_b:f_b] += 0.5*lib.einsum('blj,Ibjl->I',temp_ecv_1,eris_CEVO,optimize=True)
                s[s_b:f_b] -= 0.5*lib.einsum('blJ,lbIJ->I',temp_ecv_2,eris_OECC,optimize=True)
-               s[s_b:f_b] += 0.5*lib.einsum('blJ,IblJ->I',temp_ecv_2,eris_CEOC,optimize=True)
+               s[s_b:f_b] += 0.5*lib.einsum('blJ,IbJl->I',temp_ecv_2,eris_CECO,optimize=True)
 
                temp_2  = lib.einsum('I,lbIK->Kbl',r_a,eris_OEcc)
                temp_3  = lib.einsum('I,lbIk->kbl',r_a,eris_OEcv)
@@ -6749,9 +6734,9 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                s[s_bba_evc:f_bba_evc] += temp_evc.reshape(-1)
 
                temp_1 = lib.einsum('I,lbIK->Kbl',r_b, eris_OECC)
-               temp_1 -= lib.einsum('I,IblK->Kbl',r_b, eris_CEOC)
+               temp_1 -= lib.einsum('I,IbKl->Kbl',r_b, eris_CECO)
                temp_2 = lib.einsum('I,lbIk->kbl',r_b, eris_OECV)
-               temp_2 -= lib.einsum('I,Iblk->kbl',r_b, eris_CEOV)
+               temp_2 -= lib.einsum('I,Ibkl->kbl',r_b, eris_CEVO)
 
                temp_ecc  = lib.einsum('Kbl,Jlab->aJK',temp_1,t2_1_b_coee,optimize=True)
                temp_ecv  = lib.einsum('kbl,Jlab->aJk',temp_2,t2_1_b_coee,optimize=True)
@@ -6759,7 +6744,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                s[s_bbb_ecv:f_bbb_ecv] += temp_ecv.reshape(-1)
 
                temp_1 = lib.einsum('I,lbIJ->Jbl',r_b, eris_OECC)
-               temp_1 -= lib.einsum('I,IblJ->Jbl',r_b, eris_CEOC)
+               temp_1 -= lib.einsum('I,IbJl->Jbl',r_b, eris_CECO)
 
                temp_ecc  = lib.einsum('Jbl,Klab->aJK',temp_1,t2_1_b_coee,optimize=True)
                temp_ecv  = lib.einsum('Jbl,klab->aJk',temp_1,t2_1_b_voee,optimize=True)
@@ -6779,7 +6764,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                temp_2 = np.zeros((nvir_a, nvir_b, nvir_b))
                for p in range(0,ncvs,chnk_size):
                    if getattr(adc, 'with_df', None):
-                       eris_ovVV = dfadc.get_ovvv_spin_df(adc, eris.Lov, eris.LVV, p, chnk_size).reshape(-1,nvir_a,nvir_b,nvir_b)
+                       eris_ceEE = dfadc.get_ceee_spin_df(adc, eris.L_ce_t, eris.L_EE_t, p, chnk_size).reshape(-1,nvir_a,nvir_b,nvir_b)
                    else :
                        eris_ceEE = radc_ao2mo.unpack_eri_1(eris.ceEE, nvir_b)
                    k = eris_ceEE.shape[0]
@@ -6812,7 +6797,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                temp_2 = np.zeros((nvir_a, nvir_b, nvir_a))
                for p in range(0,ncvs,chnk_size):
                    if getattr(adc, 'with_df', None):
-                       eris_OVvv = dfadc.get_ovvv_spin_df(adc, eris.LOV, eris.Lvv, p, chnk_size).reshape(-1,nvir_b,nvir_a,nvir_a)
+                       eris_CEee = dfadc.get_ceee_spin_df(adc, eris.L_CE_t, eris.L_ee_t, p, chnk_size).reshape(-1,nvir_b,nvir_a,nvir_a)
                    else :
                        eris_CEee = radc_ao2mo.unpack_eri_1(eris.CEee, nvir_a)
                    k = eris_CEee.shape[0]
@@ -6842,17 +6827,17 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                temp_2_evc = lib.einsum('Jlba,akJ->blk',t2_1_ab_coee,r_bba_evc, optimize=True)
 
                s[s_a:f_a] += 0.5*lib.einsum('blK,lbIK->I',temp_ecc,eris_oecc,optimize=True)
-               s[s_a:f_a] -= 0.5*lib.einsum('blK,IblK->I',temp_ecc,eris_ceoc,optimize=True)
+               s[s_a:f_a] -= 0.5*lib.einsum('blK,IbKl->I',temp_ecc,eris_ceco,optimize=True)
                s[s_a:f_a] += 0.5*lib.einsum('blk,lbIk->I',temp_ecv,eris_oecv,optimize=True)
-               s[s_a:f_a] -= 0.5*lib.einsum('blk,Iblk->I',temp_ecv,eris_ceov,optimize=True)
+               s[s_a:f_a] -= 0.5*lib.einsum('blk,Ibkl->I',temp_ecv,eris_cevo,optimize=True)
                s[s_a:f_a] += 0.5*lib.einsum('blK,lbIK->I',temp_evc,eris_oecc,optimize=True)
-               s[s_a:f_a] -= 0.5*lib.einsum('blK,IblK->I',temp_evc,eris_ceoc,optimize=True)
+               s[s_a:f_a] -= 0.5*lib.einsum('blK,IbKl->I',temp_evc,eris_ceco,optimize=True)
                s[s_a:f_a] += 0.5*lib.einsum('blK,lbIK->I',temp_1_ecc,eris_OEcc,optimize=True)
                s[s_a:f_a] += 0.5*lib.einsum('blk,lbIk->I',temp_1_ecv,eris_OEcv,optimize=True)
                s[s_a:f_a] += 0.5*lib.einsum('blK,lbIK->I',temp_1_evc,eris_OEcc,optimize=True)
-               s[s_a:f_a] -= 0.5*lib.einsum('blK,IblK->I',temp_2_ecc,eris_ceOC,optimize=True)
-               s[s_a:f_a] -= 0.5*lib.einsum('blK,IblK->I',temp_2_ecv,eris_ceOC,optimize=True)
-               s[s_a:f_a] -= 0.5*lib.einsum('blK,Iblk->I',temp_2_evc,eris_ceOV,optimize=True)
+               s[s_a:f_a] -= 0.5*lib.einsum('blK,IbKl->I',temp_2_ecc,eris_ceCO,optimize=True)
+               s[s_a:f_a] -= 0.5*lib.einsum('blK,IbKl->I',temp_2_ecv,eris_ceCO,optimize=True)
+               s[s_a:f_a] -= 0.5*lib.einsum('blK,Ibkl->I',temp_2_evc,eris_ceVO,optimize=True)
 
                temp_ecc = lib.einsum('Jlab,aJK->blK',t2_1_ab_coee,r_aab_ecc,optimize=True)
                temp_ecv = lib.einsum('Jlab,aJk->blk',t2_1_ab_coee,r_aab_ecv,optimize=True)
@@ -6865,17 +6850,17 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                temp_2_evc = lib.einsum('lJab,akJ->blk',t2_1_ab_ocee,r_aab_evc,optimize=True)
 
                s[s_b:f_b] += 0.5*lib.einsum('blK,lbIK->I',temp_ecc,eris_OECC,optimize=True)
-               s[s_b:f_b] -= 0.5*lib.einsum('blK,IblK->I',temp_ecc,eris_CEOC,optimize=True)
+               s[s_b:f_b] -= 0.5*lib.einsum('blK,IbKl->I',temp_ecc,eris_CECO,optimize=True)
                s[s_b:f_b] += 0.5*lib.einsum('blk,lbIk->I',temp_ecv,eris_OECV,optimize=True)
-               s[s_b:f_b] -= 0.5*lib.einsum('blk,Iblk->I',temp_ecv,eris_CEOV,optimize=True)
+               s[s_b:f_b] -= 0.5*lib.einsum('blk,Ibkl->I',temp_ecv,eris_CEVO,optimize=True)
                s[s_b:f_b] += 0.5*lib.einsum('blK,lbIK->I',temp_evc,eris_OECC,optimize=True)
-               s[s_b:f_b] -= 0.5*lib.einsum('blK,IblK->I',temp_evc,eris_CEOC,optimize=True)
+               s[s_b:f_b] -= 0.5*lib.einsum('blK,IbKl->I',temp_evc,eris_CECO,optimize=True)
                s[s_b:f_b] += 0.5*lib.einsum('blK,lbIK->I',temp_1_ecc,eris_oeCC,optimize=True)
                s[s_b:f_b] += 0.5*lib.einsum('blK,lbIK->I',temp_1_ecv,eris_oeCC,optimize=True)
                s[s_b:f_b] += 0.5*lib.einsum('blk,lbIk->I',temp_1_evc,eris_oeCV,optimize=True)
-               s[s_b:f_b] -= 0.5*lib.einsum('blK,IblK->I',temp_2_ecc,eris_CEoc,optimize=True)
-               s[s_b:f_b] -= 0.5*lib.einsum('blK,IblK->I',temp_2_ecv,eris_CEoc,optimize=True)
-               s[s_b:f_b] -= 0.5*lib.einsum('blk,Iblk->I',temp_2_evc,eris_CEov,optimize=True)
+               s[s_b:f_b] -= 0.5*lib.einsum('blK,IbKl->I',temp_2_ecc,eris_CEco,optimize=True)
+               s[s_b:f_b] -= 0.5*lib.einsum('blK,IbKl->I',temp_2_ecv,eris_CEco,optimize=True)
+               s[s_b:f_b] -= 0.5*lib.einsum('blk,Ibkl->I',temp_2_evc,eris_CEvo,optimize=True)
 
                temp_ecc = -lib.einsum('lKba,aKJ->blJ',t2_1_ab_ocee,r_bba_ecc,optimize=True)
                temp_ecv = -lib.einsum('lKba,aKj->blj',t2_1_ab_ocee,r_bba_ecv,optimize=True)
@@ -6888,17 +6873,17 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                temp_2_evc = -lib.einsum('Klba,ajK->blj',t2_1_ab_coee,r_bba_evc,optimize=True)
 
                s[s_a:f_a] -= 0.5*lib.einsum('blJ,lbIJ->I',temp_ecc,eris_oecc,optimize=True)
-               s[s_a:f_a] += 0.5*lib.einsum('blJ,IblJ->I',temp_ecc,eris_ceoc,optimize=True)
+               s[s_a:f_a] += 0.5*lib.einsum('blJ,IbJl->I',temp_ecc,eris_ceco,optimize=True)
                s[s_a:f_a] -= 0.5*lib.einsum('blj,lbIj->I',temp_ecv,eris_oecv,optimize=True)
-               s[s_a:f_a] += 0.5*lib.einsum('blj,Iblj->I',temp_ecv,eris_ceov,optimize=True)
+               s[s_a:f_a] += 0.5*lib.einsum('blj,Ibjl->I',temp_ecv,eris_cevo,optimize=True)
                s[s_a:f_a] -= 0.5*lib.einsum('blJ,lbIJ->I',temp_evc,eris_oecc,optimize=True)
-               s[s_a:f_a] += 0.5*lib.einsum('blJ,IblJ->I',temp_evc,eris_ceoc,optimize=True)
+               s[s_a:f_a] += 0.5*lib.einsum('blJ,IbJl->I',temp_evc,eris_ceco,optimize=True)
                s[s_a:f_a] -= 0.5*lib.einsum('blJ,lbIJ->I',temp_1_ecc,eris_OEcc,optimize=True)
                s[s_a:f_a] -= 0.5*lib.einsum('blj,lbIj->I',temp_1_ecv_1,eris_OEcv,optimize=True)
                s[s_a:f_a] -= 0.5*lib.einsum('blJ,lbIJ->I',temp_1_ecv_2,eris_OEcc,optimize=True)
-               s[s_a:f_a] += 0.5*lib.einsum('blJ,IblJ->I',temp_2_ecc,eris_ceOC,optimize=True)
-               s[s_a:f_a] += 0.5*lib.einsum('blJ,IblJ->I',temp_2_ecv,eris_ceOC,optimize=True)
-               s[s_a:f_a] += 0.5*lib.einsum('blj,Iblj->I',temp_2_evc,eris_ceOV,optimize=True)
+               s[s_a:f_a] += 0.5*lib.einsum('blJ,IbJl->I',temp_2_ecc,eris_ceCO,optimize=True)
+               s[s_a:f_a] += 0.5*lib.einsum('blJ,IbJl->I',temp_2_ecv,eris_ceCO,optimize=True)
+               s[s_a:f_a] += 0.5*lib.einsum('blj,Ibjl->I',temp_2_evc,eris_ceVO,optimize=True)
 
                temp_ecc = -lib.einsum('Klab,aKJ->blJ',t2_1_ab_coee,r_aab_ecc,optimize=True)
                temp_ecv = -lib.einsum('Klab,aKj->blj',t2_1_ab_coee,r_aab_ecv,optimize=True)
@@ -6911,17 +6896,17 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                temp_2_evc = -lib.einsum('lKab,ajK->blj',t2_1_ab_ocee,r_aab_evc,optimize=True)
 
                s[s_b:f_b] -= 0.5*lib.einsum('blJ,lbIJ->I',temp_ecc,eris_OECC,optimize=True)
-               s[s_b:f_b] += 0.5*lib.einsum('blJ,IblJ->I',temp_ecc,eris_CEOC,optimize=True)
+               s[s_b:f_b] += 0.5*lib.einsum('blJ,IbJl->I',temp_ecc,eris_CECO,optimize=True)
                s[s_b:f_b] -= 0.5*lib.einsum('blj,lbIj->I',temp_ecv,eris_OECV,optimize=True)
-               s[s_b:f_b] += 0.5*lib.einsum('blj,Iblj->I',temp_ecv,eris_CEOV,optimize=True)
+               s[s_b:f_b] += 0.5*lib.einsum('blj,Ibjl->I',temp_ecv,eris_CEVO,optimize=True)
                s[s_b:f_b] -= 0.5*lib.einsum('blJ,lbIJ->I',temp_evc,eris_OECC,optimize=True)
-               s[s_b:f_b] += 0.5*lib.einsum('blJ,IblJ->I',temp_evc,eris_CEOC,optimize=True)
+               s[s_b:f_b] += 0.5*lib.einsum('blJ,IbJl->I',temp_evc,eris_CECO,optimize=True)
                s[s_b:f_b] -= 0.5*lib.einsum('blJ,lbIJ->I',temp_1_ecc,eris_oeCC,optimize=True)
                s[s_b:f_b] -= 0.5*lib.einsum('blj,lbIj->I',temp_1_ecv_1,eris_oeCV,optimize=True)
                s[s_b:f_b] -= 0.5*lib.einsum('blJ,lbIJ->I',temp_1_ecv_2,eris_oeCC,optimize=True)
-               s[s_b:f_b] += 0.5*lib.einsum('blJ,IblJ->I',temp_2_ecc,eris_CEoc,optimize=True)
-               s[s_b:f_b] += 0.5*lib.einsum('blJ,IblJ->I',temp_2_ecv,eris_CEoc,optimize=True)
-               s[s_b:f_b] += 0.5*lib.einsum('blj,Iblj->I',temp_2_evc,eris_CEov,optimize=True)
+               s[s_b:f_b] += 0.5*lib.einsum('blJ,IbJl->I',temp_2_ecc,eris_CEco,optimize=True)
+               s[s_b:f_b] += 0.5*lib.einsum('blJ,IbJl->I',temp_2_ecv,eris_CEco,optimize=True)
+               s[s_b:f_b] += 0.5*lib.einsum('blj,Ibjl->I',temp_2_evc,eris_CEvo,optimize=True)
                
                temp_2 = lib.einsum('I,lbIK->Kbl',r_a, eris_OEcc)
                temp_3 = lib.einsum('I,lbIk->kbl',r_a, eris_OEcv)
@@ -6931,9 +6916,9 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                s[s_aaa_ecv:f_aaa_ecv] += temp_ecv.reshape(-1)
 
                temp_2  = lib.einsum('I,lbIK->Kbl',r_a,eris_oecc)
-               temp_2  -= lib.einsum('I,IblK->Kbl',r_a,eris_ceoc)
+               temp_2  -= lib.einsum('I,IbKl->Kbl',r_a,eris_ceco)
                temp_3  = lib.einsum('I,lbIk->kbl',r_a,eris_oecv)
-               temp_3  -= lib.einsum('I,Iblk->kbl',r_a,eris_ceov)
+               temp_3  -= lib.einsum('I,Ibkl->kbl',r_a,eris_cevo)
 
                temp_ecc  = lib.einsum('Kbl,lJba->aJK',temp_2,t2_1_ab_ocee,optimize=True)
                temp_ecv  = lib.einsum('kbl,lJba->aJk',temp_3,t2_1_ab_ocee,optimize=True)
@@ -6951,9 +6936,9 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                s[s_bbb_ecv:f_bbb_ecv] += temp_ecv.reshape(-1)
 
                temp_1  = lib.einsum('I,lbIK->Kbl',r_b,eris_OECC)
-               temp_1  -= lib.einsum('I,IblK->Kbl',r_b,eris_CEOC)
+               temp_1  -= lib.einsum('I,IbKl->Kbl',r_b,eris_CECO)
                temp_2  = lib.einsum('I,lbIk->kbl',r_b,eris_OECV)
-               temp_2  -= lib.einsum('I,Iblk->kbl',r_b,eris_CEOV)
+               temp_2  -= lib.einsum('I,Ibkl->kbl',r_b,eris_CEVO)
 
                temp_ecc  = lib.einsum('Kbl,Jlab->aJK',temp_1,t2_1_ab_coee,optimize=True)
                temp_ecv  = lib.einsum('kbl,Jlab->aJk',temp_2,t2_1_ab_coee,optimize=True)
@@ -6969,8 +6954,8 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                s[s_aaa_ecc:f_aaa_ecc] -= temp_ecc[:,ij_ind_ncvs[0],ij_ind_ncvs[1] ].reshape(-1)
                s[s_aaa_ecv:f_aaa_ecv] -= temp_ecv.reshape(-1)
 
-               temp_1  = -lib.einsum('I,IblJ->Jbl',r_a,eris_ceOC,optimize=True)
-               temp_2  = -lib.einsum('I,Iblj->jbl',r_a,eris_ceOV,optimize=True)
+               temp_1  = -lib.einsum('I,IbJl->Jbl',r_a,eris_ceCO,optimize=True)
+               temp_2  = -lib.einsum('I,Ibjl->jbl',r_a,eris_ceVO,optimize=True)
                temp_1_ecc = -lib.einsum('Jbl,Klba->aJK',temp_1,t2_1_ab_coee,optimize=True)
                temp_1_ecv = -lib.einsum('Jbl,klba->aJk',temp_1,t2_1_ab_voee,optimize=True)
                temp_1_evc = -lib.einsum('jbl,Klba->ajK',temp_2,t2_1_ab_coee,optimize=True)
@@ -6984,8 +6969,8 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                s[s_bbb_ecc:f_bbb_ecc] -= temp_ecc[:,ij_ind_ncvs[0],ij_ind_ncvs[1] ].reshape(-1)
                s[s_bbb_ecv:f_bbb_ecv] -= temp_ecv.reshape(-1)
 
-               temp_3  = -lib.einsum('I,IblJ->Jbl',r_b,eris_CEoc,optimize=True)
-               temp_4  = -lib.einsum('I,Iblj->jbl',r_b,eris_CEov,optimize=True)
+               temp_3  = -lib.einsum('I,IbJl->Jbl',r_b,eris_CEco,optimize=True)
+               temp_4  = -lib.einsum('I,Ibjl->jbl',r_b,eris_CEvo,optimize=True)
                temp_1_ecc = -lib.einsum('Jbl,lKab->aJK',temp_3,t2_1_ab_ocee,optimize=True)
                temp_1_ecv = -lib.einsum('Jbl,lkab->aJk',temp_3,t2_1_ab_ovee,optimize=True)
                temp_1_evc = -lib.einsum('jbl,lKab->ajK',temp_4,t2_1_ab_ocee,optimize=True)

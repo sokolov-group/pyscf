@@ -59,6 +59,28 @@ def  get_ovvv_spin_df(myadc, Lov, Lvv, p, chnk_size):
     #vvvv = np.ascontiguousarray(vvvv.transpose(0,2,1,3)).reshape(-1, nvir, nvir * nvir)
     return ovvv    
 
+def  get_ceee_spin_df(myadc, L_ce, L_ee, p, chnk_size):
+
+    ''' Returns approximate cvvv integrals (different spin cases) used in unrestricted implementation '''
+
+    ncvs = L_ce.shape[1]
+    nvir_1 = L_ce.shape[2]
+    nvir_2 = L_ee.shape[1]
+    naux = myadc.with_df.get_naoaux()
+
+    L_ee = L_ee.reshape(naux,nvir_2*nvir_2)
+    L_ce = L_ce.reshape(naux,ncvs,nvir_1)
+
+    if chnk_size < ncvs:
+        #Lov_temp = np.ascontiguousarray(Lov.T[:,p:p+chnk_size,:].reshape(-1,naux))
+        L_ce_temp = np.ascontiguousarray(L_ce.transpose(1,2,0)[p:p+chnk_size].reshape(-1,naux))
+    else :
+        L_ce_temp = np.ascontiguousarray(L_ce.transpose(1,2,0).reshape(-1,naux))
+
+    ceee = np.dot(L_ce_temp, L_ee)
+    ceee = ceee.reshape(-1, nvir_1, nvir_2, nvir_2)
+    #vvvv = np.ascontiguousarray(vvvv.transpose(0,2,1,3)).reshape(-1, nvir, nvir * nvir)
+    return ceee    
 
 def  get_vvvv_df(myadc, Lvv, p, chnk_size):
 
