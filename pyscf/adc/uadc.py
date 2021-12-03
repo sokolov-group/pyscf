@@ -65,9 +65,68 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         for i in range(diag.size):
             M[:,i] = matvec(identity[:,i])
 
-        E, _ = np.linalg.eig(M)
+        E, U = np.linalg.eig(M)
         print("Dimmension of M: ", E.size) 
+        print("----------- Start of Eigenvales of M -------------------") 
         print(np.column_stack(np.unique(np.around(E, decimals=8), return_counts=True))) 
+        print("----------- End of Eigenvales of M ---------------------") 
+
+        T = adc.get_trans_moments()
+        spec_factors = get_spec_factors(adc, T, U, diag.size)
+        print("----------- Start of Spec factors -------------------") 
+        print(np.column_stack(np.unique(np.around(spec_factors, decimals=8), return_counts=True))) 
+        print("----------- End of Spec factors ---------------------")
+ 
+    if nroots == 'imds':
+        nocc_a = adc.nocc_a
+        nocc_b = adc.nocc_b
+        nvir_a = adc.nvir_a
+        nvir_b = adc.nvir_b
+        print("nocc_a",   nocc_a)  
+        print("nocc_b",   nocc_b)
+        print("nvir_a",   nvir_a)
+        print("nvir_b",   nvir_b)
+        n_singles_a = nocc_a
+        n_singles_b = nocc_b
+        s_a = 0
+        f_a = n_singles_a
+        s_b = f_a
+        f_b = s_b + n_singles_b
+
+        M_ij_a, M_ij_b = imds
+        E_a, U_a = np.linalg.eig(M_ij_a)
+        E_b, U_b = np.linalg.eig(M_ij_b)
+        T = adc.get_trans_moments()
+        T_a = T[0]
+        T_b = T[1]
+        T_a = np.array(T_a)
+        T_b = np.array(T_b)
+        T_a = T_a[:,s_a:f_a].copy() 
+        T_b = T_b[:,s_b:f_b].copy() 
+        X_a = np.dot(T_a, U_a.T).reshape(-1,nocc_a)
+        X_b = np.dot(T_b, U_b.T).reshape(-1,nocc_b)
+        P_a = lib.einsum("pi,pi->i", X_a, X_a.conj())
+        P_b = lib.einsum("pi,pi->i", X_b, X_b.conj())
+        idx_a = np.argsort(P_a) 
+        idx_b = np.argsort(P_b) 
+        P_a = P_a[idx_a]
+        P_b = P_b[idx_b]
+
+        print("Dimmension of imds_alpha: ", E_a.size) 
+        print("----------- Start of alpha Eigenvales of imds -------------------") 
+        print(np.column_stack(np.unique(np.around(E_a, decimals=8), return_counts=True))) 
+        print("----------- End of alpha Eigenvales of imds ---------------------") 
+        print("Dimmension of imds_beta: ", E_b.size) 
+        print("----------- Start of beta Eigenvales of imds -------------------") 
+        print(np.column_stack(np.unique(np.around(E_b, decimals=8), return_counts=True))) 
+        print("----------- End of beta Eigenvales of imds ---------------------") 
+
+        print("----------- Start of Spec alpha factors -------------------") 
+        print(np.column_stack(np.unique(np.around(P_a, decimals=8), return_counts=True))) 
+        print("----------- End of Spec alpha factors ---------------------") 
+        print("----------- Start of Spec beta factors -------------------") 
+        print(np.column_stack(np.unique(np.around(P_b, decimals=8), return_counts=True))) 
+        print("----------- End of Spec beta factors ---------------------") 
     exit()
     
     matvec, diag = adc.gen_matvec(imds, eris, cvs=cvs)
@@ -4201,7 +4260,7 @@ def ip_compute_trans_moments(adc, orb, spin="alpha"):
     s_bbb = f_aba
     f_bbb = s_bbb + n_doubles_bbb
 
-    T = np.zeros((dim))
+    T = np.zeros((dim), dtype=complex)
 
 ######## spin = alpha  ############################################
     if spin=="alpha":
@@ -4342,7 +4401,7 @@ def get_spec_factors(adc, T, U, nroots=1):
     T_b = T[1]
 
     T_a = np.array(T_a)
-    X_a = np.dot(T_a, U.T).reshape(-1,nroots)
+    X_a = np.dot(T_a, U.T).reshape(-1,nroots) # changed U.T to U.transpose()
     del T_a
     T_b = np.array(T_b)
     X_b = np.dot(T_b, U.T).reshape(-1,nroots)
