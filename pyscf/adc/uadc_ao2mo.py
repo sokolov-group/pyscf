@@ -712,16 +712,16 @@ def transform_integrals_df(myadc):
         eris.Lvv[p0:p1] = Lpq[:,nocc_a:,nocc_a:]
 
         if myadc.method_type == 'ip-cvs':
-            eris.L_cc = Lpq[:,:ncvs,:ncvs ]    
-            eris.L_cv = Lpq[:,:ncvs,nval_a_s ]
-            eris.L_ce = Lpq[:,:ncvs,nocc_a: ]
-            eris.L_vv = Lpq[:,nval_a_s,nval_a_s ]
-            eris.L_ve = Lpq[:, nval_a_s, nocc_a:]
-            eris.L_ee = Lpq[:, nocc_a:,nocc_a:]
-            eris.L_oo = Lpq[:, :nocc_a,:nocc_a]
-            eris.L_oe = Lpq[:, :nocc_a,nocc_a:]
-            eris.L_co = Lpq[:,:ncvs,:nocc_a]
-            eris.L_vo = Lpq[:,nval_a_s,:nocc_a]
+            eris.L_cc[p0:p1] = Lpq[:,:ncvs,:ncvs ]    
+            eris.L_cv[p0:p1] = Lpq[:,:ncvs,nval_a_s ]
+            eris.L_ce[p0:p1] = Lpq[:,:ncvs,nocc_a: ]
+            eris.L_vv[p0:p1] = Lpq[:,nval_a_s,nval_a_s ]
+            eris.L_ve[p0:p1] = Lpq[:, nval_a_s, nocc_a:]
+            eris.L_ee[p0:p1] = Lpq[:, nocc_a:,nocc_a:]
+            eris.L_oo[p0:p1] = Lpq[:, :nocc_a,:nocc_a]
+            eris.L_oe[p0:p1] = Lpq[:, :nocc_a,nocc_a:]
+            eris.L_co[p0:p1] = Lpq[:,:ncvs,:nocc_a]
+            eris.L_vo[p0:p1] = Lpq[:,nval_a_s,:nocc_a]
 
     ijslice = (0, nmo_b, 0, nmo_b)
     Lpq = None
@@ -736,16 +736,16 @@ def transform_integrals_df(myadc):
         eris.LVV[p0:p1] = Lpq[:,nocc_b:,nocc_b:]
 
         if myadc.method_type == 'ip-cvs':
-            eris.L_CC = Lpq[:,:ncvs,:ncvs ]      
-            eris.L_CV = Lpq[:,:ncvs,nval_b_s ]
-            eris.L_CE = Lpq[:,:ncvs,nocc_b: ]
-            eris.L_VV = Lpq[:,nval_b_s,nval_b_s] 
-            eris.L_VE = Lpq[:, nval_b_s, nocc_b:]
-            eris.L_EE = Lpq[:, nocc_b:,nocc_b:]
-            eris.L_OO = Lpq[:, :nocc_b,:nocc_b]
-            eris.L_OE = Lpq[:, :nocc_b,nocc_b:]
-            eris.L_CO = Lpq[:,:ncvs,:nocc_b]
-            eris.L_VO = Lpq[:,nval_b_s,:nocc_b]
+            eris.L_CC[p0:p1] = Lpq[:,:ncvs,:ncvs ]      
+            eris.L_CV[p0:p1] = Lpq[:,:ncvs,nval_b_s ]
+            eris.L_CE[p0:p1] = Lpq[:,:ncvs,nocc_b: ]
+            eris.L_VV[p0:p1] = Lpq[:,nval_b_s,nval_b_s] 
+            eris.L_VE[p0:p1] = Lpq[:, nval_b_s, nocc_b:]
+            eris.L_EE[p0:p1] = Lpq[:, nocc_b:,nocc_b:]
+            eris.L_OO[p0:p1] = Lpq[:, :nocc_b,:nocc_b]
+            eris.L_OE[p0:p1] = Lpq[:, :nocc_b,nocc_b:]
+            eris.L_CO[p0:p1] = Lpq[:,:ncvs,:nocc_b]
+            eris.L_VO[p0:p1] = Lpq[:,nval_b_s,:nocc_b]
 
 
     Loo = Loo.reshape(naux,nocc_a*nocc_a)
@@ -781,8 +781,8 @@ def transform_integrals_df(myadc):
     eris.L_CO = eris.L_CO.reshape(naux,ncvs*nocc_b)  
     eris.L_VO = eris.L_VO.reshape(naux,nval_b*nocc_b) 
 
-    Lvv_p = lib.pack_tril(eris.Lvv)
-    LVV_p = lib.pack_tril(eris.LVV)
+    eris.L_ee_p = Lvv_p = lib.pack_tril(eris.Lvv)
+    eris.L_EE_p = LVV_p = lib.pack_tril(eris.LVV)
 
     eris.vvvv_p = None
     eris.VVVV_p = None
@@ -920,13 +920,13 @@ def transform_integrals_df(myadc):
         eris.ccCV[:] = lib.ddot(eris.L_cc.T,eris.L_CV).reshape((ncvs, ncvs, ncvs,   nval_b       ))
         eris.vvCC[:] = lib.ddot(eris.L_vv.T,eris.L_CC).reshape((nval_a, nval_a,  ncvs, ncvs      ))
         eris.ccVV[:] = lib.ddot(eris.L_cc.T,eris.L_VV).reshape((ncvs, ncvs, nval_b,  nval_b      ))
-        eris.ccee[:] = lib.ddot(eris.L_cc.T,eris.L_ee).reshape((ncvs, ncvs, nvir_a,  nvir_a      ))
-        eris.vvee[:] = lib.ddot(eris.L_vv.T,eris.L_ee).reshape((nval_a, nval_a, nvir_a, nvir_a   ))
-        eris.CCEE[:] = lib.ddot(eris.L_CC.T,eris.L_EE).reshape((ncvs, ncvs, nvir_b,  nvir_b      ))
-        eris.VVEE[:] = lib.ddot(eris.L_VV.T,eris.L_EE).reshape((nval_b, nval_b, nvir_b, nvir_b   ))
-        eris.ccEE[:] = lib.ddot(eris.L_cc.T,eris.L_EE).reshape((ncvs, ncvs, nvir_b,  nvir_b      ))
-        eris.vvEE[:] = lib.ddot(eris.L_vv.T,eris.L_EE).reshape((nval_a,  nval_a,  nvir_b,  nvir_b))
-        eris.CCee[:] = lib.ddot(eris.L_CC.T,eris.L_ee).reshape((ncvs, ncvs, nvir_a,  nvir_a      ))
+        eris.ccee[:] = lib.unpack_tril(lib.ddot(eris.L_cc.T,eris.L_ee_p)).reshape((ncvs, ncvs, nvir_a,  nvir_a      ))
+        eris.vvee[:] = lib.unpack_tril(lib.ddot(eris.L_vv.T,eris.L_ee_p)).reshape((nval_a, nval_a, nvir_a, nvir_a   ))
+        eris.CCEE[:] = lib.unpack_tril(lib.ddot(eris.L_CC.T,eris.L_EE_p)).reshape((ncvs, ncvs, nvir_b,  nvir_b      ))
+        eris.VVEE[:] = lib.unpack_tril(lib.ddot(eris.L_VV.T,eris.L_EE_p)).reshape((nval_b, nval_b, nvir_b, nvir_b   ))
+        eris.ccEE[:] = lib.unpack_tril(lib.ddot(eris.L_cc.T,eris.L_EE_p)).reshape((ncvs, ncvs, nvir_b,  nvir_b      ))
+        eris.vvEE[:] = lib.unpack_tril(lib.ddot(eris.L_vv.T,eris.L_EE_p)).reshape((nval_a,  nval_a,  nvir_b,  nvir_b))
+        eris.CCee[:] = lib.unpack_tril(lib.ddot(eris.L_CC.T,eris.L_ee_p)).reshape((ncvs, ncvs, nvir_a,  nvir_a      ))
         eris.VVee[:] = lib.ddot(eris.L_VV.T,eris.L_ee).reshape((nval_b,  nval_b,  nvir_a,  nvir_a))
         eris.cvcv[:] = lib.ddot(eris.L_cv.T,eris.L_cv).reshape((ncvs, nval_a, ncvs,  nval_a      ))
         eris.CVCV[:] = lib.ddot(eris.L_CV.T,eris.L_CV).reshape((ncvs, nval_b, ncvs,  nval_b      ))
@@ -942,10 +942,10 @@ def transform_integrals_df(myadc):
         eris.VEve[:] = lib.ddot(eris.L_VE.T,eris.L_ve).reshape((nval_b,  nvir_b,  nval_a, nvir_a ))
         eris.cvCC[:] = lib.ddot(eris.L_cv.T,eris.L_CC).reshape((ncvs, nval_a,  ncvs, ncvs        ))
         eris.cvCV[:] = lib.ddot(eris.L_cv.T,eris.L_CV).reshape((ncvs, nval_a,  ncvs, nval_b      ))
-        eris.cvee[:] = lib.ddot(eris.L_cv.T,eris.L_ee).reshape((ncvs, nval_a,  nvir_a,  nvir_a   ))
-        eris.CVEE[:] = lib.ddot(eris.L_CV.T,eris.L_EE).reshape((ncvs, nval_b,  nvir_b,  nvir_b   ))
-        eris.cvEE[:] = lib.ddot(eris.L_cv.T,eris.L_EE).reshape((ncvs, nval_a,  nvir_b,  nvir_b   ))
-        eris.CVee[:] = lib.ddot(eris.L_CV.T,eris.L_ee).reshape((ncvs, nval_b,  nvir_a,  nvir_a   ))
+        eris.cvee[:] = lib.unpack_tril(lib.ddot(eris.L_cv.T,eris.L_ee_p)).reshape((ncvs, nval_a,  nvir_a,  nvir_a   ))
+        eris.CVEE[:] = lib.unpack_tril(lib.ddot(eris.L_CV.T,eris.L_EE_p)).reshape((ncvs, nval_b,  nvir_b,  nvir_b   ))
+        eris.cvEE[:] = lib.unpack_tril(lib.ddot(eris.L_cv.T,eris.L_EE_p)).reshape((ncvs, nval_a,  nvir_b,  nvir_b   ))
+        eris.CVee[:] = lib.unpack_tril(lib.ddot(eris.L_CV.T,eris.L_ee_p)).reshape((ncvs, nval_b,  nvir_a,  nvir_a   ))
 
         #----- ADC(3) integrals --------
         eris.oecc = eris.feri1.create_dataset( 'oecc', (nocc_a,  nvir_a, ncvs, ncvs   ), 'f8', chunks=(nocc_a,  1, ncvs, ncvs)) 
