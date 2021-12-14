@@ -1990,7 +1990,7 @@ def get_imds_ip(adc, eris=None, fc_bool=True):
     e_vir_a = adc.mo_energy_a[nocc_a:]
     e_vir_b = adc.mo_energy_b[nocc_b:]
     e_vir_a = complex_shift(e_vir_a, energy_thresh, imaginary_shift)
-    e_vir_b = complex_shift(e_vir_a, energy_thresh, imaginary_shift)
+    e_vir_b = complex_shift(e_vir_b, energy_thresh, imaginary_shift)
 
     idn_occ_a = np.identity(nocc_a)
     idn_occ_b = np.identity(nocc_b)
@@ -3651,7 +3651,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
         s[s_b:f_b] = lib.einsum('ij,j->i',M_ij_b,r_b)
 
 ############# ADC(2) i - kja block #########################
-
+       
         s[s_a:f_a] += 0.5*lib.einsum('jaki,ajk->i', eris_ovoo, r_aaa_u, optimize = True)
         s[s_a:f_a] -= 0.5*lib.einsum('kaji,ajk->i', eris_ovoo, r_aaa_u, optimize = True)
         s[s_a:f_a] += lib.einsum('jaki,ajk->i', eris_OVoo, r_bab, optimize = True)
@@ -3672,7 +3672,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
         s[s_bbb:f_bbb] += temp[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1)
         
 ############ ADC(2) ajk - bil block ############################
-
+        
         r_aaa = r_aaa.reshape(-1)
         r_bbb = r_bbb.reshape(-1)
 
@@ -4229,6 +4229,8 @@ def ip_compute_trans_moments(adc, orb, spin="alpha"):
     nocc_b = adc.nocc_b
     nvir_a = adc.nvir_a
     nvir_b = adc.nvir_b
+    imaginary_shift = adc.imaginary_shift
+    energy_thresh = adc.energy_thresh
 
     ij_ind_a = np.tril_indices(nocc_a, k=-1)
     ij_ind_b = np.tril_indices(nocc_b, k=-1)
@@ -4400,11 +4402,11 @@ def get_spec_factors(adc, T, U, nroots=1):
     T_a = T[0]
     T_b = T[1]
 
-    T_a = np.array(T_a)
-    X_a = np.dot(T_a, U.T).reshape(-1,nroots) # changed U.T to U.transpose()
+    T_a = np.array(T_a, dtype=complex)
+    X_a = np.dot(T_a, U).reshape(-1,nroots) # changed U.T to U.transpose()
     del T_a
-    T_b = np.array(T_b)
-    X_b = np.dot(T_b, U.T).reshape(-1,nroots)
+    T_b = np.array(T_b, dtype=complex)
+    X_b = np.dot(T_b, U).reshape(-1,nroots)
     del T_b
 
     P = lib.einsum("pi,pi->i", X_a, X_a.conj())
