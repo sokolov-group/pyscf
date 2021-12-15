@@ -34,7 +34,7 @@ from scipy.sparse.linalg import eigsh, LinearOperator
 from lanczos_full_orth import compute_lanczos
 from blanczos import compute_blanczos, mom_blanczos
 from remove_mo_r2_pyscf import complex_shift 
-np. set_printoptions(threshold=np. inf)
+np.set_printoptions(threshold=np.inf)
 
 def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
@@ -127,13 +127,18 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         print("----------- Start of Spec beta factors -------------------") 
         print(np.column_stack(np.unique(np.around(P_b, decimals=8), return_counts=True))) 
         print("----------- End of Spec beta factors ---------------------") 
-    exit()
+    #exit()
     
     matvec, diag = adc.gen_matvec(imds, eris, cvs=cvs)
+    #diag = np.real(diag)
+    print("diag sanity check: ")
+    print(np.column_stack(np.unique(np.around(diag, decimals=8), return_counts=True))) 
+    #diag = diag.astype(complex)
     guess = adc.get_init_guess(nroots, diag, ascending = True)
-    conv, E, U = davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-12, max_cycle=adc.max_cycle, max_space=adc.max_space)
-    print("Davidson energies: ", E)
-    exit()
+    conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+    #conv, E, U = davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-12, max_cycle=adc.max_cycle, max_space=adc.max_space)
+    #print("Davidson energies: ", E)
+    #exit()
     """"
     U = np.array(U)
     print("shape of U: ", U.shape)
@@ -162,7 +167,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     def cvs_pick(cvs_npick,U):          
         nroots = len(cvs_npick)
         dim_guess = np.array(U).shape[1]
-        guess = np.zeros((nroots, dim_guess))
+        guess = np.zeros((nroots, dim_guess), dtype=complex)
         for idx_guess, npick in enumerate(cvs_npick):
             U = np.array(U)
             guess[idx_guess,:] = U[npick,:]
@@ -209,15 +214,17 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         print (" WARNING : ", "Davidson iterations for ",nfalse, "root(s) not converged")
         print ("*************************************************************")
 
+    print(np.column_stack((E, spec_factors)))
+    exit() 
 
-    if adc.verbose >= logger.INFO:
-        if nroots == 1:
-            logger.info(adc, '%s root %d    Energy (Eh) = %.10f    Energy (eV) = %.8f    Spec factors = %.8f    conv = %s',
-                         adc.method, 0, E, E*27.2114, spec_factors, conv)
-        else :
-            for n, en, pn, convn in zip(range(nroots), E, spec_factors, conv):
-                logger.info(adc, '%s root %d    Energy (Eh) = %.10f    Energy (eV) = %.8f    Spec factors = %.8f    conv = %s',
-                          adc.method, n, en, en*27.2114, pn, convn)
+    #if adc.verbose >= logger.INFO:
+    #    if nroots == 1:
+    #        logger.info(adc, '%s root %d    Energy (Eh) = %.10f    Energy (eV) = %.8f    Spec factors = %.8f    conv = %s',
+    #                     adc.method, 0, E, E*27.2114, spec_factors, conv)
+    #    else :
+    #        for n, en, pn, convn in zip(range(nroots), E, spec_factors, conv):
+    #            logger.info(adc, '%s root %d    Energy (Eh) = %.10f    Energy (eV) = %.8f    Spec factors = %.8f    conv = %s',
+    #                      adc.method, n, en, en*27.2114, pn, convn)
 
     log.timer('ADC', *cput0)
 
@@ -2712,7 +2719,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
       
     if cvs is True:
         
-        shift = -100000000.0
+        shift = -100000000.0 + 0*1j 
         ncore = adc.ncore_cvs
 
         diag[(s_a+ncore):f_a] += shift
@@ -4403,10 +4410,10 @@ def get_spec_factors(adc, T, U, nroots=1):
     T_b = T[1]
 
     T_a = np.array(T_a, dtype=complex)
-    X_a = np.dot(T_a, U).reshape(-1,nroots) # changed U.T to U.transpose()
+    X_a = np.dot(T_a, U.T).reshape(-1,nroots) # changed U.T to U.transpose()
     del T_a
     T_b = np.array(T_b, dtype=complex)
-    X_b = np.dot(T_b, U).reshape(-1,nroots)
+    X_b = np.dot(T_b, U.T).reshape(-1,nroots)
     del T_b
 
     P = lib.einsum("pi,pi->i", X_a, X_a.conj())
@@ -4612,9 +4619,12 @@ class UADCIP(UADC):
             diag = self.ip_adc_diag()
         idx = None
         if ascending:
-            idx = np.argsort(diag**2)
+            idx = np.argsort(np.real(diag)**2)
+            #idx = np.argsort(np.multiply(diag, diag.conj()))
         else:
             idx = np.argsort(diag)[::-1]
+        print("----------------debugging get_init_guess-----------------------")
+        print("idx: ", idx)
         guess = np.zeros((diag.shape[0], nroots))
         min_shape = min(diag.shape[0], nroots)
         guess[:min_shape,:min_shape] = np.identity(min_shape)
