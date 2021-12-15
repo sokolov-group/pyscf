@@ -4987,7 +4987,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
     if M_ij is None:
         M_ij = adc.get_imds()
     M_ij_a, M_ij_b = M_ij
-    @profile
+    #@profile
     #Calculate sigma vector
     def sigma_(r):
         #r = np.ones(dim)
