@@ -85,7 +85,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     if (mom_skd_iter == False) and (ncore_proj > 0):
         matvec, diag = adc.gen_matvec(imds, eris, cvs)
         guess = adc.get_init_guess(nroots, diag, ascending = True)
-        conv, E, U = davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-14, max_cycle=adc.max_cycle, max_space=adc.max_space)
+        conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-14, max_cycle=adc.max_cycle, max_space=adc.max_space)
 
     elif (mom_skd_iter == True) and (ncore_proj > 0):
     
@@ -2581,8 +2581,8 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
                else :
                    chnk_size = nocc
                a = 0
-               temp_singles = np.zeros((nocc))
-               temp_doubles = np.zeros((nvir,nvir,nvir))
+               temp_singles = np.zeros((nocc), dtype=complex)
+               temp_doubles = np.zeros((nvir,nvir,nvir), dtype=complex)
                for p in range(0,nocc,chnk_size):
                    if getattr(adc, 'with_df', None):
                        eris_ovvv = dfadc.get_ovvv_df(adc, eris.Lov, eris.Lvv, p, chnk_size).reshape(-1,nvir,nvir,nvir)
@@ -2607,7 +2607,7 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
                temp += lib.einsum('ljab,akj->blk',t2_1,r2,optimize=True)
                temp += lib.einsum('ljba,ajk->blk',t2_1,r2,optimize=True)
 
-               temp_1 = np.zeros_like(r2)
+               temp_1 = np.zeros_like(r2, dtype=complex)
                temp_1 =  lib.einsum('jlab,ajk->blk',t2_1,r2,optimize=True)
                temp_1 -= lib.einsum('jlab,akj->blk',t2_1,r2,optimize=True)
                temp_1 += lib.einsum('jlab,ajk->blk',t2_1,r2,optimize=True)
@@ -2623,14 +2623,14 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
                del temp_1
                del temp_2
 
-               temp = np.zeros_like(r2)
+               temp = np.zeros_like(r2, dtype=complex)
                temp = -lib.einsum('klab,akj->blj',t2_1,r2,optimize=True)
                temp += lib.einsum('klab,ajk->blj',t2_1,r2,optimize=True)
                temp += lib.einsum('lkab,akj->blj',t2_1,r2,optimize=True)
                temp -= lib.einsum('lkab,ajk->blj',t2_1,r2,optimize=True)
                temp -= lib.einsum('lkba,akj->blj',t2_1,r2,optimize=True)
 
-               temp_1 = np.zeros_like(r2)
+               temp_1 = np.zeros_like(r2, dtype=complex)
                temp_1  = -lib.einsum('klab,akj->blj',t2_1,r2,optimize=True)
                temp_1 += lib.einsum('klab,ajk->blj',t2_1,r2,optimize=True)
                temp_1 -= lib.einsum('klab,akj->blj',t2_1,r2,optimize=True)

@@ -29,14 +29,17 @@ from pyscf.adc import dfadc
 from pyscf import __config__
 from pyscf import df
 from multiroot_davidson1 import eighg
-from linalg_helper_beta import davidson1
+from linalg_helper_beta import davidson1, pick_real_eigs, davidson_nosym1
 from scipy.sparse.linalg import eigsh, LinearOperator
 from lanczos_full_orth import compute_lanczos
 from blanczos import compute_blanczos, mom_blanczos
-from remove_mo_r2_pyscf import complex_shift 
-np.set_printoptions(threshold=np.inf)
+from remove_mo_r2_pyscf import complex_shift
+import sys 
+np.set_printoptions(threshold=np. inf)
 
 def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
+
+    nroots_kernel = nroots
 
     adc.method = adc.method.lower()
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -57,26 +60,46 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         cvs = True
     else:
         cvs = False
-   
+     
     if nroots == 'full':
         matvec, diag = adc.gen_matvec(imds, eris, cvs=cvs)
         identity = np.identity(diag.size)
         M = np.zeros((diag.size,diag.size),dtype=complex)
+        print("building and diagonalizing dim(M) = ", diag.size)
         for i in range(diag.size):
             M[:,i] = matvec(identity[:,i])
 
-        E, U = np.linalg.eig(M)
-        print("Dimmension of M: ", E.size) 
-        print("----------- Start of Eigenvales of M -------------------") 
-        print(np.column_stack(np.unique(np.around(E, decimals=8), return_counts=True))) 
-        print("----------- End of Eigenvales of M ---------------------") 
+        print("Symmetric check", np.linalg.norm(M - M.T))
+        print("Number of non-zeros in M-M.T", np.count_nonzero(M - M.T))
+        print("Sum of non-zeros in M-M.T", np.sum(M - M.T))
+        print("Indices of non-zeros in M-M.T: ")
+        #x_idx, y_idx = np.nonzero(M - M.T)
+        #print(np.column_stack((x_idx.astype(float), y_idx.astype(float)))) 
+        print("Hermiticity check", np.linalg.norm(M - M.conj().T))
 
+        E, U = np.linalg.eig(M)
         T = adc.get_trans_moments()
-        spec_factors = get_spec_factors(adc, T, U, diag.size)
-        print("----------- Start of Spec factors -------------------") 
-        print(np.column_stack(np.unique(np.around(spec_factors, decimals=8), return_counts=True))) 
-        print("----------- End of Spec factors ---------------------")
+        T_a = T[0]
+        T_b = T[1]
+        X_a = np.dot(T_a, U).reshape(-1, diag.size)
+        X_b = np.dot(T_b, U).reshape(-1, diag.size)
+        P = lib.einsum("pi,pi->i", X_a, X_a.conj())
+        P += lib.einsum("pi,pi->i", X_b, X_b.conj())
+        print("Dimmension of M: ", E.size) 
+        #E_unique, E_idx = np.unique(np.around(E*27.2114, decimals=8), return_index=True)
+        #P_unique, P_idx = np.unique(np.around(P, decimals=8), return_index=True)
+        print("----------- Start of Eigenvales of M -------------------") 
+        print(np.column_stack(np.unique(np.around(E*27.2114, decimals=8), return_counts=True))) 
+        print("----------- End of Eigenvales of M ---------------------")
  
+        #T = adc.get_trans_moments()
+        #spec_factors = get_spec_factors(adc, T, U, diag.size)
+        print("----------- Start of Spec factors -------------------") 
+        #P_unique = np.unique(np.around(P, decimals=8))
+        print(np.column_stack(np.unique(np.around(P, decimals=8), return_counts=True))) 
+        print("----------- End of Spec factors ---------------------")
+        exit()
+
     if nroots == 'imds':
         nocc_a = adc.nocc_a
         nocc_b = adc.nocc_b
@@ -103,14 +126,34 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         T_b = np.array(T_b)
         T_a = T_a[:,s_a:f_a].copy() 
         T_b = T_b[:,s_b:f_b].copy() 
-        X_a = np.dot(T_a, U_a.T).reshape(-1,nocc_a)
-        X_b = np.dot(T_b, U_b.T).reshape(-1,nocc_b)
+        X_a = np.dot(T_a, U_a).reshape(-1,diag.size)
+        X_b = np.dot(T_b, U_b).reshape(-1,diag.size)
         P_a = lib.einsum("pi,pi->i", X_a, X_a.conj())
         P_b = lib.einsum("pi,pi->i", X_b, X_b.conj())
         idx_a = np.argsort(P_a) 
         idx_b = np.argsort(P_b) 
         P_a = P_a[idx_a]
         P_b = P_b[idx_b]
+
+        print("----------------------------------")
+        print("imds_alpha")
+        print("Symmetric check", np.linalg.norm(M_ij_a - M_ij_a.T))
+        print("Number of non-zeros in M_ij_a-M_ij_a.T", np.count_nonzero(M_ij_a - M_ij_a.T))
+        print("Sum of non-zeros in M_ij_a-M_ij_a.T", np.sum(M_ij_a - M_ij_a.T))
+        print("Indices of non-zeros in M_ij_a-M_ij_a.T: ")
+        x_idx, y_idx = np.nonzero(M_ij_a - M_ij_a.T)
+        print(np.column_stack((x_idx.astype(float), y_idx.astype(float)))) 
+        print("Hermiticity check", np.linalg.norm(M_ij_a - M_ij_a.conj().T))
+        print("----------------------------------")
+        print("imds_beta")
+        print("Symmetric check", np.linalg.norm(M_ij_b - M_ij_b.T))
+        print("Number of non-zeros in M_ij_b-M_ij_b.T", np.count_nonzero(M_ij_b - M_ij_b.T))
+        print("Sum of non-zeros in M_ij_b-M_ij_b.T", np.sum(M_ij_b - M_ij_b.T))
+        print("Indices of non-zeros in M_ij_b-M_ij_b.T: ")
+        x_idx, y_idx = np.nonzero(M_ij_b - M_ij_b.T)
+        print(np.column_stack((x_idx.astype(float), y_idx.astype(float)))) 
+        print("Hermiticity check", np.linalg.norm(M_ij_b - M_ij_b.conj().T))
+        print("----------------------------------")
 
         print("Dimmension of imds_alpha: ", E_a.size) 
         print("----------- Start of alpha Eigenvales of imds -------------------") 
@@ -131,12 +174,21 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     
     matvec, diag = adc.gen_matvec(imds, eris, cvs=cvs)
     #diag = np.real(diag)
-    print("diag sanity check: ")
-    print(np.column_stack(np.unique(np.around(diag, decimals=8), return_counts=True))) 
+    #print("diag sanity check: ")
+    #print(np.column_stack(np.unique(np.around(diag, decimals=8), return_counts=True))) 
     #diag = diag.astype(complex)
+
+    def sort_complex_eigenvalues(w, v, nroots, envs):     
+        idx = np.argsort(w)[:nroots]
+        w = w[idx]
+        v = v[:, idx]
+        return w, v, idx
+
+    nroots = 2
+      
     guess = adc.get_init_guess(nroots, diag, ascending = True)
-    conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
-    #conv, E, U = davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-12, max_cycle=adc.max_cycle, max_space=adc.max_space)
+    conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=sort_complex_eigenvalues)
+    #conv, E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-12, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=pick_real_eigs)
     #print("Davidson energies: ", E)
     #exit()
     """"
@@ -163,7 +215,18 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False)
 
 
+    print("CVS results")
+    T = adc.get_trans_moments()
+    U = np.array(U)
+    spec_factors = adc.get_spec_factors(T, U, nroots)
+    #print(np.column_stack((E*27.2114, spec_factors)))
+    print("     Energies (eV)          |    Spec factors")
+    print("---------------------------------------------------")
+    print(np.c_[E*27.2114, spec_factors])
+    print("---------------------------------------------------")
+    analyze_eigenvector_ip(adc, U)
 
+    nrooots = nroots_kernel
     def cvs_pick(cvs_npick,U):          
         nroots = len(cvs_npick)
         dim_guess = np.array(U).shape[1]
@@ -194,37 +257,55 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     def eig_close_to_init_guess(w, v, nroots, envs):      
            x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])      
-           s = np.dot(np.asarray(U).conj(), np.asarray(x0).T)      
-           snorm = np.einsum('pi,pi->i', s.conj(), s)      
-           idx = np.argsort(-snorm)[:nroots]      
-           return lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
+           #s = np.dot(np.asarray(U).conj(), np.asarray(x0).T)
+           s = np.dot(np.asarray(U), np.asarray(x0).conj().T)
+           thresh = 0.01
+           snorm = np.einsum('pi,pi->i', s.conj(), s)
+           #idx = np.argsort(-snorm)[:nroots] 
+           idx = np.argsort(-snorm)
+           snorm = snorm[idx]
+           print("snorm: ", snorm)
+           idx = idx[snorm > thresh]  
+           nroots = idx.size
+           #w, v, idx = lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
+           w = w[idx]
+           v = v[:, idx]
+           return w, v, idx, nroots
        
-    #conv, E, U = davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick =eig_close_to_init_guess)
+    conv, E, U , nroots= davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick =eig_close_to_init_guess)
+    #conv, E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-12, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=eig_close_to_init_guess)
     
     U = np.array(U)
-    print("shape of Lanczos array: ", U.shape)
+    #print("shape of Lanczos array: ", U.shape)
     #for i in range(U.shape[0]):
     #    print("CVS/MOM overlap: ", np.dot(np.array(guess)[i,:], U[i,:].T))
     T = adc.get_trans_moments()
     spec_factors = adc.get_spec_factors(T, U, nroots)
-
+    s = np.dot(U, np.asarray(guess).conj().T)
+    snorm = np.einsum('pi,pi->p', s.conj(), s)
     nfalse = np.shape(conv)[0] - np.sum(conv)
     if nfalse >= 1:
         print ("*************************************************************")
         print (" WARNING : ", "Davidson iterations for ",nfalse, "root(s) not converged")
         print ("*************************************************************")
 
-    print(np.column_stack((E, spec_factors)))
+    print("MOM results ")
+    print("     Energies (eV)          |    Spec factors   |   |s|^2 w.r.t CVS eigenvectors")
+    print("---------------------------------------------------")
+    print(np.c_[E*27.2114, spec_factors, snorm])
+    print("---------------------------------------------------")
+    #print(np.column_stack((E*27.2114, spec_factors)))
+    analyze_eigenvector_ip(adc, U)
     exit() 
 
-    #if adc.verbose >= logger.INFO:
-    #    if nroots == 1:
-    #        logger.info(adc, '%s root %d    Energy (Eh) = %.10f    Energy (eV) = %.8f    Spec factors = %.8f    conv = %s',
-    #                     adc.method, 0, E, E*27.2114, spec_factors, conv)
-    #    else :
-    #        for n, en, pn, convn in zip(range(nroots), E, spec_factors, conv):
-    #            logger.info(adc, '%s root %d    Energy (Eh) = %.10f    Energy (eV) = %.8f    Spec factors = %.8f    conv = %s',
-    #                      adc.method, n, en, en*27.2114, pn, convn)
+    if adc.verbose >= logger.INFO:
+        if nroots == 1:
+            logger.info(adc, '%s root %d    Energy (Eh) = %.10f    Energy (eV) = %.8f    Spec factors = %.8f    conv = %s',
+                         adc.method, 0, E, E*27.2114, spec_factors, conv)
+        else :
+            for n, en, pn, convn in zip(range(nroots), E, spec_factors, conv):
+                logger.info(adc, '%s root %d    Energy (Eh) = %.10f    Energy (eV) = %.8f    Spec factors = %.8f    conv = %s',
+                          adc.method, n, en, en*27.2114, pn, convn)
 
     log.timer('ADC', *cput0)
 
@@ -273,26 +354,27 @@ def analyze_eigenvector_ip(adc, U):
     for I in range(U.shape[0]):
         U1 = U[I,:f_b]
         U2 = U[I,f_b:]
-        U1dotU1 = np.dot(U1, U1) 
-        U2dotU2 = np.dot(U2, U2) 
+        U1dotU1 = np.dot(U1, U1.conj()) 
+        U2dotU2 = np.dot(U2, U2.conj()) 
 
-        temp_aaa = np.zeros((nvir_a, nocc_a, nocc_a))
+        temp_aaa = np.zeros((nvir_a, nocc_a, nocc_a), dtype=complex)
         temp_aaa[:,ij_a[0],ij_a[1]] =  U[I,s_aaa:f_aaa].reshape(nvir_a,-1).copy()
         temp_aaa[:,ij_a[1],ij_a[0]] = -U[I,s_aaa:f_aaa].reshape(nvir_a,-1).copy()
         U_aaa = temp_aaa.reshape(-1).copy()
 
-        temp_bbb = np.zeros((nvir_b, nocc_b, nocc_b))
+        temp_bbb = np.zeros((nvir_b, nocc_b, nocc_b), dtype=complex)
         temp_bbb[:,ij_b[0],ij_b[1]] =  U[I,s_bbb:f_bbb].reshape(nvir_b,-1).copy()
         temp_bbb[:,ij_b[1],ij_b[0]] = -U[I,s_bbb:f_bbb].reshape(nvir_b,-1).copy()
         U_bbb = temp_bbb.reshape(-1).copy()
 
-        U_sq = U[I,:].copy()**2
+        #U_sq = U[I,:].copy()**2
+        U_sq = np.multiply(U[I,:], U[I,:].conj())
         ind_idx = np.argsort(-U_sq)
         U_sq = U_sq[ind_idx] 
         U_sorted = U[I,ind_idx].copy()
 
-        U_sq_aaa = U_aaa.copy()**2
-        U_sq_bbb = U_bbb.copy()**2
+        U_sq_aaa = np.multiply(U_aaa, U_aaa.conj())
+        U_sq_bbb = np.multiply(U_bbb, U_bbb.conj())
         ind_idx_aaa = np.argsort(-U_sq_aaa)
         ind_idx_bbb = np.argsort(-U_sq_bbb)
         U_sq_aaa = U_sq_aaa[ind_idx_aaa]
@@ -1965,8 +2047,236 @@ def get_imds_ea(adc, eris=None):
     cput0 = log.timer_debug1("Completed M_ab ADC(3) calculation", *cput0)
     return M_ab
 
+def get_imds_ip(adc, eris=None):
 
-def get_imds_ip(adc, eris=None, fc_bool=True):
+    #cput0 = (logger.process_clock(), logger.perf_counter())
+    log = logger.Logger(adc.stdout, adc.verbose)
+    if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
+        raise NotImplementedError(adc.method)
+
+    method = adc.method
+
+    t1 = adc.t1
+    t2 = adc.t2
+
+    t1_2_a, t1_2_b = t1[0]
+
+    nocc_a = adc.nocc_a
+    nocc_b = adc.nocc_b
+    nvir_a = adc.nvir_a
+    nvir_b = adc.nvir_b
+
+    ab_ind_a = np.tril_indices(nvir_a, k=-1)
+    ab_ind_b = np.tril_indices(nvir_b, k=-1)
+
+    e_occ_a = adc.mo_energy_a[:nocc_a]
+    e_occ_b = adc.mo_energy_b[:nocc_b]
+    e_vir_a = adc.mo_energy_a[nocc_a:]
+    e_vir_b = adc.mo_energy_b[nocc_b:]
+
+    idn_occ_a = np.identity(nocc_a)
+    idn_occ_b = np.identity(nocc_b)
+
+    if eris is None:
+        eris = adc.transform_integrals()
+
+    eris_ovvo = eris.ovvo
+    eris_OVVO = eris.OVVO
+    eris_ovVO = eris.ovVO
+    eris_OVvo = eris.OVvo
+
+    # i-j block
+    # Zeroth-order terms
+
+    M_ij_a = lib.einsum('ij,j->ij', idn_occ_a ,e_occ_a)
+    M_ij_b = lib.einsum('ij,j->ij', idn_occ_b ,e_occ_b)
+
+    # Second-order terms
+
+    t2_1_a = t2[0][0][:]
+    M_ij_a += 0.5 * 0.5 *  lib.einsum('ilde,jdel->ij',t2_1_a, eris_ovvo, optimize=True)
+    M_ij_a -= 0.5 * 0.5 *  lib.einsum('ilde,jedl->ij',t2_1_a, eris_ovvo, optimize=True)
+    M_ij_a += 0.5 * 0.5 *  lib.einsum('jlde,idel->ij',t2_1_a, eris_ovvo, optimize=True)
+    M_ij_a -= 0.5 * 0.5 *  lib.einsum('jlde,ldei->ij',t2_1_a, eris_ovvo, optimize=True)
+
+    t2_1_b = t2[0][2][:]
+    M_ij_b += 0.5 * 0.5 *  lib.einsum('ilde,jdel->ij',t2_1_b, eris_OVVO, optimize=True)
+    M_ij_b -= 0.5 * 0.5 *  lib.einsum('ilde,jedl->ij',t2_1_b, eris_OVVO, optimize=True)
+    M_ij_b += 0.5 * 0.5 *  lib.einsum('jlde,idel->ij',t2_1_b, eris_OVVO, optimize=True)
+    M_ij_b -= 0.5 * 0.5 *  lib.einsum('jlde,ldei->ij',t2_1_b, eris_OVVO, optimize=True)
+
+    t2_1_ab = t2[0][1][:]
+    M_ij_a += 0.5 * lib.einsum('ilde,jdel->ij',t2_1_ab, eris_ovVO, optimize=True)
+    M_ij_b += 0.5 * lib.einsum('lied,ledj->ij',t2_1_ab, eris_ovVO, optimize=True)
+    M_ij_a += 0.5 * lib.einsum('jlde,idel->ij',t2_1_ab, eris_ovVO, optimize=True)
+    M_ij_b += 0.5 * lib.einsum('ljed,ledi->ij',t2_1_ab, eris_ovVO, optimize=True)
+    del t2_1_ab
+
+    # Third-order terms
+
+    if (method == "adc(3)"):
+
+        eris_oovv = eris.oovv
+        eris_OOVV = eris.OOVV
+        eris_ooVV = eris.ooVV
+        eris_OOvv = eris.OOvv
+        eris_ovvo = eris.ovvo
+        eris_OVVO = eris.OVVO
+        eris_ovVO = eris.ovVO
+        eris_OVvo = eris.OVvo
+        eris_ovoo = eris.ovoo
+        eris_OVOO = eris.OVOO
+        eris_ovOO = eris.ovOO
+        eris_OVoo = eris.OVoo
+        eris_oooo = eris.oooo
+        eris_OOOO = eris.OOOO
+        eris_ooOO = eris.ooOO
+
+        M_ij_a += lib.einsum('ld,ldji->ij',t1_2_a, eris_ovoo, optimize=True)
+        M_ij_a -= lib.einsum('ld,jdli->ij',t1_2_a, eris_ovoo, optimize=True)
+        M_ij_a += lib.einsum('ld,ldji->ij',t1_2_b, eris_OVoo, optimize=True)
+
+        M_ij_b += lib.einsum('ld,ldji->ij',t1_2_b, eris_OVOO, optimize=True)
+        M_ij_b -= lib.einsum('ld,jdli->ij',t1_2_b, eris_OVOO, optimize=True)
+        M_ij_b += lib.einsum('ld,ldji->ij',t1_2_a, eris_ovOO, optimize=True)
+
+        M_ij_a += lib.einsum('ld,ldij->ij',t1_2_a, eris_ovoo, optimize=True)
+        M_ij_a -= lib.einsum('ld,idlj->ij',t1_2_a, eris_ovoo, optimize=True)
+        M_ij_a += lib.einsum('ld,ldij->ij',t1_2_b, eris_OVoo, optimize=True)
+
+        M_ij_b += lib.einsum('ld,ldij->ij',t1_2_b, eris_OVOO, optimize=True)
+        M_ij_b -= lib.einsum('ld,idlj->ij',t1_2_b, eris_OVOO, optimize=True)
+        M_ij_b += lib.einsum('ld,ldij->ij',t1_2_a, eris_ovOO, optimize=True)
+
+        t2_1_a = t2[0][0][:]
+        t2_2_a = t2[1][0][:]
+
+        M_ij_a += 0.5 * 0.5* lib.einsum('ilde,jdel->ij',t2_2_a, eris_ovvo, optimize=True)
+        M_ij_a -= 0.5 * 0.5* lib.einsum('ilde,jedl->ij',t2_2_a, eris_ovvo, optimize=True)
+
+        M_ij_a += 0.5 * 0.5* lib.einsum('jlde,ledi->ij',t2_2_a, eris_ovvo, optimize=True)
+        M_ij_a -= 0.5 * 0.5* lib.einsum('jlde,iedl->ij',t2_2_a, eris_ovvo, optimize=True)
+
+        t2_1_b = t2[0][2][:]
+        t2_2_b = t2[1][2][:]
+
+        M_ij_b += 0.5 * 0.5* lib.einsum('ilde,jdel->ij',t2_2_b, eris_OVVO, optimize=True)
+        M_ij_b -= 0.5 * 0.5* lib.einsum('ilde,jedl->ij',t2_2_b, eris_OVVO, optimize=True)
+        M_ij_b += 0.5 * 0.5* lib.einsum('jlde,ledi->ij',t2_2_b, eris_OVVO, optimize=True)
+        M_ij_b -= 0.5 * 0.5* lib.einsum('jlde,iedl->ij',t2_2_b, eris_OVVO, optimize=True)
+
+        t2_1_ab = t2[0][1][:]
+        t2_2_ab = t2[1][1][:]
+
+        M_ij_a += 0.5 * lib.einsum('ilde,jdel->ij',t2_2_ab, eris_ovVO, optimize=True)
+        M_ij_b += 0.5 * lib.einsum('lied,ledj->ij',t2_2_ab, eris_ovVO, optimize=True)
+        M_ij_a += 0.5 * lib.einsum('jlde,ledi->ij',t2_2_ab, eris_OVvo, optimize=True)
+        M_ij_b += 0.5 * lib.einsum('ljed,ledi->ij',t2_2_ab, eris_ovVO, optimize=True)
+
+        t2_1_a = t2[0][0][:]
+        M_ij_t = lib.einsum('lmde,jldf->mejf', t2_1_a, t2_1_a, optimize=True)
+        M_ij_a -= 0.5 * lib.einsum('mejf,mefi->ij',M_ij_t, eris_ovvo, optimize=True)
+        M_ij_a -= 0.5 * lib.einsum('mejf,mefi->ji',M_ij_t, eris_ovvo, optimize=True)
+        M_ij_a += 0.5 * lib.einsum('mejf,mife->ij',M_ij_t, eris_oovv, optimize=True)
+        M_ij_a += 0.5 * lib.einsum('mejf,mife->ji',M_ij_t, eris_oovv, optimize=True)
+        del M_ij_t
+
+        M_ij_a += 0.5 * 0.25*lib.einsum('lmde,jnde,limn->ij',t2_1_a, t2_1_a,eris_oooo, optimize = True)
+        M_ij_a -= 0.5 * 0.25*lib.einsum('lmde,jnde,lnmi->ij',t2_1_a, t2_1_a,eris_oooo, optimize = True)
+
+        M_ij_a += 0.5 *0.25*lib.einsum('inde,lmde,jlnm->ij',t2_1_a, t2_1_a,eris_oooo, optimize = True)
+        M_ij_a -= 0.5 *0.25*lib.einsum('inde,lmde,jmnl->ij',t2_1_a, t2_1_a,eris_oooo, optimize = True)
+
+        M_ij_a += 0.5*lib.einsum('lmdf,lmde,jief->ij',t2_1_a, t2_1_a, eris_oovv, optimize = True)
+        M_ij_a -= 0.5*lib.einsum('lmdf,lmde,jfei->ij',t2_1_a, t2_1_a, eris_ovvo, optimize = True)
+        M_ij_b +=0.5*lib.einsum('lmdf,lmde,jief->ij',t2_1_a, t2_1_a, eris_OOvv , optimize = True)
+
+        M_ij_a -= 0.5*lib.einsum('lnde,lmde,jinm->ij',t2_1_a, t2_1_a, eris_oooo, optimize = True)
+        M_ij_a += 0.5*lib.einsum('lnde,lmde,jmni->ij',t2_1_a, t2_1_a, eris_oooo, optimize = True)
+        M_ij_b -= 0.5 * lib.einsum('lnde,lmde,nmji->ij',t2_1_a, t2_1_a, eris_ooOO, optimize = True)
+
+        t2_1_ab = t2[0][1][:]
+        M_ij_a -= 0.5 * lib.einsum('lmde,jldf,mefi->ij',t2_1_ab, t2_1_a, eris_OVvo,optimize = True)
+        M_ij_b += 0.5 * lib.einsum('lmde,ljdf,mefi->ij',t2_1_a, t2_1_ab, eris_ovVO ,optimize = True)
+        M_ij_a -= 0.5 * lib.einsum('lmde,ildf,mefj->ij',t2_1_ab, t2_1_a, eris_OVvo,optimize = True)
+        M_ij_b += 0.5 * lib.einsum('lmde,lidf,mefj->ij',t2_1_a, t2_1_ab, eris_ovVO ,optimize = True)
+        del t2_1_a
+
+        t2_1_b = t2[0][2][:]
+        M_ij_a += 0.5 * lib.einsum('lmde,jlfd,mefi->ij',t2_1_b, t2_1_ab, eris_OVvo ,optimize = True)
+        M_ij_b -= 0.5 * lib.einsum('mled,jldf,mefi->ij',t2_1_ab, t2_1_b, eris_ovVO,optimize = True)
+        M_ij_a += 0.5 * lib.einsum('lmde,ilfd,mefj->ij',t2_1_b, t2_1_ab, eris_OVvo ,optimize = True)
+        M_ij_b -= 0.5 * lib.einsum('mled,ildf,mefj->ij',t2_1_ab, t2_1_b, eris_ovVO,optimize = True)
+
+        M_ij_t = lib.einsum('lmde,jldf->mejf', t2_1_b, t2_1_b, optimize=True)
+        M_ij_b -= 0.5 * lib.einsum('mejf,mefi->ij',M_ij_t, eris_OVVO, optimize=True)
+        M_ij_b -= 0.5 * lib.einsum('mejf,mefi->ji',M_ij_t, eris_OVVO, optimize=True)
+        M_ij_b += 0.5 * lib.einsum('mejf,mife->ij',M_ij_t, eris_OOVV, optimize=True)
+        M_ij_b += 0.5 * lib.einsum('mejf,mife->ji',M_ij_t, eris_OOVV, optimize=True)
+        del M_ij_t
+
+        M_ij_b += 0.5 * 0.25*lib.einsum('lmde,jnde,limn->ij',t2_1_b, t2_1_b,eris_OOOO, optimize = True)
+        M_ij_b -= 0.5 * 0.25*lib.einsum('lmde,jnde,lnmi->ij',t2_1_b, t2_1_b,eris_OOOO, optimize = True)
+
+        M_ij_b += 0.5 * 0.25*lib.einsum('inde,lmde,jlnm->ij',t2_1_b, t2_1_b,eris_OOOO, optimize = True)
+        M_ij_b -= 0.5 * 0.25*lib.einsum('inde,lmde,jmnl->ij',t2_1_b, t2_1_b,eris_OOOO, optimize = True)
+
+        M_ij_a += 0.5*lib.einsum('lmdf,lmde,jief->ij',t2_1_b, t2_1_b, eris_ooVV , optimize = True)
+        M_ij_b += 0.5*lib.einsum('lmdf,lmde,jief->ij',t2_1_b, t2_1_b, eris_OOVV , optimize = True)
+        M_ij_b -= 0.5*lib.einsum('lmdf,lmde,jfei->ij',t2_1_b, t2_1_b, eris_OVVO , optimize = True)
+
+        M_ij_a -= 0.5 * lib.einsum('lnde,lmde,jinm->ij',t2_1_b, t2_1_b, eris_ooOO, optimize = True)
+        M_ij_b -= 0.5*lib.einsum('lnde,lmde,jinm->ij',t2_1_b, t2_1_b, eris_OOOO, optimize = True)
+        M_ij_b += 0.5*lib.einsum('lnde,lmde,jmni->ij',t2_1_b, t2_1_b, eris_OOOO, optimize = True)
+        del t2_1_b
+
+        t2_1_ab = t2[0][1][:]
+
+        M_ij_a += 0.5 * lib.einsum('mled,jlfd,mefi->ij',t2_1_ab, t2_1_ab, eris_ovvo ,optimize = True)
+        M_ij_a -= 0.5 * lib.einsum('mled,jlfd,mife->ij',t2_1_ab, t2_1_ab, eris_oovv ,optimize = True)
+        M_ij_a -= 0.5 * lib.einsum('mlde,jldf,mife->ij',t2_1_ab, t2_1_ab, eris_ooVV ,optimize = True)
+
+        M_ij_b += 0.5 * lib.einsum('lmde,ljdf,mefi->ij',t2_1_ab, t2_1_ab, eris_OVVO,optimize = True)
+        M_ij_b -= 0.5 * lib.einsum('lmde,ljdf,mife->ij',t2_1_ab, t2_1_ab, eris_OOVV,optimize = True)
+        M_ij_b -= 0.5 * lib.einsum('lmed,ljfd,mife->ij',t2_1_ab, t2_1_ab, eris_OOvv ,optimize = True)
+
+        M_ij_a += 0.5 * lib.einsum('mled,ilfd,mefj->ij',t2_1_ab, t2_1_ab, eris_ovvo ,optimize = True)
+        M_ij_a -= 0.5 * lib.einsum('mled,ilfd,mjfe->ij',t2_1_ab, t2_1_ab, eris_oovv ,optimize = True)
+        M_ij_a -= 0.5 * lib.einsum('mlde,ildf,mjfe->ij',t2_1_ab, t2_1_ab, eris_ooVV ,optimize = True)
+
+        M_ij_b += 0.5 * lib.einsum('lmde,lidf,mefj->ij',t2_1_ab, t2_1_ab, eris_OVVO ,optimize = True)
+        M_ij_b -= 0.5 * lib.einsum('lmde,lidf,mjfe->ij',t2_1_ab, t2_1_ab, eris_OOVV ,optimize = True)
+        M_ij_b -= 0.5 * lib.einsum('lmed,lifd,mjfe->ij',t2_1_ab, t2_1_ab, eris_OOvv ,optimize = True)
+
+        M_ij_a += 0.5 * lib.einsum('lmde,jnde,limn->ij',t2_1_ab ,t2_1_ab,eris_ooOO, optimize = True)
+        M_ij_b += 0.5 * lib.einsum('mled,njed,mnli->ij',t2_1_ab ,t2_1_ab,eris_ooOO, optimize = True)
+
+        M_ij_a +=0.5 * lib.einsum('inde,lmde,jlnm->ij',t2_1_ab, t2_1_ab,eris_ooOO, optimize = True)
+
+        M_ij_b +=0.5 * lib.einsum('nied,mled,nmjl->ij',t2_1_ab, t2_1_ab,eris_ooOO, optimize = True)
+
+        M_ij_a +=lib.einsum('mlfd,mled,jief->ij',t2_1_ab, t2_1_ab, eris_oovv , optimize = True)
+        M_ij_a -=lib.einsum('mlfd,mled,jfei->ij',t2_1_ab, t2_1_ab, eris_ovvo , optimize = True)
+        M_ij_a +=lib.einsum('lmdf,lmde,jief->ij',t2_1_ab, t2_1_ab, eris_ooVV , optimize = True)
+        M_ij_b +=lib.einsum('lmdf,lmde,jief->ij',t2_1_ab, t2_1_ab, eris_OOVV , optimize = True)
+        M_ij_b -=lib.einsum('lmdf,lmde,jfei->ij',t2_1_ab, t2_1_ab, eris_OVVO , optimize = True)
+        M_ij_b +=lib.einsum('lmfd,lmed,jief->ij',t2_1_ab, t2_1_ab, eris_OOvv , optimize = True)
+
+        M_ij_a -= lib.einsum('nled,mled,jinm->ij',t2_1_ab, t2_1_ab, eris_oooo, optimize = True)
+        M_ij_a += lib.einsum('nled,mled,jmni->ij',t2_1_ab, t2_1_ab, eris_oooo, optimize = True)
+        M_ij_a -= lib.einsum('lnde,lmde,jinm->ij',t2_1_ab, t2_1_ab, eris_ooOO, optimize = True)
+        M_ij_b -= lib.einsum('lnde,lmde,jinm->ij',t2_1_ab, t2_1_ab, eris_OOOO, optimize = True)
+        M_ij_b += lib.einsum('lnde,lmde,jmni->ij',t2_1_ab, t2_1_ab, eris_OOOO, optimize = True)
+        M_ij_b -= lib.einsum('nled,mled,nmji->ij',t2_1_ab, t2_1_ab, eris_ooOO, optimize = True)
+
+        del t2_1_ab
+
+    M_ij = (M_ij_a, M_ij_b)
+    #cput0 = log.timer_debug1("Completed M_ab ADC(3) calculation", *cput0)
+
+    return M_ij
+
+def get_imds_ip_off(adc, eris=None, fc_bool=True):
 
     cput0 = (time.clock(), time.time())
     log = logger.Logger(adc.stdout, adc.verbose)
@@ -2554,8 +2864,8 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
 
     dim = n_singles_a + n_singles_b + n_doubles_aaa + n_doubles_bab + n_doubles_aba + n_doubles_bbb
 
-    e_occ_a = adc.mo_energy_a[:nocc_a]
-    e_occ_b = adc.mo_energy_b[:nocc_b]
+    e_occ_a = adc.mo_energy_a[:nocc_a].astype(complex)
+    e_occ_b = adc.mo_energy_b[:nocc_b].astype(complex)
     e_vir_a = adc.mo_energy_a[nocc_a:]
     e_vir_b = adc.mo_energy_b[nocc_b:]
     e_vir_a = complex_shift(e_vir_a, energy_thresh, imaginary_shift)
@@ -2621,7 +2931,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
     diag[s_bbb:f_bbb] = D_aij_b.copy()
 
     ###### Additional terms for the preconditioner ####
-     
+    """ 
     if (method == "adc(2)-x" or method == "adc(3)"):
         if eris is None:
             eris = adc.transform_integrals()
@@ -2716,7 +3026,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
                 temp[:] += np.diagonal(eris_OvOv_p).reshape(nocc_b,nvir_a)
                 temp = np.ascontiguousarray(temp.transpose(2,1,0))
                 diag[s_aba:f_aba] += temp.reshape(-1)
-      
+    """
     if cvs is True:
         
         shift = -100000000.0 + 0*1j 
@@ -2756,7 +3066,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         temp[:,ncore:,ncore:] += shift
         #temp[:,ncore:,:ncore] = shift
         #temp[:,:ncore,:ncore] += shift
-        temp_ecc = temp[:,:ncore,:ncore]
+        #temp_ecc = temp[:,:ncore,:ncore]
 
         diag[s_bbb:f_bbb] = temp[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1).copy()
         
@@ -3528,8 +3838,581 @@ def ea_adc_matvec(adc, M_ab=None, eris=None):
 
     return sigma_
 
-
 def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
+
+    if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
+        raise NotImplementedError(adc.method)
+
+    method = adc.method
+
+    nocc_a = adc.nocc_a
+    nocc_b = adc.nocc_b
+    nvir_a = adc.nvir_a
+    nvir_b = adc.nvir_b
+    imaginary_shift = adc.imaginary_shift
+    energy_thresh = adc.energy_thresh
+
+    ij_ind_a = np.tril_indices(nocc_a, k=-1)
+    ij_ind_b = np.tril_indices(nocc_b, k=-1)
+    n_singles_a = nocc_a
+    n_singles_b = nocc_b
+    n_doubles_aaa = nocc_a * (nocc_a - 1) * nvir_a // 2
+    n_doubles_bab = nvir_b * nocc_a * nocc_b
+    n_doubles_aba = nvir_a * nocc_b * nocc_a
+    n_doubles_bbb = nocc_b * (nocc_b - 1) * nvir_b // 2
+
+    dim = n_singles_a + n_singles_b + n_doubles_aaa + n_doubles_bab + n_doubles_aba + n_doubles_bbb
+
+    e_occ_a = adc.mo_energy_a[:nocc_a].astype(complex) 
+    e_occ_b = adc.mo_energy_b[:nocc_b].astype(complex)
+    e_vir_a = adc.mo_energy_a[nocc_a:].astype(complex)
+    e_vir_b = adc.mo_energy_b[nocc_b:].astype(complex)
+    e_vir_a = complex_shift(e_vir_a, energy_thresh, imaginary_shift)
+    e_vir_b = complex_shift(e_vir_b, energy_thresh, imaginary_shift)
+
+    idn_occ_a = np.identity(nocc_a)
+    idn_occ_b = np.identity(nocc_b)
+    idn_vir_a = np.identity(nvir_a)
+    idn_vir_b = np.identity(nvir_b)
+
+    if eris is None:
+        eris = adc.transform_integrals()
+
+    d_ij_a = e_occ_a[:,None] + e_occ_a
+    d_a_a = e_vir_a[:,None]
+    D_n_a = -d_a_a + d_ij_a.reshape(-1)
+    D_n_a = D_n_a.reshape((nvir_a,nocc_a,nocc_a))
+    D_aij_a = D_n_a.copy()[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1)
+
+    d_ij_b = e_occ_b[:,None] + e_occ_b
+    d_a_b = e_vir_b[:,None]
+    D_n_b = -d_a_b + d_ij_b.reshape(-1)
+    D_n_b = D_n_b.reshape((nvir_b,nocc_b,nocc_b))
+    D_aij_b = D_n_b.copy()[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1)
+
+    d_ij_ab = e_occ_b[:,None] + e_occ_a
+    d_a_b = e_vir_b[:,None]
+    D_n_bab = -d_a_b + d_ij_ab.reshape(-1)
+    D_aij_bab = D_n_bab.reshape(-1)
+
+    d_ij_ab = e_occ_a[:,None] + e_occ_b
+    d_a_a = e_vir_a[:,None]
+    D_n_aba = -d_a_a + d_ij_ab.reshape(-1)
+    D_aij_aba = D_n_aba.reshape(-1)
+
+    s_a = 0
+    f_a = n_singles_a
+    s_b = f_a
+    f_b = s_b + n_singles_b
+    s_aaa = f_b
+    f_aaa = s_aaa + n_doubles_aaa
+    s_bab = f_aaa
+    f_bab = s_bab + n_doubles_bab
+    s_aba = f_bab
+    f_aba = s_aba + n_doubles_aba
+    s_bbb = f_aba
+    f_bbb = s_bbb + n_doubles_bbb
+
+    if M_ij is None:
+        M_ij = adc.get_imds()
+    M_ij_a, M_ij_b = M_ij
+    M_ij_a = M_ij_a.astype(complex)
+    M_ij_b = M_ij_b.astype(complex)
+    #@profile
+    #Calculate sigma vector
+    def sigma_(r):
+        #r = np.ones(dim)
+ 
+        cput0 = (time.clock(), time.time())
+        log = logger.Logger(adc.stdout, adc.verbose)
+
+        if cvs is True:
+            r = cvs_projector(adc, r)
+
+        s = np.zeros((dim), dtype=complex)
+
+        r_a = r[s_a:f_a]
+        r_b = r[s_b:f_b]
+        r_aaa = r[s_aaa:f_aaa]
+        r_bab = r[s_bab:f_bab]
+        r_aba = r[s_aba:f_aba]
+        r_bbb = r[s_bbb:f_bbb]
+
+        r_aaa = r_aaa.reshape(nvir_a,-1)
+        r_bbb = r_bbb.reshape(nvir_b,-1)
+
+        r_aaa_u = None
+        r_aaa_u = np.zeros((nvir_a,nocc_a,nocc_a), dtype=complex)
+        r_aaa_u[:,ij_ind_a[0],ij_ind_a[1]]= r_aaa.copy()
+        r_aaa_u[:,ij_ind_a[1],ij_ind_a[0]]= -r_aaa.copy()
+
+        r_bbb_u = None
+        r_bbb_u = np.zeros((nvir_b,nocc_b,nocc_b), dtype=complex)
+        r_bbb_u[:,ij_ind_b[0],ij_ind_b[1]]= r_bbb.copy()
+        r_bbb_u[:,ij_ind_b[1],ij_ind_b[0]]= -r_bbb.copy()
+
+        r_aba = r_aba.reshape(nvir_a,nocc_a,nocc_b)
+        r_bab = r_bab.reshape(nvir_b,nocc_b,nocc_a)
+
+        eris_ovoo = eris.ovoo
+        eris_OVOO = eris.OVOO
+        eris_OVoo = eris.OVoo
+        eris_ovOO = eris.ovOO
+
+############ ADC(2) ij block ############################
+         
+        s[s_a:f_a] = lib.einsum('ij,j->i',M_ij_a,r_a)
+        s[s_b:f_b] = lib.einsum('ij,j->i',M_ij_b,r_b)
+
+############# ADC(2) i - kja block #########################
+        s[s_a:f_a] += 0.5*lib.einsum('jaki,ajk->i', eris_ovoo, r_aaa_u, optimize = True)
+        s[s_a:f_a] -= 0.5*lib.einsum('kaji,ajk->i', eris_ovoo, r_aaa_u, optimize = True)
+        s[s_a:f_a] += lib.einsum('jaki,ajk->i', eris_OVoo, r_bab, optimize = True)
+
+        s[s_b:f_b] += 0.5*lib.einsum('jaki,ajk->i', eris_OVOO, r_bbb_u, optimize = True)
+        s[s_b:f_b] -= 0.5*lib.einsum('kaji,ajk->i', eris_OVOO, r_bbb_u, optimize = True)
+        s[s_b:f_b] += lib.einsum('jaki,ajk->i', eris_ovOO, r_aba, optimize = True)
+
+############## ADC(2) ajk - i block ############################
+
+        temp = lib.einsum('jaki,i->ajk', eris_ovoo, r_a, optimize = True)
+        temp -= lib.einsum('kaji,i->ajk', eris_ovoo, r_a, optimize = True)
+        s[s_aaa:f_aaa] += temp[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1)
+        s[s_bab:f_bab] += lib.einsum('jaik,i->ajk', eris_OVoo, r_a, optimize = True).reshape(-1)
+        s[s_aba:f_aba] += lib.einsum('jaki,i->ajk', eris_ovOO, r_b, optimize = True).reshape(-1)
+        temp = lib.einsum('jaki,i->ajk', eris_OVOO, r_b, optimize = True)
+        temp -= lib.einsum('kaji,i->ajk', eris_OVOO, r_b, optimize = True)
+        s[s_bbb:f_bbb] += temp[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1)
+        
+############ ADC(2) ajk - bil block ############################
+        r_aaa = r_aaa.reshape(-1)
+        r_bbb = r_bbb.reshape(-1)
+        
+        s[s_aaa:f_aaa] += D_aij_a * r_aaa
+        s[s_bab:f_bab] += D_aij_bab * r_bab.reshape(-1)
+        s[s_aba:f_aba] += D_aij_aba * r_aba.reshape(-1)
+        s[s_bbb:f_bbb] += D_aij_b * r_bbb
+       
+############### ADC(3) ajk - bil block ############################
+
+        if (method == "adc(2)-x" or method == "adc(3)"):
+
+               eris_oooo = eris.oooo
+               eris_OOOO = eris.OOOO
+               eris_ooOO = eris.ooOO
+               eris_oovv = eris.oovv
+               eris_OOVV = eris.OOVV
+               eris_ooVV = eris.ooVV
+               eris_OOvv = eris.OOvv
+               eris_ovvo = eris.ovvo
+               eris_OVVO = eris.OVVO
+               eris_ovVO = eris.ovVO
+               eris_OVvo = eris.OVvo
+
+               #r_aaa = r_aaa.reshape(nvir_a,-1)
+               #r_bab = r_bab.reshape(nvir_b,nocc_b,nocc_a)
+               #r_aba = r_aba.reshape(nvir_a,nocc_a,nocc_b)
+               #r_bbb = r_bbb.reshape(nvir_b,-1)
+               #
+               #r_aaa_u = None
+               #r_aaa_u = np.zeros((nvir_a,nocc_a,nocc_a))
+               #r_aaa_u[:,ij_ind_a[0],ij_ind_a[1]]= r_aaa.copy()
+               #r_aaa_u[:,ij_ind_a[1],ij_ind_a[0]]= -r_aaa.copy()
+               #
+               #r_bbb_u = None
+               #r_bbb_u = np.zeros((nvir_b,nocc_b,nocc_b))
+               #r_bbb_u[:,ij_ind_b[0],ij_ind_b[1]]= r_bbb.copy()
+               #r_bbb_u[:,ij_ind_b[1],ij_ind_b[0]]= -r_bbb.copy()
+               
+               temp = 0.5*lib.einsum('jlki,ail->ajk',eris_oooo,r_aaa_u ,optimize = True)
+               temp -= 0.5*lib.einsum('jikl,ail->ajk',eris_oooo,r_aaa_u ,optimize = True)
+               s[s_aaa:f_aaa] += temp[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1)
+             
+               temp = 0.5*lib.einsum('jlki,ail->ajk',eris_OOOO,r_bbb_u,optimize = True)
+               temp -= 0.5*lib.einsum('jikl,ail->ajk',eris_OOOO,r_bbb_u,optimize = True)
+               s[s_bbb:f_bbb] += temp[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1)
+                
+               #s[s_bab:f_bab] -= 0.5*lib.einsum('kijl,ali->ajk',eris_ooOO,r_bab,optimize = True).reshape(-1)
+               s[s_bab:f_bab] -= lib.einsum('klji,ail->ajk',eris_ooOO,r_bab,optimize = True).reshape(-1)
+                
+               #s[s_aba:f_aba] -= 0.5*lib.einsum('jlki,ali->ajk',eris_ooOO,r_aba,optimize = True).reshape(-1)
+               s[s_aba:f_aba] -= lib.einsum('jikl,ail->ajk',eris_ooOO,r_aba,optimize = True).reshape(-1)
+               """
+               # Einsum paths testing 
+               path_oovv = np.einsum_path('klba,bjl->ajk',eris_oovv,r_aaa_u,optimize = True)
+               path_ovvo = np.einsum_path('kabl,bjl->ajk',eris_ovvo,r_aaa_u,optimize = True)
+               print("path info for: ", adc.method_type)
+               print("path info for 'klba,bjl->ajk',eris_oovv,r_aaa_u")
+               print(path_oovv[0])
+               print(path_oovv[1])
+               print("path info for 'kabl,bjl->ajk',eris_ovvo,r_aaa_u")
+               print(path_ovvo[0])
+               print(path_ovvo[1])
+               """ 
+               temp = 0.5*lib.einsum('klba,bjl->ajk',eris_oovv,r_aaa_u,optimize = True)
+               temp -= 0.5*lib.einsum('kabl,bjl->ajk',eris_ovvo,r_aaa_u,optimize = True)
+               temp += 0.5* lib.einsum('kabl,blj->ajk',eris_ovVO,r_bab,optimize = True)
+               s[s_aaa:f_aaa] += temp[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1)
+                
+               s[s_bab:f_bab] += 0.5*lib.einsum('klba,bjl->ajk',eris_ooVV,r_bab,optimize = True).reshape(-1)
+               
+               temp_1 = 0.5*lib.einsum('klba,bjl->ajk',eris_OOVV,r_bbb_u,optimize = True)
+               temp_1 -= 0.5*lib.einsum('kabl,bjl->ajk',eris_OVVO,r_bbb_u,optimize = True)
+               temp_1 += 0.5*lib.einsum('kabl,blj->ajk',eris_OVvo,r_aba,optimize = True)
+               s[s_bbb:f_bbb] += temp_1[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1)
+               
+               s[s_aba:f_aba] += 0.5*lib.einsum('klba,bjl->ajk',eris_OOvv,r_aba,optimize = True).reshape(-1)
+                
+               temp = -0.5*lib.einsum('jlba,bkl->ajk',eris_oovv,r_aaa_u,optimize = True)
+               temp += 0.5*lib.einsum('jabl,bkl->ajk',eris_ovvo,r_aaa_u,optimize = True)
+               temp -= 0.5*lib.einsum('jabl,blk->ajk',eris_ovVO,r_bab,optimize = True)
+               s[s_aaa:f_aaa] += temp[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1)
+               
+               s[s_bab:f_bab] +=  0.5*lib.einsum('jabl,bkl->ajk',eris_OVvo,r_aaa_u,optimize = True).reshape(-1)
+               s[s_bab:f_bab] +=  0.5*lib.einsum('jlba,blk->ajk',eris_OOVV,r_bab,optimize = True).reshape(-1)
+               s[s_bab:f_bab] -=  0.5*lib.einsum('jabl,blk->ajk',eris_OVVO,r_bab,optimize = True).reshape(-1)
+               
+               temp = -0.5*lib.einsum('jlba,bkl->ajk',eris_OOVV,r_bbb_u,optimize = True)
+               temp += 0.5*lib.einsum('jabl,bkl->ajk',eris_OVVO,r_bbb_u,optimize = True)
+               temp -= 0.5*lib.einsum('jabl,blk->ajk',eris_OVvo,r_aba,optimize = True)
+               s[s_bbb:f_bbb] += temp[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1)
+                
+               s[s_aba:f_aba] += 0.5*lib.einsum('jlba,blk->ajk',eris_oovv,r_aba,optimize = True).reshape(-1)
+               s[s_aba:f_aba] -= 0.5*lib.einsum('jabl,blk->ajk',eris_ovvo,r_aba,optimize = True).reshape(-1)
+               s[s_aba:f_aba] += 0.5*lib.einsum('jabl,bkl->ajk',eris_ovVO,r_bbb_u,optimize = True).reshape(-1)
+                
+               temp = -0.5*lib.einsum('kiba,bij->ajk',eris_oovv,r_aaa_u,optimize = True)
+               temp += 0.5*lib.einsum('kabi,bij->ajk',eris_ovvo,r_aaa_u,optimize = True)
+               temp += 0.5*lib.einsum('kabi,bij->ajk',eris_ovVO,r_bab,optimize = True)
+               s[s_aaa:f_aaa] += temp[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1)
+               
+               s[s_bab:f_bab] += 0.5*lib.einsum('kiba,bji->ajk',eris_ooVV,r_bab,optimize = True).reshape(-1)
+               
+               temp = -0.5*lib.einsum('kiba,bij->ajk',eris_OOVV,r_bbb_u,optimize = True)
+               temp += 0.5*lib.einsum('kabi,bij->ajk',eris_OVVO,r_bbb_u,optimize = True)
+               temp += 0.5*lib.einsum('kabi,bij->ajk',eris_OVvo,r_aba,optimize = True)
+               s[s_bbb:f_bbb] += temp[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1)
+               
+               s[s_aba:f_aba] += 0.5*lib.einsum('kiba,bji->ajk',eris_OOvv,r_aba,optimize = True).reshape(-1)
+               
+               temp = 0.5*lib.einsum('jiba,bik->ajk',eris_oovv,r_aaa_u,optimize = True)
+               temp -= 0.5*lib.einsum('jabi,bik->ajk',eris_ovvo,r_aaa_u,optimize = True)
+               temp -= 0.5*lib.einsum('jabi,bik->ajk',eris_ovVO,r_bab,optimize = True)
+               s[s_aaa:f_aaa] += temp[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1)
+               
+               s[s_bab:f_bab] += 0.5*lib.einsum('jiba,bik->ajk',eris_OOVV,r_bab,optimize = True).reshape(-1)
+               s[s_bab:f_bab] -= 0.5*lib.einsum('jabi,bik->ajk',eris_OVVO,r_bab,optimize = True).reshape(-1)
+               s[s_bab:f_bab] -= 0.5*lib.einsum('jabi,bik->ajk',eris_OVvo,r_aaa_u,optimize = True).reshape(-1)
+               
+               s[s_aba:f_aba] += 0.5*lib.einsum('jiba,bik->ajk',eris_oovv,r_aba,optimize = True).reshape(-1)
+               s[s_aba:f_aba] -= 0.5*lib.einsum('jabi,bik->ajk',eris_ovvo,r_aba,optimize = True).reshape(-1)
+               s[s_aba:f_aba] -= 0.5*lib.einsum('jabi,bik->ajk',eris_ovVO,r_bbb_u,optimize = True).reshape(-1)
+               
+               temp = 0.5*lib.einsum('jiba,bik->ajk',eris_OOVV,r_bbb_u,optimize = True)
+               temp -= 0.5*lib.einsum('jabi,bik->ajk',eris_OVVO,r_bbb_u,optimize = True)
+               temp -= 0.5*lib.einsum('jabi,bik->ajk',eris_OVvo,r_aba,optimize = True)
+               s[s_bbb:f_bbb] += temp[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1)
+               
+        if (method == "adc(3)"):
+
+               eris_ovoo = eris.ovoo
+               eris_OVOO = eris.OVOO
+               eris_ovOO = eris.ovOO
+               eris_OVoo = eris.OVoo
+
+################ ADC(3) i - kja and ajk - i block ############################
+               t2_1_a = adc.t2[0][0][:]
+               t2_1_ab = adc.t2[0][1][:]
+               
+               if isinstance(eris.ovvv, type(None)):
+                   chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
+               else :
+                   chnk_size = nocc_a
+
+               a = 0
+               temp_singles = np.zeros((nocc_a), dtype=complex)
+               temp_doubles = np.zeros((nvir_a, nvir_a, nvir_a), dtype=complex)
+               r_aaa = r_aaa.reshape(nvir_a,-1)
+               t2_1_a_t = t2_1_a[ij_ind_a[0],ij_ind_a[1],:,:]
+               temp_1 = lib.einsum('pbc,ap->abc',t2_1_a_t,r_aaa, optimize=True)
+               for p in range(0,nocc_a,chnk_size):
+                   if getattr(adc, 'with_df', None):
+                       eris_ovvv = dfadc.get_ovvv_spin_df(adc, eris.Lov, eris.Lvv, p, chnk_size).reshape(-1,nvir_a,nvir_a,nvir_a)
+                   else :
+                       eris_ovvv = radc_ao2mo.unpack_eri_1(eris.ovvv, nvir_a)
+                   k = eris_ovvv.shape[0]
+                   temp_singles[a:a+k] += 0.5*lib.einsum('abc,icab->i',temp_1, eris_ovvv, optimize=True)
+                   temp_singles[a:a+k] -= 0.5*lib.einsum('abc,ibac->i',temp_1, eris_ovvv, optimize=True)
+
+                   temp_doubles += lib.einsum('i,icab->bca',r_a[a:a+k],eris_ovvv,optimize=True)
+                   temp_doubles -= lib.einsum('i,ibac->bca',r_a[a:a+k],eris_ovvv,optimize=True)
+                   del eris_ovvv
+                   a += k
+               
+               s[s_a:f_a] += temp_singles
+               s[s_aaa:f_aaa] += 0.5*lib.einsum('bca,pbc->ap',temp_doubles,t2_1_a_t,optimize=True).reshape(-1)
+               del temp_singles
+               del temp_doubles
+                 
+               #r_aaa_u = np.zeros((nvir_a,nocc_a,nocc_a))
+               #r_aaa_u[:,ij_ind_a[0],ij_ind_a[1]]= r_aaa.copy()
+               #r_aaa_u[:,ij_ind_a[1],ij_ind_a[0]]= -r_aaa.copy()
+
+               #r_aba = r_aba.reshape(nvir_a,nocc_a,nocc_b)
+               # Bug is probably here?
+               temp = lib.einsum('jlab,ajk->blk',t2_1_a,r_aaa_u,optimize=True)
+               s[s_a:f_a] += 0.5*lib.einsum('blk,lbik->i',temp,eris_ovoo,optimize=True)
+               s[s_a:f_a] -= 0.5*lib.einsum('blk,iblk->i',temp,eris_ovoo,optimize=True)
+                
+               temp_1 = lib.einsum('jlab,ajk->blk',t2_1_a,r_aba,optimize=True)
+               s[s_b:f_b] += 0.5*lib.einsum('blk,lbik->i',temp_1,eris_ovOO,optimize=True)
+                
+               temp = -lib.einsum('klab,akj->blj',t2_1_a,r_aaa_u,optimize=True)
+               s[s_a:f_a] -= 0.5*lib.einsum('blj,lbij->i',temp,eris_ovoo,optimize=True)
+               s[s_a:f_a] += 0.5*lib.einsum('blj,iblj->i',temp,eris_ovoo,optimize=True)
+
+               temp_1 = -lib.einsum('klab,akj->blj',t2_1_a,r_aba,optimize=True)
+               s[s_b:f_b] -= 0.5*lib.einsum('blj,lbij->i',temp_1,eris_ovOO,optimize=True)
+
+               temp_1 = lib.einsum('i,lbik->kbl',r_a, eris_ovoo)
+               temp_1 -= lib.einsum('i,iblk->kbl',r_a, eris_ovoo)
+
+               temp  = lib.einsum('kbl,jlab->ajk',temp_1,t2_1_a,optimize=True)
+               s[s_aaa:f_aaa] += temp[:,ij_ind_a[0],ij_ind_a[1] ].reshape(-1)
+
+               temp_2  = lib.einsum('i,lbik->kbl',r_b,eris_ovOO)
+               temp = lib.einsum('kbl,jlab->ajk',temp_2,t2_1_a,optimize=True)
+               s[s_aba:f_aba] += temp.reshape(-1)
+
+               temp_1 = lib.einsum('i,lbij->jbl',r_a, eris_ovoo)
+               temp_1 -= lib.einsum('i,iblj->jbl',r_a, eris_ovoo)
+
+               temp  = lib.einsum('jbl,klab->ajk',temp_1,t2_1_a,optimize=True)
+               s[s_aaa:f_aaa] -= temp[:,ij_ind_a[0],ij_ind_a[1] ].reshape(-1)
+
+               del t2_1_a
+                
+               t2_1_b = adc.t2[0][2][:]
+                
+               if isinstance(eris.OVVV, type(None)):
+                   chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
+               else :
+                   chnk_size = nocc_b
+               a = 0
+               temp_singles = np.zeros((nocc_b), dtype=complex)
+               temp_doubles = np.zeros((nvir_b, nvir_b, nvir_b), dtype=complex)
+               r_bbb = r_bbb.reshape(nvir_b,-1)
+               t2_1_b_t = t2_1_b[ij_ind_b[0],ij_ind_b[1],:,:]
+               temp_1 = lib.einsum('pbc,ap->abc',t2_1_b_t,r_bbb, optimize=True)
+               for p in range(0,nocc_b,chnk_size):
+                   if getattr(adc, 'with_df', None):
+                       eris_OVVV = dfadc.get_ovvv_spin_df(adc, eris.LOV, eris.LVV, p, chnk_size).reshape(-1,nvir_b,nvir_b,nvir_b)
+                   else :
+                       eris_OVVV = radc_ao2mo.unpack_eri_1(eris.OVVV, nvir_b)
+                   k = eris_OVVV.shape[0]
+                   temp_singles[a:a+k] += 0.5*lib.einsum('abc,icab->i',temp_1, eris_OVVV, optimize=True)
+                   temp_singles[a:a+k] -= 0.5*lib.einsum('abc,ibac->i',temp_1, eris_OVVV, optimize=True)
+
+                   temp_doubles += lib.einsum('i,icab->bca',r_b[a:a+k],eris_OVVV,optimize=True)
+                   temp_doubles -= lib.einsum('i,ibac->bca',r_b[a:a+k],eris_OVVV,optimize=True)
+                   del eris_OVVV
+                   a += k
+
+               s[s_b:f_b] += temp_singles
+               s[s_bbb:f_bbb] += 0.5*lib.einsum('bca,pbc->ap',temp_doubles,t2_1_b_t,optimize=True).reshape(-1)
+               del temp_singles
+               del temp_doubles
+
+               #r_bbb_u = np.zeros((nvir_b,nocc_b,nocc_b))
+               #r_bbb_u[:,ij_ind_b[0],ij_ind_b[1]]= r_bbb.copy()
+               #r_bbb_u[:,ij_ind_b[1],ij_ind_b[0]]= -r_bbb.copy()
+
+               #r_bab = r_bab.reshape(nvir_b,nocc_b,nocc_a)
+
+               temp_1 = lib.einsum('jlab,ajk->blk',t2_1_b,r_bab,optimize=True)
+               s[s_a:f_a] += 0.5*lib.einsum('blk,lbik->i',temp_1,eris_OVoo,optimize=True)
+
+               temp = lib.einsum('jlab,ajk->blk',t2_1_b,r_bbb_u,optimize=True)
+
+               s[s_b:f_b] += 0.5*lib.einsum('blk,lbik->i',temp,eris_OVOO,optimize=True)
+               s[s_b:f_b] -= 0.5*lib.einsum('blk,iblk->i',temp,eris_OVOO,optimize=True)
+
+               temp_1 = -lib.einsum('klab,akj->blj',t2_1_b,r_bab,optimize=True)
+               s[s_a:f_a] -= 0.5*lib.einsum('blj,lbij->i',temp_1,eris_OVoo,optimize=True)
+
+               temp = -lib.einsum('klab,akj->blj',t2_1_b,r_bbb_u,optimize=True)
+               s[s_b:f_b] -= 0.5*lib.einsum('blj,lbij->i',temp,eris_OVOO,optimize=True)
+               s[s_b:f_b] += 0.5*lib.einsum('blj,iblj->i',temp,eris_OVOO,optimize=True)
+
+               temp_2  = lib.einsum('i,lbik->kbl',r_a,eris_OVoo)
+               temp = lib.einsum('kbl,jlab->ajk',temp_2,t2_1_b,optimize=True)
+               s[s_bab:f_bab] += temp.reshape(-1)
+
+               temp_1 = lib.einsum('i,lbik->kbl',r_b, eris_OVOO)
+               temp_1 -= lib.einsum('i,iblk->kbl',r_b, eris_OVOO)
+
+               temp  = lib.einsum('kbl,jlab->ajk',temp_1,t2_1_b,optimize=True)
+               s[s_bbb:f_bbb] += temp[:,ij_ind_b[0],ij_ind_b[1] ].reshape(-1)
+
+               temp_1 = lib.einsum('i,lbij->jbl',r_b, eris_OVOO)
+               temp_1 -= lib.einsum('i,iblj->jbl',r_b, eris_OVOO)
+
+               temp  = lib.einsum('jbl,klab->ajk',temp_1,t2_1_b,optimize=True)
+               s[s_bbb:f_bbb] -= temp[:,ij_ind_b[0],ij_ind_b[1] ].reshape(-1)
+               del t2_1_b
+                 
+               if isinstance(eris.ovVV, type(None)):
+                   chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
+               else :
+                   chnk_size = nocc_a
+               a = 0
+               temp_1 = lib.einsum('kjcb,ajk->abc',t2_1_ab,r_bab, optimize=True)
+               temp_2 = np.zeros((nvir_a, nvir_b, nvir_b), dtype=complex)
+               for p in range(0,nocc_a,chnk_size):
+                   if getattr(adc, 'with_df', None):
+                       eris_ovVV = dfadc.get_ovvv_spin_df(adc, eris.Lov, eris.LVV, p, chnk_size).reshape(-1,nvir_a,nvir_b,nvir_b)
+                   else :
+                       eris_ovVV = radc_ao2mo.unpack_eri_1(eris.ovVV, nvir_b)
+                   k = eris_ovVV.shape[0]
+
+                   s[s_a:f_a][a:a+k] += lib.einsum('abc,icab->i',temp_1, eris_ovVV, optimize=True)
+
+                   temp_2 += lib.einsum('i,icab->cba',r_a[a:a+k],eris_ovVV,optimize=True)
+                   del eris_ovVV
+                   a += k
+
+               s[s_bab:f_bab] += lib.einsum('cba,kjcb->ajk',temp_2, t2_1_ab, optimize=True).reshape(-1)
+               del temp_1
+               del temp_2
+               
+               if isinstance(eris.OVvv, type(None)):
+                   chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
+               else :
+                   chnk_size = nocc_b
+
+               a = 0
+               temp_1 = lib.einsum('jkbc,ajk->abc',t2_1_ab,r_aba, optimize=True)
+               temp_2 = np.zeros((nvir_a, nvir_b, nvir_a), dtype=complex)
+               for p in range(0,nocc_b,chnk_size):
+                   if getattr(adc, 'with_df', None):
+                       eris_OVvv = dfadc.get_ovvv_spin_df(adc, eris.LOV, eris.Lvv, p, chnk_size).reshape(-1,nvir_b,nvir_a,nvir_a)
+                   else :
+                       eris_OVvv = radc_ao2mo.unpack_eri_1(eris.OVvv, nvir_a)
+                   k = eris_OVvv.shape[0]
+                   s[s_b:f_b][a:a+k] += lib.einsum('abc,icab->i',temp_1, eris_OVvv, optimize=True)
+
+                   temp_2 += lib.einsum('i,icab->bca',r_b[a:a+k],eris_OVvv,optimize=True)
+                   del eris_OVvv
+                   a += k
+
+               s[s_aba:f_aba] += lib.einsum('bca,jkbc->ajk',temp_2, t2_1_ab, optimize=True).reshape(-1)
+               del temp_1
+               del temp_2
+               
+               temp = lib.einsum('ljba,ajk->blk',t2_1_ab,r_bab,optimize=True)
+               temp_1 = lib.einsum('jlab,ajk->blk',t2_1_ab,r_aaa_u,optimize=True)
+               temp_2 = lib.einsum('jlba,akj->blk',t2_1_ab,r_bab, optimize=True)
+
+               s[s_a:f_a] += 0.5*lib.einsum('blk,lbik->i',temp,eris_ovoo,optimize=True)
+               s[s_a:f_a] -= 0.5*lib.einsum('blk,iblk->i',temp,eris_ovoo,optimize=True)
+               s[s_a:f_a] += 0.5*lib.einsum('blk,lbik->i',temp_1,eris_OVoo,optimize=True)
+               s[s_a:f_a] -= 0.5*lib.einsum('blk,iblk->i',temp_2,eris_ovOO,optimize=True)
+
+               temp = lib.einsum('jlab,ajk->blk',t2_1_ab,r_aba,optimize=True)
+               temp_1 = lib.einsum('ljba,ajk->blk',t2_1_ab,r_bbb_u,optimize=True)
+               temp_2 = lib.einsum('ljab,akj->blk',t2_1_ab,r_aba,optimize=True)
+
+               s[s_b:f_b] += 0.5*lib.einsum('blk,lbik->i',temp,eris_OVOO,optimize=True)
+               s[s_b:f_b] -= 0.5*lib.einsum('blk,iblk->i',temp,eris_OVOO,optimize=True)
+               s[s_b:f_b] += 0.5*lib.einsum('blk,lbik->i',temp_1,eris_ovOO,optimize=True)
+               s[s_b:f_b] -= 0.5*lib.einsum('blk,iblk->i',temp_2,eris_OVoo,optimize=True)
+
+               temp = -lib.einsum('lkba,akj->blj',t2_1_ab,r_bab,optimize=True)
+               temp_1 = -lib.einsum('klab,akj->blj',t2_1_ab,r_aaa_u,optimize=True)
+               temp_2 = -lib.einsum('klba,ajk->blj',t2_1_ab,r_bab,optimize=True)
+
+               s[s_a:f_a] -= 0.5*lib.einsum('blj,lbij->i',temp,eris_ovoo,optimize=True)
+               s[s_a:f_a] += 0.5*lib.einsum('blj,iblj->i',temp,eris_ovoo,optimize=True)
+               s[s_a:f_a] -= 0.5*lib.einsum('blj,lbij->i',temp_1,eris_OVoo,optimize=True)
+               s[s_a:f_a] += 0.5*lib.einsum('blj,iblj->i',temp_2,eris_ovOO,optimize=True)
+
+               temp = -lib.einsum('klab,akj->blj',t2_1_ab,r_aba,optimize=True)
+               temp_1 = -lib.einsum('lkba,akj->blj',t2_1_ab,r_bbb_u,optimize=True)
+               temp_2 = -lib.einsum('lkab,ajk->blj',t2_1_ab,r_aba,optimize=True)
+
+               s[s_b:f_b] -= 0.5*lib.einsum('blj,lbij->i',temp,eris_OVOO,optimize=True)
+               s[s_b:f_b] += 0.5*lib.einsum('blj,iblj->i',temp,eris_OVOO,optimize=True)
+               s[s_b:f_b] -= 0.5*lib.einsum('blj,lbij->i',temp_1,eris_ovOO,optimize=True)
+               s[s_b:f_b] += 0.5*lib.einsum('blj,iblj->i',temp_2,eris_OVoo,optimize=True)
+               
+               temp_2 = lib.einsum('i,lbik->kbl',r_a, eris_OVoo)
+               temp = lib.einsum('kbl,jlab->ajk',temp_2,t2_1_ab,optimize=True)
+               s[s_aaa:f_aaa] += temp[:,ij_ind_a[0],ij_ind_a[1] ].reshape(-1)
+
+               temp_1  = lib.einsum('i,lbik->kbl',r_a,eris_ovoo)
+               temp_1  -= lib.einsum('i,iblk->kbl',r_a,eris_ovoo)
+
+               temp  = lib.einsum('kbl,ljba->ajk',temp_1,t2_1_ab,optimize=True)
+               s[s_bab:f_bab] += temp.reshape(-1)
+
+               temp_2 = lib.einsum('i,lbik->kbl',r_b, eris_ovOO)
+
+               temp = lib.einsum('kbl,ljba->ajk',temp_2,t2_1_ab,optimize=True)
+               s[s_bbb:f_bbb] += temp[:,ij_ind_b[0],ij_ind_b[1] ].reshape(-1)
+
+               temp_1  = lib.einsum('i,lbik->kbl',r_b,eris_OVOO)
+               temp_1  -= lib.einsum('i,iblk->kbl',r_b,eris_OVOO)
+
+               temp  = lib.einsum('kbl,jlab->ajk',temp_1,t2_1_ab,optimize=True)
+               s[s_aba:f_aba] += temp.reshape(-1)
+
+               temp_2 = lib.einsum('i,lbij->jbl',r_a, eris_OVoo)
+
+               temp = lib.einsum('jbl,klab->ajk',temp_2,t2_1_ab,optimize=True)
+               s[s_aaa:f_aaa] -= temp[:,ij_ind_a[0],ij_ind_a[1] ].reshape(-1)
+
+               temp  = -lib.einsum('i,iblj->jbl',r_a,eris_ovOO,optimize=True)
+               temp_1 = -lib.einsum('jbl,klba->ajk',temp,t2_1_ab,optimize=True)
+               s[s_bab:f_bab] -= temp_1.reshape(-1)
+
+               temp_2 = lib.einsum('i,lbij->jbl',r_b, eris_ovOO)
+               temp = lib.einsum('jbl,lkba->ajk',temp_2,t2_1_ab,optimize=True)
+               s[s_bbb:f_bbb] -= temp[:,ij_ind_b[0],ij_ind_b[1] ].reshape(-1)
+
+               temp  = -lib.einsum('i,iblj->jbl',r_b,eris_OVoo,optimize=True)
+               temp_1 = -lib.einsum('jbl,lkab->ajk',temp,t2_1_ab,optimize=True)
+               s[s_aba:f_aba] -= temp_1.reshape(-1)
+               
+               del t2_1_ab
+        cput0 = log.timer_debug1("completed sigma vector calculation", *cput0)
+        s *= -1.0
+
+        if cvs is True:
+            s = cvs_projector(adc, s)
+        """
+        print('s[s_a:f_a]',             np.linalg.norm(s[s_a:f_a]))
+        print(np.column_stack(np.unique(np.around(s[s_a:f_a], decimals=8), return_counts=True))) 
+        print('s[s_b:f_b]' ,            np.linalg.norm(s[s_b:f_b]))
+        print(np.column_stack(np.unique(np.around(s[s_b:f_b], decimals=8), return_counts=True))) 
+        print('s[s_aaa:f_aaa]', np.linalg.norm(s[s_aaa:f_aaa]))      
+        print(np.column_stack(np.unique(np.around(s[s_aaa:f_aaa], decimals=8), return_counts=True))) 
+        print('s[s_bab:f_bab]', np.linalg.norm(s[s_bab:f_bab]))
+        print(np.column_stack(np.unique(np.around(s[s_bab:f_bab], decimals=8), return_counts=True))) 
+        print('s[s_aba:f_aba]', np.linalg.norm(s[s_aba:f_aba]))
+        print(np.column_stack(np.unique(np.around(s[s_aba:f_aba], decimals=8), return_counts=True))) 
+        print('s[s_bbb:f_bbb]', np.linalg.norm(s[s_bbb:f_bbb]))
+        print(np.column_stack(np.unique(np.around(s[s_bbb:f_bbb], decimals=8), return_counts=True))) 
+        temp_aaa = s[s_aaa:f_aaa] 
+        temp_bbb = s[s_bbb:f_bbb] 
+        print("# of non zeros in aaa: ", temp_aaa[temp_aaa != 0].size)
+        print("# of non zeros in bbb: ", temp_bbb[temp_bbb != 0].size)
+        """
+        return s
+
+    return sigma_
+
+
+def ip_adc_matvec_off(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
@@ -3538,6 +4421,12 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
 
     t2_1_a, t2_1_ab, t2_1_b = adc.t2[0]
     t1_2_a, t1_2_b = adc.t1[0]
+
+    t2_1_a  = t2_1_a.astype(complex)  
+    t2_1_ab = t2_1_a.astype(complex)
+    t2_1_b  = t2_1_b.astype(complex)
+    t1_2_a  = t1_2_a.astype(complex)
+    t1_2_b  = t1_2_b.astype(complex)
 
     nocc_a = adc.nocc_a
     nocc_b = adc.nocc_b
@@ -3558,8 +4447,8 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
 
     dim = n_singles_a + n_singles_b + n_doubles_aaa + n_doubles_bab + n_doubles_aba + n_doubles_bbb
 
-    e_occ_a = adc.mo_energy_a[:nocc_a]
-    e_occ_b = adc.mo_energy_b[:nocc_b]
+    e_occ_a = adc.mo_energy_a[:nocc_a].astype(complex)
+    e_occ_b = adc.mo_energy_b[:nocc_b].astype(complex)
     e_vir_a = adc.mo_energy_a[nocc_a:]
     e_vir_b = adc.mo_energy_b[nocc_b:]
     e_vir_a = complex_shift(e_vir_a, energy_thresh, imaginary_shift)
@@ -3611,6 +4500,9 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
     if M_ij is None:
         M_ij = adc.get_imds(fc_bool)
     M_ij_a, M_ij_b = M_ij
+
+    M_ij_a  = M_ij_a.astype(complex) 
+    M_ij_b  = M_ij_b.astype(complex)
 
     #Calculate sigma vector
     def sigma_(r):
@@ -3707,20 +4599,20 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
                eris_ovVO = eris.ovVO
                eris_OVvo = eris.OVvo
                
-               r_aaa = r_aaa.reshape(nvir_a,-1)
-               r_bab = r_bab.reshape(nvir_b,nocc_b,nocc_a)
-               r_aba = r_aba.reshape(nvir_a,nocc_a,nocc_b)
-               r_bbb = r_bbb.reshape(nvir_b,-1)
-               
-               r_aaa_u = None
-               r_aaa_u = np.zeros((nvir_a,nocc_a,nocc_a))
-               r_aaa_u[:,ij_ind_a[0],ij_ind_a[1]]= r_aaa.copy()
-               r_aaa_u[:,ij_ind_a[1],ij_ind_a[0]]= -r_aaa.copy()
-               
-               r_bbb_u = None
-               r_bbb_u = np.zeros((nvir_b,nocc_b,nocc_b))
-               r_bbb_u[:,ij_ind_b[0],ij_ind_b[1]]= r_bbb.copy()
-               r_bbb_u[:,ij_ind_b[1],ij_ind_b[0]]= -r_bbb.copy()
+               #r_aaa = r_aaa.reshape(nvir_a,-1)
+               #r_bab = r_bab.reshape(nvir_b,nocc_b,nocc_a)
+               #r_aba = r_aba.reshape(nvir_a,nocc_a,nocc_b)
+               #r_bbb = r_bbb.reshape(nvir_b,-1)
+               #
+               #r_aaa_u = None
+               #r_aaa_u = np.zeros((nvir_a,nocc_a,nocc_a))
+               #r_aaa_u[:,ij_ind_a[0],ij_ind_a[1]]= r_aaa.copy()
+               #r_aaa_u[:,ij_ind_a[1],ij_ind_a[0]]= -r_aaa.copy()
+               #
+               #r_bbb_u = None
+               #r_bbb_u = np.zeros((nvir_b,nocc_b,nocc_b))
+               #r_bbb_u[:,ij_ind_b[0],ij_ind_b[1]]= r_bbb.copy()
+               #r_bbb_u[:,ij_ind_b[1],ij_ind_b[0]]= -r_bbb.copy()
                
                temp = 0.5*lib.einsum('jlki,ail->ajk',eris_oooo,r_aaa_u ,optimize = True)
                temp -= 0.5*lib.einsum('jikl,ail->ajk',eris_oooo,r_aaa_u ,optimize = True)
@@ -3816,8 +4708,8 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
                    chnk_size = nocc_a
 
                a = 0
-               temp_singles = np.zeros((nocc_a))
-               temp_doubles = np.zeros((nvir_a, nvir_a, nvir_a))
+               temp_singles = np.zeros((nocc_a), dtype=complex)
+               temp_doubles = np.zeros((nvir_a, nvir_a, nvir_a), dtype=complex)
                r_aaa = r_aaa.reshape(nvir_a,-1)
                t2_1_a_t = t2_1_a[ij_ind_a[0],ij_ind_a[1],:,:]
                temp_1 = lib.einsum('pbc,ap->abc',t2_1_a_t,r_aaa, optimize=True)
@@ -3845,8 +4737,8 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
                else :
                    chnk_size = nocc_b
                a = 0
-               temp_singles = np.zeros((nocc_b))
-               temp_doubles = np.zeros((nvir_b, nvir_b, nvir_b))
+               temp_singles = np.zeros((nocc_b), dtype=complex)
+               temp_doubles = np.zeros((nvir_b, nvir_b, nvir_b), dtype=complex)
                r_bbb = r_bbb.reshape(nvir_b,-1)
                t2_1_b_t = t2_1_b[ij_ind_b[0],ij_ind_b[1],:,:]
                temp_1 = lib.einsum('pbc,ap->abc',t2_1_b_t,r_bbb, optimize=True)
@@ -3875,7 +4767,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
                    chnk_size = nocc_a
                a = 0
                temp_1 = lib.einsum('kjcb,ajk->abc',t2_1_ab,r_bab, optimize=True)
-               temp_2 = np.zeros((nvir_a, nvir_b, nvir_b))
+               temp_2 = np.zeros((nvir_a, nvir_b, nvir_b), dtype=complex)
                for p in range(0,nocc_a,chnk_size):
                    if getattr(adc, 'with_df', None):
                        eris_ovVV = dfadc.get_ovvv_a_df(adc, eris.Lov, eris.LVV, p, chnk_size).reshape(-1,nvir_a,nvir_b,nvir_b)
@@ -3900,7 +4792,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
 
                a = 0
                temp_1 = lib.einsum('jkbc,ajk->abc',t2_1_ab,r_aba, optimize=True)
-               temp_2 = np.zeros((nvir_a, nvir_b, nvir_a))
+               temp_2 = np.zeros((nvir_a, nvir_b, nvir_a), dtype=complex)
                for p in range(0,nocc_b,chnk_size):
                    if getattr(adc, 'with_df', None):
                        eris_OVvv = dfadc.get_ovvv_a_df(adc, eris.LOV, eris.Lvv, p, chnk_size).reshape(-1,nvir_b,nvir_a,nvir_a)
@@ -3917,22 +4809,22 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
                del temp_1
                del temp_2
 
-               r_aaa_u = np.zeros((nvir_a,nocc_a,nocc_a))
-               r_aaa_u[:,ij_ind_a[0],ij_ind_a[1]]= r_aaa.copy()
-               r_aaa_u[:,ij_ind_a[1],ij_ind_a[0]]= -r_aaa.copy()
+               #r_aaa_u = np.zeros((nvir_a,nocc_a,nocc_a), dtype=complex)
+               #r_aaa_u[:,ij_ind_a[0],ij_ind_a[1]]= r_aaa.copy()
+               #r_aaa_u[:,ij_ind_a[1],ij_ind_a[0]]= -r_aaa.copy()
 
-               r_bbb_u = np.zeros((nvir_b,nocc_b,nocc_b))
-               r_bbb_u[:,ij_ind_b[0],ij_ind_b[1]]= r_bbb.copy()
-               r_bbb_u[:,ij_ind_b[1],ij_ind_b[0]]= -r_bbb.copy()
+               #r_bbb_u = np.zeros((nvir_b,nocc_b,nocc_b), dtype=complex)
+               #r_bbb_u[:,ij_ind_b[0],ij_ind_b[1]]= r_bbb.copy()
+               #r_bbb_u[:,ij_ind_b[1],ij_ind_b[0]]= -r_bbb.copy()
 
-               r_bab = r_bab.reshape(nvir_b,nocc_b,nocc_a)
-               r_aba = r_aba.reshape(nvir_a,nocc_a,nocc_b)
+               #r_bab = r_bab.reshape(nvir_b,nocc_b,nocc_a)
+               #r_aba = r_aba.reshape(nvir_a,nocc_a,nocc_b)
 
-               temp = np.zeros_like(r_bab)
+               temp = np.zeros_like(r_bab, dtype=complex)
                temp = lib.einsum('jlab,ajk->blk',t2_1_a,r_aaa_u,optimize=True)
                temp += lib.einsum('ljba,ajk->blk',t2_1_ab,r_bab,optimize=True)
 
-               temp_1 = np.zeros_like(r_bab)
+               temp_1 = np.zeros_like(r_bab, dtype=complex)
                temp_1 = lib.einsum('jlab,ajk->blk',t2_1_ab,r_aaa_u,optimize=True)
                temp_1 += lib.einsum('jlab,ajk->blk',t2_1_b,r_bab,optimize=True)
 
@@ -3943,11 +4835,11 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
                s[s_a:f_a] += 0.5*lib.einsum('blk,lbik->i',temp_1,eris_OVoo,optimize=True)
                s[s_a:f_a] -= 0.5*lib.einsum('blk,iblk->i',temp_2,eris_ovOO,optimize=True)
 
-               temp = np.zeros_like(r_aba)
+               temp = np.zeros_like(r_aba, dtype=complex)
                temp = lib.einsum('jlab,ajk->blk',t2_1_b,r_bbb_u,optimize=True)
                temp += lib.einsum('jlab,ajk->blk',t2_1_ab,r_aba,optimize=True)
 
-               temp_1 = np.zeros_like(r_aba)
+               temp_1 = np.zeros_like(r_aba, dtype=complex)
                temp_1 = lib.einsum('ljba,ajk->blk',t2_1_ab,r_bbb_u,optimize=True)
                temp_1 += lib.einsum('jlab,ajk->blk',t2_1_a,r_aba,optimize=True)
 
@@ -3958,11 +4850,11 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
                s[s_b:f_b] += 0.5*lib.einsum('blk,lbik->i',temp_1,eris_ovOO,optimize=True)
                s[s_b:f_b] -= 0.5*lib.einsum('blk,iblk->i',temp_2,eris_OVoo,optimize=True)
 
-               temp = np.zeros_like(r_bab)
+               temp = np.zeros_like(r_bab, dtype=complex)
                temp = -lib.einsum('klab,akj->blj',t2_1_a,r_aaa_u,optimize=True)
                temp -= lib.einsum('lkba,akj->blj',t2_1_ab,r_bab,optimize=True)
 
-               temp_1 = np.zeros_like(r_bab)
+               temp_1 = np.zeros_like(r_bab, dtype=complex)
                temp_1 = -lib.einsum('klab,akj->blj',t2_1_ab,r_aaa_u,optimize=True)
                temp_1 -= lib.einsum('klab,akj->blj',t2_1_b,r_bab,optimize=True)
 
@@ -3973,11 +4865,11 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
                s[s_a:f_a] -= 0.5*lib.einsum('blj,lbij->i',temp_1,eris_OVoo,optimize=True)
                s[s_a:f_a] += 0.5*lib.einsum('blj,iblj->i',temp_2,eris_ovOO,optimize=True)
 
-               temp = np.zeros_like(r_aba)
+               temp = np.zeros_like(r_aba, dtype=complex)
                temp = -lib.einsum('klab,akj->blj',t2_1_b,r_bbb_u,optimize=True)
                temp -= lib.einsum('klab,akj->blj',t2_1_ab,r_aba,optimize=True)
 
-               temp_1 = np.zeros_like(r_bab)
+               temp_1 = np.zeros_like(r_bab, dtype=complex)
                temp_1 = -lib.einsum('lkba,akj->blj',t2_1_ab,r_bbb_u,optimize=True)
                temp_1 -= lib.einsum('klab,akj->blj',t2_1_a,r_aba,optimize=True)
 
@@ -4619,12 +5511,15 @@ class UADCIP(UADC):
             diag = self.ip_adc_diag()
         idx = None
         if ascending:
-            idx = np.argsort(np.real(diag)**2)
-            #idx = np.argsort(np.multiply(diag, diag.conj()))
+            #idx = np.argsort(diag**2)
+            diag_r_sq = np.real(diag)**2
+            diag_im_sq = np.imag(diag)**2
+            diag_sq = diag_r_sq + 1j*diag_im_sq
+            idx = np.argsort(diag)
         else:
             idx = np.argsort(diag)[::-1]
         print("----------------debugging get_init_guess-----------------------")
-        print("idx: ", idx)
+        #print("idx: ", idx)
         guess = np.zeros((diag.shape[0], nroots))
         min_shape = min(diag.shape[0], nroots)
         guess[:min_shape,:min_shape] = np.identity(min_shape)
