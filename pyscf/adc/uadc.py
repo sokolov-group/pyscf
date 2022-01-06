@@ -5803,7 +5803,8 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                temp_1_evc = -lib.einsum('jlab,aKj->blK',t2_1_ab_voee,r_aaa_ecv,optimize=True)
                temp_2_ecc = lib.einsum('Jlba,aKJ->blK',t2_1_ab_coee,r_bba_ecc, optimize=True)
                temp_2_ecv = lib.einsum('jlba,aKj->blK',t2_1_ab_voee,r_bba_ecv, optimize=True)
-               temp_2_evc = lib.einsum('Jlba,akJ->blk',t2_1_ab_coee,r_bba_evc, optimize=True)
+               #temp_2_evc = lib.einsum('Jlba,akJ->blk',t2_1_ab_coee,r_bba_evc, optimize=True)
+               temp_2_evc = lib.einsum('Jlba,akJ->blk',t2_1_ab_coee,r_bba_evc,optimize=True)
 
                s[s_a:f_a] += 0.5*lib.einsum('blK,lbIK->I',temp_ecc,eris_oecc,optimize=True)
                s[s_a:f_a] -= 0.5*lib.einsum('blK,IbKl->I',temp_ecc,eris_ceco,optimize=True)
@@ -5816,7 +5817,8 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                s[s_a:f_a] += 0.5*lib.einsum('blK,lbIK->I',temp_1_evc,eris_OEcc,optimize=True)
                s[s_a:f_a] -= 0.5*lib.einsum('blK,IbKl->I',temp_2_ecc,eris_ceCO,optimize=True)
                s[s_a:f_a] -= 0.5*lib.einsum('blK,IbKl->I',temp_2_ecv,eris_ceCO,optimize=True)
-               s[s_a:f_a] -= 0.5*lib.einsum('blK,Ibkl->I',temp_2_evc,eris_ceVO,optimize=True)
+               #s[s_a:f_a] -= 0.5*lib.einsum('blK,Ibkl->I',temp_2_evc,eris_ceVO,optimize=True)
+               s[s_a:f_a] -= 0.5*lib.einsum('blK,IbKl->I',temp_2_evc,eris_ceVO,optimize=True)
 
                temp_ecc = lib.einsum('Jlab,aJK->blK',t2_1_ab_coee,r_aab_ecc,optimize=True)
                temp_ecv = lib.einsum('Jlab,aJk->blk',t2_1_ab_coee,r_aab_ecv,optimize=True)
