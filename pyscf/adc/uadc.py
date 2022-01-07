@@ -225,6 +225,9 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     print(np.c_[E*27.2114, spec_factors])
     print("---------------------------------------------------")
     analyze_eigenvector_ip(adc, U)
+ 
+    E_cvs = E.copy()
+    spec_factors_cvs = spec_factors.copy()    
 
     nrooots = nroots_kernel
     def cvs_pick(cvs_npick,U):          
@@ -296,6 +299,9 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     print("---------------------------------------------------")
     #print(np.column_stack((E*27.2114, spec_factors)))
     analyze_eigenvector_ip(adc, U)
+    E_mom = E.copy()
+    spec_factors_mom = spec_factors.copy() 
+    return (E_cvs, spec_factors_cvs, E_mom, spec_factors_mom) 
     exit() 
 
     if adc.verbose >= logger.INFO:
@@ -1466,12 +1472,14 @@ class UADC(lib.StreamObject):
             e_exc, v_exc, spec_fac = self.ea_adc(nroots=nroots, guess=guess, eris=eris)
 
         elif(self.method_type == "ip"):
-            e_exc, v_exc, spec_fac = self.ip_adc(nroots=nroots, guess=guess, eris=eris)
+        #    e_exc, v_exc, spec_fac = self.ip_adc(nroots=nroots, guess=guess, eris=eris)
+            temp = self.ip_adc(nroots=nroots, guess=guess, eris=eris)
 
         else:
             raise NotImplementedError(self.method_type)
 
-        return e_exc, v_exc, spec_fac
+        #return e_exc, v_exc, spec_fac
+        return temp
 
     def _finalize(self):
         '''Hook for dumping results and clearing up the object.'''
