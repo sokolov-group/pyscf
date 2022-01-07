@@ -4304,7 +4304,7 @@ def cvs_projector(adc, r):
     return Pr
 
 
-#@profile
+@profile
 def ip_adc_matvec(adc, M_ij=None, eris=None):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -4873,7 +4873,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None):
     return sigma_
 
 
-#@profile
+@profile
 def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
     # lib einsums
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
