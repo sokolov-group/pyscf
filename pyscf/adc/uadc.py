@@ -325,7 +325,7 @@ def analyze_eigenvector_ip(adc, U):
     nocc_b = adc.nocc_b
     nvir_a = adc.nvir_a
     nvir_b = adc.nvir_b
-    evec_print_tol = 0.05
+    evec_print_tol = 0.01
 
     logger.info(adc, "Number of alpha occupied orbitals = %d", nocc_a)
     logger.info(adc, "Number of beta occupied orbitals = %d", nocc_b)
@@ -2876,6 +2876,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
     e_occ_b = adc.mo_energy_b[:nocc_b].astype(complex)
     e_vir_a = adc.mo_energy_a[nocc_a:]
     e_vir_b = adc.mo_energy_b[nocc_b:]
+    #if cvs is False:
     e_vir_a = complex_shift(e_vir_a, energy_thresh, imaginary_shift)
     e_vir_b = complex_shift(e_vir_b, energy_thresh, imaginary_shift)
 
@@ -3875,6 +3876,8 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
     e_occ_b = adc.mo_energy_b[:nocc_b].astype(complex)
     e_vir_a = adc.mo_energy_a[nocc_a:].astype(complex)
     e_vir_b = adc.mo_energy_b[nocc_b:].astype(complex)
+    
+    #if cvs is False:
     e_vir_a = complex_shift(e_vir_a, energy_thresh, imaginary_shift)
     e_vir_b = complex_shift(e_vir_b, energy_thresh, imaginary_shift)
 
