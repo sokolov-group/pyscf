@@ -4394,23 +4394,23 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
 
         r_aaa_ecc_u = None
         r_aaa_ecc_u = np.zeros((nvir_a,ncvs,ncvs))
-        r_aaa_ecc_u[:,ij_ind_ncvs[0],ij_ind_ncvs[1]]= r_aaa_ecc.copy()
-        r_aaa_ecc_u[:,ij_ind_ncvs[1],ij_ind_ncvs[0]]= -r_aaa_ecc.copy()
+        r_aaa_ecc_u[:,ij_ind_ncvs[0],ij_ind_ncvs[1]]= r_aaa_ecc
+        r_aaa_ecc_u[:,ij_ind_ncvs[1],ij_ind_ncvs[0]]= -r_aaa_ecc
 
         r_bbb_ecc_u = None
         r_bbb_ecc_u = np.zeros((nvir_b,ncvs,ncvs))
-        r_bbb_ecc_u[:,ij_ind_ncvs[0],ij_ind_ncvs[1]]= r_bbb_ecc.copy()
-        r_bbb_ecc_u[:,ij_ind_ncvs[1],ij_ind_ncvs[0]]= -r_bbb_ecc.copy()
+        r_bbb_ecc_u[:,ij_ind_ncvs[0],ij_ind_ncvs[1]]= r_bbb_ecc
+        r_bbb_ecc_u[:,ij_ind_ncvs[1],ij_ind_ncvs[0]]= -r_bbb_ecc
         
 
-        r_aaa_ecv = r_aaa_ecv.reshape(nvir_a,ncvs,nval_a).copy() 
-        r_bba_ecc = r_bba_ecc.reshape(nvir_b,ncvs,ncvs)  .copy()
-        r_bba_ecv = r_bba_ecv.reshape(nvir_b,ncvs,nval_a).copy()
-        r_bba_evc = r_bba_evc.reshape(nvir_b,nval_b,ncvs).copy()
-        r_aab_ecc = r_aab_ecc.reshape(nvir_a,ncvs,ncvs)  .copy()
-        r_aab_ecv = r_aab_ecv.reshape(nvir_a,ncvs,nval_b).copy()
-        r_aab_evc = r_aab_evc.reshape(nvir_a,nval_a,ncvs).copy()
-        r_bbb_ecv = r_bbb_ecv.reshape(nvir_b,ncvs,nval_b).copy()
+        r_aaa_ecv = r_aaa_ecv.reshape(nvir_a,ncvs,nval_a) 
+        r_bba_ecc = r_bba_ecc.reshape(nvir_b,ncvs,ncvs)  
+        r_bba_ecv = r_bba_ecv.reshape(nvir_b,ncvs,nval_a)
+        r_bba_evc = r_bba_evc.reshape(nvir_b,nval_b,ncvs)
+        r_aab_ecc = r_aab_ecc.reshape(nvir_a,ncvs,ncvs)  
+        r_aab_ecv = r_aab_ecv.reshape(nvir_a,ncvs,nval_b)
+        r_aab_evc = r_aab_evc.reshape(nvir_a,nval_a,ncvs)
+        r_bbb_ecv = r_bbb_ecv.reshape(nvir_b,ncvs,nval_b)
 
         eris_cecc = eris.cecc
         eris_vecc = eris.vecc
@@ -6247,6 +6247,8 @@ def analyze_eigenvector_ip(adc):
         ind_idx_aaa = ind_idx_aaa[U_sq_aaa > evec_print_tol**2]
         ind_idx_bbb = ind_idx_bbb[U_sq_bbb > evec_print_tol**2]
         
+        print("U_sorted.size: ", U_sorted.size)
+        print("U_sorted: ", U_sorted)
         singles_a_idx = []
         singles_b_idx = []
         doubles_aaa_idx = []
@@ -6276,6 +6278,9 @@ def analyze_eigenvector_ip(adc):
                 a_idx = aij_idx//(nocc_a*nocc_b)
                 i_idx = ij_rem//nocc_a
                 j_idx = ij_rem % nocc_a
+                print("a_idx", a_idx)                
+                print("i_idx", i_idx)
+                print("j_idx", j_idx)
                 doubles_bab_idx.append((a_idx + 1 + nocc_b, i_idx + 1, j_idx + 1))
                 doubles_bab_val.append(U_sorted[iter_idx])
           
@@ -6285,6 +6290,9 @@ def analyze_eigenvector_ip(adc):
                 a_idx = aij_idx//(nocc_b*nocc_a)
                 i_idx = ij_rem//nocc_b
                 j_idx = ij_rem % nocc_b
+                print("a_idx", a_idx)                
+                print("i_idx", i_idx)
+                print("j_idx", j_idx)
                 doubles_aba_idx.append((a_idx + 1 + nocc_a, i_idx + 1, j_idx + 1))
                 doubles_aba_val.append(U_sorted[iter_idx])
 
@@ -6450,6 +6458,29 @@ def analyze_eigenvector_ip_cvs(adc):
         ind_idx_aaa_ecc = ind_idx_aaa_ecc[U_sq_aaa_ecc > evec_print_tol**2]
         ind_idx_bbb_ecc = ind_idx_bbb_ecc[U_sq_bbb_ecc > evec_print_tol**2]
         
+        print("U_sorted.size: ", U_sorted.size)
+        print("U_sorted: ", U_sorted)
+        print("idx_idx: ", ind_idx)
+        print(" s_aaa_ecc", s_aaa_ecc ) 
+        print(" f_aaa_ecc", f_aaa_ecc ) 
+        print(" s_aaa_ecv", s_aaa_ecv ) 
+        print(" f_aaa_ecv", f_aaa_ecv ) 
+        print(" s_bba_ecc", s_bba_ecc ) 
+        print(" f_bba_ecc", f_bba_ecc ) 
+        print(" s_bba_ecv", s_bba_ecv ) 
+        print(" f_bba_ecv", f_bba_ecv ) 
+        print(" s_bba_evc", s_bba_evc ) 
+        print(" f_bba_evc", f_bba_evc ) 
+        print(" s_aab_ecc", s_aab_ecc ) 
+        print(" f_aab_ecc", f_aab_ecc ) 
+        print(" s_aab_ecv", s_aab_ecv ) 
+        print(" f_aab_ecv", f_aab_ecv ) 
+        print(" s_aab_evc", s_aab_evc ) 
+        print(" f_aab_evc", f_aab_evc ) 
+        print(" s_bbb_ecc", s_bbb_ecc ) 
+        print(" f_bbb_ecc", f_bbb_ecc ) 
+        print(" s_bbb_ecv", s_bbb_ecv ) 
+        print(" f_bbb_ecv", f_bbb_ecv ) 
         singles_a_idx = []
         singles_b_idx = []
         doubles_aaa_idx = []
@@ -6489,7 +6520,11 @@ def analyze_eigenvector_ip_cvs(adc):
                 ij_rem = aij_idx % (ncvs*nval_a)
                 a_idx = aij_idx//(ncvs*nval_a)
                 i_idx = ij_rem//ncvs
-                j_idx = ij_rem % ncvs 
+                j_idx = ij_rem % ncvs
+                print("a_idx_ecv", a_idx)                
+                print("i_idx_ecv", i_idx)
+                print("j_idx_ecv", j_idx)
+ 
                 doubles_bba_idx.append((a_idx + 1 + nocc_b, i_idx + 1, j_idx + 1))
                 doubles_bba_val.append(U_sorted[iter_idx])
 
@@ -6499,6 +6534,9 @@ def analyze_eigenvector_ip_cvs(adc):
                 a_idx = aij_idx//(nval_b*ncvs)
                 i_idx = ij_rem//nval_b
                 j_idx = ij_rem % nval_b
+                print("a_idx_evc", a_idx)                
+                print("i_idx_evc", i_idx)
+                print("j_idx_evc", j_idx)
                 doubles_bba_idx.append((a_idx + 1 + nocc_b, i_idx + 1, j_idx + 1))
                 doubles_bba_val.append(U_sorted[iter_idx])
 
@@ -6508,6 +6546,9 @@ def analyze_eigenvector_ip_cvs(adc):
                 a_idx = aij_idx//(ncvs*nval_b)
                 i_idx = ij_rem//nval_b
                 j_idx = ij_rem % nval_b
+                print("a_idx_ecv", a_idx)                
+                print("i_idx_ecv", i_idx)
+                print("j_idx_ecv", j_idx)
                 doubles_aab_idx.append((a_idx + 1 + nocc_a, i_idx + 1, j_idx + 1))
                 doubles_aab_val.append(U_sorted[iter_idx])
 
@@ -6517,6 +6558,9 @@ def analyze_eigenvector_ip_cvs(adc):
                 a_idx = aij_idx//(ncvs*nval_b)
                 i_idx = ij_rem//ncvs
                 j_idx = ij_rem % ncvs 
+                print("a_idx_evc", a_idx)                
+                print("i_idx_evc", i_idx)
+                print("j_idx_evc", j_idx)
                 doubles_aab_idx.append((a_idx + 1 + nocc_a, i_idx + 1, j_idx + 1))
                 doubles_aab_val.append(U_sorted[iter_idx])
 

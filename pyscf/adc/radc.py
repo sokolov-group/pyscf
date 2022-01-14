@@ -48,6 +48,71 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     imds = adc.get_imds(eris)
     matvec, diag = adc.gen_matvec(imds, eris)
 
+    if nroots == 'full':
+        r = np.identity(diag.size)
+        M = np.zeros((diag.size, diag.size))
+        for i in range(diag.size):
+             M[:,i] = matvec(r[:,i])
+
+        print("Hermiticity: ")
+        print("Full M: ", np.linalg.norm(M - M.T))
+        
+        if adc.method_type == 'ip':
+            singles = adc._nocc
+ 
+        if adc.method_type == 'ip-cvs':
+            singles = adc.ncvs
+
+        M_i_j = M[:singles,:singles]
+        M_i_ajk = M[:singles,singles:]   
+        M_ajk_i = M[singles:,:singles]
+        M_ajk_bli = M[singles:,singles:]
+        print("ADC Method Type: ", adc.method_type)
+        print('M_i_j - M_i_j.T: ', np.linalg.norm(M_i_j - M_i_j.T))
+        print('M_ajk_bli - M_ajk_bli.T: ', np.linalg.norm(M_ajk_bli - M_ajk_bli))
+        print('M_ajk_i - M_i_ajk.T: ', np.linalg.norm(M_ajk_i - M_i_ajk.T))
+        print('M norm: ', np.linalg.norm(M))
+        print('M_i_j norm: ', np.linalg.norm(M_i_j))
+        print('M_i_ajk norm: ', np.linalg.norm(M_i_ajk))
+        print('M_ajk_i norm: ', np.linalg.norm(M_ajk_i))
+        print('M_ajk_bli norm: ', np.linalg.norm(M_ajk_bli))
+
+        E,U = np.linalg.eig(M)
+        M_size = E.size    
+        U = U[:, E != 0]
+        E = E[E != 0]
+        idx_E_sort = np.argsort(E)
+        E = E[idx_E_sort]
+        U[:, idx_E_sort]
+        #P, X = get_properties(adc, E.size ,U)
+        #idx_P_sort = np.argsort(-P)
+        #P = P[idx_P_sort]
+        #P_100 = P[:100]
+        P = None
+        E_P_size = (E, P, M_size)
+        return E_P_size  
+
+    cput0 = (time.clock(), time.time())
+    log = logger.Logger(adc.stdout, adc.verbose)
+    if nroots == 'one_matvec':
+        t = np.ones(diag.size)
+        for i in range(adc.max_cycle):
+            v = matvec(t)
+        dummy_out = (0,0)
+        cput0 = log.timer_debug1("Total time elapsed for matvec operations", *cput0)
+        return dummy_out
+
+    guess = adc.get_init_guess(nroots, diag, ascending = True)
+    conv, adc.E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space,tol_residual=adc.tol_residual)
+    #P, X = get_properties(adc, nroots ,np.array(U).T)
+    E = adc.E
+    print("Energies: ")
+    print(np.column_stack(np.unique(np.around(E, decimals=8), return_counts=True))) 
+    #print("Spectroscopic factors: ", np.linalg.norm(P))
+    #print(np.column_stack(np.unique(np.around(P, decimals=8), return_counts=True))) 
+    P = None
+    E_P = (E, P)
+    return E_P  
     guess = adc.get_init_guess(nroots, diag, ascending = True)
 
     #conv, adc.E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space,tol_residual=adc.tol_residual)
@@ -747,15 +812,18 @@ class RADC(lib.StreamObject):
             e_exc, v_exc, spec_fac, x, adc_es = self.ea_adc(nroots=nroots, guess=guess, eris=eris)
 
         elif(self.method_type == "ip"):
-            e_exc, v_exc, spec_fac, x, adc_es = self.ip_adc(nroots=nroots, guess=guess, eris=eris)
+            #e_exc, v_exc, spec_fac, x, adc_es = self.ip_adc(nroots=nroots, guess=guess, eris=eris)
+            dummy_blop = self.ip_adc(nroots=nroots, guess=guess, eris=eris)
 
         elif(self.method_type == "ip-cvs"):
-            e_exc, v_exc, spec_fac, x, adc_es = self.ip_cvs_adc(nroots=nroots, guess=guess, eris=eris)
+            #e_exc, v_exc, spec_fac, x, adc_es = self.ip_cvs_adc(nroots=nroots, guess=guess, eris=eris)
+            dummy_blop = self.ip_cvs_adc(nroots=nroots, guess=guess, eris=eris)
 
         else:
             raise NotImplementedError(self.method_type)
-        self._adc_es = adc_es
-        return e_exc, v_exc, spec_fac, x
+        #self._adc_es = adc_es
+        #return e_exc, v_exc, spec_fac, x
+        return dummy_blop
 
     def _finalize(self):
         '''Hook for dumping results and clearing up the object.'''
@@ -770,13 +838,16 @@ class RADC(lib.StreamObject):
     
     def ip_adc(self, nroots=1, guess=None, eris=None):
         adc_es = RADCIP(self)
-        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
-        return e_exc, v_exc, spec_fac, x, adc_es
+        #e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
+        dummy_blop = adc_es.kernel(nroots, guess, eris)
+        #return e_exc, v_exc, spec_fac, x, adc_es
+        return dummy_blop
 
     def ip_cvs_adc(self, nroots=1, guess=None, eris=None):
         adc_es = RADCIPCVS(self)
-        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
-        return e_exc, v_exc, spec_fac, x, adc_es
+        dummy_blop = adc_es.kernel(nroots, guess, eris)
+        #return e_exc, v_exc, spec_fac, x, adc_es
+        return dummy_blop
 
     def density_fit(self, auxbasis=None, with_df = None):
         if with_df is None:
