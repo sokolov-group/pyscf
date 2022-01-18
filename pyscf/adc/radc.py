@@ -75,6 +75,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         print('M_i_j norm: ', np.linalg.norm(M_i_j))
         print('M_i_ajk norm: ', np.linalg.norm(M_i_ajk))
         print('M_ajk_i norm: ', np.linalg.norm(M_ajk_i))
+        print('M_i_ajk sum: ', np.sum(M_i_ajk))
+        print('M_ajk_i sum: ', np.sum(M_ajk_i))
         print('M_ajk_bli norm: ', np.linalg.norm(M_ajk_bli))
 
         E,U = np.linalg.eig(M)
@@ -84,6 +86,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         idx_E_sort = np.argsort(E)
         E = E[idx_E_sort]
         U[:, idx_E_sort]
+        print("Energies: ")
+        print(np.column_stack(np.unique(np.around(E, decimals=8), return_counts=True))) 
         #P, X = get_properties(adc, E.size ,U)
         #idx_P_sort = np.argsort(-P)
         #P = P[idx_P_sort]
@@ -1838,7 +1842,7 @@ def ea_adc_diag(adc,M_ab=None,eris=None):
     return diag
 
 
-def ip_adc_diag(adc,M_ij=None,eris=None):
+def ip_adc_diag(adc,M_ij=None,eris=None, cvs=False):
    
     log = logger.Logger(adc.stdout, adc.verbose)
 
@@ -1921,6 +1925,17 @@ def ip_adc_diag(adc,M_ij=None,eris=None):
 #        else :
 #            raise Exception("Precond not available for out-of-core and density-fitted algo")
 
+    if adc.ncvs > 0:
+
+        shift = -100000000.0
+        ncvs = adc.ncvs
+        diag[ncvs:f1] += shift
+
+        temp = diag[s2:f2].reshape((nvir,nocc,nocc))
+        temp[:,ncvs:,ncvs:] += shift
+        #temp[:,:ncvs,:ncvs] += shift
+        diag[s2:f2] += temp.reshape(-1).copy()
+
     diag = -diag
     log.timer_debug1("Completed ea_diag calculation")
 
@@ -1968,7 +1983,7 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
     d_a = e_vir[:,None]
     D_n = -d_a + d_ij.reshape(-1)
     
-    D_aij = D_n.reshape(-1)
+    #D_aij = D_n.reshape(-1)
     D_aij = D_n.reshape(nvir,nocc,nocc)
 
     diag = np.zeros(dim)
@@ -1978,9 +1993,9 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
     diag[s1:f1] = M_ij_diag.copy()
 
     # Compute precond in 2p1h-2p1h block
-    diag[s2_acc:f2_acc] = D_aij[:,:ncvs,:ncvs].reshape(-1)
-    diag[s2_acv:f2_acv] = D_aij[:,:ncvs,ncvs:].reshape(-1)
-    diag[s2_avc:f2_avc] = D_aij[:,ncvs:,:ncvs].reshape(-1)
+    diag[s2_acc:f2_acc] += D_aij[:,:ncvs,:ncvs].reshape(-1)
+    diag[s2_acv:f2_acv] += D_aij[:,:ncvs,ncvs:].reshape(-1)
+    diag[s2_avc:f2_avc] += D_aij[:,ncvs:,:ncvs].reshape(-1)
     
 #    ###### Additional terms for the preconditioner ####
 #    if (method == "adc(2)-x" or method == "adc(3)"):
@@ -2293,7 +2308,7 @@ def ea_adc_matvec(adc, M_ab=None, eris=None):
     return sigma_
 
 
-def ip_adc_matvec(adc, M_ij=None, eris=None):
+def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
@@ -2339,6 +2354,9 @@ def ip_adc_matvec(adc, M_ij=None, eris=None):
         cput0 = (time.clock(), time.time())
         log = logger.Logger(adc.stdout, adc.verbose)
 
+        if adc.ncvs > 0 :
+            r = cvs_projector(adc, r)
+
         s = np.zeros((dim))
 
         r1 = r[s1:f1]
@@ -2353,7 +2371,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None):
         s[s1:f1] = lib.einsum('ij,j->i',M_ij,r1)
 
 ############ ADC(2) i - kja block #########################
-
+       
         s[s1:f1] += 2. * lib.einsum('jaki,ajk->i', eris_ovoo, r2, optimize = True)
         s[s1:f1] -= lib.einsum('kaji,ajk->i', eris_ovoo, r2, optimize = True)
 
@@ -2361,7 +2379,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None):
 
         temp = lib.einsum('jaki,i->ajk', eris_ovoo, r1, optimize = True).reshape(-1)
         s[s2:f2] += temp.reshape(-1)
-
+       
 ################ ADC(2) ajk - bil block ############################
 
         s[s2:f2] += D_aij * r2.reshape(-1)
@@ -2497,10 +2515,42 @@ def ip_adc_matvec(adc, M_ij=None, eris=None):
         cput0 = log.timer_debug1("completed sigma vector calculation", *cput0)
         s *= -1.0
 
+        if adc.ncvs > 0:
+            r = cvs_projector(adc, r)
+
         return s
 
     return sigma_
 
+
+def cvs_projector(myadc, r):
+    
+    ncvs = myadc.ncvs
+    
+    nocc = myadc._nocc
+    nvir = myadc._nvir
+
+    n_singles = nocc
+    n_doubles = nvir * nocc * nocc
+    
+    s1 = 0
+    f1 = n_singles
+    s2 = f1
+    f2 = s2 + n_doubles 
+    
+    Pr = r.copy()
+    
+    Pr[ncvs:f1] = 0    
+    
+    temp = np.zeros((nvir, nocc, nocc))
+    temp = Pr[s2:f2].reshape((nvir, nocc, nocc)).copy()
+    
+    temp[:,ncvs:,ncvs:] = 0 
+    #temp[:,:ncvs,:ncvs] *= alpha_proj
+    
+    Pr[s2:f2] = temp.reshape(-1).copy()
+    
+    return Pr
 
 def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
 
@@ -2577,7 +2627,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
 
         #s[s1:f1] += 2. * lib.einsum('jaki,ajk->i', eris_ovoo, r2, optimize = True)
         #s[s1:f1] -= lib.einsum('kaji,ajk->i', eris_ovoo, r2, optimize = True)
-
+       
         s[s1:f1] += 2. * lib.einsum('jaki,ajk->i', eris_ovoo[:ncvs,:,:ncvs,:ncvs], r2_ecc, optimize = True)
         s[s1:f1] -= lib.einsum('kaji,ajk->i', eris_ovoo[:ncvs,:,:ncvs,:ncvs], r2_ecc, optimize = True)
         s[s1:f1] += 2. * lib.einsum('jaki,ajk->i', eris_ovoo[:ncvs,:,ncvs:,:ncvs], r2_ecv, optimize = True)
@@ -2595,7 +2645,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
         s[s2_ecv:f2_ecv] += temp_ecv.reshape(-1)
         temp_evc = lib.einsum('jaki,i->ajk', eris_ovoo[ncvs:,:,:ncvs,:ncvs], r1, optimize = True).reshape(-1)
         s[s2_evc:f2_evc] += temp_evc.reshape(-1)
-
+        
 ################ ADC(2) ajk - bil block ############################
 
         #s[s2:f2] += D_aij * r2.reshape(-1)
@@ -3366,6 +3416,7 @@ class RADCIP(RADC):
         self.X = None
         self.evec_print_tol = adc.evec_print_tol
         self.spec_factor_print_tol = adc.spec_factor_print_tol
+        self.ncvs= adc.ncvs
 
         keys = set(('tol_residual','conv_tol', 'e_corr', 'method', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
