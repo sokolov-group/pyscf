@@ -2314,8 +2314,8 @@ def get_imds_ip_off(adc, eris=None, fc_bool=True):
     e_occ_b = adc.mo_energy_b[:nocc_b]
     e_vir_a = adc.mo_energy_a[nocc_a:]
     e_vir_b = adc.mo_energy_b[nocc_b:]
-    e_vir_a = complex_shift(e_vir_a, energy_thresh, imaginary_shift)
-    e_vir_b = complex_shift(e_vir_b, energy_thresh, imaginary_shift)
+    #e_vir_a = complex_shift(e_vir_a, energy_thresh, imaginary_shift)
+    #e_vir_b = complex_shift(e_vir_b, energy_thresh, imaginary_shift)
 
     idn_occ_a = np.identity(nocc_a)
     idn_occ_b = np.identity(nocc_b)
@@ -2862,6 +2862,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
     nvir_b = adc.nvir_b
     imaginary_shift = adc.imaginary_shift
     energy_thresh = adc.energy_thresh
+    ncore_cvs = adc.ncore_cvs
 
     n_singles_a = nocc_a
     n_singles_b = nocc_b
@@ -2877,8 +2878,10 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
     e_vir_a = adc.mo_energy_a[nocc_a:]
     e_vir_b = adc.mo_energy_b[nocc_b:]
     #if cvs is False:
-    e_vir_a = complex_shift(e_vir_a, energy_thresh, imaginary_shift)
-    e_vir_b = complex_shift(e_vir_b, energy_thresh, imaginary_shift)
+    #e_vir_a = complex_shift(e_vir_a, energy_thresh, imaginary_shift)
+    #e_vir_b = complex_shift(e_vir_b, energy_thresh, imaginary_shift)
+    idx_a_thresh = np.argwhere(e_vir_a >= energy_thresh)  
+    idx_b_thresh = np.argwhere(e_vir_b >= energy_thresh)  
 
     idn_occ_a = np.identity(nocc_a)
     idn_occ_b = np.identity(nocc_b)
@@ -2901,26 +2904,62 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
     s_bbb = f_aba
     f_bbb = s_bbb + n_doubles_bbb
 
+    #d_ij_a = e_occ_a[:,None] + e_occ_a
+    #d_a_a = e_vir_a[:,None]
+    #D_n_a = -d_a_a + d_ij_a.reshape(-1)
+    #D_n_a = D_n_a.reshape((nvir_a,nocc_a,nocc_a))
+    #D_aij_a = D_n_a.copy()[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1)
+
+    #d_ij_b = e_occ_b[:,None] + e_occ_b
+    #d_a_b = e_vir_b[:,None]
+    #D_n_b = -d_a_b + d_ij_b.reshape(-1)
+    #D_n_b = D_n_b.reshape((nvir_b,nocc_b,nocc_b))
+    #D_aij_b = D_n_b.copy()[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1)
+
+    #d_ij_ab = e_occ_b[:,None] + e_occ_a
+    #d_a_b = e_vir_b[:,None]
+    #D_n_bab = -d_a_b + d_ij_ab.reshape(-1)
+    #D_aij_bab = D_n_bab.reshape(-1)
+
+    #d_ij_ab = e_occ_a[:,None] + e_occ_b
+    #d_a_a = e_vir_a[:,None]
+    #D_n_aba = -d_a_a + d_ij_ab.reshape(-1)
+    #D_aij_aba = D_n_aba.reshape(-1)
+
     d_ij_a = e_occ_a[:,None] + e_occ_a
     d_a_a = e_vir_a[:,None]
     D_n_a = -d_a_a + d_ij_a.reshape(-1)
     D_n_a = D_n_a.reshape((nvir_a,nocc_a,nocc_a))
+    ### applying imaginary shift to vve elemts ###
+    D_n_a[idx_a_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
+    #################
     D_aij_a = D_n_a.copy()[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1)
 
     d_ij_b = e_occ_b[:,None] + e_occ_b
     d_a_b = e_vir_b[:,None]
     D_n_b = -d_a_b + d_ij_b.reshape(-1)
     D_n_b = D_n_b.reshape((nvir_b,nocc_b,nocc_b))
+    ### applying imaginary shift to vve elemts ###
+    D_n_b[idx_b_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
+    #################
     D_aij_b = D_n_b.copy()[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1)
 
     d_ij_ab = e_occ_b[:,None] + e_occ_a
     d_a_b = e_vir_b[:,None]
     D_n_bab = -d_a_b + d_ij_ab.reshape(-1)
+    D_n_bab = D_n_bab.reshape((nvir_b,nocc_b,nocc_a))
+    ### applying imaginary shift to vve elemts ###
+    D_n_bab[idx_b_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
+    #################
     D_aij_bab = D_n_bab.reshape(-1)
 
     d_ij_ab = e_occ_a[:,None] + e_occ_b
     d_a_a = e_vir_a[:,None]
     D_n_aba = -d_a_a + d_ij_ab.reshape(-1)
+    D_n_aba = D_n_aba.reshape((nvir_a,nocc_a,nocc_b))
+    ### applying imaginary shift to vve elemts ###
+    D_n_aba[idx_a_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
+    #################
     D_aij_aba = D_n_aba.reshape(-1)
 
     diag = np.zeros(dim).astype(complex)
@@ -3860,6 +3899,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
     nvir_b = adc.nvir_b
     imaginary_shift = adc.imaginary_shift
     energy_thresh = adc.energy_thresh
+    ncore_cvs = adc.ncore_cvs
 
     ij_ind_a = np.tril_indices(nocc_a, k=-1)
     ij_ind_b = np.tril_indices(nocc_b, k=-1)
@@ -3878,9 +3918,11 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
     e_vir_b = adc.mo_energy_b[nocc_b:].astype(complex)
     
     #if cvs is False:
-    e_vir_a = complex_shift(e_vir_a, energy_thresh, imaginary_shift)
-    e_vir_b = complex_shift(e_vir_b, energy_thresh, imaginary_shift)
-
+    #e_vir_a = complex_shift(e_vir_a, energy_thresh, imaginary_shift)
+    #e_vir_b = complex_shift(e_vir_b, energy_thresh, imaginary_shift)
+    idx_a_thresh = np.argwhere(e_vir_a >= energy_thresh)  
+    idx_b_thresh = np.argwhere(e_vir_b >= energy_thresh)  
+    
     idn_occ_a = np.identity(nocc_a)
     idn_occ_b = np.identity(nocc_b)
     idn_vir_a = np.identity(nvir_a)
@@ -3893,22 +3935,36 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
     d_a_a = e_vir_a[:,None]
     D_n_a = -d_a_a + d_ij_a.reshape(-1)
     D_n_a = D_n_a.reshape((nvir_a,nocc_a,nocc_a))
+    ### applying imaginary shift to vve elemts ###
+    D_n_a[idx_a_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
+    #################
     D_aij_a = D_n_a.copy()[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1)
 
     d_ij_b = e_occ_b[:,None] + e_occ_b
     d_a_b = e_vir_b[:,None]
     D_n_b = -d_a_b + d_ij_b.reshape(-1)
     D_n_b = D_n_b.reshape((nvir_b,nocc_b,nocc_b))
+    ### applying imaginary shift to vve elemts ###
+    D_n_b[idx_b_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
+    #################
     D_aij_b = D_n_b.copy()[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1)
 
     d_ij_ab = e_occ_b[:,None] + e_occ_a
     d_a_b = e_vir_b[:,None]
     D_n_bab = -d_a_b + d_ij_ab.reshape(-1)
+    D_n_bab = D_n_bab.reshape((nvir_b,nocc_b,nocc_a))
+    ### applying imaginary shift to vve elemts ###
+    D_n_bab[idx_b_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
+    #################
     D_aij_bab = D_n_bab.reshape(-1)
 
     d_ij_ab = e_occ_a[:,None] + e_occ_b
     d_a_a = e_vir_a[:,None]
     D_n_aba = -d_a_a + d_ij_ab.reshape(-1)
+    D_n_aba = D_n_aba.reshape((nvir_a,nocc_a,nocc_b))
+    ### applying imaginary shift to vve elemts ###
+    D_n_aba[idx_a_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
+    #################
     D_aij_aba = D_n_aba.reshape(-1)
 
     s_a = 0
@@ -4462,8 +4518,8 @@ def ip_adc_matvec_off(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
     e_occ_b = adc.mo_energy_b[:nocc_b].astype(complex)
     e_vir_a = adc.mo_energy_a[nocc_a:]
     e_vir_b = adc.mo_energy_b[nocc_b:]
-    e_vir_a = complex_shift(e_vir_a, energy_thresh, imaginary_shift)
-    e_vir_b = complex_shift(e_vir_b, energy_thresh, imaginary_shift)
+    #e_vir_a = complex_shift(e_vir_a, energy_thresh, imaginary_shift)
+    #e_vir_b = complex_shift(e_vir_b, energy_thresh, imaginary_shift)
 
     idn_occ_a = np.identity(nocc_a)
     idn_occ_b = np.identity(nocc_b)
