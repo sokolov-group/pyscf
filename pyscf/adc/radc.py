@@ -2394,7 +2394,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False):
                
                s[s2:f2] -= 0.5*lib.einsum('kijl,ali->ajk',eris_oooo, r2, optimize = True).reshape(-1)
                s[s2:f2] -= 0.5*lib.einsum('klji,ail->ajk',eris_oooo ,r2, optimize = True).reshape(-1)
-               
+               """ 
                s[s2:f2] += 0.5*lib.einsum('klba,bjl->ajk',eris_oovv,r2,optimize = True).reshape(-1)
                
                s[s2:f2] +=  0.5*lib.einsum('jabl,bkl->ajk',eris_ovvo,r2,optimize = True).reshape(-1)
@@ -2408,7 +2408,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False):
                s[s2:f2] -= 0.5*lib.einsum('jabi,bik->ajk',eris_ovvo,r2,optimize = True).reshape(-1)
                s[s2:f2] -= 0.5*lib.einsum('jabi,bik->ajk',eris_ovvo,r2,optimize = True).reshape(-1)
                s[s2:f2] += 0.5*lib.einsum('jabi,bki->ajk',eris_ovvo,r2,optimize = True).reshape(-1)
-               
+               """ 
         if (method == "adc(3)"):
 
                eris_ovoo = eris.ovoo
@@ -2665,9 +2665,30 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                eris_oovv = eris.oovv
                eris_ovvo = eris.ovvo
                
-               s[s2:f2] -= 0.5*lib.einsum('kijl,ali->ajk',eris_oooo, r2, optimize = True).reshape(-1)
-               s[s2:f2] -= 0.5*lib.einsum('klji,ail->ajk',eris_oooo ,r2, optimize = True).reshape(-1)
-               
+               #s[s2:f2] -= 0.5*lib.einsum('kijl,ali->ajk',eris_oooo, r2, optimize = True).reshape(-1)
+               #s[s2:f2] -= 0.5*lib.einsum('klji,ail->ajk',eris_oooo ,r2, optimize = True).reshape(-1)
+              
+               s[s2_ecc:f2_ecc] -= 0.5*lib.einsum('KIJL,aLI->aJK',eris_oooo[:ncvs,:ncvs,:ncvs,:ncvs], r2_ecc, optimize = True).reshape(-1)
+               s[s2_ecc:f2_ecc] -= 0.5*lib.einsum('KLJI,aIL->aJK',eris_oooo[:ncvs,:ncvs,:ncvs,:ncvs] ,r2_ecc, optimize = True).reshape(-1)
+               s[s2_ecc:f2_ecc] -= 0.5*lib.einsum('KiJL,aLi->aJK',eris_oooo[:ncvs,ncvs:,:ncvs,:ncvs], r2_ecv, optimize = True).reshape(-1)
+               s[s2_ecc:f2_ecc] -= 0.5*lib.einsum('KLJi,aiL->aJK',eris_oooo[:ncvs,:ncvs,:ncvs,ncvs:] ,r2_evc, optimize = True).reshape(-1)
+               s[s2_ecc:f2_ecc] -= 0.5*lib.einsum('KIJl,alI->aJK',eris_oooo[:ncvs,:ncvs,:ncvs,ncvs:], r2_evc, optimize = True).reshape(-1)
+               s[s2_ecc:f2_ecc] -= 0.5*lib.einsum('KlJI,aIl->aJK',eris_oooo[:ncvs,ncvs:,:ncvs,:ncvs] ,r2_ecv, optimize = True).reshape(-1)
+
+               s[s2_ecv:f2_ecv] -= 0.5*lib.einsum('kIJL,aLI->aJk',eris_oooo[ncvs:,:ncvs,:ncvs,:ncvs], r2_ecc, optimize = True).reshape(-1)
+               s[s2_ecv:f2_ecv] -= 0.5*lib.einsum('kLJI,aIL->aJk',eris_oooo[ncvs:,:ncvs,:ncvs,:ncvs] ,r2_ecc, optimize = True).reshape(-1)
+               s[s2_ecv:f2_ecv] -= 0.5*lib.einsum('kIJL,aLI->aJk',eris_oooo[ncvs:,:ncvs,:ncvs,:ncvs], r2_ecv, optimize = True).reshape(-1)
+               s[s2_ecv:f2_ecv] -= 0.5*lib.einsum('kLJi,aiL->aJk',eris_oooo[ncvs:,:ncvs,:ncvs,ncvs:] ,r2_evc, optimize = True).reshape(-1)
+               s[s2_ecv:f2_ecv] -= 0.5*lib.einsum('kIJl,alI->aJk',eris_oooo[ncvs:,:ncvs,:ncvs,ncvs:], r2_evc, optimize = True).reshape(-1)
+               s[s2_ecv:f2_ecv] -= 0.5*lib.einsum('klJI,aIl->aJk',eris_oooo[ncvs:,ncvs:,:ncvs,:ncvs] ,r2_ecv, optimize = True).reshape(-1)
+
+               s[s2_ecv:f2_ecv] -= 0.5*lib.einsum('KIjL,aLI->ajK',eris_oooo[:ncvs,:ncvs,ncvs:,:ncvs], r2_ecc, optimize = True).reshape(-1)
+               s[s2_ecv:f2_ecv] -= 0.5*lib.einsum('KLjI,aIL->ajK',eris_oooo[:ncvs,:ncvs,ncvs:,:ncvs] ,r2_ecc, optimize = True).reshape(-1)
+               s[s2_ecv:f2_ecv] -= 0.5*lib.einsum('KijL,aLi->ajK',eris_oooo[:ncvs,ncvs:,ncvs:,:ncvs], r2_ecv, optimize = True).reshape(-1)
+               s[s2_ecv:f2_ecv] -= 0.5*lib.einsum('KLji,aiL->ajK',eris_oooo[:ncvs,:ncvs,ncvs:,ncvs:] ,r2_evc, optimize = True).reshape(-1)
+               s[s2_ecv:f2_ecv] -= 0.5*lib.einsum('KIjl,alI->ajK',eris_oooo[:ncvs,:ncvs,ncvs:,ncvs:], r2_evc, optimize = True).reshape(-1)
+               s[s2_ecv:f2_ecv] -= 0.5*lib.einsum('KLji,aiL->ajK',eris_oooo[:ncvs,:ncvs,ncvs:,ncvs:] ,r2_ecv, optimize = True).reshape(-1)
+               """
                s[s2:f2] += 0.5*lib.einsum('klba,bjl->ajk',eris_oovv,r2,optimize = True).reshape(-1)
                
                s[s2:f2] +=  0.5*lib.einsum('jabl,bkl->ajk',eris_ovvo,r2,optimize = True).reshape(-1)
@@ -2681,7 +2702,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                s[s2:f2] -= 0.5*lib.einsum('jabi,bik->ajk',eris_ovvo,r2,optimize = True).reshape(-1)
                s[s2:f2] -= 0.5*lib.einsum('jabi,bik->ajk',eris_ovvo,r2,optimize = True).reshape(-1)
                s[s2:f2] += 0.5*lib.einsum('jabi,bki->ajk',eris_ovvo,r2,optimize = True).reshape(-1)
-               
+               """
         if (method == "adc(3)"):
 
                eris_ovoo = eris.ovoo
