@@ -185,9 +185,11 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         return w, v, idx
 
     nroots = 2
+    #nroots = 1
       
     guess = adc.get_init_guess(nroots, diag, ascending = True)
-    conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=sort_complex_eigenvalues)
+    #conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=sort_complex_eigenvalues)
+    conv, E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-16, max_cycle=adc.max_cycle, max_space=adc.max_space)
     #conv, E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-12, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=pick_real_eigs)
     #print("Davidson energies: ", E)
     #exit()
@@ -216,6 +218,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
 
     print("CVS results")
+    print("Orbital energy shift threshold = {}".format(adc.energy_thresh))
     T = adc.get_trans_moments()
     U = np.array(U)
     spec_factors = adc.get_spec_factors(T, U, nroots)
@@ -262,12 +265,12 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
            x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])      
            #s = np.dot(np.asarray(U).conj(), np.asarray(x0).T)
            s = np.dot(np.asarray(U), np.asarray(x0).conj().T)
-           thresh = 0.01
+           thresh = 0.03
            snorm = np.einsum('pi,pi->i', s.conj(), s)
            #idx = np.argsort(-snorm)[:nroots] 
            idx = np.argsort(-snorm)
            snorm = snorm[idx]
-           print("snorm: ", snorm)
+           print("snorm: ", snorm[:30])
            idx = idx[snorm > thresh]  
            nroots = idx.size
            #w, v, idx = lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
@@ -275,7 +278,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
            v = v[:, idx]
            return w, v, idx, nroots
        
-    conv, E, U , nroots= davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick =eig_close_to_init_guess)
+    #conv, E, U , nroots= davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick =eig_close_to_init_guess)
+    conv, E, U , nroots= davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick =eig_close_to_init_guess, tol_residual = 1e-3)
     #conv, E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-12, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=eig_close_to_init_guess)
     
     U = np.array(U)
@@ -293,6 +297,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         print ("*************************************************************")
 
     print("MOM results ")
+    print("Orbital energy shift threshold = {}".format(adc.energy_thresh))
     print("     Energies (eV)          |    Spec factors   |   |s|^2 w.r.t CVS eigenvectors")
     print("---------------------------------------------------")
     print(np.c_[E*27.2114, spec_factors, snorm])
@@ -363,12 +368,14 @@ def analyze_eigenvector_ip(adc, U):
         U1dotU1 = np.dot(U1, U1.conj()) 
         U2dotU2 = np.dot(U2, U2.conj()) 
 
-        temp_aaa = np.zeros((nvir_a, nocc_a, nocc_a), dtype=complex)
+        #temp_aaa = np.zeros((nvir_a, nocc_a, nocc_a), dtype=complex)
+        temp_aaa = np.zeros((nvir_a, nocc_a, nocc_a))
         temp_aaa[:,ij_a[0],ij_a[1]] =  U[I,s_aaa:f_aaa].reshape(nvir_a,-1).copy()
         temp_aaa[:,ij_a[1],ij_a[0]] = -U[I,s_aaa:f_aaa].reshape(nvir_a,-1).copy()
         U_aaa = temp_aaa.reshape(-1).copy()
 
-        temp_bbb = np.zeros((nvir_b, nocc_b, nocc_b), dtype=complex)
+        #temp_bbb = np.zeros((nvir_b, nocc_b, nocc_b), dtype=complex)
+        temp_bbb = np.zeros((nvir_b, nocc_b, nocc_b))
         temp_bbb[:,ij_b[0],ij_b[1]] =  U[I,s_bbb:f_bbb].reshape(nvir_b,-1).copy()
         temp_bbb[:,ij_b[1],ij_b[0]] = -U[I,s_bbb:f_bbb].reshape(nvir_b,-1).copy()
         U_bbb = temp_bbb.reshape(-1).copy()
@@ -2333,8 +2340,8 @@ def get_imds_ip_off(adc, eris=None, fc_bool=True):
     # i-j block
     # Zeroth-order terms
 
-    M_ij_a = lib.einsum('ij,j->ij', idn_occ_a ,e_occ_a).astype(complex)
-    M_ij_b = lib.einsum('ij,j->ij', idn_occ_b ,e_occ_b).astype(complex)
+    M_ij_a = lib.einsum('ij,j->ij', idn_occ_a ,e_occ_a)#.astype(complex)
+    M_ij_b = lib.einsum('ij,j->ij', idn_occ_b ,e_occ_b)#.astype(complex)
 
     # Second-order terms
 
@@ -2873,8 +2880,8 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
 
     dim = n_singles_a + n_singles_b + n_doubles_aaa + n_doubles_bab + n_doubles_aba + n_doubles_bbb
 
-    e_occ_a = adc.mo_energy_a[:nocc_a].astype(complex)
-    e_occ_b = adc.mo_energy_b[:nocc_b].astype(complex)
+    e_occ_a = adc.mo_energy_a[:nocc_a]#.astype(complex)
+    e_occ_b = adc.mo_energy_b[:nocc_b]#.astype(complex)
     e_vir_a = adc.mo_energy_a[nocc_a:]
     e_vir_b = adc.mo_energy_b[nocc_b:]
     #if cvs is False:
@@ -2962,7 +2969,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
     #################
     D_aij_aba = D_n_aba.reshape(-1)
 
-    diag = np.zeros(dim).astype(complex)
+    diag = np.zeros(dim)#.astype(complex)
 
     # Compute precond in h1-h1 block
     M_ij_a_diag = np.diagonal(M_ij_a)
@@ -2979,7 +2986,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
     diag[s_bbb:f_bbb] = D_aij_b.copy()
 
     ###### Additional terms for the preconditioner ####
-    """ 
+     
     if (method == "adc(2)-x" or method == "adc(3)"):
         if eris is None:
             eris = adc.transform_integrals()
@@ -3074,16 +3081,16 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
                 temp[:] += np.diagonal(eris_OvOv_p).reshape(nocc_b,nvir_a)
                 temp = np.ascontiguousarray(temp.transpose(2,1,0))
                 diag[s_aba:f_aba] += temp.reshape(-1)
-    """
+    
     if cvs is True:
         
-        shift = -100000000.0 + 0*1j 
+        shift = -100000000.0 #+ 0*1j 
         ncore = adc.ncore_cvs
 
         diag[(s_a+ncore):f_a] += shift
         diag[(s_b+ncore):f_b] += shift
 
-        temp = np.zeros((nvir_a, nocc_a, nocc_a)).astype(complex)
+        temp = np.zeros((nvir_a, nocc_a, nocc_a))#.astype(complex)
         temp[:,ij_ind_a[0],ij_ind_a[1]] = diag[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
         temp[:,ij_ind_a[1],ij_ind_a[0]] = -diag[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
         temp[:,ncore:,ncore:] += shift
@@ -3107,7 +3114,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
 
         diag[s_aba:f_aba] = temp.reshape(-1).copy()
 
-        temp = np.zeros((nvir_b, nocc_b, nocc_b)).astype(complex)
+        temp = np.zeros((nvir_b, nocc_b, nocc_b))#.astype(complex)
         temp[:,ij_ind_b[0],ij_ind_b[1]] = diag[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
         temp[:,ij_ind_b[1],ij_ind_b[0]] = -diag[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
 
@@ -3155,12 +3162,12 @@ def cvs_projector(adc, r):
     s_bbb = f_aba
     f_bbb = s_bbb + n_doubles_bbb
 
-    Pr = r.astype(complex)
+    Pr = r#.astype(complex)
 
     Pr[(s_a+ncore):f_a] = 0.0
     Pr[(s_b+ncore):f_b] = 0.0
 
-    temp = np.zeros((nvir_a, nocc_a, nocc_a)).astype(complex)
+    temp = np.zeros((nvir_a, nocc_a, nocc_a))#.astype(complex)
     temp[:,ij_a[0],ij_a[1]] = Pr[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
     temp[:,ij_a[1],ij_a[0]] = -Pr[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
 
@@ -3183,7 +3190,7 @@ def cvs_projector(adc, r):
 
     Pr[s_aba:f_aba] = temp.reshape(-1).copy()
 
-    temp = np.zeros((nvir_b, nocc_b, nocc_b)).astype(complex)
+    temp = np.zeros((nvir_b, nocc_b, nocc_b))#.astype(complex)
     temp[:,ij_b[0],ij_b[1]] = Pr[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
     temp[:,ij_b[1],ij_b[0]] = -Pr[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
 
@@ -3194,6 +3201,144 @@ def cvs_projector(adc, r):
 
     return Pr
 
+def vve_projector(adc, r):
+
+    ncore = adc.ncore_cvs
+
+    nocc_a = adc.nocc_a
+    nocc_b = adc.nocc_b
+    nvir_a = adc.nvir_a
+    nvir_b = adc.nvir_b
+    e_vir_a = adc.mo_energy_a[nocc_a:]#.astype(complex)
+    e_vir_b = adc.mo_energy_b[nocc_b:]#.astype(complex)
+    energy_thresh = adc.energy_thresh
+    idx_a_thresh = np.argwhere(e_vir_a >= energy_thresh)  
+    idx_b_thresh = np.argwhere(e_vir_b >= energy_thresh)  
+
+    n_singles_a = nocc_a
+    n_singles_b = nocc_b
+    n_doubles_aaa = nocc_a * (nocc_a - 1) * nvir_a // 2
+    n_doubles_bab = nvir_b * nocc_a * nocc_b
+    n_doubles_aba = nvir_a * nocc_b * nocc_a
+    n_doubles_bbb = nocc_b * (nocc_b - 1) * nvir_b // 2
+
+    ij_a = np.tril_indices(nocc_a, k=-1)
+    ij_b = np.tril_indices(nocc_b, k=-1)
+
+    s_a = 0
+    f_a = n_singles_a
+    s_b = f_a
+    f_b = s_b + n_singles_b
+    s_aaa = f_b
+    f_aaa = s_aaa + n_doubles_aaa
+    s_bab = f_aaa
+    f_bab = s_bab + n_doubles_bab
+    s_aba = f_bab
+    f_aba = s_aba + n_doubles_aba
+    s_bbb = f_aba
+    f_bbb = s_bbb + n_doubles_bbb
+
+    Pr = r#.astype(complex)
+
+    #Pr[(s_a+ncore):f_a] = 0.0
+    #Pr[(s_b+ncore):f_b] = 0.0
+
+    temp = np.zeros((nvir_a, nocc_a, nocc_a))#.astype(complex)
+    temp[:,ij_a[0],ij_a[1]] = Pr[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
+    temp[:,ij_a[1],ij_a[0]] = -Pr[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
+
+    temp[idx_a_thresh,ncore:,ncore:] = 0.0
+    Pr[s_aaa:f_aaa] = temp[:,ij_a[0],ij_a[1]].reshape(-1).copy()
+
+    temp = Pr[s_bab:f_bab].copy()
+    temp = temp.reshape((nvir_b, nocc_b, nocc_a))
+
+    temp[idx_b_thresh,ncore:,ncore:] = 0.0
+    Pr[s_bab:f_bab] = temp.reshape(-1).copy()
+
+    temp = Pr[s_aba:f_aba].copy()
+    temp = temp.reshape((nvir_a, nocc_a, nocc_b))
+
+    temp[idx_a_thresh,ncore:,ncore:] = 0.0
+    Pr[s_aba:f_aba] = temp.reshape(-1).copy()
+
+    temp = np.zeros((nvir_b, nocc_b, nocc_b))#.astype(complex)
+    temp[:,ij_b[0],ij_b[1]] = Pr[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
+    temp[:,ij_b[1],ij_b[0]] = -Pr[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
+
+    temp[idx_b_thresh,ncore:,ncore:] = 0.0
+    Pr[s_bbb:f_bbb] = temp[:,ij_b[0],ij_b[1]].reshape(-1).copy()
+
+    return Pr
+
+def composition_projector(adc, r):
+
+    ncore = adc.ncore_cvs
+
+    nocc_a = adc.nocc_a
+    nocc_b = adc.nocc_b
+    nvir_a = adc.nvir_a
+    nvir_b = adc.nvir_b
+    e_vir_a = adc.mo_energy_a[nocc_a:]#.astype(complex)
+    e_vir_b = adc.mo_energy_b[nocc_b:]#.astype(complex)
+    energy_thresh = adc.energy_thresh
+    idx_a_thresh = np.argwhere(e_vir_a >= energy_thresh)  
+    idx_b_thresh = np.argwhere(e_vir_b >= energy_thresh)  
+
+    n_singles_a = nocc_a
+    n_singles_b = nocc_b
+    n_doubles_aaa = nocc_a * (nocc_a - 1) * nvir_a // 2
+    n_doubles_bab = nvir_b * nocc_a * nocc_b
+    n_doubles_aba = nvir_a * nocc_b * nocc_a
+    n_doubles_bbb = nocc_b * (nocc_b - 1) * nvir_b // 2
+
+    ij_a = np.tril_indices(nocc_a, k=-1)
+    ij_b = np.tril_indices(nocc_b, k=-1)
+
+    s_a = 0
+    f_a = n_singles_a
+    s_b = f_a
+    f_b = s_b + n_singles_b
+    s_aaa = f_b
+    f_aaa = s_aaa + n_doubles_aaa
+    s_bab = f_aaa
+    f_bab = s_bab + n_doubles_bab
+    s_aba = f_bab
+    f_aba = s_aba + n_doubles_aba
+    s_bbb = f_aba
+    f_bbb = s_bbb + n_doubles_bbb
+
+
+    Pr[(s_a+ncore):f_a] = 0.0
+    Pr[(s_b+ncore):f_b] = 0.0
+    
+    temp = np.zeros((nvir_a, nocc_a, nocc_a))#.astype(complex)
+    temp[:,ij_a[0],ij_a[1]] = Pr[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
+    temp[:,ij_a[1],ij_a[0]] = -Pr[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
+
+    temp[idx_a_thresh,ncore:,ncore:] = 0.0
+    Pr[s_aaa:f_aaa] = temp[:,ij_a[0],ij_a[1]].reshape(-1).copy()
+
+    temp = Pr[s_bab:f_bab].copy()
+    temp = temp.reshape((nvir_b, nocc_b, nocc_a))
+
+    temp[idx_b_thresh,ncore:,ncore:] = 0.0
+    Pr[s_bab:f_bab] = temp.reshape(-1).copy()
+
+    temp = Pr[s_aba:f_aba].copy()
+    temp = temp.reshape((nvir_a, nocc_a, nocc_b))
+
+    temp[idx_a_thresh,ncore:,ncore:] = 0.0
+    Pr[s_aba:f_aba] = temp.reshape(-1).copy()
+
+    temp = np.zeros((nvir_b, nocc_b, nocc_b))#.astype(complex)
+    temp[:,ij_b[0],ij_b[1]] = Pr[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
+    temp[:,ij_b[1],ij_b[0]] = -Pr[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
+
+    temp[idx_b_thresh,ncore:,ncore:] = 0.0
+    Pr[s_bbb:f_bbb] = temp[:,ij_b[0],ij_b[1]].reshape(-1).copy()
+
+    return Pr
 def ea_contract_r_vvvv_antisym(myadc,r2,vvvv_d):
 
     nocc = r2.shape[0]
@@ -3912,10 +4057,10 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
 
     dim = n_singles_a + n_singles_b + n_doubles_aaa + n_doubles_bab + n_doubles_aba + n_doubles_bbb
 
-    e_occ_a = adc.mo_energy_a[:nocc_a].astype(complex) 
-    e_occ_b = adc.mo_energy_b[:nocc_b].astype(complex)
-    e_vir_a = adc.mo_energy_a[nocc_a:].astype(complex)
-    e_vir_b = adc.mo_energy_b[nocc_b:].astype(complex)
+    e_occ_a = adc.mo_energy_a[:nocc_a]#.astype(complex) 
+    e_occ_b = adc.mo_energy_b[:nocc_b]#.astype(complex)
+    e_vir_a = adc.mo_energy_a[nocc_a:]#.astype(complex)
+    e_vir_b = adc.mo_energy_b[nocc_b:]#.astype(complex)
     
     #if cvs is False:
     #e_vir_a = complex_shift(e_vir_a, energy_thresh, imaginary_shift)
@@ -3935,8 +4080,8 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
     d_a_a = e_vir_a[:,None]
     D_n_a = -d_a_a + d_ij_a.reshape(-1)
     D_n_a = D_n_a.reshape((nvir_a,nocc_a,nocc_a))
-    ### applying imaginary shift to vve elemts ###
-    D_n_a[idx_a_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
+    ### applying imaginary shift to vve elements ###
+    #D_n_a[idx_a_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
     #################
     D_aij_a = D_n_a.copy()[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1)
 
@@ -3944,8 +4089,8 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
     d_a_b = e_vir_b[:,None]
     D_n_b = -d_a_b + d_ij_b.reshape(-1)
     D_n_b = D_n_b.reshape((nvir_b,nocc_b,nocc_b))
-    ### applying imaginary shift to vve elemts ###
-    D_n_b[idx_b_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
+    ### applying imaginary shift to vve elements ###
+    #D_n_b[idx_b_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
     #################
     D_aij_b = D_n_b.copy()[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1)
 
@@ -3953,8 +4098,8 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
     d_a_b = e_vir_b[:,None]
     D_n_bab = -d_a_b + d_ij_ab.reshape(-1)
     D_n_bab = D_n_bab.reshape((nvir_b,nocc_b,nocc_a))
-    ### applying imaginary shift to vve elemts ###
-    D_n_bab[idx_b_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
+    ### applying imaginary shift to vve elements ###
+    #D_n_bab[idx_b_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
     #################
     D_aij_bab = D_n_bab.reshape(-1)
 
@@ -3962,8 +4107,8 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
     d_a_a = e_vir_a[:,None]
     D_n_aba = -d_a_a + d_ij_ab.reshape(-1)
     D_n_aba = D_n_aba.reshape((nvir_a,nocc_a,nocc_b))
-    ### applying imaginary shift to vve elemts ###
-    D_n_aba[idx_a_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
+    ### applying imaginary shift to vve elements ###
+    #D_n_aba[idx_a_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
     #################
     D_aij_aba = D_n_aba.reshape(-1)
 
@@ -3983,8 +4128,8 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
     if M_ij is None:
         M_ij = adc.get_imds()
     M_ij_a, M_ij_b = M_ij
-    M_ij_a = M_ij_a.astype(complex)
-    M_ij_b = M_ij_b.astype(complex)
+    M_ij_a = M_ij_a#.astype(complex)
+    M_ij_b = M_ij_b#.astype(complex)
     #@profile
     #Calculate sigma vector
     def sigma_(r):
@@ -3995,8 +4140,11 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
 
         if cvs is True:
             r = cvs_projector(adc, r)
+        else:
+            r = vve_projector(adc, r)
 
-        s = np.zeros((dim), dtype=complex)
+        #s = np.zeros((dim), dtype=complex)
+        s = np.zeros(dim)
 
         r_a = r[s_a:f_a]
         r_b = r[s_b:f_b]
@@ -4009,12 +4157,14 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
         r_bbb = r_bbb.reshape(nvir_b,-1)
 
         r_aaa_u = None
-        r_aaa_u = np.zeros((nvir_a,nocc_a,nocc_a), dtype=complex)
+        #r_aaa_u = np.zeros((nvir_a,nocc_a,nocc_a), dtype=complex)
+        r_aaa_u = np.zeros((nvir_a,nocc_a,nocc_a))
         r_aaa_u[:,ij_ind_a[0],ij_ind_a[1]]= r_aaa.copy()
         r_aaa_u[:,ij_ind_a[1],ij_ind_a[0]]= -r_aaa.copy()
 
         r_bbb_u = None
-        r_bbb_u = np.zeros((nvir_b,nocc_b,nocc_b), dtype=complex)
+        #r_bbb_u = np.zeros((nvir_b,nocc_b,nocc_b), dtype=complex)
+        r_bbb_u = np.zeros((nvir_b,nocc_b,nocc_b))
         r_bbb_u[:,ij_ind_b[0],ij_ind_b[1]]= r_bbb.copy()
         r_bbb_u[:,ij_ind_b[1],ij_ind_b[0]]= -r_bbb.copy()
 
@@ -4197,8 +4347,10 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
                    chnk_size = nocc_a
 
                a = 0
-               temp_singles = np.zeros((nocc_a), dtype=complex)
-               temp_doubles = np.zeros((nvir_a, nvir_a, nvir_a), dtype=complex)
+               #temp_singles = np.zeros((nocc_a), dtype=complex)
+               #temp_doubles = np.zeros((nvir_a, nvir_a, nvir_a), dtype=complex)
+               temp_singles = np.zeros((nocc_a))
+               temp_doubles = np.zeros((nvir_a, nvir_a, nvir_a))
                r_aaa = r_aaa.reshape(nvir_a,-1)
                t2_1_a_t = t2_1_a[ij_ind_a[0],ij_ind_a[1],:,:]
                temp_1 = lib.einsum('pbc,ap->abc',t2_1_a_t,r_aaa, optimize=True)
@@ -4266,8 +4418,10 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
                else :
                    chnk_size = nocc_b
                a = 0
-               temp_singles = np.zeros((nocc_b), dtype=complex)
-               temp_doubles = np.zeros((nvir_b, nvir_b, nvir_b), dtype=complex)
+               #temp_singles = np.zeros((nocc_b), dtype=complex)
+               #temp_doubles = np.zeros((nvir_b, nvir_b, nvir_b), dtype=complex)
+               temp_singles = np.zeros((nocc_b))
+               temp_doubles = np.zeros((nvir_b, nvir_b, nvir_b))
                r_bbb = r_bbb.reshape(nvir_b,-1)
                t2_1_b_t = t2_1_b[ij_ind_b[0],ij_ind_b[1],:,:]
                temp_1 = lib.einsum('pbc,ap->abc',t2_1_b_t,r_bbb, optimize=True)
@@ -4334,7 +4488,8 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
                    chnk_size = nocc_a
                a = 0
                temp_1 = lib.einsum('kjcb,ajk->abc',t2_1_ab,r_bab, optimize=True)
-               temp_2 = np.zeros((nvir_a, nvir_b, nvir_b), dtype=complex)
+               #temp_2 = np.zeros((nvir_a, nvir_b, nvir_b), dtype=complex)
+               temp_2 = np.zeros((nvir_a, nvir_b, nvir_b))
                for p in range(0,nocc_a,chnk_size):
                    if getattr(adc, 'with_df', None):
                        eris_ovVV = dfadc.get_ovvv_spin_df(adc, eris.Lov, eris.LVV, p, chnk_size).reshape(-1,nvir_a,nvir_b,nvir_b)
@@ -4359,7 +4514,8 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
 
                a = 0
                temp_1 = lib.einsum('jkbc,ajk->abc',t2_1_ab,r_aba, optimize=True)
-               temp_2 = np.zeros((nvir_a, nvir_b, nvir_a), dtype=complex)
+               #temp_2 = np.zeros((nvir_a, nvir_b, nvir_a), dtype=complex)
+               temp_2 = np.zeros((nvir_a, nvir_b, nvir_a))
                for p in range(0,nocc_b,chnk_size):
                    if getattr(adc, 'with_df', None):
                        eris_OVvv = dfadc.get_ovvv_spin_df(adc, eris.LOV, eris.Lvv, p, chnk_size).reshape(-1,nvir_b,nvir_a,nvir_a)
@@ -4456,6 +4612,8 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
 
         if cvs is True:
             s = cvs_projector(adc, s)
+        else:
+            s = vve_projector(adc, s)
         """
         print('s[s_a:f_a]',             np.linalg.norm(s[s_a:f_a]))
         print(np.column_stack(np.unique(np.around(s[s_a:f_a], decimals=8), return_counts=True))) 
@@ -5228,7 +5386,8 @@ def ip_compute_trans_moments(adc, orb, spin="alpha"):
     s_bbb = f_aba
     f_bbb = s_bbb + n_doubles_bbb
 
-    T = np.zeros((dim), dtype=complex)
+    #T = np.zeros((dim), dtype=complex)
+    T = np.zeros((dim))
 
 ######## spin = alpha  ############################################
     if spin=="alpha":
@@ -5368,13 +5527,15 @@ def get_spec_factors(adc, T, U, nroots=1):
     T_a = T[0]
     T_b = T[1]
 
-    T_a = np.array(T_a, dtype=complex)
+    #T_a = np.array(T_a, dtype=complex)
     X_a = np.dot(T_a, U.T).reshape(-1,nroots) # changed U.T to U.transpose()
     del T_a
-    T_b = np.array(T_b, dtype=complex)
+    #T_b = np.array(T_b, dtype=complex)
     X_b = np.dot(T_b, U.T).reshape(-1,nroots)
     del T_b
 
+    #P = lib.einsum("pi,pi->i", X_a, X_a.conj())
+    #P += lib.einsum("pi,pi->i", X_b, X_b.conj())
     P = lib.einsum("pi,pi->i", X_a, X_a.conj())
     P += lib.einsum("pi,pi->i", X_b, X_b.conj())
     return P

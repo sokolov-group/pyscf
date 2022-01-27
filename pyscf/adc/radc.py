@@ -1406,7 +1406,7 @@ def get_imds_ip(adc, eris=None, fc_bool=True):
 
     e_occ = adc.mo_energy[:nocc]
     e_vir = adc.mo_energy[nocc:]
-    e_vir = complex_shift(e_vir, energy_thresh, imaginary_shift)
+    #e_vir = complex_shift(e_vir, energy_thresh, imaginary_shift)
 
     idn_occ = np.identity(nocc)
     idn_vir = np.identity(nvir)
@@ -1425,7 +1425,7 @@ def get_imds_ip(adc, eris=None, fc_bool=True):
         e_occ = e_occ[nfc_orb:]
         idn_occ = np.identity(nocc-nfc_orb)"""
 
-    M_ij = lib.einsum('ij,j->ij', idn_occ ,e_occ).astype(complex)
+    M_ij = lib.einsum('ij,j->ij', idn_occ ,e_occ)#.astype(complex)
 
     # Second-order terms
 
@@ -1812,7 +1812,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=True, fc_bool=True, mom_skd=False, a
 
     e_occ = adc.mo_energy[:nocc]
     e_vir = adc.mo_energy[nocc:]
-    e_vir = complex_shift(e_vir, energy_thresh, imaginary_shift)
+    #e_vir = complex_shift(e_vir, energy_thresh, imaginary_shift)
 
     idn_occ = np.identity(nocc)
     idn_vir = np.identity(nvir)
@@ -1826,7 +1826,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=True, fc_bool=True, mom_skd=False, a
     d_a = e_vir[:,None]
     D_n = -d_a + d_ij.reshape(-1)
     D_aij = D_n.reshape(-1)
-    diag = np.zeros(dim).astype(complex)
+    diag = np.zeros(dim)#.astype(complex)
 
     # Compute precond in h1-h1 block
     M_ij_diag = np.diagonal(M_ij)
@@ -2475,7 +2475,7 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
 
     e_occ = adc.mo_energy[:nocc]
     e_vir = adc.mo_energy[nocc:]
-    e_vir = complex_shift(e_vir, energy_thresh, imaginary_shift)
+    #e_vir = complex_shift(e_vir, energy_thresh, imaginary_shift)
 
     idn_occ = np.identity(nocc)
     idn_vir = np.identity(nvir)
@@ -2507,7 +2507,7 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
         if adc.ncore_proj_valence > 0:
             r = cvs_proj_valence(adc, r)
 
-        s = np.zeros((dim)).astype(complex)
+        s = np.zeros((dim))#.astype(complex)
 
         r1 = r[s1:f1]
         r2 = r[s2:f2]
@@ -2581,8 +2581,10 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
                else :
                    chnk_size = nocc
                a = 0
-               temp_singles = np.zeros((nocc), dtype=complex)
-               temp_doubles = np.zeros((nvir,nvir,nvir), dtype=complex)
+               #temp_singles = np.zeros((nocc), dtype=complex)
+               #temp_doubles = np.zeros((nvir,nvir,nvir), dtype=complex)
+               temp_singles = np.zeros((nocc))
+               temp_doubles = np.zeros((nvir,nvir,nvir))
                for p in range(0,nocc,chnk_size):
                    if getattr(adc, 'with_df', None):
                        eris_ovvv = dfadc.get_ovvv_df(adc, eris.Lov, eris.Lvv, p, chnk_size).reshape(-1,nvir,nvir,nvir)
@@ -2607,7 +2609,8 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
                temp += lib.einsum('ljab,akj->blk',t2_1,r2,optimize=True)
                temp += lib.einsum('ljba,ajk->blk',t2_1,r2,optimize=True)
 
-               temp_1 = np.zeros_like(r2, dtype=complex)
+               #temp_1 = np.zeros_like(r2, dtype=complex)
+               temp_1 = np.zeros_like(r2)
                temp_1 =  lib.einsum('jlab,ajk->blk',t2_1,r2,optimize=True)
                temp_1 -= lib.einsum('jlab,akj->blk',t2_1,r2,optimize=True)
                temp_1 += lib.einsum('jlab,ajk->blk',t2_1,r2,optimize=True)
@@ -2623,14 +2626,15 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
                del temp_1
                del temp_2
 
-               temp = np.zeros_like(r2, dtype=complex)
+               #temp = np.zeros_like(r2, dtype=complex)
+               temp = np.zeros_like(r2)
                temp = -lib.einsum('klab,akj->blj',t2_1,r2,optimize=True)
                temp += lib.einsum('klab,ajk->blj',t2_1,r2,optimize=True)
                temp += lib.einsum('lkab,akj->blj',t2_1,r2,optimize=True)
                temp -= lib.einsum('lkab,ajk->blj',t2_1,r2,optimize=True)
                temp -= lib.einsum('lkba,akj->blj',t2_1,r2,optimize=True)
 
-               temp_1 = np.zeros_like(r2, dtype=complex)
+               temp_1 = np.zeros_like(r2)
                temp_1  = -lib.einsum('klab,akj->blj',t2_1,r2,optimize=True)
                temp_1 += lib.einsum('klab,ajk->blj',t2_1,r2,optimize=True)
                temp_1 -= lib.einsum('klab,akj->blj',t2_1,r2,optimize=True)
