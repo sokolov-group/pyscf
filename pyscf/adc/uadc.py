@@ -295,10 +295,10 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     
     E_mom_size = 2
     iter_i = 0
-    E_mom = 0 
+    E_mom = np.zeros(2) 
     iter_idx = []
     end_bool = False
-    while (E_mom_size <= 2 and iter_i < e_vir_a.size) or end_bool is False:
+    while E_mom_size <= 2 and iter_i < e_vir_a.size:
         energy_thresh_i = e_vir_a[iter_i] - 1e-7
         matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False, energy_thresh=energy_thresh_i)
         conv, E, U , nroots= davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick =eig_close_to_init_guess, tol_residual = 1e-3)
@@ -332,19 +332,23 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         spec_factors_mom = spec_factors.copy()
  
         E_mom_size = E.size
-        if E_mom_size > 2 and iter_i > 0:
+        #print("E_mom_size: ", E_mom_size)
+        if E.size > 2:
            print("Total number of non-degenerate virtual MOs: ", e_vir_a.size)
            print("Total number of non-degenerate virtual MOs used in vve: ", e_vir_a[:iter_i].size)
            print("Highest vve energy thresholds used (Eh): ", e_vir_a[iter_i-1])
            print("Total vve energy thresholds used (Eh): ", e_vir_a[:iter_i])
            print("Ecvs: ", E_cvs)
-           print("Emom: ", E_mom)
+           if iter_i > 0: 
+               print("Emom: ", E_mom*27.2114)
+           if iter_i == 0: 
+               print("Emom: ", E*27.2114)
 
-        if E_mom_size == 2 and iter_i == 1 and e_vir_a[0] == 1e15:
-           print("Ecvs: ", E_cvs)
-           print("Emom: ", E_mom)
+        if E.size == 2 and iter_i == 0:# and e_vir_a[0] == 1e15:
+           print("Ecvs: ", E_cvs*27.2114)
+           print("Emom: ", E*27.2114)
            print("Total number of non-degenerate virtual MOs: ", e_vir_a.size)
-           end_bool = True
+           E_mom_size = 3
         else:
            E_mom = E
            iter_i +=1
@@ -596,7 +600,7 @@ def analyze_eigenvector_ip(adc, U, print_thresh = 0.05):
                             logger.info(adc, '  %4d  %4d  %4d   %7.4f  %13.2f   %13.2f', print_doubles[1], print_doubles[2], print_doubles[0], doubles_bbb_val[idx], doubles_bbb_energy[idx], avg_energy_bbb[idx])
 
                 logger.info(adc, "\n*************************************************************\n")
-
+                sys.stdout.flush() 
 
 def compute_amplitudes_energy(myadc, eris, verbose=None, fc_bool=True):
 
