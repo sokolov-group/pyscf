@@ -172,7 +172,9 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         print("----------- End of Spec beta factors ---------------------") 
     #exit()
     
+    print("pre-matvec DEBUG")
     matvec, diag = adc.gen_matvec(imds, eris, cvs=cvs)
+
     #diag = np.real(diag)
     #print("diag sanity check: ")
     #print(np.column_stack(np.unique(np.around(diag, decimals=8), return_counts=True))) 
@@ -188,7 +190,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     #nroots = 1
       
     guess = adc.get_init_guess(nroots, diag, ascending = True)
-    #conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=sort_complex_eigenvalues)
+    #conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-16, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=sort_complex_eigenvalues)
     conv, E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-16, max_cycle=adc.max_cycle, max_space=adc.max_space)
     #conv, E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-12, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=pick_real_eigs)
     #print("Davidson energies: ", E)
@@ -214,14 +216,15 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     """
     guess = U
     #imds = adc.get_imds(eris, fc_bool=False)
-    matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False)
+
+    #matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False)
 
 
     print("CVS results")
-    print("Orbital energy shift threshold = {}".format(adc.energy_thresh))
+    #print("Orbital energy shift threshold = {}".format(adc.energy_thresh))
     T = adc.get_trans_moments()
     U = np.array(U)
-    spec_factors = adc.get_spec_factors(T, U, nroots)
+    spec_factors, X = adc.get_spec_factors(T, U, nroots)
     #print(np.column_stack((E*27.2114, spec_factors)))
     print("     Energies (eV)          |    Spec factors")
     print("---------------------------------------------------")
@@ -251,7 +254,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     max_mom_iter = 100
     de_tol = 1e-6
     res_tol = 1e-3
-    ovlp_tol = 0.01
+    #ovlp_tol = 0.01
+    ovlp_tol = adc.es_mom_thresh 
     max_v = 30
     if adc.lanczos_space > 0:
         E, U, conv, nroots = mom_blanczos(matvec, guess, adc.lanczos_space, max_mom_iter, E, de_tol, res_tol,ovlp_tol=ovlp_tol,max_v=max_v,fixed_proj=True)
@@ -265,13 +269,12 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
            x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])      
            #s = np.dot(np.asarray(U).conj(), np.asarray(x0).T)
            s = np.dot(np.asarray(U), np.asarray(x0).conj().T)
-           thresh = 0.03
            snorm = np.einsum('pi,pi->i', s.conj(), s)
            #idx = np.argsort(-snorm)[:nroots] 
            idx = np.argsort(-snorm)
            snorm = snorm[idx]
            print("snorm: ", snorm[:30])
-           idx = idx[snorm > thresh]  
+           idx = idx[snorm > ovlp_tol]  
            nroots = idx.size
            #w, v, idx = lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
            w = w[idx]
@@ -279,33 +282,72 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
            return w, v, idx, nroots
        
     #conv, E, U , nroots= davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick =eig_close_to_init_guess)
-    conv, E, U , nroots= davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick =eig_close_to_init_guess, tol_residual = 1e-3)
-    #conv, E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-12, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=eig_close_to_init_guess)
     
-    U = np.array(U)
-    #print("shape of Lanczos array: ", U.shape)
-    #for i in range(U.shape[0]):
-    #    print("CVS/MOM overlap: ", np.dot(np.array(guess)[i,:], U[i,:].T))
-    T = adc.get_trans_moments()
-    spec_factors = adc.get_spec_factors(T, U, nroots)
-    s = np.dot(U, np.asarray(guess).conj().T)
-    snorm = np.einsum('pi,pi->p', s.conj(), s)
-    nfalse = np.shape(conv)[0] - np.sum(conv)
-    if nfalse >= 1:
-        print ("*************************************************************")
-        print (" WARNING : ", "Davidson iterations for ",nfalse, "root(s) not converged")
-        print ("*************************************************************")
 
-    print("MOM results ")
-    print("Orbital energy shift threshold = {}".format(adc.energy_thresh))
-    print("     Energies (eV)          |    Spec factors   |   |s|^2 w.r.t CVS eigenvectors")
-    print("---------------------------------------------------")
-    print(np.c_[E*27.2114, spec_factors, snorm])
-    print("---------------------------------------------------")
-    #print(np.column_stack((E*27.2114, spec_factors)))
-    analyze_eigenvector_ip(adc, U)
-    E_mom = E.copy()
-    spec_factors_mom = spec_factors.copy() 
+    nocc_a = adc.nocc_a 
+    e_vir_a = adc.mo_energy_a[nocc_a:]
+    e_vir_a = np.unique(np.round(e_vir_a, 7))
+    if adc.ncore_cvs == 1 or adc.ncore_cvs == 5 or adc.ncore_cvs == 9:
+        e_vir_temp = np.zeros(e_vir_a.size+1)
+        e_vir_temp[1:] = e_vir_a[::-1]
+        e_vir_temp[0] = 1e15
+        e_vir_a = e_vir_temp
+    
+    E_mom_size = 2
+    iter_i = 0
+    E_mom = 0 
+    iter_idx = []
+    end_bool = False
+    while (E_mom_size <= 2 and iter_i < e_vir_a.size) or end_bool is False:
+        energy_thresh_i = e_vir_a[iter_i] - 1e-7
+        matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False, energy_thresh=energy_thresh_i)
+        conv, E, U , nroots= davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick =eig_close_to_init_guess, tol_residual = 1e-3)
+        #conv, E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-12, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=eig_close_to_init_guess)
+        
+        U = np.array(U)
+        idx_sort = np.argsort(E)
+        E = E[idx_sort]
+        U = U[idx_sort,:]
+        #print("shape of Lanczos array: ", U.shape)
+        #for i in range(U.shape[0]):
+        #    print("CVS/MOM overlap: ", np.dot(np.array(guess)[i,:], U[i,:].T))
+        T = adc.get_trans_moments()
+        spec_factors, X = adc.get_spec_factors(T, U, nroots)
+        s = np.dot(U, np.asarray(guess).conj().T)
+        snorm = np.einsum('pi,pi->p', s.conj(), s)
+        nfalse = np.shape(conv)[0] - np.sum(conv)
+        if nfalse >= 1:
+            print ("*************************************************************")
+            print (" WARNING : ", "Davidson iterations for ",nfalse, "root(s) not converged")
+            print ("*************************************************************")
+
+        print("MOM results ")
+        print("Orbital energy shift threshold = {}".format(energy_thresh_i))
+        print("     Energies (eV)          |    Spec factors   |   |s|^2 w.r.t CVS eigenvectors")
+        print("---------------------------------------------------")
+        print(np.c_[E*27.2114, spec_factors, snorm])
+        print("---------------------------------------------------")
+        #print(np.column_stack((E*27.2114, spec_factors)))
+        analyze_eigenvector_ip(adc, U)
+        spec_factors_mom = spec_factors.copy()
+ 
+        E_mom_size = E.size
+        if E_mom_size > 2 and iter_i > 0:
+           print("Total number of non-degenerate virtual MOs: ", e_vir_a.size)
+           print("Total number of non-degenerate virtual MOs used in vve: ", e_vir_a[:iter_i].size)
+           print("Highest vve energy thresholds used (Eh): ", e_vir_a[iter_i-1])
+           print("Total vve energy thresholds used (Eh): ", e_vir_a[:iter_i])
+           print("Ecvs: ", E_cvs)
+           print("Emom: ", E_mom)
+
+        if E_mom_size == 2 and iter_i == 1 and e_vir_a[0] == 1e15:
+           print("Ecvs: ", E_cvs)
+           print("Emom: ", E_mom)
+           print("Total number of non-degenerate virtual MOs: ", e_vir_a.size)
+           end_bool = True
+        else:
+           E_mom = E
+           iter_i +=1
     return (E_cvs, spec_factors_cvs, E_mom, spec_factors_mom) 
     exit() 
 
@@ -324,19 +366,24 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     return E, U, spec_factors
 
-def analyze_eigenvector_ip(adc, U):
+def analyze_eigenvector_ip(adc, U, print_thresh = 0.05):
 
     nocc_a = adc.nocc_a
     nocc_b = adc.nocc_b
     nvir_a = adc.nvir_a
     nvir_b = adc.nvir_b
-    evec_print_tol = 0.01
+    ncore_cvs = adc.ncore_cvs
+    Eh2eV = 27.2114
+    e_occ_a = adc.mo_energy_a[:nocc_a]*Eh2eV 
+    e_occ_b = adc.mo_energy_b[:nocc_b]*Eh2eV
+    e_vir_a = adc.mo_energy_a[nocc_a:]*Eh2eV
+    e_vir_b = adc.mo_energy_b[nocc_b:]*Eh2eV
 
     logger.info(adc, "Number of alpha occupied orbitals = %d", nocc_a)
     logger.info(adc, "Number of beta occupied orbitals = %d", nocc_b)
     logger.info(adc, "Number of alpha virtual orbitals =  %d", nvir_a)
     logger.info(adc, "Number of beta virtual orbitals =  %d", nvir_b)
-    logger.info(adc, "Print eigenvector elements > %f\n", evec_print_tol)
+    logger.info(adc, "Print eigenvector elements > %f\n", print_thresh)
 
     ij_a = np.tril_indices(nocc_a, k=-1)
     ij_b = np.tril_indices(nocc_b, k=-1)
@@ -361,157 +408,199 @@ def analyze_eigenvector_ip(adc, U):
     s_bbb = f_aba
     f_bbb = s_bbb + n_doubles_bbb
 
-
+    
     for I in range(U.shape[0]):
         U1 = U[I,:f_b]
         U2 = U[I,f_b:]
         U1dotU1 = np.dot(U1, U1.conj()) 
-        U2dotU2 = np.dot(U2, U2.conj()) 
+        U2dotU2 = np.dot(U2, U2.conj())
+ 
+        evec_tols = (0, print_thresh)
+        for iter_i, evec_print_tol in enumerate(evec_tols):
 
-        #temp_aaa = np.zeros((nvir_a, nocc_a, nocc_a), dtype=complex)
-        temp_aaa = np.zeros((nvir_a, nocc_a, nocc_a))
-        temp_aaa[:,ij_a[0],ij_a[1]] =  U[I,s_aaa:f_aaa].reshape(nvir_a,-1).copy()
-        temp_aaa[:,ij_a[1],ij_a[0]] = -U[I,s_aaa:f_aaa].reshape(nvir_a,-1).copy()
-        U_aaa = temp_aaa.reshape(-1).copy()
+            #temp_aaa = np.zeros((nvir_a, nocc_a, nocc_a), dtype=complex)
+            temp_aaa = np.zeros((nvir_a, nocc_a, nocc_a))
+            temp_aaa[:,ij_a[0],ij_a[1]] =  U[I,s_aaa:f_aaa].reshape(nvir_a,-1).copy()
+            temp_aaa[:,ij_a[1],ij_a[0]] = -U[I,s_aaa:f_aaa].reshape(nvir_a,-1).copy()
+            U_aaa = temp_aaa.reshape(-1).copy()
 
-        #temp_bbb = np.zeros((nvir_b, nocc_b, nocc_b), dtype=complex)
-        temp_bbb = np.zeros((nvir_b, nocc_b, nocc_b))
-        temp_bbb[:,ij_b[0],ij_b[1]] =  U[I,s_bbb:f_bbb].reshape(nvir_b,-1).copy()
-        temp_bbb[:,ij_b[1],ij_b[0]] = -U[I,s_bbb:f_bbb].reshape(nvir_b,-1).copy()
-        U_bbb = temp_bbb.reshape(-1).copy()
+            #temp_bbb = np.zeros((nvir_b, nocc_b, nocc_b), dtype=complex)
+            temp_bbb = np.zeros((nvir_b, nocc_b, nocc_b))
+            temp_bbb[:,ij_b[0],ij_b[1]] =  U[I,s_bbb:f_bbb].reshape(nvir_b,-1).copy()
+            temp_bbb[:,ij_b[1],ij_b[0]] = -U[I,s_bbb:f_bbb].reshape(nvir_b,-1).copy()
+            U_bbb = temp_bbb.reshape(-1).copy()
 
-        #U_sq = U[I,:].copy()**2
-        U_sq = np.multiply(U[I,:], U[I,:].conj())
-        ind_idx = np.argsort(-U_sq)
-        U_sq = U_sq[ind_idx] 
-        U_sorted = U[I,ind_idx].copy()
+            #U_sq = U[I,:].copy()**2
+            U_sq = np.multiply(U[I,:], U[I,:].conj())
+            ind_idx = np.argsort(-U_sq)
+            U_sq = U_sq[ind_idx] 
+            U_sorted = U[I,ind_idx].copy()
 
-        U_sq_aaa = np.multiply(U_aaa, U_aaa.conj())
-        U_sq_bbb = np.multiply(U_bbb, U_bbb.conj())
-        ind_idx_aaa = np.argsort(-U_sq_aaa)
-        ind_idx_bbb = np.argsort(-U_sq_bbb)
-        U_sq_aaa = U_sq_aaa[ind_idx_aaa]
-        U_sq_bbb = U_sq_bbb[ind_idx_bbb]
-        U_sorted_aaa = U_aaa[ind_idx_aaa].copy()
-        U_sorted_bbb = U_bbb[ind_idx_bbb].copy()
+            U_sq_aaa = np.multiply(U_aaa, U_aaa.conj())
+            U_sq_bbb = np.multiply(U_bbb, U_bbb.conj())
+            ind_idx_aaa = np.argsort(-U_sq_aaa)
+            ind_idx_bbb = np.argsort(-U_sq_bbb)
+            U_sq_aaa = U_sq_aaa[ind_idx_aaa]
+            U_sq_bbb = U_sq_bbb[ind_idx_bbb]
+            U_sorted_aaa = U_aaa[ind_idx_aaa].copy()
+            U_sorted_bbb = U_bbb[ind_idx_bbb].copy()
 
-        U_sorted = U_sorted[U_sq > evec_print_tol**2]
-        ind_idx = ind_idx[U_sq > evec_print_tol**2]
-        U_sorted_aaa = U_sorted_aaa[U_sq_aaa > evec_print_tol**2]
-        U_sorted_bbb = U_sorted_bbb[U_sq_bbb > evec_print_tol**2]
-        ind_idx_aaa = ind_idx_aaa[U_sq_aaa > evec_print_tol**2]
-        ind_idx_bbb = ind_idx_bbb[U_sq_bbb > evec_print_tol**2]
-        
-        singles_a_idx = []
-        singles_b_idx = []
-        doubles_aaa_idx = []
-        doubles_bab_idx = []
-        doubles_aba_idx = []
-        doubles_bbb_idx = []  
-        singles_a_val = []
-        singles_b_val = []
-        doubles_bab_val = []
-        doubles_aba_val = []  
-        iter_idx = 0
-        for orb_idx in ind_idx:
 
-            if orb_idx in range(s_a,f_a):
-                i_idx = orb_idx + 1
-                singles_a_idx.append(i_idx)
-                singles_a_val.append(U_sorted[iter_idx])
-               
-            if orb_idx in range(s_b,f_b):
-                i_idx = orb_idx - s_b + 1
-                singles_b_idx.append(i_idx)
-                singles_b_val.append(U_sorted[iter_idx])
+            U_sorted = U_sorted[U_sq > evec_print_tol**2]
+            ind_idx = ind_idx[U_sq > evec_print_tol**2]
+            U_sorted_aaa = U_sorted_aaa[U_sq_aaa > evec_print_tol**2]
+            U_sorted_bbb = U_sorted_bbb[U_sq_bbb > evec_print_tol**2]
+            ind_idx_aaa = ind_idx_aaa[U_sq_aaa > evec_print_tol**2]
+            ind_idx_bbb = ind_idx_bbb[U_sq_bbb > evec_print_tol**2]
+            
+            singles_a_idx = []
+            singles_b_idx = []
+            doubles_aaa_idx = []
+            doubles_bab_idx = []
+            doubles_aba_idx = []
+            doubles_bbb_idx = []  
+            singles_a_val = []
+            singles_b_val = []
+            doubles_bab_val = []
+            doubles_aba_val = []  
+            iter_idx = 0
 
-            if orb_idx in range(s_bab,f_bab):
-                aij_idx = orb_idx - s_bab       
-                ij_rem = aij_idx % (nocc_a*nocc_b)
-                a_idx = aij_idx//(nocc_a*nocc_b)
+            singles_a_energy = []
+            singles_b_energy = []
+            doubles_aaa_energy = []
+            doubles_bab_energy = []
+            doubles_aba_energy = []  
+            doubles_bbb_energy = []
+            for orb_idx in ind_idx:
+
+                if orb_idx in range(s_a,f_a):
+                    i_idx = orb_idx + 1
+                    singles_a_idx.append(i_idx)
+                    singles_a_val.append(U_sorted[iter_idx])
+                    singles_a_energy.append(-e_occ_a[i_idx - 1])
+                   
+                if orb_idx in range(s_b,f_b):
+                    i_idx = orb_idx - s_b + 1
+                    singles_b_idx.append(i_idx)
+                    singles_b_val.append(U_sorted[iter_idx])
+                    singles_b_energy.append(-e_occ_b[i_idx - 1])
+
+                if orb_idx in range(s_bab,f_bab):
+                    aij_idx = orb_idx - s_bab       
+                    ij_rem = aij_idx % (nocc_a*nocc_b)
+                    a_idx = aij_idx//(nocc_a*nocc_b)
+                    i_idx = ij_rem//nocc_a
+                    j_idx = ij_rem % nocc_a
+                    doubles_bab_idx.append((a_idx + 1 + nocc_b, i_idx + 1, j_idx + 1))
+                    doubles_bab_val.append(U_sorted[iter_idx])
+                    doubles_bab_energy.append(e_vir_b[a_idx] - e_occ_a[i_idx] - e_occ_b[j_idx])
+              
+                if orb_idx in range(s_aba,f_aba):
+                    aij_idx = orb_idx - s_aba     
+                    ij_rem = aij_idx % (nocc_b*nocc_a)
+                    a_idx = aij_idx//(nocc_b*nocc_a)
+                    i_idx = ij_rem//nocc_b
+                    j_idx = ij_rem % nocc_b
+                    doubles_aba_idx.append((a_idx + 1 + nocc_a, i_idx + 1, j_idx + 1))
+                    doubles_aba_val.append(U_sorted[iter_idx])
+                    doubles_aba_energy.append(e_vir_a[a_idx] - e_occ_b[i_idx] - e_occ_a[j_idx])
+
+                iter_idx += 1
+                 
+            for orb_aaa in ind_idx_aaa:              
+                ij_rem = orb_aaa % (nocc_a*nocc_a)
+                a_idx = orb_aaa//(nocc_a*nocc_a)
                 i_idx = ij_rem//nocc_a
                 j_idx = ij_rem % nocc_a
-                doubles_bab_idx.append((a_idx + 1 + nocc_b, i_idx + 1, j_idx + 1))
-                doubles_bab_val.append(U_sorted[iter_idx])
-          
-            if orb_idx in range(s_aba,f_aba):
-                aij_idx = orb_idx - s_aba     
-                ij_rem = aij_idx % (nocc_b*nocc_a)
-                a_idx = aij_idx//(nocc_b*nocc_a)
+                doubles_aaa_idx.append((a_idx + 1 + nocc_a, i_idx + 1, j_idx + 1))
+                doubles_aaa_energy.append(e_vir_a[a_idx] - e_occ_a[i_idx] - e_occ_a[j_idx])
+
+            for orb_bbb in ind_idx_bbb:                
+                ij_rem = orb_bbb % (nocc_b*nocc_b)
+                a_idx = orb_bbb//(nocc_b*nocc_b)
                 i_idx = ij_rem//nocc_b
                 j_idx = ij_rem % nocc_b
-                doubles_aba_idx.append((a_idx + 1 + nocc_a, i_idx + 1, j_idx + 1))
-                doubles_aba_val.append(U_sorted[iter_idx])
+                doubles_bbb_idx.append((a_idx + 1 + nocc_b, i_idx + 1, j_idx + 1))
+                doubles_bbb_energy.append(e_vir_b[a_idx] - e_occ_b[i_idx] - e_occ_b[j_idx])
 
-            iter_idx += 1
-             
-        for orb_aaa in ind_idx_aaa:              
-            ij_rem = orb_aaa % (nocc_a*nocc_a)
-            a_idx = orb_aaa//(nocc_a*nocc_a)
-            i_idx = ij_rem//nocc_a
-            j_idx = ij_rem % nocc_a
-            doubles_aaa_idx.append((a_idx + 1 + nocc_a, i_idx + 1, j_idx + 1))
+            doubles_aaa_val = list(U_sorted_aaa)
+            doubles_bbb_val = list(U_sorted_bbb)
 
-        for orb_bbb in ind_idx_bbb:                
-            ij_rem = orb_bbb % (nocc_b*nocc_b)
-            a_idx = orb_bbb//(nocc_b*nocc_b)
-            i_idx = ij_rem//nocc_b
-            j_idx = ij_rem % nocc_b
-            doubles_bbb_idx.append((a_idx + 1 + nocc_b, i_idx + 1, j_idx + 1))
+            avg_energy_a =   np.multiply(np.square(singles_a_val), singles_a_energy)
+            avg_energy_b =   np.multiply(np.square(singles_b_val), singles_b_energy)
+            avg_energy_aaa = np.multiply(np.square(doubles_aaa_val), doubles_aaa_energy)
+            avg_energy_bab = np.multiply(np.square(doubles_bab_val), doubles_bab_energy)
+            avg_energy_aba = np.multiply(np.square(doubles_aba_val), doubles_aba_energy)
+            avg_energy_bbb = np.multiply(np.square(doubles_bbb_val), doubles_bbb_energy)
 
-        doubles_aaa_val = list(U_sorted_aaa)
-        doubles_bbb_val = list(U_sorted_bbb)
-        
-        logger.info(adc,'%s | root %d | norm(1h)  = %6.4f | norm(2h1p) = %6.4f ',adc.method ,I, U1dotU1, U2dotU2)
+            if iter_i == 0:
+                avg_energy_a_tot   = np.sum(avg_energy_a)              
+                avg_energy_b_tot   = np.sum(avg_energy_b)
+                avg_energy_aaa_tot = np.sum(avg_energy_aaa)/2 
+                avg_energy_bab_tot = np.sum(avg_energy_bab) 
+                avg_energy_aba_tot = np.sum(avg_energy_aba) 
+                avg_energy_bbb_tot = np.sum(avg_energy_bbb)/2 
 
-        if singles_a_val:
-            logger.info(adc, "\n1h(alpha) block: ") 
-            logger.info(adc, "     i     U(i)")
-            logger.info(adc, "------------------")
-            for idx, print_singles in enumerate(singles_a_idx):
-                logger.info(adc, '  %4d   %7.4f', print_singles, singles_a_val[idx])
+            if iter_i == 1:
+                logger.info(adc,'%s | root %d | norm(1h)  = %6.4f | norm(2h1p) = %6.4f ',adc.method ,I, U1dotU1, U2dotU2)
 
-        if singles_b_val:
-            logger.info(adc, "\n1h(beta) block: ") 
-            logger.info(adc, "     i     U(i)")
-            logger.info(adc, "------------------")
-            for idx, print_singles in enumerate(singles_b_idx):
-                logger.info(adc, '  %4d   %7.4f', print_singles, singles_b_val[idx])
+                vve_projector(adc, U[I, :], cvs_composition=True)
 
-        if doubles_aaa_val:
-            logger.info(adc, "\n2h1p(alpha|alpha|alpha) block: ") 
-            logger.info(adc, "     i     j     a     U(i,j,a)")
-            logger.info(adc, "-------------------------------")
-            for idx, print_doubles in enumerate(doubles_aaa_idx):
-                logger.info(adc, '  %4d  %4d  %4d     %7.4f', print_doubles[1], print_doubles[2], print_doubles[0], doubles_aaa_val[idx])
+                logger.info(adc,' \ntotal root weighted energy (eV)  = %6.4f \n', avg_energy_a_tot + avg_energy_b_tot + avg_energy_aaa_tot + avg_energy_bab_tot + avg_energy_aba_tot + avg_energy_bbb_tot)
+                if singles_a_val:
+                        logger.info(adc, "1h(alpha) | thresh_weighted_energy = %.4f | total_weighted_energy = %.4f ", avg_energy_a_tot, np.sum(avg_energy_a)) 
+                        logger.info(adc, "----------------------------------------------")
+                        logger.info(adc, "     i    U(i)    HF_energy(eV)   weighted(eV)")
+                        logger.info(adc, "----------------------------------------------")
+                        for idx, print_singles in enumerate(singles_a_idx):
+                            logger.info(adc, '  %4d   %7.4f   %8.2f   %12.2f', print_singles, singles_a_val[idx], singles_a_energy[idx], avg_energy_a[idx])
 
-        if doubles_bab_val:
-            logger.info(adc, "\n2h1p(beta|alpha|beta) block: ") 
-            logger.info(adc, "     i     j     a     U(i,j,a)")
-            logger.info(adc, "-------------------------------")
-            for idx, print_doubles in enumerate(doubles_bab_idx):
-                logger.info(adc, '  %4d  %4d  %4d     %7.4f', print_doubles[1], print_doubles[2], print_doubles[0], doubles_bab_val[idx])
+                if singles_b_val:
+                        logger.info(adc, "1h(beta) | thresh_weighted_energy = %.4f | total_weighted_energy = %.4f ", avg_energy_b_tot, np.sum(avg_energy_b)) 
+                        logger.info(adc, "----------------------------------------------")
+                        logger.info(adc, "     i    U(i)    HF_energy(eV)   weighted(eV)")
+                        logger.info(adc, "----------------------------------------------")
+                        for idx, print_singles in enumerate(singles_b_idx):
+                            logger.info(adc, '  %4d   %7.4f   %8.2f   %12.2f', print_singles, singles_b_val[idx], singles_b_energy[idx], avg_energy_b[idx])
 
-        if doubles_aba_val:
-            logger.info(adc, "\n2h1p(alpha|beta|alpha) block: ") 
-            logger.info(adc, "     i     j     a     U(i,j,a)")
-            logger.info(adc, "-------------------------------")
-            for idx, print_doubles in enumerate(doubles_aba_idx):
-                logger.info(adc, '  %4d  %4d  %4d     %7.4f', print_doubles[1], print_doubles[2], print_doubles[0], doubles_aba_val[idx])
+                if doubles_aaa_val:
+                        logger.info(adc, "\n2h1p(alpha|alpha|alpha) | threshold_weighted_energy(eV) = %.4f | total_weighted_energy(eV) = %.4f", np.sum(avg_energy_aaa), avg_energy_aaa_tot) 
+                        logger.info(adc, "-------------------------------------------------------------------")
+                        logger.info(adc, "     i     j     a     U(i,j,a)   HF_energy(eV)    weighted(eV)")
+                        logger.info(adc, "-------------------------------------------------------------------")
+                        for idx, print_doubles in enumerate(doubles_aaa_idx):
+                            logger.info(adc, '  %4d  %4d  %4d   %7.4f  %13.2f   %13.2f', print_doubles[1], print_doubles[2], print_doubles[0], doubles_aaa_val[idx], doubles_aaa_energy[idx], avg_energy_aaa[idx])
 
-        if doubles_bbb_val:
-            logger.info(adc, "\n2h1p(beta|beta|beta) block: ") 
-            logger.info(adc, "     i     j     a     U(i,j,a)")
-            logger.info(adc, "-------------------------------")
-            for idx, print_doubles in enumerate(doubles_bbb_idx):
-                logger.info(adc, '  %4d  %4d  %4d     %7.4f', print_doubles[1], print_doubles[2], print_doubles[0], doubles_bbb_val[idx])
+                if doubles_bab_val:
+                        logger.info(adc, "\n2h1p(beta|alpha|beta) | threshold_weighted_energy(eV) = %.4f | total_weighted_energy(eV) = %.4f", np.sum(avg_energy_bab), avg_energy_bab_tot) 
+                        logger.info(adc, "-------------------------------------------------------------------")
+                        logger.info(adc, "     i     j     a     U(i,j,a)   HF_energy(eV)    weighted(eV)")
+                        logger.info(adc, "-------------------------------------------------------------------")
+                        for idx, print_doubles in enumerate(doubles_bab_idx):
+                            logger.info(adc, '  %4d  %4d  %4d   %7.4f  %13.2f   %13.2f', print_doubles[1], print_doubles[2], print_doubles[0], doubles_bab_val[idx], doubles_bab_energy[idx], avg_energy_bab[idx])
 
-        logger.info(adc, "\n*************************************************************\n")
+                if doubles_aba_val:
+                        logger.info(adc, "\n2h1p(alpha|beta|alpha) | threshold_weighted_energy(eV) = %.4f | total_weighted_energy(eV) = %.4f", np.sum(avg_energy_aba), avg_energy_aba_tot) 
+                        logger.info(adc, "-------------------------------------------------------------------")
+                        logger.info(adc, "     i     j     a     U(i,j,a)   HF_energy(eV)    weighted(eV)")
+                        logger.info(adc, "-------------------------------------------------------------------")
+                        for idx, print_doubles in enumerate(doubles_aba_idx):
+                            logger.info(adc, '  %4d  %4d  %4d   %7.4f  %13.2f   %13.2f', print_doubles[1], print_doubles[2], print_doubles[0], doubles_aba_val[idx], doubles_aba_energy[idx], avg_energy_aba[idx])
+
+                if doubles_bbb_val:
+                        logger.info(adc, "\n2h1p(beta|beta|beta) | threshold_weighted_energy(eV) = %.4f | total_weighted_energy(eV) = %.4f", np.sum(avg_energy_bbb), avg_energy_bbb_tot) 
+                        logger.info(adc, "-------------------------------------------------------------------")
+                        logger.info(adc, "     i     j     a     U(i,j,a)   HF_energy(eV)    weighted(eV)")
+                        logger.info(adc, "-------------------------------------------------------------------")
+                        for idx, print_doubles in enumerate(doubles_bbb_idx):
+                            logger.info(adc, '  %4d  %4d  %4d   %7.4f  %13.2f   %13.2f', print_doubles[1], print_doubles[2], print_doubles[0], doubles_bbb_val[idx], doubles_bbb_energy[idx], avg_energy_bbb[idx])
+
+                logger.info(adc, "\n*************************************************************\n")
 
 
 def compute_amplitudes_energy(myadc, eris, verbose=None, fc_bool=True):
 
-    t1, t2 = myadc.compute_amplitudes(eris, fc_bool=True)
+    t1, t2 = myadc.compute_amplitudes(eris, fc_bool=True) 
     e_corr = myadc.compute_energy(t1, t2, eris)
 
     return e_corr, t1, t2
@@ -1359,6 +1448,7 @@ class UADC(lib.StreamObject):
         self.lanczos_space = 0
         self.imaginary_shift = 0
         self.energy_thresh = 1000
+        self.es_mom_thresh = 0.03
         
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mol', 'mo_energy_b', 'max_memory', 'scf_energy', 'e_tot', 't1', 'frozen', 'mo_energy_a', 'chkfile', 'max_space', 't2', 'mo_occ', 'max_cycle'))
 
@@ -2882,8 +2972,8 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
 
     e_occ_a = adc.mo_energy_a[:nocc_a]#.astype(complex)
     e_occ_b = adc.mo_energy_b[:nocc_b]#.astype(complex)
-    e_vir_a = adc.mo_energy_a[nocc_a:]
-    e_vir_b = adc.mo_energy_b[nocc_b:]
+    e_vir_a = adc.mo_energy_a[nocc_a:]#.astype(complex)
+    e_vir_b = adc.mo_energy_b[nocc_b:]#.astype(complex)
     #if cvs is False:
     #e_vir_a = complex_shift(e_vir_a, energy_thresh, imaginary_shift)
     #e_vir_b = complex_shift(e_vir_b, energy_thresh, imaginary_shift)
@@ -2938,7 +3028,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
     D_n_a = -d_a_a + d_ij_a.reshape(-1)
     D_n_a = D_n_a.reshape((nvir_a,nocc_a,nocc_a))
     ### applying imaginary shift to vve elemts ###
-    D_n_a[idx_a_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
+    #D_n_a[idx_a_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
     #################
     D_aij_a = D_n_a.copy()[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1)
 
@@ -2947,7 +3037,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
     D_n_b = -d_a_b + d_ij_b.reshape(-1)
     D_n_b = D_n_b.reshape((nvir_b,nocc_b,nocc_b))
     ### applying imaginary shift to vve elemts ###
-    D_n_b[idx_b_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
+    #D_n_b[idx_b_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
     #################
     D_aij_b = D_n_b.copy()[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1)
 
@@ -2956,7 +3046,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
     D_n_bab = -d_a_b + d_ij_ab.reshape(-1)
     D_n_bab = D_n_bab.reshape((nvir_b,nocc_b,nocc_a))
     ### applying imaginary shift to vve elemts ###
-    D_n_bab[idx_b_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
+    #D_n_bab[idx_b_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
     #################
     D_aij_bab = D_n_bab.reshape(-1)
 
@@ -2965,7 +3055,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
     D_n_aba = -d_a_a + d_ij_ab.reshape(-1)
     D_n_aba = D_n_aba.reshape((nvir_a,nocc_a,nocc_b))
     ### applying imaginary shift to vve elemts ###
-    D_n_aba[idx_a_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
+    #D_n_aba[idx_a_thresh,ncore_cvs:,ncore_cvs:] -= imaginary_shift
     #################
     D_aij_aba = D_n_aba.reshape(-1)
 
@@ -3084,7 +3174,10 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
     
     if cvs is True:
         
-        shift = -100000000.0 #+ 0*1j 
+        shift = -100000000.0 
+        #if np.imag(imaginary_shift) != 0:
+        #    shift += 0*1j
+        
         ncore = adc.ncore_cvs
 
         diag[(s_a+ncore):f_a] += shift
@@ -3138,6 +3231,7 @@ def cvs_projector(adc, r):
     nocc_b = adc.nocc_b
     nvir_a = adc.nvir_a
     nvir_b = adc.nvir_b
+    imaginary_shift = adc.imaginary_shift
 
     n_singles_a = nocc_a
     n_singles_b = nocc_b
@@ -3201,7 +3295,7 @@ def cvs_projector(adc, r):
 
     return Pr
 
-def vve_projector(adc, r):
+def vve_projector(adc, r, cvs_composition=False, energy_thresh=None):
 
     ncore = adc.ncore_cvs
 
@@ -3211,7 +3305,8 @@ def vve_projector(adc, r):
     nvir_b = adc.nvir_b
     e_vir_a = adc.mo_energy_a[nocc_a:]#.astype(complex)
     e_vir_b = adc.mo_energy_b[nocc_b:]#.astype(complex)
-    energy_thresh = adc.energy_thresh
+    if energy_thresh is None:
+        energy_thresh = adc.energy_thresh
     idx_a_thresh = np.argwhere(e_vir_a >= energy_thresh)  
     idx_b_thresh = np.argwhere(e_vir_b >= energy_thresh)  
 
@@ -3243,9 +3338,26 @@ def vve_projector(adc, r):
     #Pr[(s_a+ncore):f_a] = 0.0
     #Pr[(s_b+ncore):f_b] = 0.0
 
+    norm_ecc = 0
+    norm_ecv = 0
+    norm_evc = 0
+    norm_evv = 0
+ 
+    if cvs_composition:
+        norm_c = np.sum(Pr[s_a:(s_a+ncore)]**2)  
+        norm_c += np.sum(Pr[s_b:(s_b+ncore)]**2) 
+        norm_v = np.sum(Pr[(s_a+ncore):f_a]**2)  
+        norm_v += np.sum(Pr[(s_b+ncore):f_b]**2) 
+
     temp = np.zeros((nvir_a, nocc_a, nocc_a))#.astype(complex)
     temp[:,ij_a[0],ij_a[1]] = Pr[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
     temp[:,ij_a[1],ij_a[0]] = -Pr[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
+
+    if cvs_composition:
+        norm_ecc += np.sum(temp[:, :ncore, :ncore]**2)/2
+        norm_ecv += np.sum(temp[:, :ncore, ncore:]**2)/2
+        norm_evc += np.sum(temp[:, ncore:, :ncore]**2)/2
+        norm_evv += np.sum(temp[:, ncore:, ncore:]**2)/2
 
     temp[idx_a_thresh,ncore:,ncore:] = 0.0
     Pr[s_aaa:f_aaa] = temp[:,ij_a[0],ij_a[1]].reshape(-1).copy()
@@ -3253,11 +3365,23 @@ def vve_projector(adc, r):
     temp = Pr[s_bab:f_bab].copy()
     temp = temp.reshape((nvir_b, nocc_b, nocc_a))
 
+    if cvs_composition:
+        norm_ecc += np.sum(temp[:, :ncore, :ncore]**2)
+        norm_ecv += np.sum(temp[:, :ncore, ncore:]**2)
+        norm_evc += np.sum(temp[:, ncore:, :ncore]**2)
+        norm_evv += np.sum(temp[:, ncore:, ncore:]**2)
+
     temp[idx_b_thresh,ncore:,ncore:] = 0.0
     Pr[s_bab:f_bab] = temp.reshape(-1).copy()
 
     temp = Pr[s_aba:f_aba].copy()
     temp = temp.reshape((nvir_a, nocc_a, nocc_b))
+
+    if cvs_composition:
+        norm_ecc += np.sum(temp[:, :ncore, :ncore]**2)
+        norm_ecv += np.sum(temp[:, :ncore, ncore:]**2)
+        norm_evc += np.sum(temp[:, ncore:, :ncore]**2)
+        norm_evv += np.sum(temp[:, ncore:, ncore:]**2)
 
     temp[idx_a_thresh,ncore:,ncore:] = 0.0
     Pr[s_aba:f_aba] = temp.reshape(-1).copy()
@@ -3266,79 +3390,26 @@ def vve_projector(adc, r):
     temp[:,ij_b[0],ij_b[1]] = Pr[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
     temp[:,ij_b[1],ij_b[0]] = -Pr[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
 
-    temp[idx_b_thresh,ncore:,ncore:] = 0.0
-    Pr[s_bbb:f_bbb] = temp[:,ij_b[0],ij_b[1]].reshape(-1).copy()
+    if cvs_composition:
+        norm_ecc += np.sum(temp[:, :ncore, :ncore]**2)/2
+        norm_ecv += np.sum(temp[:, :ncore, ncore:]**2)/2
+        norm_evc += np.sum(temp[:, ncore:, :ncore]**2)/2
+        norm_evv += np.sum(temp[:, ncore:, ncore:]**2)/2
 
-    return Pr
-
-def composition_projector(adc, r):
-
-    ncore = adc.ncore_cvs
-
-    nocc_a = adc.nocc_a
-    nocc_b = adc.nocc_b
-    nvir_a = adc.nvir_a
-    nvir_b = adc.nvir_b
-    e_vir_a = adc.mo_energy_a[nocc_a:]#.astype(complex)
-    e_vir_b = adc.mo_energy_b[nocc_b:]#.astype(complex)
-    energy_thresh = adc.energy_thresh
-    idx_a_thresh = np.argwhere(e_vir_a >= energy_thresh)  
-    idx_b_thresh = np.argwhere(e_vir_b >= energy_thresh)  
-
-    n_singles_a = nocc_a
-    n_singles_b = nocc_b
-    n_doubles_aaa = nocc_a * (nocc_a - 1) * nvir_a // 2
-    n_doubles_bab = nvir_b * nocc_a * nocc_b
-    n_doubles_aba = nvir_a * nocc_b * nocc_a
-    n_doubles_bbb = nocc_b * (nocc_b - 1) * nvir_b // 2
-
-    ij_a = np.tril_indices(nocc_a, k=-1)
-    ij_b = np.tril_indices(nocc_b, k=-1)
-
-    s_a = 0
-    f_a = n_singles_a
-    s_b = f_a
-    f_b = s_b + n_singles_b
-    s_aaa = f_b
-    f_aaa = s_aaa + n_doubles_aaa
-    s_bab = f_aaa
-    f_bab = s_bab + n_doubles_bab
-    s_aba = f_bab
-    f_aba = s_aba + n_doubles_aba
-    s_bbb = f_aba
-    f_bbb = s_bbb + n_doubles_bbb
-
-
-    Pr[(s_a+ncore):f_a] = 0.0
-    Pr[(s_b+ncore):f_b] = 0.0
-    
-    temp = np.zeros((nvir_a, nocc_a, nocc_a))#.astype(complex)
-    temp[:,ij_a[0],ij_a[1]] = Pr[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
-    temp[:,ij_a[1],ij_a[0]] = -Pr[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
-
-    temp[idx_a_thresh,ncore:,ncore:] = 0.0
-    Pr[s_aaa:f_aaa] = temp[:,ij_a[0],ij_a[1]].reshape(-1).copy()
-
-    temp = Pr[s_bab:f_bab].copy()
-    temp = temp.reshape((nvir_b, nocc_b, nocc_a))
-
-    temp[idx_b_thresh,ncore:,ncore:] = 0.0
-    Pr[s_bab:f_bab] = temp.reshape(-1).copy()
-
-    temp = Pr[s_aba:f_aba].copy()
-    temp = temp.reshape((nvir_a, nocc_a, nocc_b))
-
-    temp[idx_a_thresh,ncore:,ncore:] = 0.0
-    Pr[s_aba:f_aba] = temp.reshape(-1).copy()
-
-    temp = np.zeros((nvir_b, nocc_b, nocc_b))#.astype(complex)
-    temp[:,ij_b[0],ij_b[1]] = Pr[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
-    temp[:,ij_b[1],ij_b[0]] = -Pr[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
+        logger.info(adc, "-----composition by cvs components------------")
+        print("norm_c   = ", np.round(norm_c, 4))
+        print("nrom_v   = ", np.round(norm_v, 4))
+        print("norm_ecc = ", np.round(norm_ecc, 4))
+        print("norm_ecv = ", np.round(norm_ecv, 4))
+        print("norm_evc = ", np.round(norm_evc, 4))
+        print("norm_evv = ", np.round(norm_evv, 4))
+        logger.info(adc, "----------------------------------------------")
 
     temp[idx_b_thresh,ncore:,ncore:] = 0.0
     Pr[s_bbb:f_bbb] = temp[:,ij_b[0],ij_b[1]].reshape(-1).copy()
 
     return Pr
+
 def ea_contract_r_vvvv_antisym(myadc,r2,vvvv_d):
 
     nocc = r2.shape[0]
@@ -4031,7 +4102,7 @@ def ea_adc_matvec(adc, M_ab=None, eris=None):
 
     return sigma_
 
-def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
+def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True, energy_thresh=None):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
@@ -4043,9 +4114,10 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
     nvir_a = adc.nvir_a
     nvir_b = adc.nvir_b
     imaginary_shift = adc.imaginary_shift
-    energy_thresh = adc.energy_thresh
+    if energy_thresh is None:
+        energy_thresh = adc.energy_thresh
     ncore_cvs = adc.ncore_cvs
-
+ 
     ij_ind_a = np.tril_indices(nocc_a, k=-1)
     ij_ind_b = np.tril_indices(nocc_b, k=-1)
     n_singles_a = nocc_a
@@ -4141,7 +4213,9 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
         if cvs is True:
             r = cvs_projector(adc, r)
         else:
-            r = vve_projector(adc, r)
+            #print("vve energy_thresh: ", energy_thresh)
+            #exit()
+            r = vve_projector(adc, r, energy_thresh=energy_thresh)
 
         #s = np.zeros((dim), dtype=complex)
         s = np.zeros(dim)
@@ -4613,7 +4687,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True):
         if cvs is True:
             s = cvs_projector(adc, s)
         else:
-            s = vve_projector(adc, s)
+            s = vve_projector(adc, s, energy_thresh=energy_thresh)
         """
         print('s[s_a:f_a]',             np.linalg.norm(s[s_a:f_a]))
         print(np.column_stack(np.unique(np.around(s[s_a:f_a], decimals=8), return_counts=True))) 
@@ -5538,7 +5612,10 @@ def get_spec_factors(adc, T, U, nroots=1):
     #P += lib.einsum("pi,pi->i", X_b, X_b.conj())
     P = lib.einsum("pi,pi->i", X_a, X_a.conj())
     P += lib.einsum("pi,pi->i", X_b, X_b.conj())
-    return P
+    X = (X_a, X_b)
+    
+    # return P      # Originally only P was returned, not P and X 
+    return P, X
 
 
 
@@ -5612,6 +5689,7 @@ class UADCEA(UADC):
         self.lanczos_space = adc.lanczos_space
         self.imaginary_shift = adc.imaginary_shift
         self.energy_thresh = adc.energy_thresh
+        self.es_mom_thresh = adc.es_mom_thresh
 
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
@@ -5721,6 +5799,7 @@ class UADCIP(UADC):
         self.lanczos_space = adc.lanczos_space
         self.imaginary_shift = adc.imaginary_shift
         self.energy_thresh = adc.energy_thresh
+        self.es_mom_thresh = adc.es_mom_thresh
 
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
@@ -5746,7 +5825,6 @@ class UADCIP(UADC):
             idx = np.argsort(diag)
         else:
             idx = np.argsort(diag)[::-1]
-        print("----------------debugging get_init_guess-----------------------")
         #print("idx: ", idx)
         guess = np.zeros((diag.shape[0], nroots))
         min_shape = min(diag.shape[0], nroots)
@@ -5758,10 +5836,10 @@ class UADCIP(UADC):
             guess.append(g[:,p])
         return guess
 
-    def gen_matvec(self, imds=None, eris=None, fc_bool=True, cvs=False):
+    def gen_matvec(self, imds=None, eris=None, fc_bool=True, cvs=False, energy_thresh=None):
         if imds is None: imds = self.get_imds(eris, fc_bool)
         diag = self.get_diag(imds,eris, cvs, fc_bool)
-        matvec = self.matvec(imds, eris, cvs, fc_bool)
+        matvec = self.matvec(imds, eris, cvs, fc_bool, energy_thresh=energy_thresh)
         #matvec = lambda x: self.matvec()
         return matvec, diag
 
