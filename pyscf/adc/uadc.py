@@ -45,6 +45,12 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
        raise NotImplementedError(adc.method)
 
+    if adc.cvs_type == 'cce' and adc.nfc_orb > 0:
+        raise NotImplementedError('Frozen core is not implemented for cce')
+
+    if adc.cvs_type == 'cve' and (adc.ncore_cvs != adc.nfc_orb) and adc.nfc_orb > 0:
+        raise ValueError('Number of Frozen core orbitals and CVS orbitals need to be equal')
+
     cput0 = (time.clock(), time.time())
     log = logger.Logger(adc.stdout, adc.verbose)
     if adc.verbose >= logger.WARN:
@@ -172,7 +178,6 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         print("----------- End of Spec beta factors ---------------------") 
     #exit()
     
-    print("pre-matvec DEBUG")
     matvec, diag = adc.gen_matvec(imds, eris, cvs=cvs)
 
     #diag = np.real(diag)
@@ -195,40 +200,27 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     #conv, E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-12, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=pick_real_eigs)
     #print("Davidson energies: ", E)
     #exit()
-    """"
-    U = np.array(U)
-    print("shape of U: ", U.shape)
-    for i in range(U.shape[0]):
-        U_sq = U[i,:].copy()**2
-        U_sq_idx = np.argsort(-U_sq)
-        U_sq_sorted = U_sq[U_sq_idx].copy()
-        counter = 0
-        U2_sum = 0
-        print(U_sq_sorted[:100])
-        for j in U_sq_sorted:
-            U2_sum += j
-            if U2_sum < 0.9999:
-                counter += 1
-            elif U2_sum >= 0.9999:
-                break
-        print("there are ", counter, "imp elements in root ", i, " ratio: ", counter/U.shape[1]) 
-    exit() 
-    """
     guess = U
     #imds = adc.get_imds(eris, fc_bool=False)
 
-    #matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False)
+    matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False)
 
 
-    print("CVS results")
+    Eh2eV = 27.211396641308
+     
+    print("CVS type: {}".format(adc.cvs_type))
+    if adc.nfc_orb > 0:
+        print("Number of FC orbitals: {}".format(adc.nfc_orb))
     #print("Orbital energy shift threshold = {}".format(adc.energy_thresh))
     T = adc.get_trans_moments()
     U = np.array(U)
     spec_factors, X = adc.get_spec_factors(T, U, nroots)
     #print(np.column_stack((E*27.2114, spec_factors)))
-    print("     Energies (eV)          |    Spec factors")
+    print("Energies (eV)   |  Spec factors")
     print("---------------------------------------------------")
-    print(np.c_[E*27.2114, spec_factors])
+    for i in range(E.size):
+        logger.info(adc, ' %12.8f  %14.8f', E[i]*Eh2eV, spec_factors[i])
+    #print(np.c_[E*Eh2eV, spec_factors])
     print("---------------------------------------------------")
     analyze_eigenvector_ip(adc, U)
  
@@ -292,67 +284,131 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         e_vir_temp[1:] = e_vir_a[::-1]
         e_vir_temp[0] = 1e15
         e_vir_a = e_vir_temp
-    
+   
+ 
     E_mom_size = 2
     iter_i = 0
     E_mom = np.zeros(2) 
     iter_idx = []
-    end_bool = False
-    while E_mom_size <= 2 and iter_i < e_vir_a.size:
-        energy_thresh_i = e_vir_a[iter_i] - 1e-7
-        matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False, energy_thresh=energy_thresh_i)
+    oneshot_mom = adc.oneshot_mom
+    oneshot_cvs = adc.oneshot_cvs
+    mo_counter = None
+    e_vir_min = None
+    if adc.oneshot_mom is True and ovlp_tol > 0 and oneshot_cvs is False:
         conv, E, U , nroots= davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick =eig_close_to_init_guess, tol_residual = 1e-3)
-        #conv, E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-12, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=eig_close_to_init_guess)
-        
+        T = adc.get_trans_moments()
         U = np.array(U)
+        spec_factors, X = adc.get_spec_factors(T, U, nroots)
         idx_sort = np.argsort(E)
         E = E[idx_sort]
         U = U[idx_sort,:]
-        #print("shape of Lanczos array: ", U.shape)
-        #for i in range(U.shape[0]):
-        #    print("CVS/MOM overlap: ", np.dot(np.array(guess)[i,:], U[i,:].T))
-        T = adc.get_trans_moments()
-        spec_factors, X = adc.get_spec_factors(T, U, nroots)
         s = np.dot(U, np.asarray(guess).conj().T)
         snorm = np.einsum('pi,pi->p', s.conj(), s)
-        nfalse = np.shape(conv)[0] - np.sum(conv)
-        if nfalse >= 1:
-            print ("*************************************************************")
-            print (" WARNING : ", "Davidson iterations for ",nfalse, "root(s) not converged")
-            print ("*************************************************************")
-
-        print("MOM results ")
-        print("Orbital energy shift threshold = {}".format(energy_thresh_i))
-        print("     Energies (eV)          |    Spec factors   |   |s|^2 w.r.t CVS eigenvectors")
+        print("MOM type: {}".format('one-shot'))
+        print("Core excitations: {}".format(adc.cvs_type))
+        if adc.nfc_orb > 0:
+            print("Number of FC orbitals: {}".format(adc.nfc_orb))
+        print("Energies (eV)   |  Spec factors   |  snorm")
         print("---------------------------------------------------")
-        print(np.c_[E*27.2114, spec_factors, snorm])
+        for i in range(E.size):
+            logger.info(adc, ' %12.8f  %14.8f   %14.8f', E[i]*Eh2eV, spec_factors[i], snorm[i])
         print("---------------------------------------------------")
-        #print(np.column_stack((E*27.2114, spec_factors)))
         analyze_eigenvector_ip(adc, U)
-        spec_factors_mom = spec_factors.copy()
- 
-        E_mom_size = E.size
-        #print("E_mom_size: ", E_mom_size)
-        if E.size > 2:
-           print("Total number of non-degenerate virtual MOs: ", e_vir_a.size)
-           print("Total number of non-degenerate virtual MOs used in vve: ", e_vir_a[:iter_i].size)
-           print("Highest vve energy thresholds used (Eh): ", e_vir_a[iter_i-1])
-           print("Total vve energy thresholds used (Eh): ", e_vir_a[:iter_i])
-           print("Ecvs: ", E_cvs)
-           if iter_i > 0: 
-               print("Emom: ", E_mom*27.2114)
-           if iter_i == 0: 
-               print("Emom: ", E*27.2114)
+    
+    else: 
+        while E_mom_size <= 2 and iter_i < e_vir_a.size and ovlp_tol > 0 and oneshot_cvs is False:
+            energy_thresh_i = e_vir_a[iter_i] - 1e-7
+            matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False, energy_thresh=energy_thresh_i)
+            conv, E, U , nroots= davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick =eig_close_to_init_guess, tol_residual = 1e-3)
+            #conv, E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-12, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=eig_close_to_init_guess)
+            
+            U = np.array(U)
+            idx_sort = np.argsort(E)
+            E = E[idx_sort]
+            U = U[idx_sort,:]
+            #print("shape of Lanczos array: ", U.shape)
+            #for i in range(U.shape[0]):
+            #    print("CVS/MOM overlap: ", np.dot(np.array(guess)[i,:], U[i,:].T))
+            T = adc.get_trans_moments()
+            spec_factors, X = adc.get_spec_factors(T, U, nroots)
+            s = np.dot(U, np.asarray(guess).conj().T)
+            snorm = np.einsum('pi,pi->p', s.conj(), s)
+            nfalse = np.shape(conv)[0] - np.sum(conv)
+            if nfalse >= 1:
+                print ("*************************************************************")
+                print (" WARNING : ", "Davidson iterations for ",nfalse, "root(s) not converged")
+                print ("*************************************************************")
 
-        if E.size == 2 and iter_i == 0:# and e_vir_a[0] == 1e15:
-           print("Ecvs: ", E_cvs*27.2114)
-           print("Emom: ", E*27.2114)
-           print("Total number of non-degenerate virtual MOs: ", e_vir_a.size)
-           E_mom_size = 3
-        else:
-           E_mom = E
-           iter_i +=1
-    return (E_cvs, spec_factors_cvs, E_mom, spec_factors_mom) 
+            if e_vir_a[0] == 1e15:
+                if iter_i == 0:
+                   vve_str = "All vve are incluced"
+                if iter_i > 0:
+                   vve_str = "Some vve are included"
+                if iter_i == e_vir_a.size - 1:
+                   vve_str = "No vve are included"
+            if e_vir_a[0] != 1e15:
+                if iter_i == 0:
+                   vve_str = "No vve are incluced"
+                if iter_i > 0:
+                   vve_str = "Some vve are included"
+                if iter_i == e_vir_a.size - 1:
+                   vve_str = "All vve are included"
+
+            print("MOM type: {}".format(vve_str))
+            print("Core excitations: {}".format(adc.cvs_type))
+            print("Orbital energy shift threshold = {}".format(energy_thresh_i))
+            if adc.nfc_orb > 0:
+                print("Number of FC orbitals: {}".format(adc.nfc_orb))
+            print("Energies (eV)   |  Spec factors   |  snorm")
+            print("---------------------------------------------------")
+            for i in range(E.size):
+                logger.info(adc, ' %12.8f  %14.8f   %14.8f', E[i]*Eh2eV, spec_factors[i], snorm[i])
+            print("---------------------------------------------------")
+            #print(np.column_stack((E*27.2114, spec_factors)))
+            analyze_eigenvector_ip(adc, U)
+            spec_factors_mom = spec_factors.copy()
+ 
+            E_mom_size = E.size
+            #print("E_mom_size: ", E_mom_size)
+            if e_vir_a[0] != 1e15 and E.size > 2:
+               print("Total number of non-degenerate virtual MOs: ", e_vir_a.size)
+               print("Total number of non-degenerate virtual MOs used in vve: ", iter_i-1)
+               print("Highest vve energy threshold used (Eh): ", e_vir_a[iter_i-1])
+               print("Highest vve energy threshold used (eV): ", e_vir_a[iter_i-1]*Eh2eV)
+               print("Ecvs: ", E_cvs)
+               if iter_i > 0: 
+                   print("Emom: ", E_mom*27.2114)
+               if iter_i == 0: 
+                   print("Emom: ", E*27.2114)
+
+            #if E.size == 2 and iter_i == 0 and e_vir_a[0] == 1e15:
+            if e_vir_a[0] == 1e15:
+                if iter_i == e_vir_a.size - 1:
+                   print("Ecvs: ", E_cvs*Eh2eV)
+                   print("Emom: ", E*Eh2eV)
+                   print("Total number of non-degenerate virtual MOs: ", e_vir_a.size)
+                   print("Total number of non-degenerate virtual MOs used in vve: ", mo_counter)
+                   print("Lowest vve energy threshold used (Eh): ", e_vir_min)
+                   print("Lowest vve energy threshold used (eV): ", e_vir_min*Eh2eV)
+                   iter_i += 1
+                if E.size == 2 and iter_i == 0:
+                    print("MOM pole structure is preserved while including all vve excitations \nRemoving all vve and leaving only v ...")
+                    e_vir_min = e_vir_a[iter_i] 
+                    iter_i = e_vir_a.size - 1 
+                    mo_counter = e_vir_a.size
+                if E.size > 2:
+                    print("MOM pole structure is destroyed \nRemoving all vve and leaving only v ...")
+                    mo_counter = e_vir_a.size - iter_i - 1 
+                    e_vir_min = e_vir_a[iter_i] 
+                    iter_i = e_vir_a.size - 1 
+            else:
+               E_mom = E
+               iter_i +=1
+    if ovlp_tol == 0:
+        return (0, 0, 0, 0)
+    if ovlp_tol > 0:
+        #return (E_cvs, spec_factors_cvs, E_mom, spec_factors_mom) 
+        return (0, 0, 0, 0)
     exit() 
 
     if adc.verbose >= logger.INFO:
@@ -1453,6 +1509,9 @@ class UADC(lib.StreamObject):
         self.imaginary_shift = 0
         self.energy_thresh = 1000
         self.es_mom_thresh = 0.03
+        self.cvs_type = 'cce'
+        self.oneshot_mom = False
+        self.oneshot_cvs = True
         
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mol', 'mo_energy_b', 'max_memory', 'scf_energy', 'e_tot', 't1', 'frozen', 'mo_energy_a', 'chkfile', 'max_space', 't2', 'mo_occ', 'max_cycle'))
 
@@ -3183,6 +3242,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         #    shift += 0*1j
         
         ncore = adc.ncore_cvs
+        cvs_type = adc.cvs_type
 
         diag[(s_a+ncore):f_a] += shift
         diag[(s_b+ncore):f_b] += shift
@@ -3191,6 +3251,8 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         temp[:,ij_ind_a[0],ij_ind_a[1]] = diag[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
         temp[:,ij_ind_a[1],ij_ind_a[0]] = -diag[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
         temp[:,ncore:,ncore:] += shift
+        if cvs_type == 'cve':
+            temp[:,:ncore,:ncore] += shift
         #temp[:,ncore:,:ncore] = shift
         #temp[:,:ncore,:ncore] += shift
 
@@ -3199,6 +3261,8 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         temp = diag[s_bab:f_bab].copy()
         temp = temp.reshape((nvir_b, nocc_b, nocc_a))
         temp[:,ncore:,ncore:] += shift
+        if cvs_type == 'cve':
+            temp[:,:ncore,:ncore] += shift
         #temp[:,ncore:,:ncore] = shift
         #temp[:,:ncore,:ncore] += shift
         diag[s_bab:f_bab] = temp.reshape(-1).copy()
@@ -3206,6 +3270,8 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         temp = diag[s_aba:f_aba].copy()
         temp = temp.reshape((nvir_a, nocc_a, nocc_b))
         temp[:,ncore:,ncore:] += shift
+        if cvs_type == 'cve':
+            temp[:,:ncore,:ncore] += shift
         #temp[:,ncore:,:ncore] = shift
         #temp[:,:ncore,:ncore] += shift
 
@@ -3216,9 +3282,10 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
         temp[:,ij_ind_b[1],ij_ind_b[0]] = -diag[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
 
         temp[:,ncore:,ncore:] += shift
+        if cvs_type == 'cve':
+            temp[:,:ncore,:ncore] += shift
         #temp[:,ncore:,:ncore] = shift
         #temp[:,:ncore,:ncore] += shift
-        #temp_ecc = temp[:,:ncore,:ncore]
 
         diag[s_bbb:f_bbb] = temp[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1).copy()
         
@@ -3227,9 +3294,10 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
 
     return diag
 
-def cvs_projector(adc, r):
+def cvs_projector(adc, r,):
 
     ncore = adc.ncore_cvs
+    cvs_type = adc.cvs_type
 
     nocc_a = adc.nocc_a
     nocc_b = adc.nocc_b
@@ -3270,21 +3338,26 @@ def cvs_projector(adc, r):
     temp[:,ij_a[1],ij_a[0]] = -Pr[s_aaa:f_aaa].reshape(nvir_a,-1).copy()
 
     temp[:,ncore:,ncore:] = 0.0
-    #temp[:,:ncore,:ncore] = 0.0
+    if cvs_type == 'cve':
+        temp[:,:ncore,:ncore] = 0.0
 
     Pr[s_aaa:f_aaa] = temp[:,ij_a[0],ij_a[1]].reshape(-1).copy()
 
     temp = Pr[s_bab:f_bab].copy()
     temp = temp.reshape((nvir_b, nocc_b, nocc_a))
+
     temp[:,ncore:,ncore:] = 0.0
-    #temp[:,:ncore,:ncore] = 0.0
+    if cvs_type == 'cve':
+        temp[:,:ncore,:ncore] = 0.0
 
     Pr[s_bab:f_bab] = temp.reshape(-1).copy()
 
     temp = Pr[s_aba:f_aba].copy()
     temp = temp.reshape((nvir_a, nocc_a, nocc_b))
+
     temp[:,ncore:,ncore:] = 0.0
-    #temp[:,:ncore,:ncore] = 0.0
+    if cvs_type == 'cve':
+        temp[:,:ncore,:ncore] = 0.0
 
     Pr[s_aba:f_aba] = temp.reshape(-1).copy()
 
@@ -3293,7 +3366,8 @@ def cvs_projector(adc, r):
     temp[:,ij_b[1],ij_b[0]] = -Pr[s_bbb:f_bbb].reshape(nvir_b,-1).copy()
 
     temp[:,ncore:,ncore:] = 0.0
-    #temp[:,:ncore,:ncore] = 0.0
+    if cvs_type == 'cve':
+        temp[:,:ncore,:ncore] = 0.0
 
     Pr[s_bbb:f_bbb] = temp[:,ij_b[0],ij_b[1]].reshape(-1).copy()
 
@@ -3302,6 +3376,7 @@ def cvs_projector(adc, r):
 def vve_projector(adc, r, cvs_composition=False, energy_thresh=None):
 
     ncore = adc.ncore_cvs
+    cvs_type = adc.cvs_type
 
     nocc_a = adc.nocc_a
     nocc_b = adc.nocc_b
@@ -3364,6 +3439,8 @@ def vve_projector(adc, r, cvs_composition=False, energy_thresh=None):
         norm_evv += np.sum(temp[:, ncore:, ncore:]**2)/2
 
     temp[idx_a_thresh,ncore:,ncore:] = 0.0
+    if cvs_type == 'cve':
+        temp[:,:ncore,:ncore] = 0.0
     Pr[s_aaa:f_aaa] = temp[:,ij_a[0],ij_a[1]].reshape(-1).copy()
 
     temp = Pr[s_bab:f_bab].copy()
@@ -3376,6 +3453,8 @@ def vve_projector(adc, r, cvs_composition=False, energy_thresh=None):
         norm_evv += np.sum(temp[:, ncore:, ncore:]**2)
 
     temp[idx_b_thresh,ncore:,ncore:] = 0.0
+    if cvs_type == 'cve':
+        temp[:,:ncore,:ncore] = 0.0
     Pr[s_bab:f_bab] = temp.reshape(-1).copy()
 
     temp = Pr[s_aba:f_aba].copy()
@@ -3388,6 +3467,8 @@ def vve_projector(adc, r, cvs_composition=False, energy_thresh=None):
         norm_evv += np.sum(temp[:, ncore:, ncore:]**2)
 
     temp[idx_a_thresh,ncore:,ncore:] = 0.0
+    if cvs_type == 'cve':
+        temp[:,:ncore,:ncore] = 0.0
     Pr[s_aba:f_aba] = temp.reshape(-1).copy()
 
     temp = np.zeros((nvir_b, nocc_b, nocc_b))#.astype(complex)
@@ -3410,6 +3491,8 @@ def vve_projector(adc, r, cvs_composition=False, energy_thresh=None):
         logger.info(adc, "----------------------------------------------")
 
     temp[idx_b_thresh,ncore:,ncore:] = 0.0
+    if cvs_type == 'cve':
+        temp[:,:ncore,:ncore] = 0.0
     Pr[s_bbb:f_bbb] = temp[:,ij_b[0],ij_b[1]].reshape(-1).copy()
 
     return Pr
@@ -5694,6 +5777,9 @@ class UADCEA(UADC):
         self.imaginary_shift = adc.imaginary_shift
         self.energy_thresh = adc.energy_thresh
         self.es_mom_thresh = adc.es_mom_thresh
+        self.cvs_type = adc.cvs_type
+        self.oneshot_mom = adc.oneshot_mom
+        self.oneshot_cvs = adc.oneshot_cvs
 
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
@@ -5804,6 +5890,9 @@ class UADCIP(UADC):
         self.imaginary_shift = adc.imaginary_shift
         self.energy_thresh = adc.energy_thresh
         self.es_mom_thresh = adc.es_mom_thresh
+        self.cvs_type = adc.cvs_type
+        self.oneshot_mom = adc.oneshot_mom
+        self.oneshot_cvs = adc.oneshot_cvs
 
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
