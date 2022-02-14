@@ -80,7 +80,7 @@ def transform_integrals_incore(myadc):
     eris.OVvv = ao2mo.general(myadc._scf._eri, (occ_b, vir_b, vir_a, vir_a), compact=True).reshape(nocc_b, nvir_b, -1).copy()
 
     # CVS integrals for matvec function (c: core, e: external, v: valence, o: all occupied orbitals)
-    if myadc.method_type == 'ip-cvs':
+    if myadc.method_type == 'midnight_testing':#'ip-cvs':
     
         #----- ADC(2) integrals --------
         eris.cecc = ao2mo.general(myadc._scf._eri, (core_a, vir_a, core_a, core_a), compact=False).reshape(ncvs, nvir_a, ncvs, ncvs).copy()

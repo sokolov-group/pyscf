@@ -25,7 +25,8 @@ Algebraic Diagrammatic Construction
 
 from pyscf import scf
 from pyscf import lib
-from pyscf.adc import uadc
+#from pyscf.adc import uadc
+import uadc_backup_feb12 as uadc
 from pyscf.adc import radc
 
 def ADC(mf, frozen=None, mo_coeff=None, mo_occ=None):
