@@ -688,7 +688,7 @@ def cvs_projector(myadc, r, alpha_proj=0):
     temp = Pr[s2:f2].reshape((nvir, nocc, nocc)).copy()
     
     temp[:,ncore_proj:,ncore_proj:] *= alpha_proj
-    #temp[:,:ncore_proj,:ncore_proj] *= alpha_proj
+    temp[:,:ncore_proj,:ncore_proj] *= alpha_proj
     
     Pr[s2:f2] = temp.reshape(-1).copy()
     
@@ -1875,13 +1875,13 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=True, fc_bool=True, mom_skd=False, a
     """
     if (cvs is True) or ((mom_skd is True) and (alpha_proj==0)):
 
-        shift = -100000.0
+        shift = -1000000000000.0
         ncore_proj = adc.ncore_proj
         diag[ncore_proj:f1] += shift
 
         temp = np.zeros((nvir,nocc,nocc))
         temp[:,ncore_proj:,ncore_proj:] += shift
-        #temp[:,:ncore_proj,:ncore_proj] += shift
+        temp[:,:ncore_proj,:ncore_proj] += shift
 
         diag[s2:f2] += temp.reshape(-1).copy()
 

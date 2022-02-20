@@ -189,7 +189,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         v = v[:, idx]
         return w, v, idx
 
-    nroots = 2
+    nroots = 4
       
     guess = adc.get_init_guess(nroots, diag, ascending = True)
     #conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-16, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=sort_complex_eigenvalues)
@@ -200,31 +200,10 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False)
 
-
-    Eh2eV = 27.211396641308
-     
-    print("CVS type: {}".format(adc.cvs_type))
-    if adc.nfc_orb > 0:
-        print("Number of FC orbitals: {}".format(adc.nfc_orb))
-    #print("Orbital energy shift threshold = {}".format(adc.energy_thresh))
-    T = adc.get_trans_moments()
-    U = np.array(U)
-    P_cvs, X = adc.get_spec_factors(T, U, nroots)
-    #print(np.column_stack((E*27.2114, spec_factors)))
-    print("Energies (eV)   |  Spec factors")
-    print("---------------------------------------------------")
-    for i in range(E_cvs.size):
-        logger.info(adc, ' %12.8f  %14.8f', E_cvs[i]*Eh2eV, P_cvs[i])
-    #print(np.c_[E*Eh2eV, spec_factors])
-    print("---------------------------------------------------")
-    analyze_eigenvector_ip(adc, U)
- 
-
-    nrooots = nroots_kernel
     def cvs_pick(cvs_npick,U):          
         nroots = len(cvs_npick)
         dim_guess = np.array(U).shape[1]
-        guess = np.zeros((nroots, dim_guess), dtype=complex)
+        guess = np.zeros((nroots, dim_guess))#, dtype=complex)
         for idx_guess, npick in enumerate(cvs_npick):
             U = np.array(U)
             guess[idx_guess,:] = U[npick,:]
@@ -233,7 +212,26 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     cvs_npick = adc.cvs_npick
     if cvs_npick:
         guess,nroots = cvs_pick(cvs_npick,U)
-        E = E[cvs_npick]
+        E_cvs = E_cvs[cvs_npick]
+
+
+    Eh2eV = 27.211396641308
+     
+    print("CVS type: {}".format(adc.cvs_type))
+    if adc.nfc_orb > 0:
+        print("Number of FC orbitals: {}".format(adc.nfc_orb))
+    T = adc.get_trans_moments()
+    U = np.array(U)
+    P_cvs, X = adc.get_spec_factors(T, U, nroots)
+    print("Energies (eV)   |  Spec factors")
+    print("---------------------------------------------------")
+    for i in range(E_cvs.size):
+        logger.info(adc, ' %12.8f  %14.8f', E_cvs[i]*Eh2eV, P_cvs[i])
+    print("---------------------------------------------------")
+    analyze_eigenvector_ip(adc, U)
+ 
+
+    nrooots = nroots_kernel
            
     #E, U, conv = compute_lanczos(matvec, nroots, guess)
     max_mom_iter = 100
@@ -275,7 +273,9 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     e_vir_a = np.unique(np.round(e_vir_a, 7))
     nvir = e_vir_a.size
     vve_mo_count = e_vir_a.size
-    if adc.ncore_cvs == 1 or adc.ncore_cvs == 5 or adc.ncore_cvs == 9:
+    cvs_edge = adc.cvs_edge
+    #if adc.ncore_cvs == 1 or adc.ncore_cvs == 5 or adc.ncore_cvs == 9:
+    if cvs_edge == '1s' or cvs_edge == '2p' or cvs_edge == '3p':
         e_vir_temp = np.zeros(nvir+1)
         e_vir_temp[1:] = e_vir_a[::-1]
         e_vir_temp[0] = big_thresh
@@ -308,7 +308,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         print("Energies (eV)   |  Spec factors   |  snorm")
         print("---------------------------------------------------")
         for i in range(E.size):
-            logger.info(adc, ' %12.8f  %14.8f   %14.8f', E[i]*Eh2eV, spec_factors[i], snorm[i])
+            logger.info(adc, ' %12.8f  %14.8f   %14.8f', E[i]*Eh2eV, P[i], snorm[i])
         print("---------------------------------------------------")
         analyze_eigenvector_ip(adc, U)
     
@@ -380,7 +380,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
                    results_out['twopole2_E_mom_vve_2'] = E[2]*Eh2eV  
                    results_out['twopole2_P_mom_vve_2'] = P[2]
                    results_out['twopole2_S_mom_vve_2'] = snorm[2] 
-
+            
+            first_pass = False
             if e_vir_a[0] != big_thresh and E.size > 2:
                print("CVS pole structure is destroyed\n========================\nPrinting summary of results ...\n=================================")
                print("Ecvs: ", E_cvs*Eh2eV)
@@ -414,6 +415,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
                 results_out['S_mom_vve'] = S_last[0]
                 iter_i = e_vir_a.size-1
                 E_last = E
+                first_pass = True
 
             elif e_vir_a[0] == big_thresh and iter_i == e_vir_a.size-1:
                 print("==========================\nPrinting summary of results ...\n================================")
@@ -421,6 +423,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
                 print("Emom: ", E_last*Eh2eV)
                 print("Total number of non-degenerate virtual MOs: ", e_vir_a.size)
                 print("Total number of non-degenerate virtual MOs used in vve: ", vve_mo_count)
+                if first_pass is False:
+                    idx_thresh = iter_i
                 print("Lowest vve energy threshold used (Eh): ", e_vir_a[idx_thresh])
                 print("Lowest vve energy threshold used (eV): ", e_vir_a[idx_thresh]*Eh2eV)
                 results_out['E_mom_v'] = E[0]*Eh2eV 
@@ -483,7 +487,7 @@ def analyze_eigenvector_ip(adc, U, print_thresh = 0.05):
     nvir_a = adc.nvir_a
     nvir_b = adc.nvir_b
     ncore_cvs = adc.ncore_cvs
-    Eh2eV = 27.2114
+    Eh2eV = 27.211396641308
     e_occ_a = adc.mo_energy_a[:nocc_a]*Eh2eV 
     e_occ_b = adc.mo_energy_b[:nocc_b]*Eh2eV
     e_vir_a = adc.mo_energy_a[nocc_a:]*Eh2eV
@@ -659,12 +663,62 @@ def analyze_eigenvector_ip(adc, U, print_thresh = 0.05):
                 #if doubles_bab_val:
                 #if doubles_aba_val:
                 #if doubles_bbb_val:
+            if iter_i == 0:
+
+                norm_evv, norm_v = vve_projector(adc, U[I, :], cvs_composition=True)
+
+                if singles_a_val:
+                        for idx, print_singles in enumerate(singles_a_idx):
+                            logger.info(adc, '  %4d   %7.4f   %8.2f   %12.2f', print_singles, singles_a_val[idx], singles_a_energy[idx], avg_energy_a[idx])
+
+                if singles_b_val:
+                        logger.info(adc, "1h(beta) | thresh_weighted_energy = %.4f | total_weighted_energy = %.4f ", avg_energy_b_tot, np.sum(avg_energy_b)) 
+                        logger.info(adc, "----------------------------------------------")
+                        logger.info(adc, "     i    U(i)    HF_energy(eV)   weighted(eV)")
+                        logger.info(adc, "----------------------------------------------")
+                        for idx, print_singles in enumerate(singles_b_idx):
+                            logger.info(adc, '  %4d   %7.4f   %8.2f   %12.2f', print_singles, singles_b_val[idx], singles_b_energy[idx], avg_energy_b[idx])
+
+                if doubles_aaa_val:
+                        logger.info(adc, "\n2h1p(alpha|alpha|alpha) | threshold_weighted_energy(eV) = %.4f | total_weighted_energy(eV) = %.4f", np.sum(avg_energy_aaa), avg_energy_aaa_tot) 
+                        logger.info(adc, "-------------------------------------------------------------------")
+                        logger.info(adc, "     i     j     a     U(i,j,a)   HF_energy(eV)    weighted(eV)")
+                        logger.info(adc, "-------------------------------------------------------------------")
+                        for idx, print_doubles in enumerate(doubles_aaa_idx):
+                            logger.info(adc, '  %4d  %4d  %4d   %7.4f  %13.2f   %13.2f', print_doubles[1], print_doubles[2], print_doubles[0], doubles_aaa_val[idx], doubles_aaa_energy[idx], avg_energy_aaa[idx])
+
+                if doubles_bab_val:
+                        logger.info(adc, "\n2h1p(beta|alpha|beta) | threshold_weighted_energy(eV) = %.4f | total_weighted_energy(eV) = %.4f", np.sum(avg_energy_bab), avg_energy_bab_tot) 
+                        logger.info(adc, "-------------------------------------------------------------------")
+                        logger.info(adc, "     i     j     a     U(i,j,a)   HF_energy(eV)    weighted(eV)")
+                        logger.info(adc, "-------------------------------------------------------------------")
+                        for idx, print_doubles in enumerate(doubles_bab_idx):
+                            logger.info(adc, '  %4d  %4d  %4d   %7.4f  %13.2f   %13.2f', print_doubles[1], print_doubles[2], print_doubles[0], doubles_bab_val[idx], doubles_bab_energy[idx], avg_energy_bab[idx])
+
+                if doubles_aba_val:
+                        logger.info(adc, "\n2h1p(alpha|beta|alpha) | threshold_weighted_energy(eV) = %.4f | total_weighted_energy(eV) = %.4f", np.sum(avg_energy_aba), avg_energy_aba_tot) 
+                        logger.info(adc, "-------------------------------------------------------------------")
+                        logger.info(adc, "     i     j     a     U(i,j,a)   HF_energy(eV)    weighted(eV)")
+                        logger.info(adc, "-------------------------------------------------------------------")
+                        for idx, print_doubles in enumerate(doubles_aba_idx):
+                            logger.info(adc, '  %4d  %4d  %4d   %7.4f  %13.2f   %13.2f', print_doubles[1], print_doubles[2], print_doubles[0], doubles_aba_val[idx], doubles_aba_energy[idx], avg_energy_aba[idx])
+
+                if doubles_bbb_val:
+                        logger.info(adc, "\n2h1p(beta|beta|beta) | threshold_weighted_energy(eV) = %.4f | total_weighted_energy(eV) = %.4f", np.sum(avg_energy_bbb), avg_energy_bbb_tot) 
+                        logger.info(adc, "-------------------------------------------------------------------")
+                        logger.info(adc, "     i     j     a     U(i,j,a)   HF_energy(eV)    weighted(eV)")
+                        logger.info(adc, "-------------------------------------------------------------------")
+                        for idx, print_doubles in enumerate(doubles_bbb_idx):
+                            logger.info(adc, '  %4d  %4d  %4d   %7.4f  %13.2f   %13.2f', print_doubles[1], print_doubles[2], print_doubles[0], doubles_bbb_val[idx], doubles_bbb_energy[idx], avg_energy_bbb[idx])
+
+                logger.info(adc, "\n*************************************************************\n")
+                sys.stdout.flush() 
                  
 
             if iter_i == 1:
                 logger.info(adc,'%s | root %d | norm(1h)  = %6.4f | norm(2h1p) = %6.4f ',adc.method ,I, U1dotU1, U2dotU2)
 
-                _, norm_vve = vve_projector(adc, U[I, :], cvs_composition=True)
+                norm_evv, norm_v = vve_projector(adc, U[I, :], cvs_composition=True)
 
                 logger.info(adc,' \ntotal root weighted energy (eV)  = %6.4f \n', avg_energy_a_tot + avg_energy_b_tot + avg_energy_aaa_tot + avg_energy_bab_tot + avg_energy_aba_tot + avg_energy_bbb_tot)
                 if singles_a_val:
@@ -1572,7 +1626,8 @@ class UADC(lib.StreamObject):
         self.cvs_type = 'cce'
         self.oneshot_mom = False
         self.oneshot_cvs = True
-        
+        self.cvs_edge = '1s'
+         
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mol', 'mo_energy_b', 'max_memory', 'scf_energy', 'e_tot', 't1', 'frozen', 'mo_energy_a', 'chkfile', 'max_space', 't2', 'mo_occ', 'max_cycle'))
 
         self._keys = set(self.__dict__.keys()).union(keys)
@@ -3297,13 +3352,12 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=False, fc_bool=True):
     
     if cvs is True:
         
-        shift = -100000000.0 
+        shift = -100000000000.0 
         #if np.imag(imaginary_shift) != 0:
         #    shift += 0*1j
         
         ncore = adc.ncore_cvs
         cvs_type = adc.cvs_type
-
         diag[(s_a+ncore):f_a] += shift
         diag[(s_b+ncore):f_b] += shift
 
@@ -3555,7 +3609,10 @@ def vve_projector(adc, r, cvs_composition=False, energy_thresh=None):
         temp[:,:ncore,:ncore] = 0.0
     Pr[s_bbb:f_bbb] = temp[:,ij_b[0],ij_b[1]].reshape(-1).copy()
 
-    return Pr, norm_evv
+    if cvs_composition:
+        return norm_evv, norm_v
+    else:
+        return Pr
 
 def ea_contract_r_vvvv_antisym(myadc,r2,vvvv_d):
 
@@ -4362,7 +4419,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True, energy_thr
         else:
             #print("vve energy_thresh: ", energy_thresh)
             #exit()
-            r,_ = vve_projector(adc, r, energy_thresh=energy_thresh)
+            r = vve_projector(adc, r, energy_thresh=energy_thresh)
 
         #s = np.zeros((dim), dtype=complex)
         s = np.zeros(dim)
@@ -4834,7 +4891,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True, energy_thr
         if cvs is True:
             s = cvs_projector(adc, s)
         else:
-            s,_ = vve_projector(adc, s, energy_thresh=energy_thresh)
+            s = vve_projector(adc, s, energy_thresh=energy_thresh)
         """
         print('s[s_a:f_a]',             np.linalg.norm(s[s_a:f_a]))
         print(np.column_stack(np.unique(np.around(s[s_a:f_a], decimals=8), return_counts=True))) 
@@ -5840,6 +5897,7 @@ class UADCEA(UADC):
         self.cvs_type = adc.cvs_type
         self.oneshot_mom = adc.oneshot_mom
         self.oneshot_cvs = adc.oneshot_cvs
+        self.cvs_edge = adc.cvs_edge
 
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
@@ -5953,6 +6011,7 @@ class UADCIP(UADC):
         self.cvs_type = adc.cvs_type
         self.oneshot_mom = adc.oneshot_mom
         self.oneshot_cvs = adc.oneshot_cvs
+        self.cvs_edge = adc.cvs_edge
 
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
