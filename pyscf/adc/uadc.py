@@ -190,7 +190,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         v = v[:, idx]
         return w, v, idx
 
-    nroots = 4
+    #nroots = 4
+    nroots = adc.cvs_npick[-1]+1
       
     guess = adc.get_init_guess(nroots, diag, ascending = True)
     #conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-16, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=sort_complex_eigenvalues)
@@ -292,7 +293,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     mo_counter = None
     e_vir_min = None
     #end_bool = False
-    if adc.oneshot_mom is True and ovlp_tol > 0 and oneshot_cvs is False:
+    oneshot_no_vve = adc.oneshot_no_vve
+    if adc.oneshot_mom is True and ovlp_tol > 0 and oneshot_cvs is False and oneshot_no_vve is False:
         conv, E, U , nroots= davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick =eig_close_to_init_guess, tol_residual = 1e-3)
         T = adc.get_trans_moments()
         U = np.array(U)
@@ -317,8 +319,38 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
             print(f'root {key}')   
             for key2, value2 in value.items():
                 print(f'{key2} = {value2}')
+    elif adc.oneshot_mom is False and ovlp_tol > 0 and oneshot_cvs is False and oneshot_no_vve is True:
+
+        nocc_a = adc.nocc_a 
+        energy_thresh = adc.mo_energy_a[nocc_a]
+        matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False, energy_thresh=energy_thresh)
+
+        conv, E, U , nroots= davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick =eig_close_to_init_guess, tol_residual = 1e-3)
+        T = adc.get_trans_moments()
+        U = np.array(U)
+        P, X = adc.get_spec_factors(T, U, nroots)
+        s = np.dot(U, np.asarray(guess).conj().T)
+        snorm = np.einsum('pi,pi->p', s.conj(), s)
+        print("MOM type: {}".format('No vve included'))
+        print("Core excitations: {}".format(adc.cvs_type))
+        if adc.nfc_orb > 0:
+            print("Number of FC orbitals: {}".format(adc.nfc_orb))
+        print("Energies (eV)   |  Spec factors   |  snorm")
+        print("---------------------------------------------------")
+        for i in range(E.size):
+            logger.info(adc, ' %12.8f  %14.8f   %14.8f', E[i]*Eh2eV, P[i], snorm[i])
+        print("---------------------------------------------------")
+        norm_v, norm_evv, max_u2_e = analyze_eigenvector_ip(adc, U, analyze_v_vve=True)
+        results_out['E_cvs'] = E_cvs[0]*Eh2eV
+        results_out['P_cvs'] = P_cvs[0]
+        results_out['E_v'] = E[0]*Eh2eV
+        results_out['P_v'] = P[0]
+        results_out['norm_v'] = norm_v
+        results_out['nvir'] = e_vir_a.size
+        
+
     else: 
-        while iter_i < e_vir_a.size and ovlp_tol > 0 and oneshot_cvs is False:
+        while iter_i < e_vir_a.size and ovlp_tol > 0 and oneshot_cvs is False and oneshot_no_vve is False:
             energy_thresh_i = e_vir_a[iter_i] - 1e-7
             matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False, energy_thresh=energy_thresh_i)
             conv, E, U , nroots= davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick =eig_close_to_init_guess, tol_residual = 1e-3)
@@ -488,9 +520,10 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
      #Retruning results for high throughput analysis. Implemented only for closed-shell systems
 
 
-        results_out['E_cvs'] = E_cvs[0]*Eh2eV
-        results_out['P_cvs'] = P_cvs[0]
-        results_out['nvir_full'] = e_vir_a.size 
+        #results_out['E_cvs'] = E_cvs[0]*Eh2eV
+        #results_out['P_cvs'] = P_cvs[0]
+        #results_out['nvir_full'] = e_vir_a.size
+ 
         #results_out['onepole_E_vve_HF'] = onepole_E_vve
         #results_out['onepole_vve_idx'] = onepole_vve_idx 
         #results_out['onepole_vve_U2'] = onepole_vve_U2
@@ -503,8 +536,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         
          
         #return (E_cvs, spec_factors_cvs, E_mom, spec_factors_mom) 
-        return results_out
-    exit()
+    return results_out
+    #exit()
  
     nfalse = np.shape(conv)[0] - np.sum(conv)
     if nfalse >= 1:
@@ -729,62 +762,62 @@ def analyze_eigenvector_ip(adc, U, print_thresh = 0.05, energy_thresh=None, anal
                 bab_idx_v = 0
                 aba_idx_v = 0
                 bbb_idx_v = 0
-                if analyze_v_vve:
-                   if singles_a_val:
-                      singles_a_val_v = np.array(singles_a_val)
-                      singles_a_energy_v = np.array(singles_a_energy)
-                      u2_a = np.unique(singles_a_val_v[0]**2)
-                      e_a = np.unique(singles_a_energy_v[0])
-                      a_idx_v = np.array(singles_a_idx[0]) 
-                   if singles_b_val:
-                      singles_b_val_v = np.array(singles_b_val)
-                      singles_b_energy_v = np.array(singles_b_energy)
-                      u2_b = np.unique(singles_b_val_v[0]**2)
-                      e_b =  np.unique(singles_b_energy_v[0])
-                      b_idx_v = np.array(singles_b_idx[0]) 
-                   if doubles_aaa_val:
-                      doubles_aaa_val_v = np.array(doubles_aaa_val)
-                      doubles_aaa_energy_v = np.array(doubles_aaa_energy)
-                      u2_aaa = np.unique(doubles_aaa_val_v[0]**2)
-                      e_aaa = np.unique(doubles_aaa_energy_v[0])
-                      aaa_idx_v = np.array(doubles_aaa_idx[0]) 
-                   if doubles_bab_val:
-                      doubles_bab_val_v = np.array(doubles_bab_val)
-                      doubles_bab_energy_v = np.array(doubles_bab_energy)
-                      u2_bab = np.unique(doubles_bab_val_v[0]**2)
-                      e_bab = np.unique(doubles_bab_energy_v[0])
-                      bab_idx_v = np.array(doubles_bab_idx[0]) 
-                   if doubles_aba_val:
-                      doubles_aba_val_v = np.array(doubles_aba_val)
-                      doubles_aba_energy_v = np.array(doubles_aba_energy)
-                      u2_aba = np.unique(doubles_aba_val_v[0]**2)
-                      e_aba = np.unique(doubles_aba_energy_v[0])
-                      aba_idx_v = np.array(doubles_aba_idx[0]) 
-                   if doubles_bbb_val:
-                      doubles_bbb_val_v = np.array(doubles_bbb_val)
-                      doubles_bbb_energy_v = np.array(doubles_bbb_energy)
-                      u2_bbb = np.unique(doubles_bbb_val_v[0]**2)
-                      e_bbb = np.unique(doubles_bbb_energy_v[0])
-                      aba_idx_v = np.array(doubles_aba_idx[0])
+                #if analyze_v_vve:
+                #   if singles_a_val:
+                #      singles_a_val_v = np.array(singles_a_val)
+                #      singles_a_energy_v = np.array(singles_a_energy)
+                #      u2_a = np.unique(singles_a_val_v[0]**2)
+                #      e_a = np.unique(singles_a_energy_v[0])
+                #      a_idx_v = np.array(singles_a_idx[0]) 
+                #   if singles_b_val:
+                #      singles_b_val_v = np.array(singles_b_val)
+                #      singles_b_energy_v = np.array(singles_b_energy)
+                #      u2_b = np.unique(singles_b_val_v[0]**2)
+                #      e_b =  np.unique(singles_b_energy_v[0])
+                #      b_idx_v = np.array(singles_b_idx[0]) 
+                #   if doubles_aaa_val:
+                #      doubles_aaa_val_v = np.array(doubles_aaa_val)
+                #      doubles_aaa_energy_v = np.array(doubles_aaa_energy)
+                #      u2_aaa = np.unique(doubles_aaa_val_v[0]**2)
+                #      e_aaa = np.unique(doubles_aaa_energy_v[0])
+                #      aaa_idx_v = np.array(doubles_aaa_idx[0]) 
+                #   if doubles_bab_val:
+                #      doubles_bab_val_v = np.array(doubles_bab_val)
+                #      doubles_bab_energy_v = np.array(doubles_bab_energy)
+                #      u2_bab = np.unique(doubles_bab_val_v[0]**2)
+                #      e_bab = np.unique(doubles_bab_energy_v[0])
+                #      bab_idx_v = np.array(doubles_bab_idx[0]) 
+                #   if doubles_aba_val:
+                #      doubles_aba_val_v = np.array(doubles_aba_val)
+                #      doubles_aba_energy_v = np.array(doubles_aba_energy)
+                #      u2_aba = np.unique(doubles_aba_val_v[0]**2)
+                #      e_aba = np.unique(doubles_aba_energy_v[0])
+                #      aba_idx_v = np.array(doubles_aba_idx[0]) 
+                #   if doubles_bbb_val:
+                #      doubles_bbb_val_v = np.array(doubles_bbb_val)
+                #      doubles_bbb_energy_v = np.array(doubles_bbb_energy)
+                #      u2_bbb = np.unique(doubles_bbb_val_v[0]**2)
+                #      e_bbb = np.unique(doubles_bbb_energy_v[0])
+                #      aba_idx_v = np.array(doubles_aba_idx[0])
 
-                   u2_singles = np.array([u2_a, u2_b], dtype=tuple)
-                   u2_doubles = np.array([u2_aaa, u2_bab, u2_aba, u2_bbb], tuple) 
-                   e_singles = {'0':e_a, '1':e_b}
-                   e_doubles = {'0':e_aaa, '1':e_bab, '2':e_aba, '3':e_bbb} 
-                   orb_singles = {'0':a_idx_v, '1':b_idx_v}
-                   orb_doubles = {'0':aaa_idx_v, '1':bab_idx_v, '2': aba_idx_v, '3': bbb_idx_v} 
-                   u2_singles_sorted_idx = np.argsort(-u2_singles) 
-                   u2_doubles_sorted_idx = np.argsort(-u2_doubles) 
+                #   u2_singles = np.array([u2_a, u2_b], dtype=tuple)
+                #   u2_doubles = np.array([u2_aaa, u2_bab, u2_aba, u2_bbb], tuple) 
+                #   e_singles = {'0':e_a, '1':e_b}
+                #   e_doubles = {'0':e_aaa, '1':e_bab, '2':e_aba, '3':e_bbb} 
+                #   orb_singles = {'0':a_idx_v, '1':b_idx_v}
+                #   orb_doubles = {'0':aaa_idx_v, '1':bab_idx_v, '2': aba_idx_v, '3': bbb_idx_v} 
+                #   u2_singles_sorted_idx = np.argsort(-u2_singles) 
+                #   u2_doubles_sorted_idx = np.argsort(-u2_doubles) 
 
-                   u2_singles_max = u2_singles[u2_singles_sorted_idx][0] 
-                   u2_doubles_max = u2_doubles[u2_doubles_sorted_idx][0] 
-                   e_singles_max = e_singles[f'{u2_singles_sorted_idx[0]}'] 
-                   e_doubles_max = e_doubles[f'{u2_doubles_sorted_idx[0]}'] 
-                   orb_singles_max = orb_singles[f'{u2_singles_sorted_idx[0]}'] 
-                   orb_doubles_max = orb_doubles[f'{u2_doubles_sorted_idx[0]}']
+                #   u2_singles_max = u2_singles[u2_singles_sorted_idx][0] 
+                #   u2_doubles_max = u2_doubles[u2_doubles_sorted_idx][0] 
+                #   e_singles_max = e_singles[f'{u2_singles_sorted_idx[0]}'] 
+                #   e_doubles_max = e_doubles[f'{u2_doubles_sorted_idx[0]}'] 
+                #   orb_singles_max = orb_singles[f'{u2_singles_sorted_idx[0]}'] 
+                #   orb_doubles_max = orb_doubles[f'{u2_doubles_sorted_idx[0]}']
  
 
-                   max_u2_e[f'{iter_f}'] = {'u2_singles': u2_singles_max, 'u2_doubles': u2_doubles_max, 'e_singles': e_singles_max, 'e_doubles': e_doubles_max, 'orb_singles': orb_singles_max, 'orb_doubles': orb_doubles_max, 'norm_v_full':norm_v, 'norm_vve_full':norm_evv}
+                   #max_u2_e[f'{iter_f}'] = {'u2_singles': u2_singles_max, 'u2_doubles': u2_doubles_max, 'e_singles': e_singles_max, 'e_doubles': e_doubles_max, 'orb_singles': orb_singles_max, 'orb_doubles': orb_doubles_max, 'norm_v_full':norm_v, 'norm_vve_full':norm_evv}
 
             if iter_i == 1:
         
@@ -1703,6 +1736,7 @@ class UADC(lib.StreamObject):
         self.oneshot_mom = False
         self.oneshot_cvs = True
         self.cvs_edge = '1s'
+        self.oneshot_no_vve = False
          
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mol', 'mo_energy_b', 'max_memory', 'scf_energy', 'e_tot', 't1', 'frozen', 'mo_energy_a', 'chkfile', 'max_space', 't2', 'mo_occ', 'max_cycle'))
 
@@ -6001,6 +6035,7 @@ class UADCEA(UADC):
         self.oneshot_mom = adc.oneshot_mom
         self.oneshot_cvs = adc.oneshot_cvs
         self.cvs_edge = adc.cvs_edge
+        self.oneshot_no_vve = adc.oneshot_no_vve
 
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
@@ -6115,6 +6150,7 @@ class UADCIP(UADC):
         self.oneshot_mom = adc.oneshot_mom
         self.oneshot_cvs = adc.oneshot_cvs
         self.cvs_edge = adc.cvs_edge
+        self.oneshot_no_vve = adc.oneshot_no_vve
 
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
