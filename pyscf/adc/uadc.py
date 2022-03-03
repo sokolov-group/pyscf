@@ -3725,7 +3725,6 @@ def ip_adc_matvec(adc, M_ij=None, eris=None):
  
         cput0 = (time.clock(), time.time())
         log = logger.Logger(adc.stdout, adc.verbose)
-
         if adc.ncvs > 0:
             r = cvs_projector(adc, r)
 
@@ -6973,9 +6972,11 @@ class UADCIPCVS(UADC):
         self._keys = set(self.__dict__.keys()).union(keys)
     kernel = kernel
     get_imds = get_imds_ip_cvs
+    get_imds = get_imds_ip
     get_diag = ip_cvs_adc_diag
     matvec = ip_cvs_adc_matvec
     compute_trans_moments = ip_cvs_compute_trans_moments
+    compute_trans_moments = ip_compute_trans_moments
     get_trans_moments = get_trans_moments
     get_properties = get_properties
 
