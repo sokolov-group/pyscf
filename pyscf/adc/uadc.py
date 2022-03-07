@@ -241,15 +241,15 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     res_tol = 1e-3
     #ovlp_tol = 0.01
     ovlp_tol = adc.es_mom_thresh 
-    max_v = 30
-    if adc.lanczos_space > 0:
-        E, U, conv, nroots = mom_blanczos(matvec, guess, adc.lanczos_space, max_mom_iter, E, de_tol, res_tol,ovlp_tol=ovlp_tol,max_v=max_v,fixed_proj=True)
+    max_v = 2
+    #if adc.lanczos_space > 0:
+    #    E, U, conv, nroots = mom_blanczos(matvec, guess, adc.lanczos_space, max_mom_iter, E, de_tol, res_tol,ovlp_tol=ovlp_tol,max_v=max_v,fixed_proj=True)
     def guess_temp_func(numroots, ad, ascending=True):
         return adc.get_init_guess(numroots,ad,ascending) 
 
     def matvec_idn1(idn1_vec):
         return idn1_vec
-
+    max_nmom = adc.max_nmom 
     def eig_close_to_init_guess(w, v, nroots, envs):      
            x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])      
            #s = np.dot(np.asarray(U).conj(), np.asarray(x0).T)
@@ -259,7 +259,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
            idx = np.argsort(-snorm)
            snorm = snorm[idx]
            #print("snorm: ", snorm[:30])
-           idx = idx[snorm > ovlp_tol]  
+           idx = idx[snorm > ovlp_tol]
+           idx = idx[:max_nmom]  
            nroots = idx.size
            #w, v, idx = lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
            w = w[idx]
@@ -1737,7 +1738,8 @@ class UADC(lib.StreamObject):
         self.oneshot_cvs = True
         self.cvs_edge = '1s'
         self.oneshot_no_vve = False
-         
+        self.max_nmom = 2
+ 
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mol', 'mo_energy_b', 'max_memory', 'scf_energy', 'e_tot', 't1', 'frozen', 'mo_energy_a', 'chkfile', 'max_space', 't2', 'mo_occ', 'max_cycle'))
 
         self._keys = set(self.__dict__.keys()).union(keys)
@@ -6036,6 +6038,7 @@ class UADCEA(UADC):
         self.oneshot_cvs = adc.oneshot_cvs
         self.cvs_edge = adc.cvs_edge
         self.oneshot_no_vve = adc.oneshot_no_vve
+        self.max_nmom = adc.max_nmom
 
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
@@ -6151,6 +6154,7 @@ class UADCIP(UADC):
         self.oneshot_cvs = adc.oneshot_cvs
         self.cvs_edge = adc.cvs_edge
         self.oneshot_no_vve = adc.oneshot_no_vve
+        self.max_nmom = adc.max_nmom
 
         keys = set(('conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
