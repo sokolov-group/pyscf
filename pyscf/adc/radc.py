@@ -2448,7 +2448,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False):
                    a += k
 
                s[s1:f1] += temp_singles
-               '''
+              
                temp = np.zeros_like(r2)
                temp =  lib.einsum('jlab,ajk->blk',t2_1,r2,optimize=True)
                temp -= lib.einsum('jlab,akj->blk',t2_1,r2,optimize=True)
@@ -2472,7 +2472,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False):
                del temp
                del temp_1
                del temp_2
-               '''
+              
                temp = np.zeros_like(r2)
                temp = -lib.einsum('klab,akj->blj',t2_1,r2,optimize=True)
                temp += lib.einsum('klab,ajk->blj',t2_1,r2,optimize=True)
