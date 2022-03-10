@@ -24,8 +24,9 @@ Algebraic Diagrammatic Construction
 '''
 
 from pyscf import scf
-from pyscf.adc import uadc
+#from pyscf.adc import uadc
 from pyscf.adc import radc
+import uadc_vve_batch as uadc
 
 def ADC(mf, frozen=None, mo_coeff=None, mo_occ=None):
     if not (frozen is None or frozen == 0):

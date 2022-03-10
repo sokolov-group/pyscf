@@ -195,7 +195,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
       
     guess = adc.get_init_guess(nroots, diag, ascending = True)
     #conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-16, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=sort_complex_eigenvalues)
-    conv, E_cvs, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-16, max_cycle=adc.max_cycle, max_space=adc.max_space)
+    conv, E_cvs, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
     #conv, E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-12, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=pick_real_eigs)
     guess = U
     #imds = adc.get_imds(eris, fc_bool=False)
@@ -230,7 +230,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     for i in range(E_cvs.size):
         logger.info(adc, ' %12.8f  %14.8f', E_cvs[i]*Eh2eV, P_cvs[i])
     print("---------------------------------------------------")
-    analyze_eigenvector_ip(adc, U)
+    analyze_eigenvector_ip(adc, U, analyze_v_vve=True)
  
 
     nrooots = nroots_kernel
@@ -277,15 +277,18 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     nvir = e_vir_a.size
     vve_mo_count = e_vir_a.size
     cvs_edge = adc.cvs_edge
-    #if adc.ncore_cvs == 1 or adc.ncore_cvs == 5 or adc.ncore_cvs == 9:
-    if cvs_edge == '1s' or cvs_edge == '2p' or cvs_edge == '3p':
-        e_vir_temp = np.zeros(nvir+1)
-        e_vir_temp[1:] = e_vir_a[::-1]
-        e_vir_temp[0] = big_thresh
-        e_vir_a = e_vir_temp
+    #if cvs_edge == '1s' or cvs_edge == '2p' or cvs_edge == '3p':
+    #    e_vir_temp = np.zeros(nvir+1)
+    #    e_vir_temp[1:] = e_vir_a[::-1]
+    #    e_vir_temp[0] = big_thresh
+    #    e_vir_a = e_vir_temp
    
- 
-    E_mom_size = 2
+    results_out['E_cvs'] =  E_cvs[0]*Eh2eV
+    results_out['P_cvs'] =  P_cvs[0]
+    results_out['E_v'] =    ''
+    results_out['P_v'] =    ''
+    results_out['norm_v'] = ''
+    #results_out['nvir'] =   ''
     iter_i = 0
     #E_mom = np.zeros(2) 
     #iter_idx = []
@@ -323,8 +326,10 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     elif adc.oneshot_mom is False and ovlp_tol > 0 and oneshot_cvs is False and oneshot_no_vve is True:
 
         nocc_a = adc.nocc_a 
-        energy_thresh = adc.mo_energy_a[nocc_a]
-        matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False, energy_thresh=energy_thresh)
+        energy_thresh = 0#e_vir_a[0]-1e-7
+        print("Running no vve calc")
+        
+        matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False, energy_thresh=0)
 
         conv, E, U , nroots= davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick =eig_close_to_init_guess, tol_residual = 1e-3)
         T = adc.get_trans_moments()
@@ -332,6 +337,9 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         P, X = adc.get_spec_factors(T, U, nroots)
         s = np.dot(U, np.asarray(guess).conj().T)
         snorm = np.einsum('pi,pi->p', s.conj(), s)
+
+        results_out['<CVS|MOM_v>'] = snorm[0]
+
         print("MOM type: {}".format('No vve included'))
         print("Core excitations: {}".format(adc.cvs_type))
         if adc.nfc_orb > 0:
@@ -342,181 +350,184 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
             logger.info(adc, ' %12.8f  %14.8f   %14.8f', E[i]*Eh2eV, P[i], snorm[i])
         print("---------------------------------------------------")
         norm_v, norm_evv, max_u2_e = analyze_eigenvector_ip(adc, U, analyze_v_vve=True)
-        results_out['E_cvs'] = E_cvs[0]*Eh2eV
-        results_out['P_cvs'] = P_cvs[0]
+        #results_out['E_cvs'] = E_cvs[0]*Eh2eV
+        #results_out['P_cvs'] = P_cvs[0]
         results_out['E_v'] = E[0]*Eh2eV
         results_out['P_v'] = P[0]
         results_out['norm_v'] = norm_v
-        results_out['nvir'] = e_vir_a.size
+        results_out['E_v'] =    E[0]*Eh2eV
+        results_out['P_v'] =    P[0]
+        results_out['norm_v'] = norm_v
+        results_out['Davidson_conv'] = conv[0]
         
 
-    else: 
-        while iter_i < e_vir_a.size and ovlp_tol > 0 and oneshot_cvs is False and oneshot_no_vve is False:
-            energy_thresh_i = e_vir_a[iter_i] - 1e-7
-            matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False, energy_thresh=energy_thresh_i)
-            conv, E, U , nroots= davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick =eig_close_to_init_guess, tol_residual = 1e-3)
-            #conv, E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-12, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=eig_close_to_init_guess)
-            
-            U = np.array(U)
-            #idx_sort = np.argsort(E)
-            #E = E[idx_sort]
-            #U = U[idx_sort,:]
-            T = adc.get_trans_moments()
-            P, X = adc.get_spec_factors(T, U, nroots)
-            s = np.dot(U, np.asarray(guess).conj().T)
-            snorm = np.einsum('pi,pi->p', s.conj(), s)
+    #else: 
+        #while iter_i < e_vir_a.size and ovlp_tol > 0 and oneshot_cvs is False and oneshot_no_vve is False, switch_off_while_loop:
+        #    energy_thresh_i = e_vir_a[iter_i] - 1e-7
+        #    matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False, energy_thresh=energy_thresh_i)
+        #    conv, E, U , nroots= davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space, pick =eig_close_to_init_guess, tol_residual = 1e-3)
+        #    #conv, E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-12, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=eig_close_to_init_guess)
+        #    
+        #    U = np.array(U)
+        #    #idx_sort = np.argsort(E)
+        #    #E = E[idx_sort]
+        #    #U = U[idx_sort,:]
+        #    T = adc.get_trans_moments()
+        #    P, X = adc.get_spec_factors(T, U, nroots)
+        #    s = np.dot(U, np.asarray(guess).conj().T)
+        #    snorm = np.einsum('pi,pi->p', s.conj(), s)
 
-            if e_vir_a[0] == big_thresh:
-                if iter_i == 0:
-                   vve_str = "All vve are incluced"
-                if iter_i > 0:
-                   vve_str = "Some vve are included"
-                if iter_i == e_vir_a.size - 1:
-                   vve_str = "No vve are included"
-            if e_vir_a[0] != big_thresh:
-                if iter_i == 0:
-                   vve_str = "No vve are incluced"
-                if iter_i > 0:
-                   vve_str = "Some vve are included"
-                if iter_i == e_vir_a.size - 1:
-                   vve_str = "All vve are included"
+        #    if e_vir_a[0] == big_thresh:
+        #        if iter_i == 0:
+        #           vve_str = "All vve are incluced"
+        #        if iter_i > 0:
+        #           vve_str = "Some vve are included"
+        #        if iter_i == e_vir_a.size - 1:
+        #           vve_str = "No vve are included"
+        #    if e_vir_a[0] != big_thresh:
+        #        if iter_i == 0:
+        #           vve_str = "No vve are incluced"
+        #        if iter_i > 0:
+        #           vve_str = "Some vve are included"
+        #        if iter_i == e_vir_a.size - 1:
+        #           vve_str = "All vve are included"
 
-            print('cvs_npick: ', cvs_npick)
-            print("MOM type: {}".format(vve_str))
-            print("Core excitations: {}".format(adc.cvs_type))
-            print("Orbital energy shift threshold = {}".format(energy_thresh_i))
-            if adc.nfc_orb > 0:
-                print("Number of FC orbitals: {}".format(adc.nfc_orb))
-            print("Energies (eV)   |  Spec factors   |  snorm")
-            print("---------------------------------------------------")
-            for i in range(E.size):
-                logger.info(adc, ' %12.8f  %14.8f   %14.8f', E[i]*Eh2eV, P[i], snorm[i])
-            print("---------------------------------------------------")
-            #print(np.column_stack((E*27.2114, spec_factors)))
-            #analyze_eigenvector_ip(adc, U, analyze_v_vve=True)
-            norm_v, norm_evv, max_u2_e = analyze_eigenvector_ip(adc, U, analyze_v_vve=True)
-            for key, value in max_u2_e.items():
-                for key2, value2 in value.items():
-                    print(f'{key2} = {value2}')
-            
-            if iter_i == 0:
-                E_last = E
-                P_last = P
-                S_last = snorm
-                max_u2_e_last = max_u2_e
+        #    print('cvs_npick: ', cvs_npick)
+        #    print("MOM type: {}".format(vve_str))
+        #    print("Core excitations: {}".format(adc.cvs_type))
+        #    print("Orbital energy shift threshold = {}".format(energy_thresh_i))
+        #    if adc.nfc_orb > 0:
+        #        print("Number of FC orbitals: {}".format(adc.nfc_orb))
+        #    print("Energies (eV)   |  Spec factors   |  snorm")
+        #    print("---------------------------------------------------")
+        #    for i in range(E.size):
+        #        logger.info(adc, ' %12.8f  %14.8f   %14.8f', E[i]*Eh2eV, P[i], snorm[i])
+        #    print("---------------------------------------------------")
+        #    #print(np.column_stack((E*27.2114, spec_factors)))
+        #    #analyze_eigenvector_ip(adc, U, analyze_v_vve=True)
+        #    norm_v, norm_evv, max_u2_e = analyze_eigenvector_ip(adc, U, analyze_v_vve=True)
+        #    for key, value in max_u2_e.items():
+        #        for key2, value2 in value.items():
+        #            print(f'{key2} = {value2}')
+        #    
+        #    if iter_i == 0:
+        #        E_last = E
+        #        P_last = P
+        #        S_last = snorm
+        #        max_u2_e_last = max_u2_e
  
-            if e_vir_a[0] != big_thresh and iter_i == 0:
+        #    if e_vir_a[0] != big_thresh and iter_i == 0:
 
-               results_out['pole_E_mom_v'] = E[0]*Eh2eV 
-               results_out['pole_P_mom_v'] = P[0]
-               results_out['pole_S_mom_v'] = snorm[0]
-               for root_key, root_value in max_u2_e['0'].items():
-                   results_out[f'pole_v_{root_key}'] = root_value
+        #       results_out['pole_E_mom_v'] = E[0]*Eh2eV 
+        #       results_out['pole_P_mom_v'] = P[0]
+        #       results_out['pole_S_mom_v'] = snorm[0]
+        #       for root_key, root_value in max_u2_e['0'].items():
+        #           results_out[f'pole_v_{root_key}'] = root_value
 
-            if e_vir_a[0] == big_thresh and iter_i == 0:
+        #    if e_vir_a[0] == big_thresh and iter_i == 0:
 
-               results_out['twopole1_E_mom_vve'] = E[0]*Eh2eV
-               results_out['twopole1_P_mom_vve'] = P[0]
-               results_out['twopole1_S_mom_vve'] = snorm[0]
-               results_out['twopole2_E_mom_vve'] = "" 
-               results_out['twopole2_P_mom_vve'] = "" 
-               results_out['twopole2_S_mom_vve'] = ""  
+        #       results_out['twopole1_E_mom_vve'] = E[0]*Eh2eV
+        #       results_out['twopole1_P_mom_vve'] = P[0]
+        #       results_out['twopole1_S_mom_vve'] = snorm[0]
+        #       results_out['twopole2_E_mom_vve'] = "" 
+        #       results_out['twopole2_P_mom_vve'] = "" 
+        #       results_out['twopole2_S_mom_vve'] = ""  
 
-               for root_key, root_value in max_u2_e['0'].items():
-                   results_out[f'twopole1_{root_key}'] = root_value
-                   results_out[f'twopole2_{root_key}'] = ""
+        #       for root_key, root_value in max_u2_e['0'].items():
+        #           results_out[f'twopole1_{root_key}'] = root_value
+        #           results_out[f'twopole2_{root_key}'] = ""
 
-               if E.size > 2: 
-                   results_out['twopole2_E_mom_vve'] = E[2]*Eh2eV  
-                   results_out['twopole2_P_mom_vve'] = P[2]
-                   results_out['twopole2_S_mom_vve'] = snorm[2]
+        #       if E.size > 2: 
+        #           results_out['twopole2_E_mom_vve'] = E[2]*Eh2eV  
+        #           results_out['twopole2_P_mom_vve'] = P[2]
+        #           results_out['twopole2_S_mom_vve'] = snorm[2]
  
-                   for root_key, root_value in max_u2_e['2'].items():
-                       results_out[f'twopole2_{root_key}'] = root_value
-            
-            first_pass = False
-            if e_vir_a[0] != big_thresh and E.size > 2:
-               print("CVS pole structure is destroyed\n========================\nPrinting summary of results ...\n=================================")
-               print("Ecvs: ", E_cvs*Eh2eV)
-               print("Emom: ", E_last*Eh2eV)
-               print("Total number of non-degenerate virtual MOs: ", e_vir_a.size)
-               print("Total number of non-degenerate virtual MOs used in vve: ", iter_i)
-               print("Highest vve energy threshold used (Eh): ", e_vir_a[iter_i-1])
-               print("Highest vve energy threshold used (eV): ", e_vir_a[iter_i-1]*Eh2eV) 
-                
-               results_out['onepole_E_vve_thresh'] = e_vir_a[iter_i-1]*Eh2eV
-               results_out['onepole_nvir_vve'] = iter_i
-               iter_i = e_vir_a.size
+        #           for root_key, root_value in max_u2_e['2'].items():
+        #               results_out[f'twopole2_{root_key}'] = root_value
+        #    
+        #    first_pass = False
+        #    if e_vir_a[0] != big_thresh and E.size > 2:
+        #       print("CVS pole structure is destroyed\n========================\nPrinting summary of results ...\n=================================")
+        #       print("Ecvs: ", E_cvs*Eh2eV)
+        #       print("Emom: ", E_last*Eh2eV)
+        #       print("Total number of non-degenerate virtual MOs: ", e_vir_a.size)
+        #       print("Total number of non-degenerate virtual MOs used in vve: ", iter_i)
+        #       print("Highest vve energy threshold used (Eh): ", e_vir_a[iter_i-1])
+        #       print("Highest vve energy threshold used (eV): ", e_vir_a[iter_i-1]*Eh2eV) 
+        #        
+        #       results_out['onepole_E_vve_thresh'] = e_vir_a[iter_i-1]*Eh2eV
+        #       results_out['onepole_nvir_vve'] = iter_i
+        #       iter_i = e_vir_a.size
 
-               results_out['onepole_E_mom_vve'] = E_last[0]*Eh2eV
-               results_out['onepole_P_mom_vve'] = P_last[0]
-               results_out['onepole_S_mom_vve'] = S_last[0]
-               for root_key, root_value in max_u2_e_last['0'].items():
-                   results_out[f'onepole_{root_key}'] = root_value
+        #       results_out['onepole_E_mom_vve'] = E_last[0]*Eh2eV
+        #       results_out['onepole_P_mom_vve'] = P_last[0]
+        #       results_out['onepole_S_mom_vve'] = S_last[0]
+        #       for root_key, root_value in max_u2_e_last['0'].items():
+        #           results_out[f'onepole_{root_key}'] = root_value
 
-               results_out['twopole1_E_mom_vve'] = E[0]*Eh2eV
-               results_out['twopole1_P_mom_vve'] = P[0]
-               results_out['twopole1_S_mom_vve'] = snorm[0]
-               for root_key, root_value in max_u2_e['0'].items():
-                   results_out[f'twopole1_{root_key}'] = root_value
-               results_out['twopole2_E_mom_vve'] = E[2]*Eh2eV  
-               results_out['twopole2_P_mom_vve'] = P[2]
-               results_out['twopole2_S_mom_vve'] = snorm[2] 
-               for root_key, root_value in max_u2_e['2'].items():
-                   results_out[f'twopole2_{root_key}'] = root_value
+        #       results_out['twopole1_E_mom_vve'] = E[0]*Eh2eV
+        #       results_out['twopole1_P_mom_vve'] = P[0]
+        #       results_out['twopole1_S_mom_vve'] = snorm[0]
+        #       for root_key, root_value in max_u2_e['0'].items():
+        #           results_out[f'twopole1_{root_key}'] = root_value
+        #       results_out['twopole2_E_mom_vve'] = E[2]*Eh2eV  
+        #       results_out['twopole2_P_mom_vve'] = P[2]
+        #       results_out['twopole2_S_mom_vve'] = snorm[2] 
+        #       for root_key, root_value in max_u2_e['2'].items():
+        #           results_out[f'twopole2_{root_key}'] = root_value
  
 
-            elif e_vir_a[0] == big_thresh and iter_i < e_vir_a.size-1 and E.size == 2:
-                print("-------------------------------------------------\nMOM pole structure is now equal to CVS pole structure \nRemoving all vve and leaving only v ...\n------------------------------")
-                vve_mo_count = e_vir_a.size-iter_i
-                idx_thresh = iter_i 
-                results_out['onepole_E_vve_thresh'] = e_vir_a[idx_thresh]*Eh2eV
-                results_out['onepole_nvir_vve'] = vve_mo_count
-                results_out['onepole_E_mom_vve'] = E_last[0]*Eh2eV 
-                results_out['onepole_P_mom_vve'] = P_last[0]
-                results_out['onepole_S_mom_vve'] = S_last[0]
-                for root_key, root_value in max_u2_e_last['0'].items():
-                   results_out[f'onepole_{root_key}'] = root_value
-                iter_i = e_vir_a.size-1
-                E_last = E
-                first_pass = True
+        #    elif e_vir_a[0] == big_thresh and iter_i < e_vir_a.size-1 and E.size == 2:
+        #        print("-------------------------------------------------\nMOM pole structure is now equal to CVS pole structure \nRemoving all vve and leaving only v ...\n------------------------------")
+        #        vve_mo_count = e_vir_a.size-iter_i
+        #        idx_thresh = iter_i 
+        #        results_out['onepole_E_vve_thresh'] = e_vir_a[idx_thresh]*Eh2eV
+        #        results_out['onepole_nvir_vve'] = vve_mo_count
+        #        results_out['onepole_E_mom_vve'] = E_last[0]*Eh2eV 
+        #        results_out['onepole_P_mom_vve'] = P_last[0]
+        #        results_out['onepole_S_mom_vve'] = S_last[0]
+        #        for root_key, root_value in max_u2_e_last['0'].items():
+        #           results_out[f'onepole_{root_key}'] = root_value
+        #        iter_i = e_vir_a.size-1
+        #        E_last = E
+        #        first_pass = True
 
-            elif e_vir_a[0] == big_thresh and iter_i == e_vir_a.size-1:
-                print("==========================\nPrinting summary of results ...\n================================")
-                print("Ecvs: ", E_cvs*Eh2eV)
-                print("Emom: ", E_last*Eh2eV)
-                print("Total number of non-degenerate virtual MOs: ", e_vir_a.size)
-                print("Total number of non-degenerate virtual MOs used in vve: ", vve_mo_count)
-                if first_pass is False:
-                    idx_thresh = iter_i
-                print("Lowest vve energy threshold used (Eh): ", e_vir_a[idx_thresh])
-                print("Lowest vve energy threshold used (eV): ", e_vir_a[idx_thresh]*Eh2eV)
+        #    elif e_vir_a[0] == big_thresh and iter_i == e_vir_a.size-1:
+        #        print("==========================\nPrinting summary of results ...\n================================")
+        #        print("Ecvs: ", E_cvs*Eh2eV)
+        #        print("Emom: ", E_last*Eh2eV)
+        #        print("Total number of non-degenerate virtual MOs: ", e_vir_a.size)
+        #        print("Total number of non-degenerate virtual MOs used in vve: ", vve_mo_count)
+        #        if first_pass is False:
+        #            idx_thresh = iter_i
+        #        print("Lowest vve energy threshold used (Eh): ", e_vir_a[idx_thresh])
+        #        print("Lowest vve energy threshold used (eV): ", e_vir_a[idx_thresh]*Eh2eV)
 
-                results_out['pole_E_mom_v'] = E[0]*Eh2eV
-                results_out['pole_P_mom_v'] = P[0]
-                results_out['pole_S_mom_v'] = snorm[0]
-                #results_out['twopole2_E_mom_vve_2'] = "" 
-                #results_out['twopole2_P_mom_vve_2'] = "" 
-                #results_out['twopole2_S_mom_vve_2'] = ""  
+        #        results_out['pole_E_mom_v'] = E[0]*Eh2eV
+        #        results_out['pole_P_mom_v'] = P[0]
+        #        results_out['pole_S_mom_v'] = snorm[0]
+        #        #results_out['twopole2_E_mom_vve_2'] = "" 
+        #        #results_out['twopole2_P_mom_vve_2'] = "" 
+        #        #results_out['twopole2_S_mom_vve_2'] = ""  
 
-                for root_key, root_value in max_u2_e['0'].items():
-                    results_out[f'pole_v_{root_key}'] = root_value
+        #        for root_key, root_value in max_u2_e['0'].items():
+        #            results_out[f'pole_v_{root_key}'] = root_value
 
-                #if E.size > 2: 
-                #    results_out['twopole2_E_mom_vve_2'] = E[2]*Eh2eV  
-                #    results_out['twopole2_P_mom_vve_2'] = P[2]
-                #    results_out['twopole2_S_mom_vve_2'] = snorm[2]
+        #        #if E.size > 2: 
+        #        #    results_out['twopole2_E_mom_vve_2'] = E[2]*Eh2eV  
+        #        #    results_out['twopole2_P_mom_vve_2'] = P[2]
+        #        #    results_out['twopole2_S_mom_vve_2'] = snorm[2]
  
-                #    for root_key, root_value in max_u2_e['2'].items():
-                #        results_out[f'twopole2_{root_key}'] = root_value
-                iter_i = e_vir_a.size
-                    
-            else:
-               E_last = E
-               P_last = P
-               S_last = snorm
-               max_u2_e_last = max_u2_e
-               iter_i += 1
+        #        #    for root_key, root_value in max_u2_e['2'].items():
+        #        #        results_out[f'twopole2_{root_key}'] = root_value
+        #        iter_i = e_vir_a.size
+        #            
+        #    else:
+        #       E_last = E
+        #       P_last = P
+        #       S_last = snorm
+        #       max_u2_e_last = max_u2_e
+        #       iter_i += 1
 
      #Retruning results for high throughput analysis. Implemented only for closed-shell systems
 
@@ -3670,10 +3681,7 @@ def vve_projector(adc, r, cvs_composition=False, energy_thresh=None, analyze_v_v
         temp[:,:ncore,:] = 0.0
         temp[:,:,:ncore] = 0.0
     else:
-        if cvs_type == 'cce' or cvs_type == 'ecv':
-            temp[idx_a_thresh,ncore:,ncore:] = 0.0
-        if cvs_type == 'cve':
-            temp[:,:ncore,:ncore] = 0.0
+        temp[idx_a_thresh,ncore:,ncore:] = 0.0
     Pr[s_aaa:f_aaa] = temp[:,ij_a[0],ij_a[1]].reshape(-1).copy()
 
     temp = Pr[s_bab:f_bab].copy()
@@ -3690,10 +3698,7 @@ def vve_projector(adc, r, cvs_composition=False, energy_thresh=None, analyze_v_v
         temp[:,:ncore,:] = 0.0
         temp[:,:,:ncore] = 0.0
     else:
-        if cvs_type == 'cce' or cvs_type == 'ecv':
-            temp[idx_a_thresh,ncore:,ncore:] = 0.0
-        if cvs_type == 'cve':
-            temp[:,:ncore,:ncore] = 0.0
+        temp[idx_a_thresh,ncore:,ncore:] = 0.0
     Pr[s_bab:f_bab] = temp.reshape(-1).copy()
 
     temp = Pr[s_aba:f_aba].copy()
@@ -3710,10 +3715,7 @@ def vve_projector(adc, r, cvs_composition=False, energy_thresh=None, analyze_v_v
         temp[:,:ncore,:] = 0.0
         temp[:,:,:ncore] = 0.0
     else:
-        if cvs_type == 'cce' or cvs_type == 'ecv':
-            temp[idx_a_thresh,ncore:,ncore:] = 0.0
-        if cvs_type == 'cve':
-            temp[:,:ncore,:ncore] = 0.0
+        temp[idx_a_thresh,ncore:,ncore:] = 0.0
     Pr[s_aba:f_aba] = temp.reshape(-1).copy()
 
     temp = np.zeros((nvir_b, nocc_b, nocc_b))#.astype(complex)
@@ -3741,10 +3743,7 @@ def vve_projector(adc, r, cvs_composition=False, energy_thresh=None, analyze_v_v
         temp[:,:ncore,:] = 0.0
         temp[:,:,:ncore] = 0.0
     else:
-        if cvs_type == 'cce' or cvs_type == 'ecv':
-            temp[idx_a_thresh,ncore:,ncore:] = 0.0
-        if cvs_type == 'cve':
-            temp[:,:ncore,:ncore] = 0.0
+        temp[idx_a_thresh,ncore:,ncore:] = 0.0
 
     Pr[s_bbb:f_bbb] = temp[:,ij_b[0],ij_b[1]].reshape(-1).copy()
 
@@ -4680,7 +4679,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False, fc_bool=True, energy_thr
         if cvs is True:
             r = cvs_projector(adc, r)
         else:
-            #print("vve energy_thresh: ", energy_thresh)
+            print("DEBUG vve energy_thresh: ", energy_thresh)
             #exit()
             r = vve_projector(adc, r, energy_thresh=energy_thresh)
 
