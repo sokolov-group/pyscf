@@ -2469,7 +2469,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False):
                s[s1:f1] += 0.5*lib.einsum('blk,lbik->i',temp,eris_ovoo,optimize=True)
                s[s1:f1] -= 0.5*lib.einsum('blk,iblk->i',temp,eris_ovoo,optimize=True)
                #s[s1:f1] += 0.5*lib.einsum('blk,lbik->i',temp_1,eris_ovoo,optimize=True)
-               #s[s1:f1] -= 0.5*lib.einsum('blk,iblk->i',temp_2,eris_ovoo,optimize=True)
+               s[s1:f1] -= 0.5*lib.einsum('blk,iblk->i',temp_2,eris_ovoo,optimize=True)
                
                del temp
                del temp_1
@@ -2927,15 +2927,15 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                s[s1:f1] += 0.5*lib.einsum('blK,lbIK->I',temp_1_evc,eris_ovoo[:,:,:ncvs,:ncvs],optimize=True)
 
 
-               temp_1_ecc = -lib.einsum('Klab,aKJ->blJ',t2_1[:ncvs,:,:,:],r2_ecc,optimize=True)
-               temp_1_ecc -= -lib.einsum('lKab,aKJ->blJ',t2_1[:,:ncvs,:,:],r2_ecc,optimize=True)
-               temp_1_ecv = -lib.einsum('Klab,aKj->blj',t2_1[:ncvs,:,:,:],r2_ecv,optimize=True)
-               temp_1_ecv -= -lib.einsum('lKab,aKj->blj',t2_1[:,:ncvs,:,:],r2_ecv,optimize=True)
-               temp_1_evc = -lib.einsum('klab,akJ->blJ',t2_1[ncvs:,:,:,:],r2_evc,optimize=True)
-               temp_1_evc -= -lib.einsum('lkab,akJ->blJ',t2_1[:,ncvs:,:,:],r2_evc,optimize=True)
-               s[s1:f1] -= 0.5*lib.einsum('blj,lbIJ->I',temp_1_ecc,eris_ovoo[:,:,:ncvs,:ncvs],optimize=True)
-               s[s1:f1] -= 0.5*lib.einsum('blj,lbIj->I',temp_1_ecv,eris_ovoo[:,:,:ncvs,ncvs:],optimize=True)
-               s[s1:f1] -= 0.5*lib.einsum('blJ,lbIJ->I',temp_1_evc,eris_ovoo[:,:,:ncvs,:ncvs],optimize=True)
+               #temp_1_ecc = -lib.einsum('Klab,aKJ->blJ',t2_1[:ncvs,:,:,:],r2_ecc,optimize=True)
+               #temp_1_ecc -= -lib.einsum('lKab,aKJ->blJ',t2_1[:,:ncvs,:,:],r2_ecc,optimize=True)
+               #temp_1_ecv = -lib.einsum('Klab,aKj->blj',t2_1[:ncvs,:,:,:],r2_ecv,optimize=True)
+               #temp_1_ecv -= -lib.einsum('lKab,aKj->blj',t2_1[:,:ncvs,:,:],r2_ecv,optimize=True)
+               #temp_1_evc = -lib.einsum('klab,akJ->blJ',t2_1[ncvs:,:,:,:],r2_evc,optimize=True)
+               #temp_1_evc -= -lib.einsum('lkab,akJ->blJ',t2_1[:,ncvs:,:,:],r2_evc,optimize=True)
+               #s[s1:f1] -= 0.5*lib.einsum('blj,lbIJ->I',temp_1_ecc,eris_ovoo[:,:,:ncvs,:ncvs],optimize=True)
+               #s[s1:f1] -= 0.5*lib.einsum('blj,lbIj->I',temp_1_ecv,eris_ovoo[:,:,:ncvs,ncvs:],optimize=True)
+               #s[s1:f1] -= 0.5*lib.einsum('blJ,lbIJ->I',temp_1_evc,eris_ovoo[:,:,:ncvs,:ncvs],optimize=True)
 
 
                #temp_ecc = lib.einsum('lJba,aJK->blK',t2_1[:,:ncvs,:,:],r2_ecc,optimize=True)
