@@ -56,7 +56,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     ncore_proj_valence = adc.ncore_proj_valence
     Eh2ev = 27.211386245988
     alpha_proj = adc.alpha_proj
-    mom_skd_iter = adc.mom_skd_iter 
+    singles_v = adc.singles_v 
 
     if ncore_proj > 0:
         cvs = True
@@ -70,7 +70,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
        raise Exception("CVS and Koopman's aren't not implemented for EA")
 
 
-    imds = adc.get_imds(eris)
+    #imds = adc.get_imds(eris)
     if nroots == 'full':
         matvec, diag = adc.gen_matvec(imds, eris, cvs)
         identity = np.identity(diag.size)
@@ -82,19 +82,23 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         print(np.column_stack(np.unique(np.around(E, decimals=8), return_counts=True))) 
         exit()
 
-    if (mom_skd_iter == False) and (ncore_proj > 0):
+    if (singles_v == False) and (ncore_proj > 0):
+        imds = adc.get_imds(eris, fc_bool=True)
         matvec, diag = adc.gen_matvec(imds, eris, cvs)
         guess = adc.get_init_guess(nroots, diag, ascending = True)
         conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-14, max_cycle=adc.max_cycle, max_space=adc.max_space)
 
-    elif (mom_skd_iter == True) and (ncore_proj > 0):
-    
-        matvec, diag = adc.gen_matvec(imds, eris, cvs=True, alpha_proj=0)
+    elif (singles_v == True) and (ncore_proj > 0):
+        print('debug: if statement works')    
+        imds = adc.get_imds(eris, fc_bool=False)
+        matvec, diag = adc.gen_matvec(imds, eris, cvs)
         guess = adc.get_init_guess(nroots, diag, ascending = True)
+        print("PRE DAVIDSON 1")
         conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+        print("POST DAVIDSON 1", E)
         guess = U
-        imds = adc.get_imds(eris,fc_bool=False)
-        matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False, alpha_proj=1)
+        #imds = adc.get_imds(eris,fc_bool=False)
+        matvec, diag = adc.gen_matvec(imds, eris, cvs=False, singles_v=True)
             
             
         def cvs_pick(cvs_npick,U):          
@@ -118,12 +122,15 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
             w, v, idx = lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
             return w, v, idx
 
+        print("PRE DAVIDSON 2")
         conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space)
+        
+        print("POST DAVIDSON 2", E)
         #conv, E, U = davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, pick=eig_close_to_init_guess, nroots=nroots, verbose=log, tol=skd[2], max_cycle=skd[1], max_space=adc.max_space)
-    elif (mom_skd_iter == False) and (ncore_proj == 0):
+    elif (singles_v == False) and (ncore_proj == 0):
         matvec, diag = adc.gen_matvec(imds, eris, cvs)
         guess = adc.get_init_guess(nroots, diag, ascending = True)
-        conv, E, U = davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-14, max_cycle=adc.max_cycle, max_space=adc.max_space)
+        conv, E, U = davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-14, max_cycle=adc.max_cycle, max_space=adc.max_space, residual=1e-3)
            
     elif (ncore_proj_valence > 0):
         matvec, diag = adc.gen_matvec(imds, eris, cvs)
@@ -662,7 +669,7 @@ def contract_ladder(myadc,t_amp,vvvv):
 
     return t
 
-def cvs_projector(myadc, r, alpha_proj=0):
+def cvs_projector(myadc, r, singles_v=False):
     
     ncore_proj = myadc.ncore_proj
     
@@ -681,14 +688,15 @@ def cvs_projector(myadc, r, alpha_proj=0):
     f2 = s2 + n_doubles 
     
     Pr = r.copy()
-    
-    Pr[ncore_proj:f1] *= alpha_proj    
+
+    if singles_v == False:  
+        Pr[ncore_proj:f1] = 0    
     
     temp = np.zeros((nvir, nocc, nocc))
     temp = Pr[s2:f2].reshape((nvir, nocc, nocc)).copy()
     
-    temp[:,ncore_proj:,ncore_proj:] *= alpha_proj
-    temp[:,:ncore_proj,:ncore_proj] *= alpha_proj
+    temp[:,ncore_proj:,ncore_proj:] = 0
+    #temp[:,:ncore_proj,:ncore_proj] *= alpha_proj
     
     Pr[s2:f2] = temp.reshape(-1).copy()
     
@@ -836,6 +844,7 @@ class RADC(lib.StreamObject):
         self.mom_skd_iter = []
         self.imaginary_shift = 0
         self.energy_thresh = 10000
+        self.singles_v = False
         keys = set(('conv_tol', 'e_corr', 'method', 'mo_coeff', 'mol', 'mo_energy', 'max_memory', 'incore_complete', 'scf_energy', 'e_tot', 't1', 'frozen', 'chkfile', 'max_space', 't2', 'mo_occ', 'max_cycle'))
 
         self._keys = set(self.__dict__.keys()).union(keys)
@@ -1392,9 +1401,9 @@ def get_imds_ip(adc, eris=None, fc_bool=True):
         raise NotImplementedError(adc.method)
 
     method = adc.method
-    t1, t2 = adc.compute_amplitudes(eris, fc_bool)   
-    #t1 = adc.t1
-    #t2 = adc.t2
+    #t1, t2 = adc.compute_amplitudes(eris, fc_bool)   
+    t1 = adc.t1
+    t2 = adc.t2
 
     t1_2 = t1[0]
     t2_1 = t2[0]
@@ -1881,7 +1890,7 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=True, fc_bool=True, mom_skd=False, a
 
         temp = np.zeros((nvir,nocc,nocc))
         temp[:,ncore_proj:,ncore_proj:] += shift
-        temp[:,:ncore_proj,:ncore_proj] += shift
+        #temp[:,:ncore_proj,:ncore_proj] += shift
 
         diag[s2:f2] += temp.reshape(-1).copy()
 
@@ -2450,7 +2459,7 @@ def ip_adc_matvec_off(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd
 
     return sigma_
 
-def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=False, alpha_proj=0):
+def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=False, alpha_proj=0, singles_v=False):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
@@ -2503,9 +2512,11 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
 
         if cvs is True:
             r = cvs_projector(adc, r)
+        if singles_v is True:
+            r = cvs_projector(adc, r, singles_v=singles_v)
 
-        if adc.ncore_proj_valence > 0:
-            r = cvs_proj_valence(adc, r)
+        #if adc.ncore_proj_valence > 0:
+        #    r = cvs_proj_valence(adc, r)
 
         s = np.zeros((dim))#.astype(complex)
 
@@ -2672,10 +2683,11 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
 
         if cvs is True:
             s = cvs_projector(adc, s)
+        if singles_v is True:
+            r = cvs_projector(adc, r, singles_v=singles_v)
 
-
-        if adc.ncore_proj_valence > 0:
-            s = cvs_proj_valence(adc, s)
+        #if adc.ncore_proj_valence > 0:
+        #    s = cvs_proj_valence(adc, s)
 
         return s
 
@@ -3683,6 +3695,7 @@ class RADCEA(RADC):
         self.mom_skd_iter = adc.mom_skd_iter
         self.imaginary_shift = adc.imaginary_shift
         self.energy_thresh = adc.energy_thresh
+        self.singles_v = adc.singles_v 
         keys = set(('conv_tol', 'e_corr', 'method', 'mo_coeff', 'mo_energy', 'max_memory', 't1', 'max_space', 't2', 'max_cycle'))
 
         self._keys = set(self.__dict__.keys()).union(keys)
@@ -3790,6 +3803,7 @@ class RADCIP(RADC):
         self.mom_skd_iter = adc.mom_skd_iter 
         self.imaginary_shift = adc.imaginary_shift
         self.energy_thresh = adc.energy_thresh
+        self.singles_v = adc.singles_v 
         keys = set(('conv_tol', 'e_corr', 'method', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
         self._keys = set(self.__dict__.keys()).union(keys)
@@ -3821,10 +3835,10 @@ class RADCIP(RADC):
             guess.append(g[:,p])
         return guess
 
-    def gen_matvec(self, imds=None, eris=None, cvs=False, fc_bool=True, mom_skd=False, alpha_proj=0):
+    def gen_matvec(self, imds=None, eris=None, cvs=False, fc_bool=True, mom_skd=False, alpha_proj=0, singles_v=False):
         if imds is None: imds = self.get_imds(eris, fc_bool)
         diag = self.get_diag(imds, eris, cvs, fc_bool, mom_skd, alpha_proj)
-        matvec = self.matvec(imds, eris, cvs, fc_bool, mom_skd, alpha_proj)
+        matvec = self.matvec(imds, eris, cvs, fc_bool, mom_skd, alpha_proj, singles_v)
         return matvec, diag
 
 if __name__ == '__main__':
