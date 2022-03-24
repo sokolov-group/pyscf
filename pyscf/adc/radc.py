@@ -2310,7 +2310,7 @@ def ea_adc_matvec(adc, M_ab=None, eris=None):
 
     return sigma_
 
-
+#@profile
 def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -2599,7 +2599,7 @@ def cvs_projector(myadc, r):
     Pr[s2:f2] = temp.reshape(-1).copy()
     
     return Pr
-
+#@profile
 def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -2978,7 +2978,7 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
                temp_1_ecv -= -lib.einsum('lKab,aKj->blj',t2_1[:,:ncvs,:,:],r2_ecv,optimize=True)
                temp_1_evc = -lib.einsum('klab,akJ->blJ',t2_1[ncvs:,:,:,:],r2_evc,optimize=True)
                temp_1_evc -= -lib.einsum('lkab,akJ->blJ',t2_1[:,ncvs:,:,:],r2_evc,optimize=True)
-               s[s1:f1] -= 0.5*lib.einsum('blj,lbIJ->I',temp_1_ecc,eris_ovoo[:,:,:ncvs,:ncvs],optimize=True)
+               s[s1:f1] -= 0.5*lib.einsum('blJ,lbIJ->I',temp_1_ecc,eris_ovoo[:,:,:ncvs,:ncvs],optimize=True)
                s[s1:f1] -= 0.5*lib.einsum('blj,lbIj->I',temp_1_ecv,eris_ovoo[:,:,:ncvs,ncvs:],optimize=True)
                s[s1:f1] -= 0.5*lib.einsum('blJ,lbIJ->I',temp_1_evc,eris_ovoo[:,:,:ncvs,:ncvs],optimize=True)
 
