@@ -29,9 +29,9 @@ from pyscf.adc import dfadc
 from pyscf import __config__
 from pyscf import df
 import pandas as pd
-from linalg_helper_beta import davidson_nosym1
-from multiroot_davidson import eighg
-from remove_mo_r2_pyscf import complex_shift 
+from pyscf.adc.linalg_helper_beta import davidson_nosym1
+from pyscf.adc.multiroot_davidson import eighg
+from pyscf.adc.remove_mo_r2_pyscf import complex_shift 
 
 def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
