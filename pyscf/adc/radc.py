@@ -35,6 +35,8 @@ from pyscf.adc.remove_mo_r2_pyscf import complex_shift
 
 def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
+    print('radc kernel is working ')
+    exit()
     adc.method = adc.method.lower()
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
        raise NotImplementedError(adc.method)
