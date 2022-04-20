@@ -39,10 +39,9 @@ import copy
 np.set_printoptions(threshold=np. inf)
 
 def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
-    print('kernel is working ')
-    exit()
-    nroots_kernel = nroots
 
+    nroots_kernel = nroots
+    print('# of cvs orbs: ', )
     adc.method = adc.method.lower()
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
        raise NotImplementedError(adc.method)
@@ -218,7 +217,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         E_cvs = E_cvs[cvs_npick]
 
 
-    Eh2eV = 27.211396641308
+    #Eh2eV = 27.211396641308
+    Eh2eV = 27.2114
      
     print("CVS type: {}".format(adc.cvs_type))
     if adc.nfc_orb > 0:
@@ -233,14 +233,12 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     print("---------------------------------------------------")
     #analyze_eigenvector_ip(adc, U, analyze_v_vve=True)  # commented out for rdm/tdm implementation
     U = np.array(U)
-    total_tpdm_a = ()
-    total_tpdm_b = ()
+    total_tpdm_idx = []
     for i in range(nroots):
         for j in range(nroots):
             print('i = ', i, ' j = ', j) 
             tpdm_a, tpdm_b = compute_rdm_tdm(adc, U[i,:], U[j,:])
-            total_tpdm_a += (tpdm_a,)
-            total_tpdm_b += (tpdm_b,)
+            total_tpdm_idx.append((tpdm_a,tpdm_b,i,j))
 
     
     nrooots = nroots_kernel
@@ -559,7 +557,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
          
         #return (E_cvs, spec_factors_cvs, E_mom, spec_factors_mom) 
     #return results_out
-    return (E_cvs, total_tpdm_a, total_tpdm_b)
+    return (adc.e_corr, E_cvs, total_tpdm_idx)
+    #return (E_cvs, total_tpdm_a, total_tpdm_b)
     #exit()
  
     nfalse = np.shape(conv)[0] - np.sum(conv)

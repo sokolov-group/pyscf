@@ -35,8 +35,6 @@ from pyscf.adc.remove_mo_r2_pyscf import complex_shift
 
 def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
-    print('radc kernel is working ')
-    exit()
     adc.method = adc.method.lower()
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
        raise NotImplementedError(adc.method)
@@ -51,6 +49,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         eris = adc.transform_integrals()
       
     nfc_orb = adc.nfc_orb
+    print('nfc_orb = ', nfc_orb)
     nkop_chk = adc.nkop_chk
     cvs_npick = adc.cvs_npick
     kop_npick = adc.kop_npick
@@ -85,7 +84,9 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         exit()
 
     if (singles_v == False) and (ncore_proj > 0):
-        imds = adc.get_imds(eris, fc_bool=True)
+        #imds = adc.get_imds(eris, fc_bool=True)
+        print('correct if statment working')
+        imds = adc.get_imds(eris)
         matvec, diag = adc.gen_matvec(imds, eris, cvs)
         guess = adc.get_init_guess(nroots, diag, ascending = True)
         conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-14, max_cycle=adc.max_cycle, max_space=adc.max_space)
@@ -163,7 +164,13 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
                           adc.method, n, en, en*27.2114, pn, convn)
     log.timer('ADC', *cput0)
 
-    return E, U, spec_factors
+    Eh2eV = 27.211396641308
+    results_out = {}
+    results_out['E'] = E[0]*Eh2eV
+    results_out['P'] = spec_factors[0]
+    results_out['Davidson_conv'] = conv[0]
+    #return E, U, spec_factors
+    return results_out
 
 
 def compute_amplitudes_energy(myadc, eris, verbose=None, fc_bool=True):
@@ -185,11 +192,11 @@ def compute_amplitudes(myadc, eris, fc_bool=True):
     nocc = myadc._nocc
     nvir = myadc._nvir
     
-    if fc_bool is False:
-        nfc_orb = 0
-    else:
-        nfc_orb = myadc.nfc_orb
-    
+    #if fc_bool is False:
+    #    nfc_orb = 0
+    #else:
+    nfc_orb = myadc.nfc_orb
+    print('# of fc orbs in amplitude func = ', nfc_orb) 
         
     eris_oooo = eris.oooo
     eris_ovoo = eris.ovoo
@@ -673,7 +680,8 @@ def contract_ladder(myadc,t_amp,vvvv):
 
 def cvs_projector(myadc, r, singles_v=False):
     
-    ncore_proj = myadc.ncore_proj
+    ncore = myadc.ncore_proj
+    cvs_type = myadc.cvs_type
     
     #if alpha_proj != 0:
     #    alpha_proj = myadc.alpha_proj 
@@ -691,13 +699,15 @@ def cvs_projector(myadc, r, singles_v=False):
     
     Pr = r.copy()
 
-    if singles_v == False:  
-        Pr[ncore_proj:f1] = 0    
+    #if singles_v == False:  
+    Pr[ncore:f1] = 0.0    
     
     temp = np.zeros((nvir, nocc, nocc))
     temp = Pr[s2:f2].reshape((nvir, nocc, nocc)).copy()
     
-    temp[:,ncore_proj:,ncore_proj:] = 0
+    temp[:,ncore:,ncore:] = 0.0
+    if cvs_type == 'cve':
+        temp[:,:ncore,:ncore] = 0.0
     #temp[:,:ncore_proj,:ncore_proj] *= alpha_proj
     
     Pr[s2:f2] = temp.reshape(-1).copy()
@@ -847,6 +857,7 @@ class RADC(lib.StreamObject):
         self.imaginary_shift = 0
         self.energy_thresh = 10000
         self.singles_v = False
+        self.cvs_type = 'cce'
         keys = set(('conv_tol', 'e_corr', 'method', 'mo_coeff', 'mol', 'mo_energy', 'max_memory', 'incore_complete', 'scf_energy', 'e_tot', 't1', 'frozen', 'chkfile', 'max_space', 't2', 'mo_occ', 'max_cycle'))
 
         self._keys = set(self.__dict__.keys()).union(keys)
@@ -966,12 +977,14 @@ class RADC(lib.StreamObject):
             e_exc, v_exc, spec_fac = self.ea_adc(nroots=nroots, guess=guess, eris=eris)
 
         elif(self.method_type == "ip"):
-            e_exc, v_exc, spec_fac = self.ip_adc(nroots=nroots, guess=guess, eris=eris)
+            #e_exc, v_exc, spec_fac = self.ip_adc(nroots=nroots, guess=guess, eris=eris)
+            resuls_out = self.ip_adc(nroots=nroots, guess=guess, eris=eris)
 
         else:
             raise NotImplementedError(self.method_type)
 
-        return e_exc, v_exc, spec_fac
+        #return e_exc, v_exc, spec_fac
+        return resuls_out
 
     def _finalize(self):
         '''Hook for dumping results and clearing up the object.'''
@@ -1884,17 +1897,24 @@ def ip_adc_diag(adc,M_ij=None,eris=None,cvs=True, fc_bool=True, mom_skd=False, a
                 temp = np.ascontiguousarray(temp.transpose(2,0,1))
                 diag[s2:f2] += temp.reshape(-1)
     """
-    if (cvs is True) or ((mom_skd is True) and (alpha_proj==0)):
+    #if (cvs is True) or ((mom_skd is True) and (alpha_proj==0)):
+    #if cvs is True:# or ((mom_skd is True) and (alpha_proj==0)):
+    ncore = adc.ncore_proj
+    if ncore > 0:
 
         shift = -1000000000000.0
-        ncore_proj = adc.ncore_proj
-        diag[ncore_proj:f1] += shift
+        cvs_type = adc.cvs_type
 
-        temp = np.zeros((nvir,nocc,nocc))
-        temp[:,ncore_proj:,ncore_proj:] += shift
+        diag[ncore:f1] += shift
+
+        #temp = np.zeros((nvir,nocc,nocc))
+        temp = diag[s2:f2].reshape((nvir,nocc,nocc))
+        temp[:,ncore:,ncore:] += shift
+        if cvs_type == 'cve':
+            temp[:,:ncore,:ncore] += shift
         #temp[:,:ncore_proj,:ncore_proj] += shift
 
-        diag[s2:f2] += temp.reshape(-1).copy()
+        diag[s2:f2] = temp.reshape(-1).copy()
 
     diag = -diag
     return diag
@@ -2471,6 +2491,7 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
     #t1, t2 = adc.compute_amplitudes(eris, fc_bool)
     t2_1 = adc.t2[0]
     t1_2 = adc.t1[0]
+    ncore = adc.ncore_proj
 
     nocc = adc._nocc
     nvir = adc._nvir
@@ -2505,17 +2526,17 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
     D_aij = D_n.reshape(-1)
 
     if M_ij is None:
-        M_ij = adc.get_imds(fc_bool)
+        M_ij = adc.get_imds()
 
     #Calculate sigma vector
     def sigma_(r):
         cput0 = (time.clock(), time.time())
         log = logger.Logger(adc.stdout, adc.verbose)
 
-        if cvs is True:
+        if ncore > 0:
             r = cvs_projector(adc, r)
-        if singles_v is True:
-            r = cvs_projector(adc, r, singles_v=singles_v)
+        #if singles_v is True:
+        #    r = cvs_projector(adc, r, singles_v=singles_v)
 
         #if adc.ncore_proj_valence > 0:
         #    r = cvs_proj_valence(adc, r)
@@ -2683,10 +2704,11 @@ def ip_adc_matvec(adc,M_ij=None, eris=None, cvs=False, fc_bool=True, mom_skd=Fal
 
         s *= -1.0
 
-        if cvs is True:
+        #if cvs is True:
+        if ncore > 0:
             s = cvs_projector(adc, s)
-        if singles_v is True:
-            r = cvs_projector(adc, r, singles_v=singles_v)
+        #if singles_v is True:
+        #    r = cvs_projector(adc, r, singles_v=singles_v)
 
         #if adc.ncore_proj_valence > 0:
         #    s = cvs_proj_valence(adc, s)
@@ -3698,6 +3720,7 @@ class RADCEA(RADC):
         self.imaginary_shift = adc.imaginary_shift
         self.energy_thresh = adc.energy_thresh
         self.singles_v = adc.singles_v 
+        self.cvs_type = adc.cvs_type
         keys = set(('conv_tol', 'e_corr', 'method', 'mo_coeff', 'mo_energy', 'max_memory', 't1', 'max_space', 't2', 'max_cycle'))
 
         self._keys = set(self.__dict__.keys()).union(keys)
@@ -3806,6 +3829,7 @@ class RADCIP(RADC):
         self.imaginary_shift = adc.imaginary_shift
         self.energy_thresh = adc.energy_thresh
         self.singles_v = adc.singles_v 
+        self.cvs_type = adc.cvs_type
         keys = set(('conv_tol', 'e_corr', 'method', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
         self._keys = set(self.__dict__.keys()).union(keys)
