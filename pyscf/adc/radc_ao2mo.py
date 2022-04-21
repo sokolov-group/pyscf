@@ -27,7 +27,7 @@ import tempfile
 ### Incore integral transformation for integrals in Chemists' notation###
 def transform_integrals_incore(myadc):
 
-    cput0 = (time.clock(), time.time())
+    cput0_proj = (time.clock(), time.time())
     log = logger.Logger(myadc.stdout, myadc.verbose)
 
     occ = myadc.mo_coeff[:,:myadc._nocc]
@@ -35,6 +35,11 @@ def transform_integrals_incore(myadc):
 
     nocc = occ.shape[1]
     nvir = vir.shape[1]
+    ncore = myadc.ncvs
+    nval = nocc - ncore
+    core = occ[:,:ncore]
+    val = occ[:,ncore:]
+
 
     eris = lambda:None
 
@@ -45,13 +50,41 @@ def transform_integrals_incore(myadc):
     eris.oovv = ao2mo.general(myadc._scf._eri, (occ, occ, vir, vir), compact=False).reshape(nocc, nocc, nvir, nvir).copy()
     eris.ovvo = ao2mo.general(myadc._scf._eri, (occ, vir, vir, occ), compact=False).reshape(nocc, nvir, nvir, nocc).copy()
     eris.ovvv = ao2mo.general(myadc._scf._eri, (occ, vir, vir, vir), compact=True).reshape(nocc, nvir, -1).copy()
+    log.timer('ADC integral transformation proj', *cput0_proj)
+    cput0_cvs = (time.clock(), time.time())
 
+    if myadc.method_type == 'ip-cvs':
+        eris.ccce = ao2mo.general(myadc._scf._eri, (core, core, core, vir), compact=False).reshape(ncore, ncore, ncore, nvir).copy() 
+        eris.cvce = ao2mo.general(myadc._scf._eri, (core, val, core, vir) , compact=False).reshape(ncore, nval,  ncore, nvir).copy()
+        eris.ccve = ao2mo.general(myadc._scf._eri, (core, core, val, vir) , compact=False).reshape(ncore, ncore, nval,  nvir).copy()
+
+        eris.cccc = ao2mo.general(myadc._scf._eri, (core, core, core, core), compact=False).reshape(ncore, ncore, ncore, ncore).copy()
+        eris.cccv = ao2mo.general(myadc._scf._eri, (core, core, core, val) , compact=False).reshape(ncore, ncore, ncore, nval).copy()
+        eris.cvcv = ao2mo.general(myadc._scf._eri, (core, val,  core, val) , compact=False).reshape(ncore, nval,  ncore, nval).copy()
+        eris.ccvv = ao2mo.general(myadc._scf._eri, (core, core, val,  val) , compact=False).reshape(ncore, ncore, nval,  nval).copy()
+        eris.cece = ao2mo.general(myadc._scf._eri, (core, vir,  core, vir) , compact=False).reshape(ncore, nvir,  ncore, nvir).copy()
+        eris.ceve = ao2mo.general(myadc._scf._eri, (core, vir,  val,  vir) , compact=False).reshape(ncore, nvir,  nval,  nvir).copy()
+        eris.veve = ao2mo.general(myadc._scf._eri, (val,  vir,  val,  vir) , compact=False).reshape(nval,  nvir,  nval,  nvir).copy()
+        eris.ccee = ao2mo.general(myadc._scf._eri, (core, core, vir, vir) , compact=False).reshape(ncore, ncore,  nvir, nvir).copy()
+        eris.cvee = ao2mo.general(myadc._scf._eri, (core, val,  vir, vir) , compact=False).reshape(ncore, nval,   nvir, nvir).copy()
+        eris.vvee = ao2mo.general(myadc._scf._eri, (val,  val,  vir, vir) , compact=False).reshape(nval,  nval,   nvir, nvir).copy()
+
+        #eris.ceee = ao2mo.general(myadc._scf._eri, (core, vir,  vir,  vir) , compact=False).reshape(ncore, nvir,  -1).copy()
+        #eris.ccoe = ao2mo.general(myadc._scf._eri, (core, core, occ,  vir) , compact=False).reshape(ncore, ncore, nocc,  nvir).copy()
+        #eris.cvoe = ao2mo.general(myadc._scf._eri, (core, val,  occ,  vir) , compact=False).reshape(ncore, nval,  nocc,  nvir).copy()
+        #eris.cooe = ao2mo.general(myadc._scf._eri, (core, occ,  occ,  vir) , compact=False).reshape(ncore, nocc,  nocc,  nvir).copy()
+        #eris.vooe = ao2mo.general(myadc._scf._eri, (val,  occ,  occ,  vir) , compact=False).reshape(nval,  nocc,  nocc,  nvir).copy()
+        #eris.coce = ao2mo.general(myadc._scf._eri, (core, occ,  core, vir) , compact=False).reshape(ncore, nocc,  ncore, nvir).copy()
+        #eris.voce = ao2mo.general(myadc._scf._eri, (val,  occ,  core, vir) , compact=False).reshape(nval,  nocc,  ncore, nvir).copy()
+
+    log.timer('ADC integral transformation cvs', *cput0_cvs)
+    #exit()
     if (myadc.method == "adc(2)-x" or myadc.method == "adc(3)"):
         eris.vvvv = ao2mo.general(myadc._scf._eri, (vir, vir, vir, vir), compact=False).reshape(nvir, nvir, nvir, nvir)
         eris.vvvv = np.ascontiguousarray(eris.vvvv.transpose(0,2,1,3)) 
         eris.vvvv = eris.vvvv.reshape(nvir*nvir, nvir*nvir)
 
-    log.timer('ADC integral transformation', *cput0)
+    #log.timer('ADC integral transformation', *cput0)
     return eris
 
 

@@ -44,7 +44,7 @@ def transform_integrals_incore(myadc):
     ind_VV_g = np.tril_indices(nvir_b, k=-1)
 
     # Number of CVS orbital (it is assumed that the number of ionized core alpha electrons equals the number of ionized core beta electrons)
-    ncvs = ncvs = ncvs = myadc.ncvs
+    ncvs = myadc.ncvs
     # Slices of occupied MO coeffcients needed for forming CVS integrals
     nval_a = nocc_a - ncvs
     nval_b = nocc_b - ncvs
