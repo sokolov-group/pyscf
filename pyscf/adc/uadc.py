@@ -3916,6 +3916,7 @@ def compute_rdm_tdm(adc, U1, U2):
 
     U2_aba = U2_aba.reshape(nvir_a,nocc_a,nocc_b)
     U2_bab = U2_bab.reshape(nvir_b,nocc_b,nocc_a)
+
 ################TOTAL OPDMS OPDMS OPDMS OPDMS####################################
 
 #####G^000#### block- ij
@@ -3975,8 +3976,8 @@ def compute_rdm_tdm(adc, U1, U2):
     total_opdm_a[nocc_a:,nocc_a:] = 0.5*np.einsum('atu,btu->ab', U1_aaa_u,U2_aaa_u,optimize=True)
     total_opdm_a[nocc_a:,nocc_a:] += np.einsum('atu,btu->ab', U1_aba,U2_aba,optimize=True)
 
-    total_opdm_b[nocc_b:,nocc_b:] = 0.5*np.einsum('atu,btu->ab', U1_bbb_u,U1_bbb_u,optimize=True)
-    total_opdm_b[nocc_b:,nocc_b:] += np.einsum('atu,btu->ab', U1_bab,U1_bab,optimize=True)
+    total_opdm_b[nocc_b:,nocc_b:] = 0.5*np.einsum('atu,btu->ab', U1_bbb_u,U2_bbb_u,optimize=True)
+    total_opdm_b[nocc_b:,nocc_b:] += np.einsum('atu,btu->ab', U1_bab,U2_bab,optimize=True)
 
 #####G^020#### block- ab
     total_opdm_a[nocc_a:,nocc_a:] += 0.5*np.einsum('g,g,hmbc,hmac->ab', U1_a,U2_a,t2_1_a,t2_1_a,optimize=True)
