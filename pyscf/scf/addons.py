@@ -29,8 +29,10 @@ from pyscf.scf import hf
 from pyscf import __config__
 
 LINEAR_DEP_THRESHOLD = getattr(__config__, 'scf_addons_remove_linear_dep_threshold', 1e-8)
+#LINEAR_DEP_THRESHOLD = getattr(__config__, 'scf_addons_remove_linear_dep_threshold', 1e-20)
 CHOLESKY_THRESHOLD = getattr(__config__, 'scf_addons_cholesky_threshold', 1e-10)
 LINEAR_DEP_TRIGGER = getattr(__config__, 'scf_addons_remove_linear_dep_trigger', 1e-10)
+#LINEAR_DEP_TRIGGER = getattr(__config__, 'scf_addons_remove_linear_dep_trigger', 1e-20)
 
 def frac_occ_(mf, tol=1e-3):
     from pyscf.scf import uhf, rohf
@@ -398,6 +400,7 @@ def project_dm_r2r(mol1, dm1, mol2):
         return lib.einsum('pi,nij,qj->npq', p21, dm1, p21.conj())
 
 def canonical_orth_(S, thr=1e-7):
+#def canonical_orth_(S, thr=1e-14):
     '''Löwdin's canonical orthogonalization'''
     # Ensure the basis functions are normalized (symmetry-adapted ones are not!)
     normlz = numpy.power(numpy.diag(S), -0.5)
@@ -405,6 +408,7 @@ def canonical_orth_(S, thr=1e-7):
     # Form vectors for normalized overlap matrix
     Sval, Svec = numpy.linalg.eigh(Snorm)
     X = Svec[:,Sval>=thr] / numpy.sqrt(Sval[Sval>=thr])
+    ###X = Svec / numpy.sqrt(Sval)
     # Plug normalization back in
     X = numpy.dot(numpy.diag(normlz), X)
     return X
