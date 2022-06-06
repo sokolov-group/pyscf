@@ -142,8 +142,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 ############################################
 
     U = np.array(U)
-    for i in range(U.shape[0]):
-        print("CVS/MOM overlap: ", np.dot(np.array(guess)[i,:], U[i,:].T))
+    print(f'cvs type = {adc.cvs_type} | nfc = {adc.nfc_orb} | nbelow_edge = {adc.nbelow_edge}' )
     adc.analyze_eigenvector_ip(U)
     T = adc.get_trans_moments()
 
@@ -191,6 +190,7 @@ def compute_amplitudes(myadc, eris, fc_bool=True):
    
     nocc = myadc._nocc
     nvir = myadc._nvir
+    nbelow_edge = myadc.nbelow_edge
     
     #if fc_bool is False:
     #    nfc_orb = 0
@@ -221,9 +221,9 @@ def compute_amplitudes(myadc, eris, fc_bool=True):
     t2_1 = v2e_oovv/D2
 
     # Frozen core
-    t2_1[:nfc_orb,:,:,:] = 0
-    t2_1[:,:nfc_orb,:,:] = 0
-    t2_1[:nfc_orb,:nfc_orb,:,:] = 0
+    t2_1[nbelow_edge:nfc_orb,:,:,:] = 0
+    t2_1[:,nbelow_edge:nfc_orb,:,:] = 0
+    t2_1[nbelow_edge:nfc_orb,nbelow_edge:nfc_orb,:,:] = 0
 
     del (v2e_oovv)
     del (D2)
@@ -262,7 +262,7 @@ def compute_amplitudes(myadc, eris, fc_bool=True):
     t1_2 -= lib.einsum('lcki,klac->ia',eris_ovoo,t2_1,optimize=True)
     
     # Frozen core
-    t1_2[:nfc_orb,:] = 0
+    t1_2[nbelow_edge:nfc_orb,:] = 0
 
     t1_2 = t1_2/D1
 
@@ -304,9 +304,9 @@ def compute_amplitudes(myadc, eris, fc_bool=True):
         D2 = D2.reshape((nocc,nocc,nvir,nvir))
         
         # Frozen core
-        t2_2[:nfc_orb,:,:,:] = 0
-        t2_2[:,:nfc_orb,:,:] = 0      
-        t2_2[:nfc_orb,:nfc_orb,:,:] = 0
+        t2_2[nbelow_edge:nfc_orb,:,:,:] = 0
+        t2_2[:,nbelow_edge:nfc_orb,:,:] = 0      
+        t2_2[nbelow_edge:nfc_orb,nbelow_edge:nfc_orb,:,:] = 0
 
         t2_2 = t2_2/D2
         del (D2)
@@ -520,7 +520,7 @@ def compute_amplitudes(myadc, eris, fc_bool=True):
         t1_3 += lib.einsum('nlde,neim,mlad->ia',t2_1,eris_ovoo,t2_1,optimize=True)
         
         # Frozen core
-        t1_3[:nfc_orb,:] = 0
+        t1_3[nbelow_edge:nfc_orb,:] = 0
 
         t1_3 = t1_3/D1
       
@@ -682,6 +682,7 @@ def cvs_projector(myadc, r, singles_v=False):
     
     ncore = myadc.ncore_proj
     cvs_type = myadc.cvs_type
+    nbelow_edge = myadc.nbelow_edge
     
     #if alpha_proj != 0:
     #    alpha_proj = myadc.alpha_proj 
@@ -700,12 +701,16 @@ def cvs_projector(myadc, r, singles_v=False):
     Pr = r.copy()
 
     #if singles_v == False:  
-    Pr[ncore:f1] = 0.0    
+    Pr[ncore:f1] = 0.0   
+    Pr[:nbelow_edge] = 0.0 
     
     temp = np.zeros((nvir, nocc, nocc))
     temp = Pr[s2:f2].reshape((nvir, nocc, nocc)).copy()
     
     temp[:,ncore:,ncore:] = 0.0
+    temp[:,:nbelow_edge,ncore:] = 0.0
+    temp[:,ncore:,:nbelow_edge] = 0.0
+    temp[:,:nbelow_edge,:nbelow_edge] = 0.0
     if cvs_type == 'cve':
         temp[:,:ncore,:ncore] = 0.0
     #temp[:,:ncore_proj,:ncore_proj] *= alpha_proj
@@ -858,6 +863,7 @@ class RADC(lib.StreamObject):
         self.energy_thresh = 10000
         self.singles_v = False
         self.cvs_type = 'cce'
+        self.nbelow_edge = 0
         keys = set(('conv_tol', 'e_corr', 'method', 'mo_coeff', 'mol', 'mo_energy', 'max_memory', 'incore_complete', 'scf_energy', 'e_tot', 't1', 'frozen', 'chkfile', 'max_space', 't2', 'mo_occ', 'max_cycle'))
 
         self._keys = set(self.__dict__.keys()).union(keys)
@@ -3721,6 +3727,7 @@ class RADCEA(RADC):
         self.energy_thresh = adc.energy_thresh
         self.singles_v = adc.singles_v 
         self.cvs_type = adc.cvs_type
+        self.nbelow_edge = adc.nbelow_edge
         keys = set(('conv_tol', 'e_corr', 'method', 'mo_coeff', 'mo_energy', 'max_memory', 't1', 'max_space', 't2', 'max_cycle'))
 
         self._keys = set(self.__dict__.keys()).union(keys)
@@ -3830,6 +3837,7 @@ class RADCIP(RADC):
         self.energy_thresh = adc.energy_thresh
         self.singles_v = adc.singles_v 
         self.cvs_type = adc.cvs_type
+        self.nbelow_edge = adc.nbelow_edge
         keys = set(('conv_tol', 'e_corr', 'method', 'mo_coeff', 'mo_energy_b', 'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
 
         self._keys = set(self.__dict__.keys()).union(keys)

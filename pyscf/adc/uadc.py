@@ -190,8 +190,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         v = v[:, idx]
         return w, v, idx
 
-    #nroots = 4
-    nroots = adc.cvs_npick[-1]+1 # commented out for tdm/rdm implementation
+    nroots = 4
+    #nroots = adc.cvs_npick[-1]+1 # commented out for tdm/rdm implementation
       
     guess = adc.get_init_guess(nroots, diag, ascending = True)
     #conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-16, max_cycle=adc.max_cycle, max_space=adc.max_space, pick=sort_complex_eigenvalues)
@@ -231,18 +231,18 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     for i in range(E_cvs.size):
         logger.info(adc, ' %12.8f  %14.8f', E_cvs[i]*Eh2eV, P_cvs[i])
     print("---------------------------------------------------")
-    #analyze_eigenvector_ip(adc, U, analyze_v_vve=True)  # commented out for rdm/tdm implementation
+    analyze_eigenvector_ip(adc, U, analyze_v_vve=False)  # commented out for rdm/tdm implementation
     U = np.array(U)
-    #total_tpdm_a = ()
-    #total_tpdm_b = ()
-    #for i in range(nroots):
-    #    for j in range(nroots):
-    #        print('i = ', i, ' j = ', j) 
-    #        tpdm_a, tpdm_b = compute_rdm_tdm(adc, U[i,:], U[j,:])
-    #        total_tpdm_a += (tpdm_a,)
-    #        total_tpdm_b += (tpdm_b,)
+    total_tpdm_a = ()
+    total_tpdm_b = ()
+    for i in range(nroots):
+        for j in range(nroots):
+            print('i = ', i, ' j = ', j) 
+            tpdm_a, tpdm_b = compute_rdm_tdm(adc, U[i,:], U[j,:])
+            total_tpdm_a += (tpdm_a,)
+            total_tpdm_b += (tpdm_b,)
 
-    
+    tpdm = (total_tpdm_a, total_tpdm_b) 
     nrooots = nroots_kernel
            
     #E, U, conv = compute_lanczos(matvec, nroots, guess)
