@@ -318,7 +318,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         return w, v, idx
 
     #nroots = 4
-    #nroots = adc.cvs_npick[-1]+1 # commented out for tdm/rdm implementation
+    nroots = adc.cvs_npick[-1]+1 # commented out for tdm/rdm implementation
     print('diag size', diag.size) 
     #exit() 
     guess = adc.get_init_guess(nroots, diag, ascending = True)
@@ -345,7 +345,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         E_cvs = E_cvs[cvs_npick]
 
 
-    Eh2eV = 27.211396641308
+    Eh2eV = 27.2114#396641308
      
     print("CVS type: {}".format(adc.cvs_type))
     if adc.nfc_orb > 0:
@@ -457,12 +457,12 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         for i in range(E.size):
             logger.info(adc, ' %12.8f  %14.8f   %14.8f', E[i]*Eh2eV, P[i], snorm[i])
         print("---------------------------------------------------")
-        norm_v, norm_evv, max_u2_e = analyze_eigenvector_ip(adc, U, analyze_v_vve=True)
+        #norm_v, norm_evv, max_u2_e = analyze_eigenvector_ip(adc, U, analyze_v_vve=True)
         #analyze_eigenvector_ip(adc, U, analyze_v_vve=True)
-        for key, value in max_u2_e.items():
-            print(f'root {key}')   
-            for key2, value2 in value.items():
-                print(f'{key2} = {value2}')
+        #for key, value in max_u2_e.items():
+        #    print(f'root {key}')   
+        #    for key2, value2 in value.items():
+        #        print(f'{key2} = {value2}')
         U = np.array(U)
         total_tpdm_idx = []
         for i in range(nroots):
@@ -472,6 +472,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
                 tpdm_a, tpdm_b = compute_rdm_tdm(adc, U[i,:], U[j,:])
                 total_tpdm_idx.append((tpdm_a,tpdm_b,i,j))
         return (adc.e_corr, E, total_tpdm_idx, E.size, total_rdm_cvs)
+    else:
+        return (adc.e_corr, E_cvs, [], E_cvs.size, total_rdm_cvs)
     '''
     elif adc.oneshot_mom is False and ovlp_tol > 0 and oneshot_cvs is False and oneshot_no_vve is True:
 
@@ -1881,7 +1883,7 @@ class UADC(lib.StreamObject):
         self._nocc = mf.nelec
         self._nmo = (mo_coeff[0].shape[1], mo_coeff[1].shape[1])
         self._nvir = (self._nmo[0] - self._nocc[0], self._nmo[1] - self._nocc[1])
-        self.mo_energy_a = mf.mo_energy[0] 
+        self.mo_energy_a = mf.mo_energy[0] + 1e-10 
         self.mo_energy_b = mf.mo_energy[1]
         self.chkfile = mf.chkfile
         self.method = "adc(2)"
