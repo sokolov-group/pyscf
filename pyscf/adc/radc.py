@@ -45,8 +45,6 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     if eris is None:
         eris = adc.transform_integrals()
 
-    imds = adc.get_imds(eris)
-    matvec, diag = adc.gen_matvec(imds, eris)
 
     if nroots == 'full':
         r = np.identity(diag.size)
@@ -80,16 +78,22 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         print('M_ajk_bli norm: ', np.linalg.norm(M_ajk_bli))
 
         E,U = np.linalg.eig(M)
-        M_size = E.size    
-        U = U[:, E != 0]
+        print("Kernel U norm {} = ".format(adc.method_type))
+        adc.U = U = np.array(U)
+        #P, X = get_properties(adc, E.size)
+        #P = P[E != 0]
         E = E[E != 0]
         idx_E_sort = np.argsort(E)
+        #idx_P_sort = np.argsort(P)
         E = E[idx_E_sort]
-        U[:, idx_E_sort]
+        #P = P[idx_P_sort]
+        M_size = E.size    
+        #U = U[:, E != 0]
         print("Energies: ")
         print(np.column_stack(np.unique(np.around(E, decimals=8), return_counts=True))) 
-        #P, X = get_properties(adc, E.size ,U)
         #idx_P_sort = np.argsort(-P)
+        print("Spec factors: ")
+        #print(np.column_stack(np.unique(np.around(P, decimals=8), return_counts=True))) 
         #P = P[idx_P_sort]
         #P_100 = P[:100]
         P = None
@@ -106,27 +110,21 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         cput0 = log.timer_debug1("Total time elapsed for matvec operations", *cput0)
         return dummy_out
 
-    #guess = adc.get_init_guess(nroots, diag, ascending = True)
-    #conv, adc.E, U = lib.linalg_helper.davidson1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space,tol_residual=adc.tol_residual)
-    #P, X = get_properties(adc, nroots ,np.array(U).T)
-    E = adc.E
-    #print("Energies: ")
-
-    #print(np.column_stack(np.unique(np.around(E, decimals=8), return_counts=True))) 
-
-    #print("Spectroscopic factors: ", np.linalg.norm(P))
-    #print(np.column_stack(np.unique(np.around(P, decimals=8), return_counts=True))) 
-    P = None
-    E_P = (E, P)
-    return E_P  
-    #guess = adc.get_init_guess(nroots, diag, ascending = True)
-
-    #conv, adc.E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space,tol_residual=adc.tol_residual)
+    imds = adc.get_imds(eris)
+    matvec, diag = adc.gen_matvec(imds, eris)
+    guess = adc.get_init_guess(nroots, diag, ascending = True)
 
     conv, E, U = lib.linalg_helper.davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_cycle=adc.max_cycle, max_space=adc.max_space,tol_residual=adc.tol_residual)
-    print("Davidson CVS energies: ", E)
-    exit()
 
+    #print(np.column_stack(np.unique(np.around(E, decimals=8), return_counts=True))) 
+    #E = E[E != 0]
+    #idx_E_sort = np.argsort(E)
+    ##idx_P_sort = np.argsort(P)
+    #E = E[idx_E_sort]
+
+    P = None
+    E_P_size = (E, P, diag.size)
+    return E_P_size  
     adc.U = np.array(U).T.copy()
 
     if adc.compute_properties:
@@ -1853,18 +1851,21 @@ def ip_adc_diag(adc,M_ij=None,eris=None, cvs=False):
 
     if adc.ncvs > 0:
 
-        shift = -100000000.0
+        shift = -1000000000000.0
         ncvs = adc.ncvs
         diag[ncvs:f1] += shift
 
         temp = diag[s2:f2].copy()
         temp = temp.reshape((nvir,nocc,nocc))
         temp[:,ncvs:,ncvs:] += shift
+        #temp[:,:ncvs,ncvs:] += shift
+        #temp[:,ncvs:,:ncvs] += shift
         #temp[:,:ncvs,:ncvs] += shift
-        diag[s2:f2] += temp.reshape(-1).copy()
+        diag[s2:f2] = temp.reshape(-1).copy()
 
     diag = -diag
     log.timer_debug1("Completed ea_diag calculation")
+    print('diag norm for {} = '.format(adc.method_type), np.linalg.norm(diag))
 
     return diag
 
@@ -1884,12 +1885,13 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
     nocc = adc._nocc
     nvir = adc._nvir
     ncvs = adc.ncvs
+    nval = nocc - ncvs
 
     n_singles = ncvs
-    n_doubles_acc = nvir * ncvs * ncvs
-    n_doubles_acv =  nvir * ncvs * (nocc - ncvs)
+    n_doubles_ecc = nvir * ncvs * ncvs
+    n_doubles_ecv =  nvir * ncvs * nval
 
-    dim = n_singles + n_doubles_acc + 2 * n_doubles_acv
+    dim = n_singles + n_doubles_ecc + 2 * n_doubles_ecv
 
     e_occ = adc.mo_energy[:nocc]
     e_vir = adc.mo_energy[nocc:]
@@ -1899,18 +1901,18 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
 
     s1 = 0
     f1 = n_singles
-    s2_acc = f1
-    f2_acc = s2_acc + n_doubles_acc
-    s2_acv = f2_acc
-    f2_acv = s2_acv + n_doubles_acv
-    s2_avc = f2_acv
-    f2_avc = s2_avc + n_doubles_acv
+    s2_ecc = f1
+    f2_ecc = s2_ecc + n_doubles_ecc
+    s2_ecv = f2_ecc
+    f2_ecv = s2_ecv + n_doubles_ecv
+    s2_evc = f2_ecv
+    f2_evc = s2_evc + n_doubles_ecv
 
     d_ij = e_occ[:,None] + e_occ
     d_a = e_vir[:,None]
     D_n = -d_a + d_ij.reshape(-1)
     
-    #D_aij = D_n.reshape(-1)
+    D_aij = D_n.reshape(-1)
     D_aij = D_n.reshape(nvir,nocc,nocc)
 
     diag = np.zeros(dim)
@@ -1920,9 +1922,9 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
     diag[s1:f1] = M_ij_diag.copy()
 
     # Compute precond in 2p1h-2p1h block
-    diag[s2_acc:f2_acc] += D_aij[:,:ncvs,:ncvs].reshape(-1)
-    diag[s2_acv:f2_acv] += D_aij[:,:ncvs,ncvs:].reshape(-1)
-    diag[s2_avc:f2_avc] += D_aij[:,ncvs:,:ncvs].reshape(-1)
+    diag[s2_ecc:f2_ecc] = D_aij[:,:ncvs,:ncvs].reshape(-1)
+    diag[s2_ecv:f2_ecv] = D_aij[:,:ncvs,ncvs:].reshape(-1)
+    diag[s2_evc:f2_evc] = D_aij[:,ncvs:,:ncvs].reshape(-1)
     
 #    ###### Additional terms for the preconditioner ####
 #    if (method == "adc(2)-x" or method == "adc(3)"):
@@ -1963,6 +1965,7 @@ def ip_cvs_adc_diag(adc,M_ij=None,eris=None):
 
     diag = -diag
     log.timer_debug1("Completed ea_diag calculation")
+    print('diag norm for {} = '.format(adc.method_type), np.linalg.norm(diag))
 
     return diag
 
@@ -2234,7 +2237,7 @@ def ea_adc_matvec(adc, M_ab=None, eris=None):
 
     return sigma_
 
-#@profile
+
 def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -2374,49 +2377,6 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False):
                    a += k
 
                s[s1:f1] += temp_singles
-               ###### START TESTING ####### 
-               #temp = lib.einsum('jlab,ajk->blk',t2_1,r2,optimize=True)
-               #temp += -lib.einsum('ljab,ajk->blk',t2_1,r2,optimize=True)
-               #temp += -lib.einsum('jlab,akj->blk',t2_1,r2,optimize=True)
-               #temp += lib.einsum('ljab,akj->blk',t2_1,r2,optimize=True)
-               #s[s1:f1] += 0.5*lib.einsum('blk,lbik->i',temp,eris_ovoo,optimize=True)
-               #s[s1:f1] -= 0.5*lib.einsum('blk,iblk->i',temp,eris_ovoo,optimize=True)
-
-               #temp = -lib.einsum('klab,akj->blj',t2_1,r2,optimize=True)
-               #temp += lib.einsum('lkab,akj->blj',t2_1,r2,optimize=True)
-               #temp += lib.einsum('klab,ajk->blj',t2_1,r2,optimize=True)
-               #temp += -lib.einsum('lkab,ajk->blj',t2_1,r2,optimize=True)
-               #s[s1:f1] -= 0.5*lib.einsum('blj,lbij->i',temp,eris_ovoo,optimize=True)
-               #s[s1:f1] += 0.5*lib.einsum('blj,iblj->i',temp,eris_ovoo,optimize=True)
-
-               #temp = lib.einsum('ljba,ajk->blk',t2_1,r2,optimize=True)
-               #temp_1 = lib.einsum('jlab,ajk->blk',t2_1,r2,optimize=True)
-               #temp_1 += -lib.einsum('jlab,akj->blk',t2_1,r2,optimize=True)
-               #temp_2 = lib.einsum('jlba,akj->blk',t2_1,r2, optimize=True)
-
-               #s[s1:f1] += 0.5*lib.einsum('blk,lbik->i',temp,eris_ovoo,optimize=True)
-               #s[s1:f1] -= 0.5*lib.einsum('blk,iblk->i',temp,eris_ovoo,optimize=True)
-               #s[s1:f1] += 0.5*lib.einsum('blk,lbik->i',temp_1,eris_ovoo,optimize=True)
-               #s[s1:f1] -= 0.5*lib.einsum('blk,iblk->i',temp_2,eris_ovoo,optimize=True)
-
-               #temp = -lib.einsum('lkba,akj->blj',t2_1,r2,optimize=True)
-               #temp_1 = -lib.einsum('klab,akj->blj',t2_1,r2,optimize=True)
-               #temp_1 += lib.einsum('klab,ajk->blj',t2_1,r2,optimize=True)
-               #temp_2 = -lib.einsum('klba,ajk->blj',t2_1,r2,optimize=True)
-
-               #s[s1:f1] -= 0.5*lib.einsum('blj,lbij->i',temp,eris_ovoo,optimize=True)
-               #s[s1:f1] += 0.5*lib.einsum('blj,iblj->i',temp,eris_ovoo,optimize=True)
-               #s[s1:f1] -= 0.5*lib.einsum('blj,lbij->i',temp_1,eris_ovoo,optimize=True)
-               #s[s1:f1] += 0.5*lib.einsum('blj,iblj->i',temp_2,eris_ovoo,optimize=True)
-
-               #temp_1 = lib.einsum('jlab,ajk->blk',t2_1,r2,optimize=True)
-               #temp_1 += -lib.einsum('ljab,ajk->blk',t2_1,r2,optimize=True)
-               #s[s1:f1] += 0.5*lib.einsum('blk,lbik->i',temp_1,eris_ovoo,optimize=True)
-
-               #temp_1 = -lib.einsum('klab,akj->blj',t2_1,r2,optimize=True)
-               #temp_1 += lib.einsum('lkab,akj->blj',t2_1,r2,optimize=True)
-               #s[s1:f1] -= 0.5*lib.einsum('blj,lbij->i',temp_1,eris_ovoo,optimize=True)
-               ###### END TESTING ####### 
                temp = np.zeros_like(r2)
                temp =  lib.einsum('jlab,ajk->blk',t2_1,r2,optimize=True)
                temp -= lib.einsum('jlab,akj->blk',t2_1,r2,optimize=True)
@@ -2487,7 +2447,7 @@ def ip_adc_matvec(adc, M_ij=None, eris=None, cvs=False):
         s *= -1.0
 
         if adc.ncvs > 0:
-            r = cvs_projector(adc, r)
+            s = cvs_projector(adc, s)
 
         return s
 
@@ -2523,7 +2483,7 @@ def cvs_projector(myadc, r):
     Pr[s2:f2] = temp.reshape(-1).copy()
     
     return Pr
-#@profile
+
 def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -2537,8 +2497,6 @@ def ip_cvs_adc_matvec(adc, M_ij=None, eris=None):
     nvir = adc._nvir
     ncvs = adc.ncvs
     nval = nocc - ncvs
-
-    #ij_ind = np.tril_indices(nocc, k=-1)
 
     n_singles = ncvs
     n_doubles_ecc = nvir * ncvs * ncvs
@@ -3060,6 +3018,124 @@ def ip_compute_trans_moments(adc, orb):
 
     return T
 
+#def ip_cvs_compute_trans_moments(adc, orb):
+#
+#    if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
+#        raise NotImplementedError(adc.method)
+#
+#    method = adc.method
+#
+#    nocc = adc._nocc
+#    nvir = adc._nvir
+#    ncvs = adc.ncvs
+#    nval = nocc - ncvs
+#
+#    t2_1 = adc.t2[0][:]
+#    t1_2 = adc.t1[0][:]
+#    t2_1_coee = t2_1[:ncvs,:,:,:].copy()
+#    t1_2_ce = t1_2[:ncvs,:].copy()
+#
+#    n_singles = ncvs
+#    n_doubles_ecc = nvir * ncvs * ncvs
+#    n_doubles_ecv =  nvir * ncvs * nval
+#
+#    dim = n_singles + n_doubles_ecc + 2 * n_doubles_ecv
+#
+#    e_occ = adc.mo_energy[:nocc]
+#    e_vir = adc.mo_energy[nocc:]
+#
+#    idn_cvs = np.identity(ncvs)
+#    idn_occ = np.identity(nocc)
+#    idn_vir = np.identity(nvir)
+#
+#    s1 = 0
+#    f1 = n_singles
+#    s2_ecc = f1
+#    f2_ecc = s2_ecc + n_doubles_ecc
+#    s2_ecv = f2_ecc
+#    f2_ecv = s2_ecv + n_doubles_ecv
+#    s2_evc = f2_ecv
+#    f2_evc = s2_evc + n_doubles_ecv
+#
+#    T = np.zeros((dim))
+#
+######### ADC(2) 1h part  ############################################
+#
+#    if orb < nocc:
+#    #if orb < ncvs:
+#        T[s1:f1]  = idn_occ[orb, :ncvs]
+#        T[s1:f1] += 0.25*lib.einsum('kdc,ikdc->i',t2_1[:,orb,:,:], t2_1_coee, optimize = True)
+#        T[s1:f1] -= 0.25*lib.einsum('kcd,ikdc->i',t2_1[:,orb,:,:], t2_1_coee, optimize = True)
+#        T[s1:f1] -= 0.25*lib.einsum('kdc,ikcd->i',t2_1[:,orb,:,:], t2_1_coee, optimize = True)
+#        T[s1:f1] += 0.25*lib.einsum('kcd,ikcd->i',t2_1[:,orb,:,:], t2_1_coee, optimize = True)
+#        T[s1:f1] -= 0.25*lib.einsum('kdc,ikdc->i',t2_1[orb,:,:,:], t2_1_coee, optimize = True)
+#        T[s1:f1] -= 0.25*lib.einsum('kcd,ikcd->i',t2_1[orb,:,:,:], t2_1_coee, optimize = True)
+#    #else :
+#        #T[s1:f1] += t1_2_ce[:,(orb-nocc)]
+#
+######### ADC(2) 2h-1p  part  ############################################
+#
+#        t2_1_t = t2_1.transpose(2,3,1,0)
+#        t2_1_t_eecc = t2_1_t[:,:,:ncvs,:ncvs].copy()
+#        t2_1_t_eecv = t2_1_t[:,:,:ncvs,ncvs:].copy()
+#        t2_1_t_eevc = t2_1_t[:,:,ncvs:,:ncvs].copy()
+#
+#        #T[s2_ecc:f2_ecc] = t2_1_t_eecc[(orb-nocc),:,:,:].reshape(-1)
+#        #T[s2_ecv:f2_ecv] = t2_1_t_eecv[(orb-nocc),:,:,:].reshape(-1)
+#        #T[s2_evc:f2_evc] = t2_1_t_eevc[(orb-nocc),:,:,:].reshape(-1)
+#
+######### ADC(3) 2h-1p  part  ############################################
+#
+#    if(method=='adc(2)-x'or method=='adc(3)'):
+#
+#        t2_2 = adc.t2[1][:]
+#
+#        if orb >= nocc:
+#            t2_2_t = t2_2.transpose(2,3,1,0)
+#
+#            T[s2:f2] += t2_2_t[(orb-nocc),:,:,:].reshape(-1)
+#
+########## ADC(3) 1h part  ############################################
+#
+#    if(method=='adc(3)'):
+#
+#        t1_3 = adc.t1[1]
+#
+#        if orb < ncvs:
+#            T[s1:f1] += 0.25*lib.einsum('kdc,ikdc->i',t2_1[:,orb,:,:], t2_2, optimize = True)
+#            T[s1:f1] -= 0.25*lib.einsum('kcd,ikdc->i',t2_1[:,orb,:,:], t2_2, optimize = True)
+#            T[s1:f1] -= 0.25*lib.einsum('kdc,ikcd->i',t2_1[:,orb,:,:], t2_2, optimize = True)
+#            T[s1:f1] += 0.25*lib.einsum('kcd,ikcd->i',t2_1[:,orb,:,:], t2_2, optimize = True)
+#            T[s1:f1] -= 0.25*lib.einsum('kdc,ikdc->i',t2_1[orb,:,:,:], t2_2, optimize = True)
+#            T[s1:f1] -= 0.25*lib.einsum('kcd,ikcd->i',t2_1[orb,:,:,:], t2_2, optimize = True)
+#
+#            T[s1:f1] += 0.25*lib.einsum('ikdc,kdc->i',t2_1, t2_2[:,orb,:,:],optimize = True)
+#            T[s1:f1] -= 0.25*lib.einsum('ikcd,kdc->i',t2_1, t2_2[:,orb,:,:],optimize = True)
+#            T[s1:f1] -= 0.25*lib.einsum('ikdc,kcd->i',t2_1, t2_2[:,orb,:,:],optimize = True)
+#            T[s1:f1] += 0.25*lib.einsum('ikcd,kcd->i',t2_1, t2_2[:,orb,:,:],optimize = True)
+#            T[s1:f1] -= 0.25*lib.einsum('ikcd,kcd->i',t2_1, t2_2[orb,:,:,:],optimize = True)
+#            T[s1:f1] -= 0.25*lib.einsum('ikdc,kdc->i',t2_1, t2_2[orb,:,:,:],optimize = True)
+#        else:
+#            T[s1:f1] += 0.5*lib.einsum('ikc,kc->i',t2_1[:,:,(orb-nocc),:], t1_2,optimize = True)
+#            T[s1:f1] -= 0.5*lib.einsum('kic,kc->i',t2_1[:,:,(orb-nocc),:], t1_2,optimize = True)
+#            T[s1:f1] += 0.5*lib.einsum('ikc,kc->i',t2_1[:,:,(orb-nocc),:], t1_2,optimize = True)
+#            T[s1:f1] += t1_3[:,(orb-nocc)]
+#
+#        del t2_2
+#    del t2_1
+#
+#    #T_aaa_ecc = T[s2_ecc:f2_ecc].reshape(nvir,ncvs,ncvs).copy()
+#    #T_aaa_ecv = T[s2_ecv:f2_ecv].reshape(nvir,ncvs,nval).copy()
+#    #T_aaa_evc = T[s2_evc:f2_evc].reshape(nvir,nval,ncvs).copy()
+#    #T_aaa_ecc = T_aaa_ecc - T_aaa_ecc.transpose(0,2,1)
+#    #T_aaa_ecv = T_aaa_ecv - T_aaa_evc.transpose(0,2,1)
+#    #T_aaa_evc = T_aaa_evc - T_aaa_ecv.transpose(0,2,1)
+#
+#    #T[s2_ecc:f2_ecc] += T_aaa_ecc.reshape(-1)
+#    #T[s2_ecv:f2_ecv] += T_aaa_ecv.reshape(-1)
+#    #T[s2_evc:f2_evc] += T_aaa_evc.reshape(-1)
+#
+#    return T
 
 def get_trans_moments(adc):
 
@@ -3071,6 +3147,7 @@ def get_trans_moments(adc):
             T.append(T_a)
 
     T = np.array(T)
+    print('norm of trans moment Efficient: ', np.linalg.norm(T))
     return T
 
 
@@ -3283,15 +3360,56 @@ def renormalize_eigenvectors_ip(adc, nroots=1):
     n_doubles = nvir * nocc * nocc
 
     U = adc.U
-
     for I in range(U.shape[1]):
+        print('U norm Projector = ', np.linalg.norm(U[:,I]))
         U1 = U[:n_singles,I]
         U2 = U[n_singles:,I].reshape(nvir,nocc,nocc)
         UdotU = np.dot(U1, U1) + 2.*np.dot(U2.ravel(), U2.ravel()) - np.dot(U2.ravel(), U2.transpose(0,2,1).ravel())
         U[:,I] /= np.sqrt(UdotU)
+        print('IP-Projector renormalized = ', np.linalg.norm(U[:,I]))
 
     return U
 
+#def renormalize_eigenvectors_ip_cvs(adc, nroots=1):
+#
+#    nocc = adc._nocc
+#    nvir = adc._nvir
+#    ncvs = adc.ncvs
+#    nval = nocc - ncvs
+#
+#    n_singles = ncvs
+#    n_doubles_ecc = nvir * ncvs * ncvs
+#    n_doubles_ecv =  nvir * ncvs * nval
+#
+#    s1 = 0
+#    f1 = n_singles
+#    s2_ecc = f1
+#    f2_ecc = s2_ecc + n_doubles_ecc
+#    s2_ecv = f2_ecc
+#    f2_ecv = s2_ecv + n_doubles_ecv
+#    s2_evc = f2_ecv
+#    f2_evc = s2_evc + n_doubles_ecv
+#
+#    dim = n_singles + n_doubles_ecc + 2 * n_doubles_ecv
+#
+#    U = adc.U
+#
+#    for I in range(U.shape[1]):
+#        print('U norm Efficient = ', np.linalg.norm(U[:,I]))
+#        U1 = U[:n_singles,I]
+#        U2_ecc = U[s2_ecc:f2_ecc,I].reshape(nvir,ncvs,ncvs)
+#        U2_ecv = U[s2_ecv:f2_ecv,I].reshape(nvir,ncvs,nval)
+#        U2_evc = U[s2_evc:f2_evc,I].reshape(nvir,nval,ncvs)
+#
+#        UdotU = np.dot(U1, U1) 
+#        UdotU += 2.*np.dot(U2_ecc.ravel(), U2_ecc.ravel()) - np.dot(U2_ecc.ravel(), U2_ecc.transpose(0,2,1).ravel())
+#        UdotU += 2.*np.dot(U2_ecv.ravel(), U2_ecv.ravel()) - np.dot(U2_ecv.ravel(), U2_evc.transpose(0,2,1).ravel())
+#        UdotU += 2.*np.dot(U2_evc.ravel(), U2_evc.ravel()) - np.dot(U2_evc.ravel(), U2_ecv.transpose(0,2,1).ravel())
+#        U[:,I] /= np.sqrt(UdotU)
+#        print('IP-Efficient renormalized = ', np.linalg.norm(U[:,I]))
+#        #U[:,I] /= np.sqrt(UdotU)
+#
+#    return U
 
 def get_properties(adc, nroots=1):
 
@@ -3603,9 +3721,10 @@ class RADCIPCVS(RADC):
     get_imds = get_imds_ip_cvs
     get_diag = ip_cvs_adc_diag
     matvec = ip_cvs_adc_matvec
+    #compute_trans_moments = ip_cvs_compute_trans_moments
     compute_trans_moments = ip_compute_trans_moments
     get_trans_moments = get_trans_moments
-    renormalize_eigenvectors = renormalize_eigenvectors_ip
+    renormalize_eigenvectors = renormalize_eigenvectors_ip#_cvs
     get_properties = get_properties
     analyze_spec_factor = analyze_spec_factor
     analyze_eigenvector = analyze_eigenvector_ip
