@@ -17,7 +17,7 @@
 #
 
 '''
-Unrestricted algebraic diagrammatic construction
+Unrestricted algebraic diagrammatic construction with EE_ADC
 '''
 
 import numpy as np
