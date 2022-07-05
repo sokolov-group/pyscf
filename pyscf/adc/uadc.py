@@ -1034,6 +1034,9 @@ class UADC(lib.StreamObject):
         elif(self.method_type == "ip"):
             e_exc, v_exc, spec_fac, X, adc_es = self.ip_adc(nroots=nroots, guess=guess, eris=eris)
 
+        elif(self.method_type == "ee"):
+            e_exc, v_exc, spec_fac, X, adc_es = self.ee_adc(nroots=nroots, guess=guess, eris=eris)
+
         else:
             raise NotImplementedError(self.method_type)
 
@@ -1053,6 +1056,11 @@ class UADC(lib.StreamObject):
 
     def ip_adc(self, nroots=1, guess=None, eris=None):
         adc_es = UADCIP(self)
+        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
+        return e_exc, v_exc, spec_fac, x, adc_es
+
+    def ee_adc(self, nroots=1, guess=None, eris=None):
+        adc_es = UADCEE(self)
         e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
         return e_exc, v_exc, spec_fac, x, adc_es
 
@@ -1754,6 +1762,11 @@ def get_imds_ip(adc, eris=None):
 
     return M_ij
 
+def get_imds_ee(adc, eris=None):
+    p = 0
+    print("imds buddy")
+    exit()
+    return p
 
 def ea_adc_diag(adc,M_ab=None,eris=None):
 
@@ -2114,6 +2127,11 @@ def ip_adc_diag(adc,M_ij=None,eris=None):
     diag = -diag
     return diag
 
+def ee_adc_diag(adc,M_ij=None,eris=None):
+
+
+    diag = 0
+    return diag
 
 def ea_contract_r_vvvv_antisym(myadc,r2,vvvv_d):
 
@@ -3382,6 +3400,12 @@ def ip_adc_matvec(adc, M_ij=None, eris=None):
 
     return sigma_
 
+def ee_adc_matvec(adc, M_ij=None, eris=None):
+
+        s = -1.0
+
+
+        return s
 
 def ea_compute_trans_moments(adc, orb, spin="alpha"):
 
@@ -4495,6 +4519,127 @@ class UADCIP(UADC):
     def get_init_guess(self, nroots=1, diag=None, ascending = True):
         if diag is None :
             diag = self.ip_adc_diag()
+        idx = None
+        if ascending:
+            idx = np.argsort(diag)
+        else:
+            idx = np.argsort(diag)[::-1]
+        guess = np.zeros((diag.shape[0], nroots))
+        min_shape = min(diag.shape[0], nroots)
+        guess[:min_shape,:min_shape] = np.identity(min_shape)
+        g = np.zeros((diag.shape[0], nroots))
+        g[idx] = guess.copy()
+        guess = []
+        for p in range(g.shape[1]):
+            guess.append(g[:,p])
+        return guess
+
+    def gen_matvec(self, imds=None, eris=None):
+        if imds is None: imds = self.get_imds(eris)
+        diag = self.get_diag(imds,eris)
+        matvec = self.matvec(imds, eris)
+        #matvec = lambda x: self.matvec()
+        return matvec, diag
+
+class UADCEE(UADC):
+    '''unrestricted ADC for EE energies and spectroscopic amplitudes
+
+    Attributes:
+        verbose : int
+            Print level.  Default value equals to :class:`Mole.verbose`
+        max_memory : float or int
+            Allowed memory in MB.  Default value equals to :class:`Mole.max_memory`
+        incore_complete : bool
+            Avoid all I/O. Default is False.
+        method : string
+            nth-order ADC method. Options are : ADC(2), ADC(2)-X, ADC(3). Default is ADC(2).
+        conv_tol : float
+            Convergence threshold for Davidson iterations.  Default is 1e-12.
+        max_cycle : int
+            Number of Davidson iterations.  Default is 50.
+        max_space : int
+            Space size to hold trial vectors for Davidson iterative diagonalization.  Default is 12.
+
+    Kwargs:
+        nroots : int
+            Number of roots (eigenvalues) requested. Default value is 1.
+
+            >>> myadc = adc.UADC(mf).run()
+            >>> myadcea = adc.UADC(myadc).run()
+
+    Saved results
+
+        e_ee : float or list of floats
+            EA energy (eigenvalue). For nroots = 1, it is a single float
+            number. If nroots > 1, it is a list of floats for the lowest
+            nroots eigenvalues.
+        v_ee : array
+            Eigenvectors for each EA transition.
+        p_ee : float
+            Spectroscopic amplitudes for each EA transition.
+    '''
+    def __init__(self, adc):
+        self.verbose = adc.verbose
+        self.stdout = adc.stdout
+        self.max_memory = adc.max_memory
+        self.max_space = adc.max_space
+        self.max_cycle = adc.max_cycle
+        self.conv_tol  = adc.conv_tol
+        self.tol_residual  = adc.tol_residual
+        self.t1 = adc.t1
+        self.t2 = adc.t2
+        self.imds = adc.imds
+        self.e_corr = adc.e_corr
+        self.method = adc.method
+        self.method_type = adc.method_type
+        self._scf = adc._scf
+        self._nocc = adc._nocc
+        self._nvir = adc._nvir
+        self.nocc_a = adc._nocc[0]
+        self.nocc_b = adc._nocc[1]
+        self.nvir_a = adc._nvir[0]
+        self.nvir_b = adc._nvir[1]
+        self.mo_coeff = adc.mo_coeff
+        self.mo_energy_a = adc.mo_energy_a
+        self.mo_energy_b = adc.mo_energy_b
+        self.nmo_a = adc._nmo[0]
+        self.nmo_b = adc._nmo[1]
+        self.mol = adc.mol
+        self.transform_integrals = adc.transform_integrals
+        self.with_df = adc.with_df
+        self.spec_factor_print_tol = adc.spec_factor_print_tol
+        self.evec_print_tol = adc.evec_print_tol
+
+#        self.compute_properties = adc.compute_properties
+#        self.approx_trans_moments = adc.approx_trans_moments
+        self.E = adc.E
+        self.U = adc.U
+        self.P = adc.P
+        self.X = adc.X
+
+        keys = set(('tol_residual','conv_tol', 'e_corr', 'method',
+                    'method_type', 'mo_coeff', 'mo_energy_b', 'max_memory',
+                    't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
+
+        self._keys = set(self.__dict__.keys()).union(keys)
+
+    kernel = kernel
+
+    get_imds = get_imds_ee
+    matvec = ee_adc_matvec
+    get_diag = ee_adc_diag
+#    compute_trans_moments = ea_compute_trans_moments
+#    get_trans_moments = get_trans_moments
+#    analyze_spec_factor = analyze_spec_factor
+#    get_properties = get_properties
+#    analyze = analyze
+#    compute_dyson_mo = compute_dyson_mo
+
+#    analyze_eigenvector = analyze_eigenvector_ee
+
+    def get_init_guess(self, nroots=1, diag=None, ascending = True):
+        if diag is None :
+            diag = self.ee_adc_diag()
         idx = None
         if ascending:
             idx = np.argsort(diag)
