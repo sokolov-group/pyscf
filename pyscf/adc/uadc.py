@@ -56,8 +56,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     adc.U = np.array(U).T.copy()
 
-    if adc.compute_properties:
-        adc.P,adc.X = adc.get_properties(nroots)
+#    if adc.compute_properties:
+#        adc.P,adc.X = adc.get_properties(nroots)
 
     nfalse = np.shape(conv)[0] - np.sum(conv)
 
@@ -72,14 +72,15 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     for n in range(nroots):
         print_string = ('%s root %d  |  Energy (Eh) = %14.10f  |  Energy (eV) = %12.8f  ' %
                         (adc.method, n, adc.E[n], adc.E[n]*27.2114))
-        if adc.compute_properties:
-            print_string += ("|  Spec factors = %10.8f  " % adc.P[n])
-        print_string += ("|  conv = %s" % conv[n])
-        logger.info(adc, print_string)
+#        if adc.compute_properties:
+#            print_string += ("|  Spec factors = %10.8f  " % adc.P[n])
+#        print_string += ("|  conv = %s" % conv[n])
+#        logger.info(adc, print_string)
 
     log.timer('ADC', *cput0)
 
-    return adc.E, adc.U, adc.P, adc.X
+    #return adc.E, adc.U, adc.P, adc.X
+    return adc.E, adc.U 
 
 
 def compute_amplitudes_energy(myadc, eris, verbose=None):
@@ -1035,13 +1036,15 @@ class UADC(lib.StreamObject):
             e_exc, v_exc, spec_fac, X, adc_es = self.ip_adc(nroots=nroots, guess=guess, eris=eris)
 
         elif(self.method_type == "ee"):
-            e_exc, v_exc, spec_fac, X, adc_es = self.ee_adc(nroots=nroots, guess=guess, eris=eris)
+            #e_exc, v_exc, spec_fac, X, adc_es = self.ee_adc(nroots=nroots, guess=guess, eris=eris)
+            e_exc, v_exc, adc_es = self.ee_adc(nroots=nroots, guess=guess, eris=eris)
 
         else:
             raise NotImplementedError(self.method_type)
 
         self._adc_es = adc_es
-        return e_exc, v_exc, spec_fac, X
+        #return e_exc, v_exc, spec_fac, X
+        return e_exc, v_exc 
 
     def _finalize(self):
         '''Hook for dumping results and clearing up the object.'''
@@ -1061,8 +1064,10 @@ class UADC(lib.StreamObject):
 
     def ee_adc(self, nroots=1, guess=None, eris=None):
         adc_es = UADCEE(self)
-        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
-        return e_exc, v_exc, spec_fac, x, adc_es
+        #e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
+        e_exc, v_exc = adc_es.kernel(nroots, guess, eris)
+        return e_exc, v_exc, adc_es
+        #return e_exc, v_exc, spec_fac, x, adc_es
 
     def density_fit(self, auxbasis=None, with_df=None):
         if with_df is None:
@@ -1872,7 +1877,7 @@ def get_imds_ee(adc, eris=None):
 
     M_a += M_ia_jb_a.reshape(n_singles_a, n_singles_a)
     M_b += M_ia_jb_b.reshape(n_singles_b, n_singles_b)
-    
+        
     M_ia_jb = (M_a, M_b)
 
     return M_ia_jb
@@ -2236,10 +2241,98 @@ def ip_adc_diag(adc,M_ij=None,eris=None):
     diag = -diag
     return diag
 
-def ee_adc_diag(adc,M_ij=None,eris=None):
+def ee_adc_diag(adc,M_ia_jb=None,eris=None):
+
+    if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
+        raise NotImplementedError(adc.method)
+
+    method = adc.method
+
+    nocc_a = adc.nocc_a
+    nocc_b = adc.nocc_b
+    nvir_a = adc.nvir_a
+    nvir_b = adc.nvir_b
+
+    ij_ind_a = np.tril_indices(nocc_a, k=-1)
+    ij_ind_b = np.tril_indices(nocc_b, k=-1)
+    ab_ind_a = np.tril_indices(nvir_a, k=-1)
+    ab_ind_b = np.tril_indices(nvir_b, k=-1)
+
+    n_singles_a = int(nocc_a*nvir_a)
+    n_singles_b = int(nocc_b*nvir_b)
+    n_doubles_aaaa = int(nocc_a * (nocc_a - 1) * nvir_a * (nvir_a -1)/ 4)
+    n_doubles_ab = int(nocc_a * nocc_b * nvir_a * nvir_b)
+    n_doubles_bbbb = int(nocc_b * (nocc_b - 1) * nvir_b * (nvir_b -1)/ 4)
+
+    dim = int(n_singles_a + n_singles_b + n_doubles_aaaa + n_doubles_ab + n_doubles_ab + n_doubles_bbbb)
+    
+    e_occ_a = adc.mo_energy_a[:nocc_a]
+    e_occ_b = adc.mo_energy_b[:nocc_b]
+    e_vir_a = adc.mo_energy_a[nocc_a:]
+    e_vir_b = adc.mo_energy_b[nocc_b:]
+
+    if eris is None:
+        eris = adc.transform_integrals()
+
+    d_ij_a = e_occ_a[:,None]+e_occ_a
+    d_ij_b = e_occ_b[:,None]+e_occ_b
+    d_ab_a = e_vir_a[:,None]+e_vir_a
+    d_ab_b = e_vir_b[:,None]+e_vir_b
+    D_n_a = -d_ij_a.reshape(-1,1) + d_ab_a.reshape(-1)
+    D_n_b = -d_ij_b.reshape(-1,1) + d_ab_b.reshape(-1)
+    D_n_a = D_n_a.reshape((nocc_a,nocc_a,nvir_a,nvir_a))
+    D_n_b = D_n_b.reshape((nocc_b,nocc_b,nvir_b,nvir_b))
+
+    D_ijab_a = D_n_a.copy()[:,:,ab_ind_a[0],ab_ind_a[1]]
+    D_ijab_a = D_ijab_a.copy()[ij_ind_a[0],ij_ind_a[1]].reshape(-1)
+    D_ijab_b = D_n_b.copy()[:,:,ab_ind_b[0],ab_ind_b[1]]
+    D_ijab_b = D_ijab_b.copy()[ij_ind_b[0],ij_ind_b[1]].reshape(-1)
+
+    d_ij_ab = e_occ_a[:,None]+e_occ_b
+    d_ab_ab = e_vir_a[:,None]+e_vir_b
+    D_n_ab = -d_ij_ab.reshape(-1,1) + d_ab_ab.reshape(-1)
+    D_ijab_ab = D_n_ab.reshape(-1)
 
 
-    diag = 0
+    d_ij_ba = e_occ_b[:,None]+e_occ_a
+    d_ab_ba = e_vir_b[:,None]+e_vir_a
+    D_n_ba = -d_ij_ba.reshape(-1,1) + d_ab_ba.reshape(-1)
+    D_ijab_ba = D_n_ba.reshape(-1)
+
+    s_a = 0
+    f_a = n_singles_a
+    s_b = f_a
+    f_b = s_b + n_singles_b
+    s_aaaa = f_b
+    f_aaaa = s_aaaa + n_doubles_aaaa
+    s_baba = f_aaaa
+    f_ba = s_baba + n_doubles_ab
+    s_abab = f_ba
+    f_ab = s_abab + n_doubles_ab
+    s_bbbb = f_ab
+    f_bbbb = s_bbbb + n_doubles_bbbb
+
+    if M_ia_jb is None:
+        M_ia_jb  = adc.get_imds()
+
+    M_ia_jb_a, M_ia_jb_b = M_ia_jb
+
+    diag = np.zeros(dim)
+
+    # Compute precond
+    M_ia_jb_a_diag = np.diagonal(M_ia_jb_a)
+    M_ia_jb_b_diag = np.diagonal(M_ia_jb_b)
+
+    diag[s_a:f_a] = M_ia_jb_a_diag.copy()
+    diag[s_b:f_b] = M_ia_jb_b_diag.copy()
+
+    # Compute precond
+
+    diag[s_aaaa:f_aaaa] = D_ijab_a.copy()
+    diag[s_baba:f_ba] = D_ijab_ba.copy()
+    diag[s_abab:f_ab] = D_ijab_ab.copy()
+    diag[s_bbbb:f_bbbb] = D_ijab_b.copy()
+
     return diag
 
 def ea_contract_r_vvvv_antisym(myadc,r2,vvvv_d):
@@ -3525,15 +3618,14 @@ def ee_adc_matvec(adc, M_ia_jb=None, eris=None):
     ij_ind_b = np.tril_indices(nocc_b, k=-1)
     ab_ind_a = np.tril_indices(nvir_a, k=-1)
     ab_ind_b = np.tril_indices(nvir_b, k=-1)
-    exit()
 
-    n_singles_a = nocc_a*nvir_a
-    n_singles_b = nocc_b*nvir_b
-    n_doubles_aaaa = nocc_a * (nocc_a - 1) * nvir_a * (nvir_a -1)/ 4
-    n_doubles_ab = nocc_a * nocc_b * nvir_a * nvir_b
-    n_doubles_bbbb = nocc_b * (nocc_b - 1) * nvir_b * (nvir_b -1)/ 4
+    n_singles_a = int(nocc_a*nvir_a)
+    n_singles_b = int(nocc_b*nvir_b)
+    n_doubles_aaaa = int(nocc_a * (nocc_a - 1) * nvir_a * (nvir_a -1)/ 4)
+    n_doubles_ab = int(nocc_a * nocc_b * nvir_a * nvir_b)
+    n_doubles_bbbb = int(nocc_b * (nocc_b - 1) * nvir_b * (nvir_b -1)/ 4)
 
-    dim = n_singles_a + n_singles_b + n_doubles_aaaa + n_doubles_ab + n_doubles_ab + n_doubles_bbbb
+    dim = int(n_singles_a + n_singles_b + n_doubles_aaaa + n_doubles_ab + n_doubles_ab + n_doubles_bbbb)
 
     e_occ_a = adc.mo_energy_a[:nocc_a]
     e_occ_b = adc.mo_energy_b[:nocc_b]
@@ -3543,93 +3635,69 @@ def ee_adc_matvec(adc, M_ia_jb=None, eris=None):
     if eris is None:
         eris = adc.transform_integrals()
 
-    d_ij_a = e_occ_a[:,None]+e_occ_a
-    d_ij_b = e_occ_b[:,None]+e_occ_b
-    d_ab_a = e_vir_a[:,None]+e_vir_a
-    d_ab_b = e_vir_b[:,None]+e_vir_b
-    D_n_a = -d_ij_a.reshape(-1,1) + d_ab_a.reshape(-1)
-    D_n_b = -d_ij_b.reshape(-1,1) + d_ab_b.reshape(-1)
-    D_n_a = D_n_a.reshape((nocc_a,nocc_a,nvir_a,nvir_a))
-    D_n_b = D_n_b.reshape((nocc_b,nocc_b,nvir_b,nvir_b))
+    s_a = 0
+    f_a = n_singles_a
+    s_b = f_a
+    f_b = s_b + n_singles_b
+    s_aaaa = f_b
+    f_aaaa = s_aaaa + n_doubles_aaaa
+    s_baba = f_aaaa
+    f_ba = s_baba + n_doubles_ab
+    s_abab = f_ba
+    f_ab = s_abab + n_doubles_ab
+    s_bbbb = f_ab
+    f_bbbb = s_bbbb + n_doubles_bbbb
 
-    D_ijab_a = D_n_a.copy()[:,:,ab_ind_a[0],ab_ind_a[1]]
-    D_ijab_a = D_ijab_a.copy()[ij_ind_a[0],ij_ind_a[1]].reshape(-1)
-    D_ijab_b = D_n_b.copy()[:,:,ab_ind_b[0],ab_ind_b[1]]
-    D_ijab_b = D_ijab_b.copy()[ij_ind_b[0],ij_ind_b[1]].reshape(-1)
-
-    d_ij_ab = e_occ_a[:,None]+e_occ_b
-    d_ab_ab = e_vir_a[:,None]+e_vir_b
-    D_n_ab = -d_ij_ab.reshape(-1,1) + d_ab_ab.reshape(-1)
-    D_n_ab = D_n_ab.reshape((nocc_a,nocc_b,nvir_a,nvir_b))
+    if eris is None:
+        eris = adc.transform_integrals()
 
 
-    d_ij_ba = e_occ_b[:,None]+e_occ_a
-    d_ab_ba = e_vir_b[:,None]+e_vir_a
-    D_n_ba = -d_ij_ba.reshape(-1,1) + d_ab_ba.reshape(-1)
-    D_n_ba = D_n_ba.reshape((nocc_b,nocc_a,nvir_b,nvir_a))
+    if M_ia_jb is None:
+        M_ia_jb  = adc.get_imds()
 
-    exit()
 
-#    d_ij_a = e_occ_a[:,None] + e_occ_a
-#    d_a_a = e_vir_a[:,None]
-#    D_n_a = -d_a_a + d_ij_a.reshape(-1)
-#    D_n_a = D_n_a.reshape((nvir_a,nocc_a,nocc_a))
-#    D_aij_a = D_n_a.copy()[:,ij_ind_a[0],ij_ind_a[1]].reshape(-1)
-#
-#    d_ij_b = e_occ_b[:,None] + e_occ_b
-#    d_a_b = e_vir_b[:,None]
-#    D_n_b = -d_a_b + d_ij_b.reshape(-1)
-#    D_n_b = D_n_b.reshape((nvir_b,nocc_b,nocc_b))
-#    D_aij_b = D_n_b.copy()[:,ij_ind_b[0],ij_ind_b[1]].reshape(-1)
-#
-#    d_ij_ab = e_occ_b[:,None] + e_occ_a
-#    d_a_b = e_vir_b[:,None]
-#    D_n_bab = -d_a_b + d_ij_ab.reshape(-1)
-#    D_aij_bab = D_n_bab.reshape(-1)
-#
-#    d_ij_ab = e_occ_a[:,None] + e_occ_b
-#    d_a_a = e_vir_a[:,None]
-#    D_n_aba = -d_a_a + d_ij_ab.reshape(-1)
-#    D_aij_aba = D_n_aba.reshape(-1)
+    M_ia_jb_a, M_ia_jb_b = M_ia_jb
 
-#    s_a = 0
-#    f_a = n_singles_a
-#    s_b = f_a
-#    f_b = s_b + n_singles_b
-#    s_aaa = f_b
-#    f_aaa = s_aaa + n_doubles_aaa
-#    s_bab = f_aaa
-#    f_bab = s_bab + n_doubles_bab
-#    s_aba = f_bab
-#    f_aba = s_aba + n_doubles_aba
-#    s_bbb = f_aba
-#    f_bbb = s_bbb + n_doubles_bbb
-#
-#    if eris is None:
-#        eris = adc.transform_integrals()
-#
-#
-#    if M_ia_jb is None:
-#        M_ia_jb  = adc.get_imds_ee()
-#
-#    M_ia_jb_a, M_ia_jb_b = M_ia_jb
-#
-#    print("hello")
-#    exit()
-#
-#
-#    #Calculate sigma vector
-#    def sigma_(r):
-#        cput0 = (logger.process_clock(), logger.perf_counter())
-#        log = logger.Logger(adc.stdout, adc.verbose)
-#
-#        s = np.zeros((dim))
-#        
-#
-#
-#        return s
+    #Calculate sigma vector
+    def sigma_(r):
+        cput0 = (logger.process_clock(), logger.perf_counter())
+        log = logger.Logger(adc.stdout, adc.verbose)
 
-    return nvir_b
+        s = np.zeros((dim))
+        print("sigma")
+        exit()
+
+#        r_a = r[s_a:f_a]
+#        r_b = r[s_b:f_b]
+#        r_aaa = r[s_aaa:f_aaa]
+#        r_bab = r[s_bab:f_bab]
+#        r_aba = r[s_aba:f_aba]
+#        r_bbb = r[s_bbb:f_bbb]
+#
+#        r_aaa = r_aaa.reshape(nvir_a,-1)
+#        r_bbb = r_bbb.reshape(nvir_b,-1)
+#
+#        r_aaa_u = None
+#        r_aaa_u = np.zeros((nvir_a,nocc_a,nocc_a))
+#        r_aaa_u[:,ij_ind_a[0],ij_ind_a[1]]= r_aaa.copy()
+#        r_aaa_u[:,ij_ind_a[1],ij_ind_a[0]]= -r_aaa.copy()
+#
+#        r_bbb_u = None
+#        r_bbb_u = np.zeros((nvir_b,nocc_b,nocc_b))
+#        r_bbb_u[:,ij_ind_b[0],ij_ind_b[1]]= r_bbb.copy()
+#        r_bbb_u[:,ij_ind_b[1],ij_ind_b[0]]= -r_bbb.copy()
+#
+#        r_aba = r_aba.reshape(nvir_a,nocc_a,nocc_b)
+#        r_bab = r_bab.reshape(nvir_b,nocc_b,nocc_a)
+#
+#        eris_ovoo = eris.ovoo
+#        eris_OVOO = eris.OVOO
+#        eris_OVoo = eris.OVoo
+#        eris_ovOO = eris.ovOO
+        
+        return s
+
+    return sigma_
 
 def ea_compute_trans_moments(adc, orb, spin="alpha"):
 
@@ -4851,6 +4919,7 @@ class UADCEE(UADC):
 
     get_imds = get_imds_ee
     matvec = ee_adc_matvec
+    
     get_diag = ee_adc_diag
 #    compute_trans_moments = ea_compute_trans_moments
 #    get_trans_moments = get_trans_moments
