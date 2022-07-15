@@ -851,6 +851,8 @@ def matvec(adc, M_ab=None, eris=None):
         s[s_bab:f_bab] += D_iab_bab * r_bab.reshape(-1)
         s[s_aba:f_aba] += D_iab_aba * r_aba.reshape(-1)
         s[s_bbb:f_bbb] += D_iab_b * r_bbb
+        print("s norm", np.linalg.norm(s))
+        exit()
 
 ############### ADC(3) iab - jcd block ############################
 
