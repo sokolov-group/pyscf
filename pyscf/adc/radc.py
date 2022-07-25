@@ -102,8 +102,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         guess = U
         #imds = adc.get_imds(eris,fc_bool=False)
         matvec, diag = adc.gen_matvec(imds, eris, cvs=False, singles_v=True)
-            
-            
+           
         def cvs_pick(cvs_npick,U):          
             len_cvs_npick = len(cvs_npick)
             nroots = len_cvs_npick
@@ -141,7 +140,19 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         conv, E, U = davidson_nosym1(lambda xs : [matvec(x) for x in xs], guess, diag, nroots=nroots, verbose=log, tol=1e-14, max_cycle=adc.max_cycle, max_space=adc.max_space)
 ############################################
 
-    U = np.array(U)
+    E_expectation_v1 = np.zeros(E.size)
+    E_expectation_v2 = np.zeros(E.size)
+    nsingles = adc._nocc
+    for idx_expec,y in enumerate(U):
+        y_v1 = y.copy()
+        y_v2 = y.copy()
+        y_v1[nsingles:] = 0 
+        y_v2[:nsingles] = 0 
+        E_expectation_v1[idx_expec] = np.dot(y_v1, matvec(y_v1)) 
+        E_expectation_v2[idx_expec] = np.dot(y_v2, matvec(y_v2)) 
+    print('E_expectation_v1 = ', E_expectation_v1 * 27.2114)       
+    print('E_expectation_v2 = ', E_expectation_v2 * 27.2114)       
+    U = np.array(U) 
     print(f'cvs type = {adc.cvs_type} | nfc = {adc.nfc_orb} | nbelow_edge = {adc.nbelow_edge}' )
     adc.analyze_eigenvector_ip(U)
     T = adc.get_trans_moments()

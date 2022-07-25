@@ -202,6 +202,9 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     matvec, diag = adc.gen_matvec(imds, eris, cvs=False, fc_bool=False)
 
+    #for y in U:
+        
+
     def cvs_pick(cvs_npick,U):          
         nroots = len(cvs_npick)
         dim_guess = np.array(U).shape[1]
@@ -347,6 +350,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         P, X = adc.get_spec_factors(T, U, nroots)
         s = np.dot(U, np.asarray(guess).conj().T)
         snorm = np.einsum('pi,pi->p', s.conj(), s)
+
+
 
         results_out['<CVS|MOM_v>'] = snorm[0]
 
