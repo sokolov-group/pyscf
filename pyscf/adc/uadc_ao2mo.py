@@ -43,28 +43,29 @@ def transform_integrals_incore(myadc):
     ind_VV_g = np.tril_indices(nvir_b, k=-1)
 
     eris = lambda: None
-
+    
     eris.oooo = ao2mo.general(myadc._scf._eri, (occ_a, occ_a, occ_a, occ_a), compact=False).reshape(nocc_a, nocc_a, nocc_a, nocc_a).copy()  # noqa: E501
     eris.ovoo = ao2mo.general(myadc._scf._eri, (occ_a, vir_a, occ_a, occ_a), compact=False).reshape(nocc_a, nvir_a, nocc_a, nocc_a).copy()  # noqa: E501
     eris.ovvo = ao2mo.general(myadc._scf._eri, (occ_a, vir_a, vir_a, occ_a), compact=False).reshape(nocc_a, nvir_a, nvir_a, nocc_a).copy()  # noqa: E501
     eris.oovv = ao2mo.general(myadc._scf._eri, (occ_a, occ_a, vir_a, vir_a), compact=False).reshape(nocc_a, nocc_a, nvir_a, nvir_a).copy()  # noqa: E501
     eris.ovvv = ao2mo.general(myadc._scf._eri, (occ_a, vir_a, vir_a, vir_a), compact=True).reshape(nocc_a, nvir_a, -1).copy()  # noqa: E501
-
+    
     eris.OOOO = ao2mo.general(myadc._scf._eri, (occ_b, occ_b, occ_b, occ_b), compact=False).reshape(nocc_b, nocc_b, nocc_b, nocc_b).copy()  # noqa: E501
     eris.OVOO = ao2mo.general(myadc._scf._eri, (occ_b, vir_b, occ_b, occ_b), compact=False).reshape(nocc_b, nvir_b, nocc_b, nocc_b).copy()  # noqa: E501
     eris.OOVV = ao2mo.general(myadc._scf._eri, (occ_b, occ_b, vir_b, vir_b), compact=False).reshape(nocc_b, nocc_b, nvir_b, nvir_b).copy()  # noqa: E501
     eris.OVVO = ao2mo.general(myadc._scf._eri, (occ_b, vir_b, vir_b, occ_b), compact=False).reshape(nocc_b, nvir_b, nvir_b, nocc_b).copy()  # noqa: E501
     eris.OVVV = ao2mo.general(myadc._scf._eri, (occ_b, vir_b, vir_b, vir_b), compact=True).reshape(nocc_b, nvir_b, -1).copy()  # noqa: E501
-
+    
     eris.ooOO = ao2mo.general(myadc._scf._eri, (occ_a, occ_a, occ_b, occ_b), compact=False).reshape(nocc_a, nocc_a, nocc_b, nocc_b).copy()  # noqa: E501
     eris.ovOO = ao2mo.general(myadc._scf._eri, (occ_a, vir_a, occ_b, occ_b), compact=False).reshape(nocc_a, nvir_a, nocc_b, nocc_b).copy()  # noqa: E501
     eris.ooVV = ao2mo.general(myadc._scf._eri, (occ_a, occ_a, vir_b, vir_b), compact=False).reshape(nocc_a, nocc_a, nvir_b, nvir_b).copy()  # noqa: E501
     eris.ovVO = ao2mo.general(myadc._scf._eri, (occ_a, vir_a, vir_b, occ_b), compact=False).reshape(nocc_a, nvir_a, nvir_b, nocc_b).copy()  # noqa: E501
     eris.ovVV = ao2mo.general(myadc._scf._eri, (occ_a, vir_a, vir_b, vir_b), compact=True).reshape(nocc_a, nvir_a, -1).copy()  # noqa: E501
-
+    
     eris.OVoo = ao2mo.general(myadc._scf._eri, (occ_b, vir_b, occ_a, occ_a), compact=False).reshape(nocc_b, nvir_b, nocc_a, nocc_a).copy()  # noqa: E501
     eris.OOvv = ao2mo.general(myadc._scf._eri, (occ_b, occ_b, vir_a, vir_a), compact=False).reshape(nocc_b, nocc_b, nvir_a, nvir_a).copy()  # noqa: E501
     eris.OVvo = ao2mo.general(myadc._scf._eri, (occ_b, vir_b, vir_a, occ_a), compact=False).reshape(nocc_b, nvir_b, nvir_a, nocc_a).copy()  # noqa: E501
+    eris.VOov = ao2mo.general(myadc._scf._eri, (vir_b, occ_b, occ_a, vir_a), compact=False).reshape(nvir_b, nocc_b, nocc_a, nvir_a).copy()  # noqa: E501
     eris.OVvv = ao2mo.general(myadc._scf._eri, (occ_b, vir_b, vir_a, vir_a), compact=True).reshape(nocc_b, nvir_b, -1).copy()  # noqa: E501
 
     if (myadc.method == "adc(2)-x" and myadc.approx_trans_moments == False) or (myadc.method == "adc(3)"):
@@ -435,6 +436,31 @@ def transform_integrals_df(myadc):
     log.timer('DF-ADC integral transformation', *cput0)
 
     return eris
+
+def unpack_eri_1(eri, norb):
+
+    n_oo = norb * (norb + 1) // 2
+    ind_oo = np.tril_indices(norb)
+
+    eri_ = None
+
+    if len(eri.shape) == 3:
+        if (eri.shape[0] == n_oo):
+            eri_ = np.zeros((norb, norb, eri.shape[1], eri.shape[2]))
+            eri_[ind_oo[0], ind_oo[1]] = eri
+            eri_[ind_oo[1], ind_oo[0]] = eri
+
+        elif (eri.shape[2] == n_oo):
+            eri_ = np.zeros((eri.shape[0], eri.shape[1], norb, norb))
+            eri_[:, :, ind_oo[0], ind_oo[1]] = eri
+            eri_[:, :, ind_oo[1], ind_oo[0]] = eri
+        else:
+            raise TypeError("ERI dimensions don't match")
+
+    else:
+        raise RuntimeError("ERI does not have a correct dimension")
+
+    return eri_
 
 def calculate_chunk_size(myadc):
 

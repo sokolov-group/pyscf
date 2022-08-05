@@ -50,6 +50,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     imds = adc.get_imds(eris)
     matvec, diag = adc.gen_matvec(imds, eris)
 
+
     guess = adc.get_init_guess(nroots, diag, ascending = True)
 
     conv, adc.E, U = lib.linalg_helper.davidson1(
