@@ -378,39 +378,74 @@ def matvec(adc, M_ia_jb=None, eris=None):
         s[s_abab:f_ab] = D_ijab_abab*r_abab
         s[s_bbbb:f_bbbb] = D_ijab_b*r_packed_b
 
-#        print("r_a norm", np.linalg.norm(r_a))
-#        print("r_b norm", np.linalg.norm(r_b))
-#        print("s_a norm", np.linalg.norm(s[:f_a]))
-#        print("s_b norm", np.linalg.norm(s[s_b:f_b]))
-#        print("s norm", np.linalg.norm(s[:f_bbbb]))
-#        exit()
-#        print("M_a norm", np.linalg.norm(M_ia_jb_a))
-#        print("M_b norm", np.linalg.norm(M_ia_jb_b))
-#        print("r_a norm", r_a)
-#        print("r_b norm", r_b)
-#        exit()
-
         eris_ovvv = uadc_ao2mo.unpack_eri_1(eris.ovvv, nvir_a)
         eris_OVVV = uadc_ao2mo.unpack_eri_1(eris.OVVV, nvir_b)
         eris_ovVV = uadc_ao2mo.unpack_eri_1(eris.ovVV, nvir_b)
         eris_OVvv = uadc_ao2mo.unpack_eri_1(eris.OVvv, nvir_a)
 
-
+        r_abab = r_abab.reshape(nocc_a, nocc_b, nvir_a, nvir_b)
         
-#        s[s_a:f_a] += 0.5*lib.einsum('imef,mfea->ia',r_oovv_u_a, eris_ovvv, optimize = True).reshape(-1)
-#        s[s_b:f_b] -= 0.5*lib.einsum('imef,mefa->ia',r_oovv_u_b, eris_OVVV, optimize = True).reshape(-1)
-#        s[s_b:f_b] -= 0.5*lib.einsum('mief,mfea->ia',r_abab, eris_ovVV, optimize = True).reshape(-1)
-#        s[s_a:f_a] += 0.5*lib.einsum('imef,mfea->ia',r_baba, eris_OVvv, optimize = True).reshape(-1)
+        s[s_a:f_a] += 0.5*lib.einsum('imef,mfea->ia',r_oovv_u_a, eris_ovvv, optimize = True).reshape(-1)
+        s[s_a:f_a] -= 0.5*lib.einsum('imef,mefa->ia',r_oovv_u_a, eris_ovvv, optimize = True).reshape(-1)
+        s[s_b:f_b] += 0.5*lib.einsum('imef,mfea->ia',r_oovv_u_b, eris_OVVV, optimize = True).reshape(-1)
+        s[s_b:f_b] -= 0.5*lib.einsum('imef,mefa->ia',r_oovv_u_b, eris_OVVV, optimize = True).reshape(-1)
+
+
+        s[s_a:f_a] -= 0.5*lib.einsum('mnae,neim->ia',r_oovv_u_a, eris.ovoo, optimize = True).reshape(-1)
+        s[s_a:f_a] += 0.5*lib.einsum('mnae,mein->ia',r_oovv_u_a, eris.ovoo, optimize = True).reshape(-1)
+        s[s_b:f_b] -= 0.5*lib.einsum('mnae,neim->ia',r_oovv_u_b, eris.OVOO, optimize = True).reshape(-1)
+        s[s_b:f_b] += 0.5*lib.einsum('mnae,mein->ia',r_oovv_u_b, eris.OVOO, optimize = True).reshape(-1)
+
+        print("norm of s before", np.linalg.norm(s[s_aaaa:f_bbbb]))
+        exit()
+        temp_a = -lib.einsum('ie,jabe->ijab',r_a_ov, eris_ovvv, optimize = True)
+        temp_a += lib.einsum('ie,jbae->ijab',r_a_ov, eris_ovvv, optimize = True)
+
+        temp_abab = -lib.einsum('ie,jabe->ijab',r_a_ov, eris_OVvv, optimize = True)
+        temp_abab += lib.einsum('ie,jbae->ijab',r_a_ov, eris_ovvv, optimize = True)
+
+        temp_b = -lib.einsum('ie,jabe->ijab',r_b_ov, eris_OVVV, optimize = True)
+        temp_b += lib.einsum('ie,jbae->ijab',r_b_ov, eris_OVVV, optimize = True)
+
+#        temp_a += lib.einsum('je,iabe->ijab',r_a_ov, eris_ovvv, optimize = True)
+#        temp_a -= lib.einsum('je,ibae->ijab',r_a_ov, eris_ovvv, optimize = True)
+#
+#        temp_b += lib.einsum('je,iabe->ijab',r_b_ov, eris_OVVV, optimize = True)
+#        temp_b -= lib.einsum('je,ibae->ijab',r_b_ov, eris_OVVV, optimize = True)
+#
+#        temp_a += lib.einsum('ma,ibjm->ijab',r_a_ov, eris.ovoo, optimize = True)
+#        temp_a -= lib.einsum('ma,jbim->ijab',r_a_ov, eris.ovoo, optimize = True)
+#
+#        temp_b += lib.einsum('ma,ibjm->ijab',r_b_ov, eris.OVOO, optimize = True)
+#        temp_b -= lib.einsum('ma,jbim->ijab',r_b_ov, eris.OVOO, optimize = True)
+#
+#        temp_a -= lib.einsum('mb,iajm->ijab',r_a_ov, eris.ovoo, optimize = True)
+#        temp_a += lib.einsum('mb,jaim->ijab',r_a_ov, eris.ovoo, optimize = True)
+#
+#        temp_b -= lib.einsum('mb,iajm->ijab',r_b_ov, eris.OVOO, optimize = True)
+#        temp_b += lib.einsum('mb,jaim->ijab',r_b_ov, eris.OVOO, optimize = True)
+        
+
+        temp_a = temp_a[:,:,ab_ind_a[0],ab_ind_a[1]]
+        s[s_aaaa:f_aaaa] += temp_a[ij_ind_a[0],ij_ind_a[1]].reshape(n_doubles_aaaa)
+
+        temp_b = temp_b[:,:,ab_ind_b[0],ab_ind_b[1]]
+        s[s_bbbb:f_bbbb] += temp_b[ij_ind_b[0],ij_ind_b[1]].reshape(n_doubles_bbbb)
+
+        print("norm of s after", np.linalg.norm(s[s_aaaa:f_bbbb]))
+        exit()
+
+       
 #        print("r_a norm", np.linalg.norm(r_a))
 #        print("r_b norm", np.linalg.norm(r_b))
 #        print("s_a norm", np.linalg.norm(s[:f_a]))
 #        print("s_b norm", np.linalg.norm(s[s_b:f_b]))
-#        print("s norm", np.linalg.norm(s))
+        #print("s norm", np.linalg.norm(s))
 #        print("M_a norm", np.linalg.norm(M_ia_jb_a))
 #        print("M_b norm", np.linalg.norm(M_ia_jb_b))
 #        print("r_a norm", r_a)
 #        print("r_b norm", r_b)
-#        exit()
+        
 #
 ############## ADC(2) i - kja block #########################
 #
