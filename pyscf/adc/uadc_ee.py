@@ -171,6 +171,8 @@ def get_imds(adc, eris=None):
 
     cput0 = log.timer_debug1("Completed M_ia_jb  ADC calculation", *cput0)
 
+
+
     return M_ia_jb
 
 
@@ -436,7 +438,6 @@ def matvec(adc, M_ia_jb=None, eris=None):
         temp_b += lib.einsum('mb,jaim->ijab',r_b_ov, eris.OVOO, optimize = True)
         temp_abab -= lib.einsum('mb,iajm->ijab',r_b_ov, eris.ovOO, optimize = True)
         
-
         temp_a = temp_a[:,:,ab_ind_a[0],ab_ind_a[1]]
         s[s_aaaa:f_aaaa] += temp_a[ij_ind_a[0],ij_ind_a[1]].reshape(n_doubles_aaaa)
 
@@ -445,7 +446,77 @@ def matvec(adc, M_ia_jb=None, eris=None):
         temp_b = temp_b[:,:,ab_ind_b[0],ab_ind_b[1]]
         s[s_bbbb:f_bbbb] += temp_b[ij_ind_b[0],ij_ind_b[1]].reshape(n_doubles_bbbb)
 
-        print("norm of s after", np.linalg.norm(s))
+#        print("norm of s after", np.linalg.norm(s))
+
+        if (method == "adc(2)-x"):
+            interim_a = 0.5*lib.einsum('ijef,aebf->ijab', r_oovv_u_a, eris.vvvv, optimize = True)
+            interim_a -= 0.5*lib.einsum('ijef,afbe->ijab', r_oovv_u_a, eris.vvvv, optimize = True)
+
+            interim_abab = lib.einsum('ijef,aebf->ijab', r_abab, eris.vvVV, optimize = True)
+
+            interim_b = 0.5*lib.einsum('ijef,aebf->ijab', r_oovv_u_b, eris.VVVV, optimize = True)
+            interim_b -= 0.5*lib.einsum('ijef,afbe->ijab', r_oovv_u_b, eris.VVVV, optimize = True)
+
+            interim_a += lib.einsum('imae,jbem->ijab', r_oovv_u_a, eris.ovvo, optimize = True)
+            interim_a -= lib.einsum('imae,mjbe->ijab', r_oovv_u_a, eris.oovv, optimize = True)
+            interim_a += lib.einsum('imae,jbem->ijab', r_abab, eris.ovVO, optimize = True)
+
+            interim_abab += lib.einsum('imae,jbem->ijab', r_abab, eris.OVVO, optimize = True)
+            interim_abab -= lib.einsum('imae,mjbe->ijab', r_abab, eris.OOVV, optimize = True)
+            interim_abab += lib.einsum('imae,mebj->ijab', r_oovv_u_a, eris.ovVO, optimize = True)
+            
+            interim_b += lib.einsum('imae,jbem->ijab', r_oovv_u_b, eris.OVVO, optimize = True)
+            interim_b -= lib.einsum('imae,mjbe->ijab', r_oovv_u_b, eris.OOVV, optimize = True)
+            interim_b += lib.einsum('miea,mebj->ijab', r_abab, eris.ovVO, optimize = True)
+
+            interim_a -= lib.einsum('jmae,ibem->ijab', r_oovv_u_a, eris.ovvo, optimize = True)
+            interim_a += lib.einsum('jmae,mibe->ijab', r_oovv_u_a, eris.oovv, optimize = True)
+            interim_a -= lib.einsum('jmae,ibem->ijab', r_abab, eris.ovVO, optimize = True)
+
+            interim_abab -= lib.einsum('mjae,mibe->ijab', r_abab, eris.ooVV, optimize = True)
+
+            interim_b -= lib.einsum('jmae,ibem->ijab', r_oovv_u_b, eris.OVVO, optimize = True)
+            interim_b += lib.einsum('jmae,mibe->ijab', r_oovv_u_b, eris.OOVV, optimize = True)
+            interim_b -= lib.einsum('mjea,mebi->ijab', r_abab, eris.ovVO, optimize = True)
+
+            interim_a += 0.5*lib.einsum('mnab,minj->ijab', r_oovv_u_a, eris.oooo, optimize = True)
+            interim_a -= 0.5*lib.einsum('mnab,mjni->ijab', r_oovv_u_a, eris.oooo, optimize = True)
+
+            interim_abab += lib.einsum('mnab,minj->ijab', r_abab, eris.ooOO, optimize = True)
+
+            interim_b += 0.5*lib.einsum('mnab,minj->ijab', r_oovv_u_b, eris.OOOO, optimize = True)
+            interim_b -= 0.5*lib.einsum('mnab,mjni->ijab', r_oovv_u_b, eris.OOOO, optimize = True)
+
+            interim_a -= lib.einsum('imbe,jaem->ijab', r_oovv_u_a, eris.ovvo, optimize = True)
+            interim_a += lib.einsum('imbe,jmea->ijab', r_oovv_u_a, eris.oovv, optimize = True)
+            interim_a -= lib.einsum('imbe,jaem->ijab', r_abab, eris.ovVO, optimize = True)
+            
+            interim_abab -= lib.einsum('imeb,jmea->ijab', r_abab, eris.OOvv, optimize = True)
+
+            interim_b -= lib.einsum('imbe,jaem->ijab', r_oovv_u_b, eris.OVVO, optimize = True)
+            interim_b += lib.einsum('imbe,jmea->ijab', r_oovv_u_b, eris.OOVV, optimize = True)
+            interim_b -= lib.einsum('mieb,meaj->ijab', r_abab, eris.ovVO, optimize = True)
+
+            interim_a += lib.einsum('jmbe,iaem->ijab', r_oovv_u_a, eris.ovvo, optimize = True)
+            interim_a -= lib.einsum('jmbe,imea->ijab', r_oovv_u_a, eris.oovv, optimize = True)
+            interim_a += lib.einsum('jmbe,iaem->ijab', r_abab, eris.ovVO, optimize = True)
+
+            interim_abab += lib.einsum('mjeb,iaem->ijab', r_abab, eris.ovvo, optimize = True)
+            interim_abab -= lib.einsum('mjeb,imea->ijab', r_abab, eris.oovv, optimize = True)
+            interim_abab += lib.einsum('jmbe,iaem->ijab', r_oovv_u_b, eris.ovVO, optimize = True)
+            
+            interim_b += lib.einsum('jmbe,iaem->ijab', r_oovv_u_b, eris.OVVO, optimize = True)
+            interim_b -= lib.einsum('jmbe,imea->ijab', r_oovv_u_b, eris.OOVV, optimize = True)
+            interim_b += lib.einsum('mjeb,meai->ijab', r_abab, eris.ovVO, optimize = True)
+
+            interim_a = interim_a[:,:,ab_ind_a[0],ab_ind_a[1]]
+            s[s_aaaa:f_aaaa] += interim_a[ij_ind_a[0],ij_ind_a[1]].reshape(n_doubles_aaaa)
+
+            s[s_abab:f_ab] += interim_abab.reshape(-1)
+
+            interim_b = interim_b[:,:,ab_ind_b[0],ab_ind_b[1]]
+            s[s_bbbb:f_bbbb] += interim_b[ij_ind_b[0],ij_ind_b[1]].reshape(n_doubles_bbbb)
+#        print("s norm", np.linalg.norm(s))
 #        exit()
 
        
@@ -453,7 +524,6 @@ def matvec(adc, M_ia_jb=None, eris=None):
 #        print("r_b norm", np.linalg.norm(r_b))
 #        print("s_a norm", np.linalg.norm(s[:f_a]))
 #        print("s_b norm", np.linalg.norm(s[s_b:f_b]))
-        #print("s norm", np.linalg.norm(s))
 #        print("M_a norm", np.linalg.norm(M_ia_jb_a))
 #        print("M_b norm", np.linalg.norm(M_ia_jb_b))
 #        print("r_a norm", r_a)
