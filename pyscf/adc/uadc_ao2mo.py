@@ -70,9 +70,7 @@ def transform_integrals_incore(myadc):
 
     if (myadc.method == "adc(2)-x" ) or (myadc.method == "adc(3)"):
 #and myadc.approx_trans_moments == False
-        eris.vvvv = ao2mo.general(myadc._scf._eri, (vir_a, vir_a, vir_a, vir_a), compact=False).reshape(nvir_a, nvir_a, nvir_a, nvir_a).copy()  # noqa: E501
-        eris.vvVV = ao2mo.general(myadc._scf._eri, (vir_a, vir_a, vir_b, vir_b), compact=False).reshape(nvir_a, nvir_a, nvir_b, nvir_b).copy()  # noqa: E501
-        eris.VVVV = ao2mo.general(myadc._scf._eri, (vir_b, vir_b, vir_b, vir_b), compact=False).reshape(nvir_b, nvir_b, nvir_b, nvir_b).copy()  # noqa: E501
+
         eris.vvvv_p = ao2mo.general(myadc._scf._eri, (vir_a, vir_a, vir_a, vir_a),
                                     compact=False).reshape(nvir_a, nvir_a, nvir_a, nvir_a)
         eris.vvvv_p = eris.vvvv_p.transpose(0,2,1,3)
