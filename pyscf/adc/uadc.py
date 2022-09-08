@@ -77,7 +77,10 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         print_string = ('%s root %d  |  Energy (Eh) = %14.10f  |  Energy (eV) = %12.8f  ' %
                         (adc.method, n, adc.E[n], adc.E[n]*27.2114))
         if adc.compute_properties:
-            print_string += ("|  Spec factors = %10.8f  " % adc.P[n])
+            if (adc.method_type == "ee"):
+                print_string += ("|  Oscillator Strengths = %10.8f  " % adc.P[n])
+            else:
+                print_string += ("|  Spec Factors = %10.8f  " % adc.P[n])
         print_string += ("|  conv = %s" % conv[n])
         logger.info(adc, print_string)
 
@@ -143,6 +146,8 @@ class UADC(lib.StreamObject):
         self.e_corr = None
         self.t1 = None
         self.t2 = None
+        self.dm_a = None
+        self.dm_b = None
         self.imds = lambda:None
         self._nocc = mf.nelec
         self._nmo = (mo_coeff[0].shape[1], mo_coeff[1].shape[1])

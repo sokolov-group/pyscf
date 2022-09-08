@@ -35,6 +35,9 @@ def transform_integrals_incore(myadc):
     vir_a = myadc.mo_coeff[0][:,myadc._nocc[0]:]
     vir_b = myadc.mo_coeff[1][:,myadc._nocc[1]:]
 
+    alpha = myadc.mo_coeff[0]
+    beta = myadc.mo_coeff[1]
+
     nocc_a = occ_a.shape[1]
     nocc_b = occ_b.shape[1]
     nvir_a = vir_a.shape[1]
@@ -68,7 +71,18 @@ def transform_integrals_incore(myadc):
     eris.VOov = ao2mo.general(myadc._scf._eri, (vir_b, occ_b, occ_a, vir_a), compact=False).reshape(nvir_b, nocc_b, nocc_a, nvir_a).copy()  # noqa: E501
     eris.OVvv = ao2mo.general(myadc._scf._eri, (occ_b, vir_b, vir_a, vir_a), compact=True).reshape(nocc_b, nvir_b, -1).copy()  # noqa: E501
 
-    if (myadc.method == "adc(2)-x" ) or (myadc.method == "adc(3)"):
+    dip_ints = -myadc.mol.intor('int1e_r',comp=3)
+    myadc.dm_a = np.zeros_like((dip_ints))
+    myadc.dm_b = np.zeros_like((dip_ints))
+    
+    for i in range(dip_ints.shape[0]):
+        dip = dip_ints[i,:,:]
+        myadc.dm_a[i,:,:] = np.dot(alpha.T,np.dot(dip,alpha))
+        myadc.dm_b[i,:,:] = np.dot(beta.T,np.dot(dip,beta))
+    
+
+
+    if (myadc.method == "adc(2)-x" ) or (myadc.method == "adc(2)") or (myadc.method == "adc(3)"):
 #and myadc.approx_trans_moments == False
 
         eris.vvvv_p = ao2mo.general(myadc._scf._eri, (vir_a, vir_a, vir_a, vir_a),
