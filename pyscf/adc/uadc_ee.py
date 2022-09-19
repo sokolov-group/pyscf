@@ -554,7 +554,6 @@ def get_X(adc):
     nmo_a = nocc_a + nvir_a
     nmo_b = nocc_b + nvir_b
 
-
     n_singles_a = nocc_a * nvir_a
     n_singles_b = nocc_b * nvir_b
     n_doubles_aaaa = nocc_a * (nocc_a - 1) * nvir_a * (nvir_a -1) // 4
@@ -1305,6 +1304,7 @@ class UADCEE(uadc.UADC):
         self.tol_residual  = adc.tol_residual
         self.t1 = adc.t1
         self.t2 = adc.t2
+        #self.f_ov = adc.f_ov
         self.dm_a = adc.dm_a
         self.dm_b = adc.dm_b
         self.imds = adc.imds

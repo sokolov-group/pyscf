@@ -123,6 +123,22 @@ def compute_amplitudes(myadc, eris):
     D1_b = D1_b.reshape((nocc_b,nvir_b))
 
     cput0 = log.timer_debug1("Completed t2_1 amplitude calculation", *cput0)
+    
+    t1_1 = (None,)
+    
+    if "ROHF" in str(type(myadc._scf)):
+
+        f_ov_a, f_ov_b = myadc.f_ov
+
+        t1_1_a = f_ov_a/D1_a
+        t1_1_b = f_ov_b/D1_b
+
+    else:
+
+        t1_1_a = np.zeros((nocc_a, nvir_a))
+        t1_1_b = np.zeros((nocc_b, nvir_b))
+
+
 
     t1_2 = (None,)
     if myadc.method == "adc(3)" or  myadc.method == "adc(2)-x" or myadc.method == "adc(2)":
@@ -131,6 +147,7 @@ def compute_amplitudes(myadc, eris):
 
         t1_2_a = np.zeros((nocc_a,nvir_a))
         t1_2_b = np.zeros((nocc_b,nvir_b))
+
         if isinstance(eris.ovvv, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(myadc)
             a = 0
@@ -149,6 +166,34 @@ def compute_amplitudes(myadc, eris):
 
         t1_2_a -= 0.5*lib.einsum('lcki,klac->ia',eris_ovoo,t2_1_a[:],optimize=True)
         t1_2_a += 0.5*lib.einsum('kcli,klac->ia',eris_ovoo,t2_1_a[:],optimize=True)
+
+        t1_2_a += lib.einsum('d,ld,ilad->ia',e_a[nocc_a:],t1_1_a,t2_1_a[:], optimize = True)
+        t1_2_a += lib.einsum('d,ld,ilad->ia',e_b[nocc_b:],t1_1_b,t2_1_ab[:], optimize = True)
+
+        t1_2_a -= lib.einsum('l,ld,ilad->ia',e_a[:nocc_a],t1_1_a,t2_1_a[:], optimize = True)
+        t1_2_a -= lib.einsum('l,ld,ilad->ia',e_b[:nocc_b],t1_1_b,t2_1_ab[:], optimize = True)
+
+
+        t1_2_a += 0.5*lib.einsum('a,ld,ilad->ia',e_a[nocc_a:],t1_1_a,t2_1_a[:], optimize = True)
+        t1_2_a += 0.5*lib.einsum('a,ld,ilad->ia',e_a[nocc_a:],t1_1_b,t2_1_ab[:], optimize = True)
+
+        t1_2_a -= 0.5*lib.einsum('i,ld,ilad->ia',e_a[:nocc_a],t1_1_a,t2_1_a[:], optimize = True)
+        t1_2_a -= 0.5*lib.einsum('i,ld,ilad->ia',e_a[:nocc_a],t1_1_b,t2_1_ab[:], optimize = True)
+
+        t1_2_a += lib.einsum('ld,ilad->ia',f_ov_a,t2_1_a[:], optimize = True)
+        t1_2_a += lib.einsum('ld,ilad->ia',f_ov_b,t2_1_ab[:], optimize = True)
+
+        t1_2_a += lib.einsum('ld,iadl->ia',t1_1_a, eris.ovvo, optimize = True)
+        t1_2_a -= lib.einsum('ld,idal->ia',t1_1_a, eris.ovvo, optimize = True)
+        t1_2_a += lib.einsum('ld,iadl->ia',t1_1_b, eris.ovVO, optimize = True)
+
+        t1_2_a += lib.einsum('ld,iadl->ia',t1_1_a,eris.ovvo, optimize = True)
+        t1_2_a -= lib.einsum('ld,liad->ia',t1_1_a,eris.oovv, optimize = True)
+        t1_2_a += lib.einsum('ld,iadl->ia',t1_1_b,eris.ovVO, optimize = True)
+
+
+
+
 
         if isinstance(eris.OVvv, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(myadc)
@@ -180,7 +225,31 @@ def compute_amplitudes(myadc, eris):
             del eris_ovVV
 
         t1_2_a -= lib.einsum('lcki,klac->ia',eris_OVoo,t2_1_ab[:],optimize=True)
-        t1_2_b -= lib.einsum('lcki,lkca->ia',eris_ovOO,t2_1_ab[:])
+        t1_2_b -= lib.einsum('lcki,lkca->ia',eris_ovOO,t2_1_ab[:],optimize=True)
+
+        t1_2_b += lib.einsum('d,ld,ilad->ia',e_b[nocc_b:],t1_1_b,t2_1_b[:], optimize = True)
+        t1_2_b += lib.einsum('d,ld,lida->ia',e_a[nocc_a:],t1_1_a,t2_1_ab[:], optimize = True)
+
+        t1_2_b -= lib.einsum('l,ld,ilad->ia',e_b[:nocc_b],t1_1_b,t2_1_b[:], optimize = True)
+        t1_2_b -= lib.einsum('l,ld,lida->ia',e_a[:nocc_a],t1_1_a,t2_1_ab[:], optimize = True)
+
+        t1_2_b += 0.5*lib.einsum('a,ld,ilad->ia',e_b[nocc_b:],t1_1_b,t2_1_b[:], optimize = True)
+        t1_2_b += 0.5*lib.einsum('a,ld,lida->ia',e_b[nocc_b:],t1_1_a,t2_1_ab[:], optimize = True)
+
+        t1_2_b -= 0.5*lib.einsum('i,ld,ilad->ia',e_b[:nocc_b],t1_1_b,t2_1_b[:], optimize = True)
+        t1_2_b -= 0.5*lib.einsum('i,ld,lida->ia',e_b[:nocc_b],t1_1_a,t2_1_ab[:], optimize = True)
+
+        t1_2_b += lib.einsum('ld,ilad->ia',f_ov_b,t2_1_b[:], optimize = True)
+        t1_2_b += lib.einsum('ld,lida->ia',f_ov_a,t2_1_ab[:], optimize = True)
+
+        t1_2_b += lib.einsum('ld,iadl->ia',t1_1_b, eris.OVVO, optimize = True)
+        t1_2_b -= lib.einsum('ld,idal->ia',t1_1_b, eris.OVVO, optimize = True)
+        t1_2_b += lib.einsum('ld,ldai->ia',t1_1_a, eris.ovVO, optimize = True)
+
+        t1_2_b += lib.einsum('ld,iadl->ia',t1_1_b,eris.OVVO, optimize = True)
+        t1_2_b -= lib.einsum('ld,liad->ia',t1_1_b,eris.OOVV, optimize = True)
+        t1_2_b += lib.einsum('ld,ldai->ia',t1_1_a,eris.ovVO, optimize = True)
+
 
         if isinstance(eris.OVVV, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(myadc)
@@ -251,6 +320,21 @@ def compute_amplitudes(myadc, eris):
 
         t2_2_a += temp - temp.transpose(1,0,2,3) - temp.transpose(0,1,3,2) + temp.transpose(1,0,3,2)
         t2_2_a += temp_1 - temp_1.transpose(1,0,2,3) - temp_1.transpose(0,1,3,2) + temp_1.transpose(1,0,3,2)
+      
+##############################################################################################  
+#        t2_2 += np.einsum('la,jilb->ijab',t1_1,v2e_so_ooov, optimize = True) - \
+#                 np.einsum('lb,jila->ijab',t1_1,v2e_so_ooov, optimize = True) + \
+#                 np.einsum('id,bajd->ijab',t1_1,v2e_so_vvov, optimize = True) - \
+#                 np.einsum('jd,baid->ijab',t1_1,v2e_so_vvov, optimize = True)
+##########################################################################################
+
+
+        t2_2_a += np.einsum('la,ibjl->ijab',t1_1_a,eris.ovoo, optimize = True)
+        t2_2_a -= np.einsum('la,jbil->ijab',t1_1_a,eris.ovoo, optimize = True)
+
+
+
+
 
         del temp
         del temp_1
@@ -281,6 +365,9 @@ def compute_amplitudes(myadc, eris):
 
         t2_2_b += temp - temp.transpose(1,0,2,3) - temp.transpose(0,1,3,2) + temp.transpose(1,0,3,2)
         t2_2_b += temp_1 - temp_1.transpose(1,0,2,3) - temp_1.transpose(0,1,3,2) + temp_1.transpose(1,0,3,2)
+
+#        t2_2_a += np.einsum('la,ibjl->ijab',t1_1_a,eris.ovoo, optimize = True)
+#        t2_2_a -= np.einsum('la,jbil->ijab',t1_1_a,eris.ovoo, optimize = True)
         del temp
         del temp_1
 
@@ -610,7 +697,7 @@ def compute_amplitudes(myadc, eris):
         t2_2 = (t2_2_a , t2_2_ab, t2_2_b)
         t2_1_vvvv = (t2_1_vvvv_a, t2_1_vvvv_ab, t2_1_vvvv_b)
 
-    t1 = (t1_2, t1_3)
+    t1 = (t1_2, t1_3, t1_1)
     t2 = (t2_1, t2_2)
 
     cput0 = log.timer_debug1("Completed amplitude calculation", *cput0)
