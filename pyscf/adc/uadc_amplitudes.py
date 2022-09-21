@@ -132,11 +132,14 @@ def compute_amplitudes(myadc, eris):
 
         t1_1_a = f_ov_a/D1_a
         t1_1_b = f_ov_b/D1_b
+        t1_1 = (t1_1_a, t1_1_b)
 
     else:
 
         t1_1_a = np.zeros((nocc_a, nvir_a))
         t1_1_b = np.zeros((nocc_b, nvir_b))
+        f_ov_a = np.zeros((nocc_a, nvir_a))
+        f_ov_b = np.zeros((nocc_b, nvir_b))
 
 
 
@@ -322,19 +325,30 @@ def compute_amplitudes(myadc, eris):
         t2_2_a += temp_1 - temp_1.transpose(1,0,2,3) - temp_1.transpose(0,1,3,2) + temp_1.transpose(1,0,3,2)
       
 ##############################################################################################  
-#        t2_2 += np.einsum('la,jilb->ijab',t1_1,v2e_so_ooov, optimize = True) - \
-#                 np.einsum('lb,jila->ijab',t1_1,v2e_so_ooov, optimize = True) + \
-#                 np.einsum('id,bajd->ijab',t1_1,v2e_so_vvov, optimize = True) - \
-#                 np.einsum('jd,baid->ijab',t1_1,v2e_so_vvov, optimize = True)
+#       k t2_2 += np.einsum('la,jilb->ijab',t1_1,v2e_so_ooov, optimize = True) - \
+#       k          np.einsum('lb,jila->ijab',t1_1,v2e_so_ooov, optimize = True) + \
+#       k          np.einsum('id,bajd->ijab',t1_1,v2e_so_vvov, optimize = True) - \
+#       k          np.einsum('jd,baid->ijab',t1_1,v2e_so_vvov, optimize = True)
 ##########################################################################################
 
 
-        t2_2_a += np.einsum('la,ibjl->ijab',t1_1_a,eris.ovoo, optimize = True)
-        t2_2_a -= np.einsum('la,jbil->ijab',t1_1_a,eris.ovoo, optimize = True)
+        t2_2_a += lib.einsum('la,ibjl->ijab',t1_1_a,eris.ovoo, optimize = True)
+        t2_2_a -= lib.einsum('la,jbil->ijab',t1_1_a,eris.ovoo, optimize = True)
 
 
+        t2_2_a -= lib.einsum('lb,iajl->ijab',t1_1_a,eris.ovoo, optimize = True)
+        t2_2_a += lib.einsum('lb,jail->ijab',t1_1_a,eris.ovoo, optimize = True)
 
+        eris_ovvv = uadc_ao2mo.unpack_eri_1(eris.ovvv, nvir_a)
+        eris_OVVV = uadc_ao2mo.unpack_eri_1(eris.OVVV, nvir_b)
+        eris_ovVV = uadc_ao2mo.unpack_eri_1(eris.ovVV, nvir_b)
+        eris_OVvv = uadc_ao2mo.unpack_eri_1(eris.OVvv, nvir_a)
 
+        t2_2_a += lib.einsum('id,jbad->ijab',t1_1_a,eris_ovvv, optimize = True)
+        t2_2_a -= lib.einsum('id,jabd->ijab',t1_1_a,eris_ovvv, optimize = True)
+
+        t2_2_a -= lib.einsum('jd,ibad->ijab',t1_1_a,eris_ovvv, optimize = True)
+        t2_2_a += lib.einsum('jd,iabd->ijab',t1_1_a,eris_ovvv, optimize = True)
 
         del temp
         del temp_1
@@ -366,8 +380,18 @@ def compute_amplitudes(myadc, eris):
         t2_2_b += temp - temp.transpose(1,0,2,3) - temp.transpose(0,1,3,2) + temp.transpose(1,0,3,2)
         t2_2_b += temp_1 - temp_1.transpose(1,0,2,3) - temp_1.transpose(0,1,3,2) + temp_1.transpose(1,0,3,2)
 
-#        t2_2_a += np.einsum('la,ibjl->ijab',t1_1_a,eris.ovoo, optimize = True)
-#        t2_2_a -= np.einsum('la,jbil->ijab',t1_1_a,eris.ovoo, optimize = True)
+        t2_2_b += lib.einsum('la,ibjl->ijab',t1_1_b,eris.OVOO, optimize = True)
+        t2_2_b -= lib.einsum('la,jbil->ijab',t1_1_b,eris.OVOO, optimize = True)
+
+        t2_2_b -= lib.einsum('lb,iajl->ijab',t1_1_b,eris.OVOO, optimize = True)
+        t2_2_b += lib.einsum('lb,jail->ijab',t1_1_b,eris.OVOO, optimize = True)
+
+        t2_2_b += lib.einsum('id,jbad->ijab',t1_1_b,eris_OVVV, optimize = True)
+        t2_2_b -= lib.einsum('id,jabd->ijab',t1_1_b,eris_OVVV, optimize = True)
+
+        t2_2_b -= lib.einsum('jd,ibad->ijab',t1_1_b,eris_OVVV, optimize = True)
+        t2_2_b += lib.einsum('jd,iabd->ijab',t1_1_b,eris_OVVV, optimize = True)
+
         del temp
         del temp_1
 
@@ -394,6 +418,13 @@ def compute_amplitudes(myadc, eris):
         t2_2_ab += lib.einsum('kcai,kjcb->ijab',eris_OVvo,t2_1_b[:],optimize=True)
         t2_2_ab += lib.einsum('kcai,kjcb->ijab',eris_ovvo,t2_1_ab[:],optimize=True)
         t2_2_ab -= lib.einsum('kiac,kjcb->ijab',eris_oovv,t2_1_ab[:],optimize=True)
+
+
+        t2_2_ab -= lib.einsum('la,jbil->ijab',t1_1_a,eris.OVoo, optimize = True)
+        t2_2_ab -= lib.einsum('lb,iajl->ijab',t1_1_b,eris.ovOO, optimize = True)
+        t2_2_ab += lib.einsum('id,jbad->ijab',t1_1_a,eris_OVvv, optimize = True)
+        t2_2_ab += lib.einsum('jd,iabd->ijab',t1_1_b,eris_ovVV, optimize = True)
+
 
         D2_a = d_ij_a.reshape(-1,1) - d_ab_a.reshape(-1)
         D2_a = D2_a.reshape((nocc_a,nocc_a,nvir_a,nvir_a))

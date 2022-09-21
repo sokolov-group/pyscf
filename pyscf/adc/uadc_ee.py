@@ -40,8 +40,13 @@ def get_imds(adc, eris=None):
 
     method = adc.method
 
+    f_ov_a, f_ov_b = adc.f_ov
+
     t1 = adc.t1
     t2 = adc.t2
+
+    t1_1_a = t1[2][0][:]
+    t1_1_b = t1[2][1][:]
 
     t2_1_a = t2[0][0][:]
     t2_1_ab = t2[0][1][:]
@@ -159,6 +164,92 @@ def get_imds(adc, eris=None):
 #    print("M_b norm", np.linalg.norm(M_aabb))
 #    exit()
 
+############################################################################
+# k   A_temp -= 0.5*np.einsum('ab,je,ie->iajb',idn_vir,t1_1,f_ia,optimize = True)
+# k   A_temp -= 0.5*np.einsum('ab,ie,je->iajb',idn_vir,t1_1,f_ia,optimize = True)
+# k   A_temp -= 0.5*np.einsum('ij,ma,mb->iajb',idn_occ,f_ia,t1_1,optimize = True)
+# k   A_temp -= 0.5*np.einsum('ij,mb,ma->iajb',idn_occ,f_ia,t1_1,optimize = True)
+# k   A_temp -= np.einsum('ab,me,imje->iajb',idn_vir,t1_1,v2e_so_ooov,optimize = True)
+# k   A_temp -= np.einsum('ab,me,jmie->iajb',idn_vir,t1_1,v2e_so_ooov,optimize = True)
+# k   A_temp += np.einsum('ij,me,bmae->iajb',idn_occ,t1_1,v2e_so_vovv,optimize = True)
+# k   A_temp += np.einsum('ij,me,beam->iajb',idn_occ,t1_1,v2e_so_vvvo,optimize = True)
+# k   A_temp -= np.einsum('je,aebi->iajb',t1_1,v2e_so_vvvo,optimize = True)
+# k   A_temp -= np.einsum('ma,jmbi->iajb',t1_1,v2e_so_oovo,optimize = True)
+# k   A_temp -= np.einsum('mb,imaj->iajb',t1_1,v2e_so_oovo,optimize = True)
+# k   A_temp -= np.einsum('ie,beaj->iajb',t1_1,v2e_so_vvvo,optimize = True)
+############################################################################
+
+    eris_ovvv = uadc_ao2mo.unpack_eri_1(eris.ovvv, nvir_a)
+    eris_OVVV = uadc_ao2mo.unpack_eri_1(eris.OVVV, nvir_b)
+    eris_ovVV = uadc_ao2mo.unpack_eri_1(eris.ovVV, nvir_b)
+    eris_OVvv = uadc_ao2mo.unpack_eri_1(eris.OVvv, nvir_a)
+
+    M_ia_jb_a[:, vir_list_a, :, vir_list_a] -= 0.5*lib.einsum('je,ie->ij',t1_1_a,f_ov_a,optimize = True)
+    M_ia_jb_a[:, vir_list_a, :, vir_list_a] -= 0.5*lib.einsum('ie,je->ij',t1_1_a,f_ov_a,optimize = True)
+    M_ia_jb_a[occ_list_a, :, occ_list_a, :] -= 0.5*lib.einsum('ma,mb->ab',f_ov_a,t1_1_a,optimize = True)
+    M_ia_jb_a[occ_list_a, :, occ_list_a, :] -= 0.5*lib.einsum('mb,ma->ab',f_ov_a,t1_1_a,optimize = True)
+
+    M_ia_jb_a[:, vir_list_a, :, vir_list_a] -= 2*lib.einsum('me,meij->ij',t1_1_a,eris.ovoo,optimize = True)
+    M_ia_jb_a[:, vir_list_a, :, vir_list_a] += lib.einsum('me,iemj->ij',t1_1_a,eris.ovoo,optimize = True)
+    M_ia_jb_a[:, vir_list_a, :, vir_list_a] -= 2*lib.einsum('me,meij->ij',t1_1_b,eris.OVoo,optimize = True)
+
+    M_ia_jb_a[:, vir_list_a, :, vir_list_a] += lib.einsum('me,jemi->ij',t1_1_a,eris.ovoo,optimize = True)
+
+    M_ia_jb_a[occ_list_a, :, occ_list_a, :] += 2*lib.einsum('me,meba->ab',t1_1_a,eris_ovvv,optimize = True)
+    M_ia_jb_a[occ_list_a, :, occ_list_a, :] -= lib.einsum('me,mabe->ab',t1_1_a,eris_ovvv,optimize = True)
+    M_ia_jb_a[occ_list_a, :, occ_list_a, :] += 2*lib.einsum('me,meba->ab',t1_1_b,eris_OVvv,optimize = True)
+
+    M_ia_jb_a[occ_list_a, :, occ_list_a, :] -= lib.einsum('me,mbea->ab',t1_1_a,eris_ovvv,optimize = True)
+
+
+    M_ia_jb_a -= lib.einsum('je,ieab->iajb',t1_1_a,eris_ovvv,optimize = True)
+    M_ia_jb_a += lib.einsum('je,iaeb->iajb',t1_1_a,eris_ovvv,optimize = True)
+    M_aabb += lib.einsum('je,iaeb->iajb',t1_1_b,eris_ovVV,optimize = True)
+
+    M_ia_jb_a -= lib.einsum('ma,jbmi->iajb',t1_1_a,eris.ovoo,optimize = True)
+    M_ia_jb_a += lib.einsum('ma,mbji->iajb',t1_1_a,eris.ovoo,optimize = True)
+    M_aabb -= lib.einsum('ma,jbmi->iajb',t1_1_a,eris.OVoo,optimize = True)
+
+
+    M_ia_jb_a -= lib.einsum('mb,iamj->iajb',t1_1_a,eris.ovoo,optimize = True)
+    M_ia_jb_a += lib.einsum('mb,maij->iajb',t1_1_a,eris.ovoo,optimize = True)
+    M_aabb -= lib.einsum('mb,iamj->iajb',t1_1_b,eris.ovOO,optimize = True)
+
+    M_ia_jb_a -= lib.einsum('ie,jeba->iajb',t1_1_a,eris_ovvv,optimize = True)
+    M_ia_jb_a += lib.einsum('ie,jbea->iajb',t1_1_a,eris_ovvv,optimize = True)
+    M_aabb += lib.einsum('ie,jbea->iajb',t1_1_a,eris_OVvv,optimize = True)
+
+
+    M_ia_jb_b[:, vir_list_b, :, vir_list_b] -= 0.5*lib.einsum('je,ie->ij',t1_1_b,f_ov_b,optimize = True)
+    M_ia_jb_b[:, vir_list_b, :, vir_list_b] -= 0.5*lib.einsum('ie,je->ij',t1_1_b,f_ov_b,optimize = True)
+    M_ia_jb_b[occ_list_b, :, occ_list_b, :] -= 0.5*lib.einsum('ma,mb->ab',f_ov_b,t1_1_b,optimize = True)
+    M_ia_jb_b[occ_list_b, :, occ_list_b, :] -= 0.5*lib.einsum('mb,ma->ab',f_ov_b,t1_1_b,optimize = True)
+
+    M_ia_jb_b[:, vir_list_b, :, vir_list_b] -= 2*lib.einsum('me,meij->ij',t1_1_b,eris.OVOO,optimize = True)
+    M_ia_jb_b[:, vir_list_b, :, vir_list_b] += lib.einsum('me,iemj->ij',t1_1_b,eris.OVOO,optimize = True)
+    M_ia_jb_b[:, vir_list_b, :, vir_list_b] -= 2*lib.einsum('me,meij->ij',t1_1_a,eris.ovOO,optimize = True)
+
+    M_ia_jb_b[:, vir_list_b, :, vir_list_b] += lib.einsum('me,jemi->ij',t1_1_b,eris.OVOO,optimize = True)
+
+    M_ia_jb_b[occ_list_b, :, occ_list_b, :] += 2*lib.einsum('me,meba->ab',t1_1_b,eris_OVVV,optimize = True)
+    M_ia_jb_b[occ_list_b, :, occ_list_b, :] -= lib.einsum('me,mabe->ab',t1_1_b,eris_OVVV,optimize = True)
+    M_ia_jb_b[occ_list_b, :, occ_list_b, :] += 2*lib.einsum('me,meba->ab',t1_1_a,eris_ovVV,optimize = True)
+
+    M_ia_jb_b[occ_list_b, :, occ_list_b, :] -= lib.einsum('me,mbea->ab',t1_1_b,eris_OVVV,optimize = True)
+
+
+    M_ia_jb_b -= lib.einsum('je,ieab->iajb',t1_1_b,eris_OVVV,optimize = True)
+    M_ia_jb_b += lib.einsum('je,iaeb->iajb',t1_1_b,eris_OVVV,optimize = True)
+
+    M_ia_jb_b -= lib.einsum('ma,jbmi->iajb',t1_1_b,eris.OVOO,optimize = True)
+    M_ia_jb_b += lib.einsum('ma,mbji->iajb',t1_1_b,eris.OVOO,optimize = True)
+
+    M_ia_jb_b -= lib.einsum('mb,iamj->iajb',t1_1_b,eris.OVOO,optimize = True)
+    M_ia_jb_b += lib.einsum('mb,maij->iajb',t1_1_b,eris.OVOO,optimize = True)
+
+    M_ia_jb_b -= lib.einsum('ie,jeba->iajb',t1_1_b,eris_OVVV,optimize = True)
+    M_ia_jb_b += lib.einsum('ie,jbea->iajb',t1_1_b,eris_OVVV,optimize = True)
+
     M_a += M_ia_jb_a.reshape(n_singles_a, n_singles_a)
     M_b += M_ia_jb_b.reshape(n_singles_b, n_singles_b)
     M_aabb = M_aabb.reshape(n_singles_a, n_singles_b)
@@ -170,6 +261,7 @@ def get_imds(adc, eris=None):
     M_ia_jb = (M_a, M_b, M_aabb)
 
     cput0 = log.timer_debug1("Completed M_ia_jb  ADC calculation", *cput0)
+
 
 
 
@@ -1304,7 +1396,7 @@ class UADCEE(uadc.UADC):
         self.tol_residual  = adc.tol_residual
         self.t1 = adc.t1
         self.t2 = adc.t2
-        #self.f_ov = adc.f_ov
+        self.f_ov = adc.f_ov
         self.dm_a = adc.dm_a
         self.dm_b = adc.dm_b
         self.imds = adc.imds
