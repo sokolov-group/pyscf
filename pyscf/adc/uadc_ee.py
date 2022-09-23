@@ -626,6 +626,9 @@ def get_X(adc):
     t1 = adc.t1
     t2 = adc.t2
 
+    t1_1_a = t1[2][0][:]
+    t1_1_b = t1[2][1][:]
+
     t1_2_a, t1_2_b = adc.t1[0]
     t2_1_a = t2[0][0][:]
     t2_1_ab = t2[0][1][:]
@@ -712,29 +715,99 @@ def get_X(adc):
         Y1_oovv_u_b[ij_ind_b[0],ij_ind_b[1],:,:]= Y_vv_u_b.copy()
         Y1_oovv_u_b[ij_ind_b[1],ij_ind_b[0],:,:]= -Y_vv_u_b.copy()
 
+######################################################################################
+#        # T_U1_Y0 qp block
+#       K TY[:nocc_so,:nocc_so] = -np.einsum('pg,qg->qp',Y,t1_1,optimize=True)
+#----
+#        # T_U2_Y0 qp block
+#      K  TY[:nocc_so,:nocc_so] += np.einsum('xg,ph,qxgh->qp',Y,t1_1,t2_1,optimize=True)
+#      K  TY[:nocc_so,:nocc_so] -= 0.5*np.einsum('pg,xh,qxgh->qp',Y,t1_1,t2_1,optimize=True)
+#----
+#
+#        # T_U1_Y0 rv block
+#     K   TY[nocc_so:,nocc_so:] = np.einsum('xr,xv->rv',Y,t1_1,optimize=True)
+##
+##        # T_U2_Y0 rv block
+#     K   TY[nocc_so:,nocc_so:] -= np.einsum('xg,yr,xyvg->rv',Y,t1_1,t2_1,optimize=True)
+#     K    TY[nocc_so:,nocc_so:] += 0.5*np.einsum('xr,yg,xyvg->rv',Y,t1_1,t2_1,optimize=True)
+##
+##
+##
+##        # T_U2_Y0 vp block
+#     K   TY[nocc_so:,:nocc_so] -= 0.5*np.einsum('pg,xg,xv->vp',Y,t1_1,t1_1,optimize=True)
+#     K   TY[nocc_so:,:nocc_so] -= 0.5*np.einsum('xv,xg,pg->vp',Y,t1_1,t1_1,optimize=True)
+##
+##
+##
+##        # T_U2_Y0 pv block
+#        TY[:nocc_so,nocc_so:] -= np.einsum('xg,pg,xv->pv',Y,t1_1,t1_1,optimize=True)
+#
+#
+#
+#
+#        if (method == "adc(2)-e"):
+#            # T_U2_Y1 vp block
+#            TY[nocc_so:,:nocc_so] += 0.25*np.einsum('pxgh,yv,xygh->vp',Y1,t1_1,t2_1,optimize=True)
+#            TY[nocc_so:,:nocc_so] += 0.25*np.einsum('xyvg,ph,xygh->vp',Y1,t1_1,t2_1,optimize=True)
+#            # T_U2_Y1 pv block
+#            TY[:nocc_so,nocc_so:] -= 0.5*np.einsum('xygh,pg,xyvh->pv',Y1,t1_1,t2_1,optimize=True)
+#            TY[:nocc_so,nocc_so:] += 0.5*np.einsum('xygh,yv,pxgh->pv',Y1,t1_1,t2_1,optimize=True)
+######################################################################################
+
 
         # T_U2_Y0 qp block
-        TY_a[:nocc_a,:nocc_a] = -np.einsum('pg,qg->qp',Y_a,t1_2_a,optimize=True)
-        TY_b[:nocc_b,:nocc_b] = -np.einsum('pg,qg->qp',Y_b,t1_2_b,optimize=True)
-    
-        # T_U1_Y1 qp block
-        TY_a[:nocc_a,:nocc_a] -= 0.5*np.einsum('pxgh,qxgh->qp',Y1_oovv_u_a,t2_1_a,optimize=True)
-        TY_a[:nocc_a,:nocc_a] -= np.einsum('pxgh,qxgh->qp',Y1_abab,t2_1_ab,optimize=True)
+        TY_a[:nocc_a,:nocc_a] = -lib.einsum('pg,qg->qp',Y_a,t1_2_a,optimize=True)
+        TY_b[:nocc_b,:nocc_b] = -lib.einsum('pg,qg->qp',Y_b,t1_2_b,optimize=True)
 
-        TY_b[:nocc_b,:nocc_b] -= 0.5*np.einsum('pxgh,qxgh->qp',Y1_oovv_u_b,t2_1_b,optimize=True)
-        TY_b[:nocc_b,:nocc_b] -= np.einsum('xpgh,xqgh->qp',Y1_abab,t2_1_ab,optimize=True)
+        TY_a[:nocc_a,:nocc_a] += lib.einsum('xg,ph,qxgh->qp',Y_a,t1_1_a,t2_1_a,optimize=True)
+        TY_a[:nocc_a,:nocc_a] -= lib.einsum('xg,ph,qxhg->qp',Y_b,t1_1_a,t2_1_ab,optimize=True)
+        TY_b[:nocc_b,:nocc_b] += lib.einsum('xg,ph,qxgh->qp',Y_b,t1_1_b,t2_1_b,optimize=True)
+        TY_b[:nocc_b,:nocc_b] -= lib.einsum('xg,ph,xqgh->qp',Y_a,t1_1_b,t2_1_ab,optimize=True)
+
+        TY_a[:nocc_a,:nocc_a] -= 0.5*np.einsum('pg,xh,qxgh->qp',Y_a,t1_1_a,t2_1_a,optimize=True)
+        TY_a[:nocc_a,:nocc_a] -= 0.5*np.einsum('pg,xh,qxgh->qp',Y_a,t1_1_b,t2_1_ab,optimize=True)
+
+        TY_b[:nocc_b,:nocc_b] -= 0.5*np.einsum('pg,xh,qxgh->qp',Y_b,t1_1_b,t2_1_b,optimize=True)
+        TY_b[:nocc_b,:nocc_b] -= 0.5*np.einsum('pg,xh,xqhg->qp',Y_b,t1_1_a,t2_1_ab,optimize=True)
+
+
+        # T_U1_Y0 qp block
+        TY_a[:nocc_a,:nocc_a] -= lib.einsum('pg,qg->qp',Y_a,t1_1_a,optimize=True)
+        TY_b[:nocc_b,:nocc_b] -= lib.einsum('pg,qg->qp',Y_b,t1_1_b,optimize=True)
+
+        # T_U1_Y1 qp block
+        TY_a[:nocc_a,:nocc_a] -= 0.5*lib.einsum('pxgh,qxgh->qp',Y1_oovv_u_a,t2_1_a,optimize=True)
+        TY_a[:nocc_a,:nocc_a] -= lib.einsum('pxgh,qxgh->qp',Y1_abab,t2_1_ab,optimize=True)
+
+        TY_b[:nocc_b,:nocc_b] -= 0.5*lib.einsum('pxgh,qxgh->qp',Y1_oovv_u_b,t2_1_b,optimize=True)
+        TY_b[:nocc_b,:nocc_b] -= lib.einsum('xpgh,xqgh->qp',Y1_abab,t2_1_ab,optimize=True)
 
 
         # T_U2_Y0 rv block
-        TY_a[nocc_a:,nocc_a:] = np.einsum('xr,xv->rv',Y_a,t1_2_a,optimize=True)
-        TY_b[nocc_b:,nocc_b:] = np.einsum('xr,xv->rv',Y_b,t1_2_b,optimize=True)
+        TY_a[nocc_a:,nocc_a:] = lib.einsum('xr,xv->rv',Y_a,t1_2_a,optimize=True)
+        TY_b[nocc_b:,nocc_b:] = lib.einsum('xr,xv->rv',Y_b,t1_2_b,optimize=True)
 
         # T_U1_Y1 rv block
-        TY_a[nocc_a:,nocc_a:] += 0.5*np.einsum('xyrg,xyvg->rv',Y1_oovv_u_a,t2_1_a,optimize=True)
-        TY_a[nocc_a:,nocc_a:] += np.einsum('xyrg,xyvg->rv',Y1_abab,t2_1_ab,optimize=True)
+        TY_a[nocc_a:,nocc_a:] += 0.5*lib.einsum('xyrg,xyvg->rv',Y1_oovv_u_a,t2_1_a,optimize=True)
+        TY_a[nocc_a:,nocc_a:] += lib.einsum('xyrg,xyvg->rv',Y1_abab,t2_1_ab,optimize=True)
 
-        TY_b[nocc_b:,nocc_b:] += 0.5*np.einsum('xyrg,xyvg->rv',Y1_oovv_u_b,t2_1_b,optimize=True)
-        TY_b[nocc_b:,nocc_b:] += np.einsum('xygr,xygv->rv',Y1_abab,t2_1_ab,optimize=True)
+        TY_b[nocc_b:,nocc_b:] += 0.5*lib.einsum('xyrg,xyvg->rv',Y1_oovv_u_b,t2_1_b,optimize=True)
+        TY_b[nocc_b:,nocc_b:] += lib.einsum('xygr,xygv->rv',Y1_abab,t2_1_ab,optimize=True)
+
+        # T_U1_Y0 rv block
+        TY_a[nocc_a:,nocc_a:] += lib.einsum('xr,xv->rv',Y_a,t1_1_a,optimize=True)
+        TY_b[nocc_b:,nocc_b:] += lib.einsum('xr,xv->rv',Y_b,t1_1_b,optimize=True)
+
+        TY_a[nocc_a:,nocc_a:] -= lib.einsum('xg,yr,xyvg->rv',Y_a,t1_1_a,t2_1_a,optimize=True)
+        TY_a[nocc_a:,nocc_a:] += lib.einsum('xg,yr,yxvg->rv',Y_b,t1_1_a,t2_1_ab,optimize=True)
+        TY_b[nocc_b:,nocc_b:] -= lib.einsum('xg,yr,xyvg->rv',Y_b,t1_1_b,t2_1_b,optimize=True)
+        TY_b[nocc_b:,nocc_b:] += lib.einsum('xg,yr,xygv->rv',Y_a,t1_1_b,t2_1_ab,optimize=True)
+
+        TY_a[nocc_a:,nocc_a:] += 0.5*np.einsum('xr,yg,xyvg->rv',Y_a,t1_1_a,t2_1_a,optimize=True)
+        TY_a[nocc_a:,nocc_a:] += 0.5*np.einsum('xr,yg,xyvg->rv',Y_a,t1_1_b,t2_1_ab,optimize=True)
+
+        TY_b[nocc_b:,nocc_b:] += 0.5*np.einsum('xr,yg,xyvg->rv',Y_b,t1_1_b,t2_1_b,optimize=True)
+        TY_b[nocc_b:,nocc_b:] += 0.5*np.einsum('xr,yg,yxgv->rv',Y_b,t1_1_a,t2_1_ab,optimize=True)
 
         # T_U0_Y0 vp block
         TY_a[nocc_a:,:nocc_a] = Y_a.T.copy()
@@ -742,58 +815,70 @@ def get_X(adc):
 
 
         # T_U2_Y0 vp block
-        TY_a[nocc_a:,:nocc_a] += 0.5*np.einsum('xg,xygh,pyvh->vp',Y_a,t2_1_a,t2_1_a,optimize=True)
-        TY_a[nocc_a:,:nocc_a] += 0.5*np.einsum('xg,xygh,pyvh->vp',Y_a,t2_1_ab,t2_1_ab,optimize=True)
-        TY_a[nocc_a:,:nocc_a] += 0.5*np.einsum('xg,xygh,pyvh->vp',Y_b,t2_1_b,t2_1_ab,optimize=True)
-        TY_a[nocc_a:,:nocc_a] += 0.5*np.einsum('xg,yxhg,pyvh->vp',Y_b,t2_1_ab,t2_1_a,optimize=True)
+        TY_a[nocc_a:,:nocc_a] += 0.5*lib.einsum('xg,xygh,pyvh->vp',Y_a,t2_1_a,t2_1_a,optimize=True)
+        TY_a[nocc_a:,:nocc_a] += 0.5*lib.einsum('xg,xygh,pyvh->vp',Y_a,t2_1_ab,t2_1_ab,optimize=True)
+        TY_a[nocc_a:,:nocc_a] += 0.5*lib.einsum('xg,xygh,pyvh->vp',Y_b,t2_1_b,t2_1_ab,optimize=True)
+        TY_a[nocc_a:,:nocc_a] += 0.5*lib.einsum('xg,yxhg,pyvh->vp',Y_b,t2_1_ab,t2_1_a,optimize=True)
 
-        TY_b[nocc_b:,:nocc_b] += 0.5*np.einsum('xg,xygh,pyvh->vp',Y_b,t2_1_b,t2_1_b,optimize=True)
-        TY_b[nocc_b:,:nocc_b] += 0.5*np.einsum('xg,yxhg,yphv->vp',Y_b,t2_1_ab,t2_1_ab,optimize=True)
-        TY_b[nocc_b:,:nocc_b] += 0.5*np.einsum('xg,xygh,yphv->vp',Y_a,t2_1_a,t2_1_ab,optimize=True)
-        TY_b[nocc_b:,:nocc_b] += 0.5*np.einsum('xg,xygh,pyvh->vp',Y_a,t2_1_ab,t2_1_b,optimize=True)
-
-
-        TY_a[nocc_a:,:nocc_a] -= 0.25*np.einsum('pg,xygh,xyvh->vp',Y_a,t2_1_a,t2_1_a,optimize=True)
-        TY_a[nocc_a:,:nocc_a] -= 0.5*np.einsum('pg,xygh,xyvh->vp',Y_a,t2_1_ab,t2_1_ab,optimize=True)
+        TY_b[nocc_b:,:nocc_b] += 0.5*lib.einsum('xg,xygh,pyvh->vp',Y_b,t2_1_b,t2_1_b,optimize=True)
+        TY_b[nocc_b:,:nocc_b] += 0.5*lib.einsum('xg,yxhg,yphv->vp',Y_b,t2_1_ab,t2_1_ab,optimize=True)
+        TY_b[nocc_b:,:nocc_b] += 0.5*lib.einsum('xg,xygh,yphv->vp',Y_a,t2_1_a,t2_1_ab,optimize=True)
+        TY_b[nocc_b:,:nocc_b] += 0.5*lib.einsum('xg,xygh,pyvh->vp',Y_a,t2_1_ab,t2_1_b,optimize=True)
 
 
-        TY_b[nocc_b:,:nocc_b] -= 0.25*np.einsum('pg,xygh,xyvh->vp',Y_b,t2_1_b,t2_1_b,optimize=True)
-        TY_b[nocc_b:,:nocc_b] -= 0.5*np.einsum('pg,xyhg,xyhv->vp',Y_b,t2_1_ab,t2_1_ab,optimize=True)
-
-        TY_a[nocc_a:,:nocc_a] -= 0.25*np.einsum('xv,xygh,pygh->vp',Y_a,t2_1_a,t2_1_a,optimize=True)
-        TY_a[nocc_a:,:nocc_a] -= 0.5*np.einsum('xv,xygh,pygh->vp',Y_a,t2_1_ab,t2_1_ab,optimize=True)
+        TY_a[nocc_a:,:nocc_a] -= 0.25*lib.einsum('pg,xygh,xyvh->vp',Y_a,t2_1_a,t2_1_a,optimize=True)
+        TY_a[nocc_a:,:nocc_a] -= 0.5*lib.einsum('pg,xygh,xyvh->vp',Y_a,t2_1_ab,t2_1_ab,optimize=True)
 
 
-        TY_b[nocc_b:,:nocc_b] -= 0.25*np.einsum('xv,xygh,pygh->vp',Y_b,t2_1_b,t2_1_b,optimize=True)
-        TY_b[nocc_b:,:nocc_b] -= 0.5*np.einsum('xv,yxgh,ypgh->vp',Y_b,t2_1_ab,t2_1_ab,optimize=True)
+        TY_b[nocc_b:,:nocc_b] -= 0.25*lib.einsum('pg,xygh,xyvh->vp',Y_b,t2_1_b,t2_1_b,optimize=True)
+        TY_b[nocc_b:,:nocc_b] -= 0.5*lib.einsum('pg,xyhg,xyhv->vp',Y_b,t2_1_ab,t2_1_ab,optimize=True)
+
+        TY_a[nocc_a:,:nocc_a] -= 0.25*lib.einsum('xv,xygh,pygh->vp',Y_a,t2_1_a,t2_1_a,optimize=True)
+        TY_a[nocc_a:,:nocc_a] -= 0.5*lib.einsum('xv,xygh,pygh->vp',Y_a,t2_1_ab,t2_1_ab,optimize=True)
+
+
+        TY_b[nocc_b:,:nocc_b] -= 0.25*lib.einsum('xv,xygh,pygh->vp',Y_b,t2_1_b,t2_1_b,optimize=True)
+        TY_b[nocc_b:,:nocc_b] -= 0.5*lib.einsum('xv,yxgh,ypgh->vp',Y_b,t2_1_ab,t2_1_ab,optimize=True)
+
+        TY_a[nocc_a:,:nocc_a] -= 0.5*np.einsum('pg,xg,xv->vp',Y_a,t1_1_a,t1_1_a,optimize=True)
+        TY_b[nocc_b:,:nocc_b] -= 0.5*np.einsum('pg,xg,xv->vp',Y_b,t1_1_b,t1_1_b,optimize=True)
+
+        TY_a[nocc_a:,:nocc_a] -= 0.5*np.einsum('xv,xg,pg->vp',Y_a,t1_1_a,t1_1_a,optimize=True)
+        TY_b[nocc_b:,:nocc_b] -= 0.5*np.einsum('xv,xg,pg->vp',Y_b,t1_1_b,t1_1_b,optimize=True)
+
+
 
         # T_U1_Y0 pv block
-        TY_a[:nocc_a,nocc_a:] = np.einsum('xg,pxvg->pv',Y_a,t2_1_a,optimize=True)
-        TY_a[:nocc_a,nocc_a:] += np.einsum('xg,pxvg->pv',Y_b,t2_1_ab,optimize=True)
+        TY_a[:nocc_a,nocc_a:] = lib.einsum('xg,pxvg->pv',Y_a,t2_1_a,optimize=True)
+        TY_a[:nocc_a,nocc_a:] += lib.einsum('xg,pxvg->pv',Y_b,t2_1_ab,optimize=True)
 
-        TY_b[:nocc_b,nocc_b:] = np.einsum('xg,pxvg->pv',Y_b,t2_1_b,optimize=True)
-        TY_b[:nocc_b,nocc_b:] += np.einsum('xg,xpgv->pv',Y_a,t2_1_ab,optimize=True)
+        TY_b[:nocc_b,nocc_b:] = lib.einsum('xg,pxvg->pv',Y_b,t2_1_b,optimize=True)
+        TY_b[:nocc_b,nocc_b:] += lib.einsum('xg,xpgv->pv',Y_a,t2_1_ab,optimize=True)
 
         # T_U2_Y0 pv block
-        TY_a[:nocc_a,nocc_a:] += np.einsum('xg,pxvg->pv',Y_a,t2_2_a,optimize=True)
-        TY_a[:nocc_a,nocc_a:] += np.einsum('xg,pxvg->pv',Y_b,t2_2_ab,optimize=True)
+        TY_a[:nocc_a,nocc_a:] += lib.einsum('xg,pxvg->pv',Y_a,t2_2_a,optimize=True)
+        TY_a[:nocc_a,nocc_a:] += lib.einsum('xg,pxvg->pv',Y_b,t2_2_ab,optimize=True)
 
-        TY_b[:nocc_b,nocc_b:] += np.einsum('xg,pxvg->pv',Y_b,t2_2_b,optimize=True)
-        TY_b[:nocc_b,nocc_b:] += np.einsum('xg,xpgv->pv',Y_a,t2_2_ab,optimize=True)
+        TY_b[:nocc_b,nocc_b:] += lib.einsum('xg,pxvg->pv',Y_b,t2_2_b,optimize=True)
+        TY_b[:nocc_b,nocc_b:] += lib.einsum('xg,xpgv->pv',Y_a,t2_2_ab,optimize=True)
+
+        TY_a[:nocc_a,nocc_a:] -= lib.einsum('xg,pg,xv->pv',Y_a,t1_1_a,t1_1_a,optimize=True)
+        TY_b[:nocc_b,nocc_b:] -= lib.einsum('xg,pg,xv->pv',Y_b,t1_1_b,t1_1_b,optimize=True)
+
 
         if (method == "adc(2)-x"):
             # T_U2_Y1 qp block
-            TY_a[:nocc_a,:nocc_a] -= 0.5*np.einsum('pxgh,qxgh->qp',Y1_oovv_u_a,t2_2_a,optimize=True)
-            TY_a[:nocc_a,:nocc_a] -= np.einsum('pxgh,qxgh->qp',Y1_abab,t2_2_ab,optimize=True)
+            TY_a[:nocc_a,:nocc_a] -= 0.5*lib.einsum('pxgh,qxgh->qp',Y1_oovv_u_a,t2_2_a,optimize=True)
+            TY_a[:nocc_a,:nocc_a] -= lib.einsum('pxgh,qxgh->qp',Y1_abab,t2_2_ab,optimize=True)
 
-            TY_b[:nocc_b,:nocc_b] -= 0.5*np.einsum('pxgh,qxgh->qp',Y1_oovv_u_b,t2_2_b,optimize=True)
-            TY_b[:nocc_b,:nocc_b] -= np.einsum('xpgh,xqgh->qp',Y1_abab,t2_2_ab,optimize=True)
+            TY_b[:nocc_b,:nocc_b] -= 0.5*lib.einsum('pxgh,qxgh->qp',Y1_oovv_u_b,t2_2_b,optimize=True)
+            TY_b[:nocc_b,:nocc_b] -= lib.einsum('xpgh,xqgh->qp',Y1_abab,t2_2_ab,optimize=True)
             # T_U2_Y1 rv block
-            TY_a[nocc_a:,nocc_a:] += 0.5*np.einsum('xyrg,xyvg->rv',Y1_oovv_u_a,t2_2_a,optimize=True)
-            TY_a[nocc_a:,nocc_a:] += np.einsum('xyrg,xyvg->rv',Y1_abab,t2_2_ab,optimize=True)
+            TY_a[nocc_a:,nocc_a:] += 0.5*lib.einsum('xyrg,xyvg->rv',Y1_oovv_u_a,t2_2_a,optimize=True)
+            TY_a[nocc_a:,nocc_a:] += lib.einsum('xyrg,xyvg->rv',Y1_abab,t2_2_ab,optimize=True)
 
-            TY_b[nocc_b:,nocc_b:] += 0.5*np.einsum('xyrg,xyvg->rv',Y1_oovv_u_b,t2_2_b,optimize=True)
-            TY_b[nocc_b:,nocc_b:] += np.einsum('xygr,xygv->rv',Y1_abab,t2_2_ab,optimize=True)
+            TY_b[nocc_b:,nocc_b:] += 0.5*lib.einsum('xyrg,xyvg->rv',Y1_oovv_u_b,t2_2_b,optimize=True)
+            TY_b[nocc_b:,nocc_b:] += lib.einsum('xygr,xygv->rv',Y1_abab,t2_2_ab,optimize=True)
 
         TY = (TY_a, TY_b)
 
