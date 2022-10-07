@@ -245,6 +245,7 @@ class UADC(lib.StreamObject):
             self.mo_coeff = mo_coeff
             self.mo_occ = mo_occ
             self.e_corr = None
+            self.f_ov = None
             self.t1 = None
             self.t2 = None
             self.dm_a = None
