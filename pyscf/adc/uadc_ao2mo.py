@@ -710,7 +710,7 @@ def transform_integrals_df(myadc):
         Loo[p0:p1] = Lpq[:,:nocc_a,:nocc_a]
         eris.Lov[p0:p1] = Lpq[:,:nocc_a,nocc_a:]
         Lvo[p0:p1] = Lpq[:,nocc_a:,:nocc_a]
-        eris.Lvv[p0:p1] = Lpq[:,nocc_a:,nocc_a:]
+        eris.L_ee[p0:p1] = eris.Lvv[p0:p1] = Lpq[:,nocc_a:,nocc_a:]
 
         if myadc.method_type == 'ip-cvs':
             eris.L_cc[p0:p1] = Lpq[:,:ncvs,:ncvs ]    
