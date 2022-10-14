@@ -357,6 +357,18 @@ def transform_integrals_df(myadc):
     nvir_a = vir_a.shape[1]
     nvir_b = vir_b.shape[1]
 
+    alpha = myadc.mo_coeff[0]
+    beta = myadc.mo_coeff[1]
+
+    dip_ints = -myadc.mol.intor('int1e_r',comp=3)
+    myadc.dm_a = np.zeros_like((dip_ints))
+    myadc.dm_b = np.zeros_like((dip_ints))
+
+    for i in range(dip_ints.shape[0]):
+        dip = dip_ints[i,:,:]
+        myadc.dm_a[i,:,:] = np.dot(alpha.T,np.dot(dip,alpha))
+        myadc.dm_b[i,:,:] = np.dot(beta.T,np.dot(dip,beta))
+
     eris = lambda:None
     eris.vvvv = None
     with_df = myadc.with_df
