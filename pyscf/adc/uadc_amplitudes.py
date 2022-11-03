@@ -320,7 +320,10 @@ def compute_amplitudes(myadc, eris):
 
         t2_2_a += temp - temp.transpose(1,0,2,3) - temp.transpose(0,1,3,2) + temp.transpose(1,0,3,2)
         t2_2_a += temp_1 - temp_1.transpose(1,0,2,3) - temp_1.transpose(0,1,3,2) + temp_1.transpose(1,0,3,2)
-      
+        
+
+        del temp
+        del temp_1
 ##############################################################################################  
 #       k t2_2 += np.einsum('la,jilb->ijab',t1_1,v2e_so_ooov, optimize = True) - \
 #       k          np.einsum('lb,jila->ijab',t1_1,v2e_so_ooov, optimize = True) + \
@@ -337,19 +340,25 @@ def compute_amplitudes(myadc, eris):
             t2_2_a -= lib.einsum('lb,iajl->ijab',t1_1_a,eris.ovoo, optimize = True)
             t2_2_a += lib.einsum('lb,jail->ijab',t1_1_a,eris.ovoo, optimize = True)
 
-            eris_ovvv = uadc_ao2mo.unpack_eri_1(eris.ovvv, nvir_a)
-            eris_OVVV = uadc_ao2mo.unpack_eri_1(eris.OVVV, nvir_b)
-            eris_ovVV = uadc_ao2mo.unpack_eri_1(eris.ovVV, nvir_b)
-            eris_OVvv = uadc_ao2mo.unpack_eri_1(eris.OVvv, nvir_a)
-
-            t2_2_a += lib.einsum('id,jbad->ijab',t1_1_a,eris_ovvv, optimize = True)
-            t2_2_a -= lib.einsum('id,jabd->ijab',t1_1_a,eris_ovvv, optimize = True)
-
-            t2_2_a -= lib.einsum('jd,ibad->ijab',t1_1_a,eris_ovvv, optimize = True)
-            t2_2_a += lib.einsum('jd,iabd->ijab',t1_1_a,eris_ovvv, optimize = True)
-
-        del temp
-        del temp_1
+            if isinstance(eris.ovvv, type(None)):
+                chnk_size = uadc_ao2mo.calculate_chunk_size(myadc)
+                a = 0
+                for p in range(0,nocc_a,chnk_size):
+                    eris_ovvv = dfadc.get_ovvv_spin_df(myadc, eris.Lov, eris.Lvv, p, chnk_size).reshape(-1,nvir_a,nvir_a,nvir_a)
+                    k = eris_ovvv.shape[0]
+                    t2_2_a[:,a:a+k] += lib.einsum('id,jbad->ijab',t1_1_a,eris_ovvv, optimize = True)
+                    t2_2_a[:,a:a+k] -= lib.einsum('id,jabd->ijab',t1_1_a,eris_ovvv, optimize = True)
+                    t2_2_a[a:a+k] -= lib.einsum('jd,ibad->ijab',t1_1_a,eris_ovvv, optimize = True)
+                    t2_2_a[a:a+k] += lib.einsum('jd,iabd->ijab',t1_1_a,eris_ovvv, optimize = True)
+                    del eris_ovvv
+                    a += k
+            else:
+                eris_ovvv = uadc_ao2mo.unpack_eri_1(eris.ovvv, nvir_a)
+                t2_2_a += lib.einsum('id,jbad->ijab',t1_1_a,eris_ovvv, optimize = True)
+                t2_2_a -= lib.einsum('id,jabd->ijab',t1_1_a,eris_ovvv, optimize = True)
+                t2_2_a -= lib.einsum('jd,ibad->ijab',t1_1_a,eris_ovvv, optimize = True)
+                t2_2_a += lib.einsum('jd,iabd->ijab',t1_1_a,eris_ovvv, optimize = True)
+                del eris_ovvv
 
         if isinstance(eris.VVVV_p, np.ndarray):
             eris_VVVV = eris.VVVV_p
@@ -378,27 +387,39 @@ def compute_amplitudes(myadc, eris):
         t2_2_b += temp - temp.transpose(1,0,2,3) - temp.transpose(0,1,3,2) + temp.transpose(1,0,3,2)
         t2_2_b += temp_1 - temp_1.transpose(1,0,2,3) - temp_1.transpose(0,1,3,2) + temp_1.transpose(1,0,3,2)
 
+        del temp
+        del temp_1
+
         if "ROHF" in str(type(myadc._scf)):
-
-            eris_ovvv = uadc_ao2mo.unpack_eri_1(eris.ovvv, nvir_a)
-            eris_OVVV = uadc_ao2mo.unpack_eri_1(eris.OVVV, nvir_b)
-            eris_ovVV = uadc_ao2mo.unpack_eri_1(eris.ovVV, nvir_b)
-            eris_OVvv = uadc_ao2mo.unpack_eri_1(eris.OVvv, nvir_a)
-
+            
             t2_2_b += lib.einsum('la,ibjl->ijab',t1_1_b,eris.OVOO, optimize = True)
             t2_2_b -= lib.einsum('la,jbil->ijab',t1_1_b,eris.OVOO, optimize = True)
 
             t2_2_b -= lib.einsum('lb,iajl->ijab',t1_1_b,eris.OVOO, optimize = True)
             t2_2_b += lib.einsum('lb,jail->ijab',t1_1_b,eris.OVOO, optimize = True)
 
-            t2_2_b += lib.einsum('id,jbad->ijab',t1_1_b,eris_OVVV, optimize = True)
-            t2_2_b -= lib.einsum('id,jabd->ijab',t1_1_b,eris_OVVV, optimize = True)
+            if isinstance(eris.OVVV, type(None)):
+                chnk_size = uadc_ao2mo.calculate_chunk_size(myadc)
+                a = 0
+                for p in range(0,nocc_a,chnk_size):
+                    eris_OVVV = dfadc.get_ovvv_spin_df(myadc, eris.LOV, eris.LVV, p, chnk_size).reshape(-1,nvir_b,nvir_b,nvir_b)
+                    k = eris_OVVV.shape[0]
+                    t2_2_b[:,a:a+k] += lib.einsum('id,jbad->ijab',t1_1_b,eris_OVVV, optimize = True)
+                    t2_2_b[:,a:a+k] -= lib.einsum('id,jabd->ijab',t1_1_b,eris_OVVV, optimize = True)
+                    t2_2_b[a:a+k] -= lib.einsum('jd,ibad->ijab',t1_1_b,eris_OVVV, optimize = True)
+                    t2_2_b[a:a+k] += lib.einsum('jd,iabd->ijab',t1_1_b,eris_OVVV, optimize = True)
+                    del eris_OVVV
+                    a += k
+            else:
+                eris_OVVV = uadc_ao2mo.unpack_eri_1(eris.OVVV, nvir_b)
+                t2_2_b += lib.einsum('id,jbad->ijab',t1_1_b,eris_OVVV, optimize = True)
+                t2_2_b -= lib.einsum('id,jabd->ijab',t1_1_b,eris_OVVV, optimize = True)
+                t2_2_b -= lib.einsum('jd,ibad->ijab',t1_1_b,eris_OVVV, optimize = True)
+                t2_2_b += lib.einsum('jd,iabd->ijab',t1_1_b,eris_OVVV, optimize = True)
+                del eris_OVVV
 
-            t2_2_b -= lib.einsum('jd,ibad->ijab',t1_1_b,eris_OVVV, optimize = True)
-            t2_2_b += lib.einsum('jd,iabd->ijab',t1_1_b,eris_OVVV, optimize = True)
 
-        del temp
-        del temp_1
+
 
         if isinstance(eris.vVvV_p, np.ndarray):
             temp = t2_1_ab.reshape(nocc_a*nocc_b,nvir_a*nvir_b)
@@ -425,16 +446,36 @@ def compute_amplitudes(myadc, eris):
         t2_2_ab -= lib.einsum('kiac,kjcb->ijab',eris_oovv,t2_1_ab[:],optimize=True)
 
         if "ROHF" in str(type(myadc._scf)):
-
-            eris_ovvv = uadc_ao2mo.unpack_eri_1(eris.ovvv, nvir_a)
-            eris_OVVV = uadc_ao2mo.unpack_eri_1(eris.OVVV, nvir_b)
-            eris_ovVV = uadc_ao2mo.unpack_eri_1(eris.ovVV, nvir_b)
-            eris_OVvv = uadc_ao2mo.unpack_eri_1(eris.OVvv, nvir_a)
-
             t2_2_ab -= lib.einsum('la,jbil->ijab',t1_1_a,eris.OVoo, optimize = True)
             t2_2_ab -= lib.einsum('lb,iajl->ijab',t1_1_b,eris.ovOO, optimize = True)
-            t2_2_ab += lib.einsum('id,jbad->ijab',t1_1_a,eris_OVvv, optimize = True)
-            t2_2_ab += lib.einsum('jd,iabd->ijab',t1_1_b,eris_ovVV, optimize = True)
+
+            if isinstance(eris.OVvv, type(None)):
+                chnk_size = uadc_ao2mo.calculate_chunk_size(myadc)
+                a = 0
+                for p in range(0,nocc_b,chnk_size):
+                    eris_OVvv = dfadc.get_ovvv_spin_df(myadc, eris.LOV, eris.Lvv, p, chnk_size).reshape(-1,nvir_b,nvir_a,nvir_a)
+                    t2_2_ab[:,a:a+k] += lib.einsum('id,jbad->ijab',t1_1_a,eris_OVvv, optimize = True)
+                    del eris_OVvv
+                    a += k
+            else:
+                eris_OVvv = uadc_ao2mo.unpack_eri_1(eris.OVvv, nvir_a)
+                t2_2_ab += lib.einsum('id,jbad->ijab',t1_1_a,eris_OVvv, optimize = True)
+                del eris_OVvv
+
+            if isinstance(eris.ovVV, type(None)):
+                chnk_size = uadc_ao2mo.calculate_chunk_size(myadc)
+                a = 0
+                for p in range(0,nocc_a,chnk_size):
+                    eris_ovVV = dfadc.get_ovvv_spin_df(myadc, eris.Lov, eris.LVV, p, chnk_size).reshape(-1,nvir_a,nvir_b,nvir_b)
+                    k = eris_ovVV.shape[0]
+                    t2_2_ab[a:a+k] += lib.einsum('jd,iabd->ijab',t1_1_b,eris_ovVV, optimize = True)
+                    del eris_ovVV
+                    a += k
+            else:
+                eris_ovVV = uadc_ao2mo.unpack_eri_1(eris.ovVV, nvir_b)
+                t2_2_ab += lib.einsum('jd,iabd->ijab',t1_1_b,eris_ovVV, optimize = True)
+                del eris_ovVV
+    
 
 
         D2_a = d_ij_a.reshape(-1,1) - d_ab_a.reshape(-1)
