@@ -29,9 +29,11 @@ from pyscf.adc import radc_ao2mo
 from pyscf.adc import dfadc
 from pyscf import __config__
 from pyscf import df
+from pyscf import scf
 
 
 # Excited-state kernel
+#@profile
 def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     adc.method = adc.method.lower()
@@ -117,6 +119,7 @@ class UADC(lib.StreamObject):
     '''
     incore_complete = getattr(__config__, 'adc_uadc_UADC_incore_complete', False)
 
+   # @profile
     def __init__(self, mf, frozen=None, mo_coeff=None, mo_occ=None):
         from pyscf import gto
 
@@ -126,8 +129,9 @@ class UADC(lib.StreamObject):
         if mo_coeff is None: mo_coeff = mf.mo_coeff
         if mo_occ is None: mo_occ = mf.mo_occ
         
-        if "ROHF" in str(type(mf)):
+        if isinstance(mf, scf.rohf.ROHF):
             print ("ROHF reference detected")
+            
             mo_a = mo_coeff.copy()
             self.nmo = mo_a.shape[1]
             nalpha = mf.mol.nelec[0]
@@ -227,7 +231,7 @@ class UADC(lib.StreamObject):
 
  
         else:
-            
+
             self.mol = mf.mol
             self._scf = mf
             self.verbose = self.mol.verbose
@@ -283,6 +287,7 @@ class UADC(lib.StreamObject):
     compute_energy = uadc_amplitudes.compute_energy
     transform_integrals = uadc_ao2mo.transform_integrals_incore
 
+  #  @profile
     def semi_canonicalize_orbitals(self, f, nocc, C): 
  
          # Diagonalize occ-occ block
@@ -305,6 +310,7 @@ class UADC(lib.StreamObject):
  
          return C, evals, f_ov, transform_f
 
+ #   @profile
     def dump_flags(self, verbose=None):
         logger.info(self, '')
         logger.info(self, '******** %s ********', self.__class__)
@@ -316,13 +322,15 @@ class UADC(lib.StreamObject):
                     self.max_memory, lib.current_memory()[0])
         return self
 
+#    @profile
     def dump_flags_gs(self, verbose=None):
         logger.info(self, '')
         logger.info(self, '******** %s ********', self.__class__)
         logger.info(self, 'max_memory %d MB (current use %d MB)',
                     self.max_memory, lib.current_memory()[0])
         return self
-
+#
+    @profile
     def kernel_gs(self):
         assert(self.mo_coeff is not None)
         assert(self.mo_occ is not None)
@@ -364,6 +372,7 @@ class UADC(lib.StreamObject):
 
         return self.e_corr, self.t1, self.t2
 
+    @profile
     def kernel(self, nroots=1, guess=None, eris=None):
         assert(self.mo_coeff is not None)
         assert(self.mo_occ is not None)
@@ -419,6 +428,7 @@ class UADC(lib.StreamObject):
         self._adc_es = adc_es
         return e_exc, v_exc, spec_fac, X
 
+  #  @profile
     def _finalize(self):
         '''Hook for dumping results and clearing up the object.'''
         logger.note(self, 'E_corr = %.8f',
@@ -437,12 +447,14 @@ class UADC(lib.StreamObject):
         e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
         return e_exc, v_exc, spec_fac, x, adc_es
 
+  #  @profile
     def ee_adc(self, nroots=1, guess=None, eris=None):
         from pyscf.adc import uadc_ee
         adc_es = uadc_ee.UADCEE(self)
         e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
         return e_exc, v_exc, spec_fac, x, adc_es
 
+  #  @profile
     def density_fit(self, auxbasis=None, with_df=None):
         if with_df is None:
             self.with_df = df.DF(self._scf.mol)
