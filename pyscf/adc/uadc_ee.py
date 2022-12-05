@@ -86,8 +86,8 @@ def get_imds(adc, eris=None):
     dim_a = int(n_singles_a)
     n_singles_b = nocc_b * nvir_b
     dim_b = int(n_singles_b)
-    M_a = np.zeros((dim_a,dim_a))
-    M_b = np.zeros((dim_b,dim_b))
+    M_a = np.zeros((dim_a, dim_a))
+    M_b = np.zeros((dim_b, dim_b))
 
 #    M_ia_jb_a = np.zeros((nocc_a,nvir_a,nocc_a,nvir_a))
 #    M_ia_jb_b = np.zeros((nocc_b,nvir_b,nocc_b,nvir_b))
@@ -316,16 +316,9 @@ def get_imds(adc, eris=None):
 
     M_a += M_ia_jb_a.reshape(n_singles_a, n_singles_a)
     M_b += M_ia_jb_b.reshape(n_singles_b, n_singles_b)
-    M_aabb = M_aabb.reshape(n_singles_a, n_singles_b)
-        
-#    print("M_a norm", np.linalg.norm(M_a.reshape(nocc_a,nvir_a,nocc_a,nvir_a)))
-#    print("M_b norm", np.linalg.norm(M_b.reshape(nocc_b,nvir_b,nocc_b,nvir_b)))
-#    print("M_aabb norm", np.linalg.norm(M_aabb.reshape(nocc_a,nvir_a,nocc_b,nvir_b)))
-#    exit()
-    M_ia_jb = (M_a, M_b, M_aabb)
 
+    M_ia_jb = (M_a, M_b, M_aabb.reshape(n_singles_a, n_singles_b))
     cput0 = log.timer_debug1("Completed M_ia_jb  ADC calculation", *cput0)
-
 
 
 
@@ -430,18 +423,20 @@ def matvec(adc, M_ia_jb=None, eris=None):
         raise NotImplementedError(adc.method)
 
     method = adc.method
-
+    
     if M_ia_jb is None:
         M_ia_jb  = adc.get_imds()
 
     M_ia_jb_a, M_ia_jb_b, M_aabb = M_ia_jb[0], M_ia_jb[1], M_ia_jb[2]
+
+    M_ia_jb_a_diag = np.diagonal(M_ia_jb_a)
+    M_ia_jb_b_diag = np.diagonal(M_ia_jb_b)
 
 
     nocc_a = adc.nocc_a
     nocc_b = adc.nocc_b
     nvir_a = adc.nvir_a
     nvir_b = adc.nvir_b
-
 
     n_singles_a = nocc_a * nvir_a
     n_singles_b = nocc_b * nvir_b
@@ -450,7 +445,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
     n_doubles_bbbb = nocc_b * (nocc_b - 1) * nvir_b * (nvir_b -1) // 4
 
     dim = n_singles_a + n_singles_b + n_doubles_aaaa + n_doubles_ab + n_doubles_bbbb
-    
+
     e_occ_a = adc.mo_energy_a[:nocc_a]
     e_occ_b = adc.mo_energy_b[:nocc_b]
     e_vir_a = adc.mo_energy_a[nocc_a:]
@@ -472,12 +467,24 @@ def matvec(adc, M_ia_jb=None, eris=None):
     s_bbbb = f_ab
     f_bbbb = s_bbbb + n_doubles_bbbb
     
-    if eris is None:
-        eris = adc.transform_integrals()
+    d_ij_a = e_occ_a[:,None]+e_occ_a
+    d_ij_b = e_occ_b[:,None]+e_occ_b
+    d_ab_a = e_vir_a[:,None]+e_vir_a
+    d_ab_b = e_vir_b[:,None]+e_vir_b
+    D_n_a = -d_ij_a.reshape(-1,1) + d_ab_a.reshape(-1)
+    D_n_b = -d_ij_b.reshape(-1,1) + d_ab_b.reshape(-1)
+    D_n_a = D_n_a.reshape((nocc_a,nocc_a,nvir_a,nvir_a))
+    D_n_b = D_n_b.reshape((nocc_b,nocc_b,nvir_b,nvir_b))
 
-    diag = get_diag(adc)
+    D_ijab_a = D_n_a.copy()[:,:,ab_ind_a[0],ab_ind_a[1]]
+    D_ijab_a = D_ijab_a.copy()[ij_ind_a[0],ij_ind_a[1]].reshape(-1)
+    D_ijab_b = D_n_b.copy()[:,:,ab_ind_b[0],ab_ind_b[1]]
+    D_ijab_b = D_ijab_b.copy()[ij_ind_b[0],ij_ind_b[1]].reshape(-1)
 
-    #print(diag.shape)
+    d_ij_abab = e_occ_a[:,None]+e_occ_b
+    d_ab_abab = e_vir_a[:,None]+e_vir_b
+    D_n_abab = -d_ij_abab.reshape(-1,1) + d_ab_abab.reshape(-1)
+    D_ijab_abab = D_n_abab.reshape(-1)
 
     #Calculate sigma vector
     @profile
@@ -485,23 +492,55 @@ def matvec(adc, M_ia_jb=None, eris=None):
         cput0 = (logger.process_clock(), logger.perf_counter())
         log = logger.Logger(adc.stdout, adc.verbose)
 
+#        r_a = r[s_a:f_a]
+#        r_b = r[s_b:f_b]
+#
+#        r_a_ov = r_a.reshape(nocc_a, nvir_a)
+#        r_b_ov = r_b.reshape(nocc_b, nvir_b)
+#        
+#        r_aaaa = r[s_aaaa:f_aaaa]
+#        r_abab = r[s_abab:f_ab]
+#        r_bbbb = r[s_bbbb:f_bbbb]
+#
+#        r_aaaa = r_aaaa.reshape(int((nocc_a * (nocc_a - 1))/2),int((nvir_a * (nvir_a - 1))/2)).copy()
+#        r_bbbb = r_bbbb.reshape(int((nocc_b * (nocc_b - 1))/2),int((nvir_b * (nvir_b - 1))/2)).copy()
+#
+#        r_vv_u_a = None
+#        r_vv_u_a = np.zeros((int((nocc_a * (nocc_a - 1))/2),nvir_a, nvir_a))
+#        r_vv_u_a[:,ab_ind_a[0],ab_ind_a[1]]= r_aaaa.copy()
+#        r_vv_u_a[:,ab_ind_a[1],ab_ind_a[0]]= -r_aaaa.copy()
+#        r_oovv_u_a = np.zeros((nocc_a,nocc_a,nvir_a,nvir_a))
+#        r_oovv_u_a[ij_ind_a[0],ij_ind_a[1],:,:]= r_vv_u_a.copy()
+#        r_oovv_u_a[ij_ind_a[1],ij_ind_a[0],:,:]= -r_vv_u_a.copy()
+#        
+#        r_oovv_a = r_oovv_u_a.copy()[:,:,ab_ind_a[0],ab_ind_a[1]]
+#        r_packed_a = r_oovv_a.copy()[ij_ind_a[0],ij_ind_a[1]].reshape(-1)
+#
+#        r_vv_u_b = None
+#        r_vv_u_b = np.zeros((int((nocc_b * (nocc_b - 1))/2),nvir_b, nvir_b))
+#        r_vv_u_b[:,ab_ind_b[0],ab_ind_b[1]]= r_bbbb.copy()
+#        r_vv_u_b[:,ab_ind_b[1],ab_ind_b[0]]= -r_bbbb.copy()
+#        r_oovv_u_b = np.zeros((nocc_b,nocc_b,nvir_b,nvir_b))
+#        r_oovv_u_b[ij_ind_b[0],ij_ind_b[1],:,:]= r_vv_u_b.copy()
+#        r_oovv_u_b[ij_ind_b[1],ij_ind_b[0],:,:]= -r_vv_u_b.copy()
+#
+#        r_oovv_b = r_oovv_u_b.copy()[:,:,ab_ind_b[0],ab_ind_b[1]]
+#        r_packed_b = r_oovv_b.copy()[ij_ind_b[0],ij_ind_b[1]].reshape(-1)
+
+
+
         r_a = r[s_a:f_a]
         r_b = r[s_b:f_b]
 
         r_a_ov = r_a.reshape(nocc_a, nvir_a)
         r_b_ov = r_b.reshape(nocc_b, nvir_b)
         
-        r_aaaa = r[s_aaaa:f_aaaa]
+        
         r_abab = r[s_abab:f_ab]
-        r_bbbb = r[s_bbbb:f_bbbb]
 
-        r_aaaa = r_aaaa.reshape(int((nocc_a * (nocc_a - 1))/2),int((nvir_a * (nvir_a - 1))/2)).copy()
-        r_bbbb = r_bbbb.reshape(int((nocc_b * (nocc_b - 1))/2),int((nvir_b * (nvir_b - 1))/2)).copy()
-
-        r_vv_u_a = None
         r_vv_u_a = np.zeros((int((nocc_a * (nocc_a - 1))/2),nvir_a, nvir_a))
-        r_vv_u_a[:,ab_ind_a[0],ab_ind_a[1]]= r_aaaa.copy()
-        r_vv_u_a[:,ab_ind_a[1],ab_ind_a[0]]= -r_aaaa.copy()
+        r_vv_u_a[:,ab_ind_a[0],ab_ind_a[1]]= r[s_aaaa:f_aaaa].reshape(int((nocc_a * (nocc_a - 1))/2),int((nvir_a * (nvir_a - 1))/2)).copy()
+        r_vv_u_a[:,ab_ind_a[1],ab_ind_a[0]]= -r[s_aaaa:f_aaaa].reshape(int((nocc_a * (nocc_a - 1))/2),int((nvir_a * (nvir_a - 1))/2)).copy()
         r_oovv_u_a = np.zeros((nocc_a,nocc_a,nvir_a,nvir_a))
         r_oovv_u_a[ij_ind_a[0],ij_ind_a[1],:,:]= r_vv_u_a.copy()
         r_oovv_u_a[ij_ind_a[1],ij_ind_a[0],:,:]= -r_vv_u_a.copy()
@@ -509,17 +548,15 @@ def matvec(adc, M_ia_jb=None, eris=None):
         r_oovv_a = r_oovv_u_a.copy()[:,:,ab_ind_a[0],ab_ind_a[1]]
         r_packed_a = r_oovv_a.copy()[ij_ind_a[0],ij_ind_a[1]].reshape(-1)
 
-        r_vv_u_b = None
         r_vv_u_b = np.zeros((int((nocc_b * (nocc_b - 1))/2),nvir_b, nvir_b))
-        r_vv_u_b[:,ab_ind_b[0],ab_ind_b[1]]= r_bbbb.copy()
-        r_vv_u_b[:,ab_ind_b[1],ab_ind_b[0]]= -r_bbbb.copy()
+        r_vv_u_b[:,ab_ind_b[0],ab_ind_b[1]]= r[s_bbbb:f_bbbb].reshape(int((nocc_b * (nocc_b - 1))/2),int((nvir_b * (nvir_b - 1))/2)).copy()
+        r_vv_u_b[:,ab_ind_b[1],ab_ind_b[0]]= -r[s_bbbb:f_bbbb].reshape(int((nocc_b * (nocc_b - 1))/2),int((nvir_b * (nvir_b - 1))/2)).copy()
         r_oovv_u_b = np.zeros((nocc_b,nocc_b,nvir_b,nvir_b))
         r_oovv_u_b[ij_ind_b[0],ij_ind_b[1],:,:]= r_vv_u_b.copy()
         r_oovv_u_b[ij_ind_b[1],ij_ind_b[0],:,:]= -r_vv_u_b.copy()
 
         r_oovv_b = r_oovv_u_b.copy()[:,:,ab_ind_b[0],ab_ind_b[1]]
         r_packed_b = r_oovv_b.copy()[ij_ind_b[0],ij_ind_b[1]].reshape(-1)
-
 
         s = np.zeros(dim)
 
@@ -533,10 +570,6 @@ def matvec(adc, M_ia_jb=None, eris=None):
         s[s_b:f_b] = lib.einsum('ab,b->a',M_ia_jb_b,r_b, optimize = True)
         s[s_b:f_b] += lib.einsum('ab,b->a',M_aabb.T,r_a, optimize = True)
 
-        D_ijab_a = diag[s_aaaa:f_aaaa]
-        D_ijab_abab = diag[s_abab:f_ab]
-        D_ijab_b = diag[s_bbbb:f_bbbb]
-        
         s[s_aaaa:f_aaaa] = D_ijab_a*r_packed_a
         s[s_abab:f_ab] = D_ijab_abab*r_abab
         s[s_bbbb:f_bbbb] = D_ijab_b*r_packed_b
@@ -567,6 +600,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
             temp_a += lib.einsum('ie,jbae->ijab',r_a_ov, eris_ovvv, optimize = True)
             temp_a += lib.einsum('je,iabe->ijab',r_a_ov, eris_ovvv, optimize = True)
             temp_a -= lib.einsum('je,ibae->ijab',r_a_ov, eris_ovvv, optimize = True)
+            del eris_ovvv
         temp_a = temp_a[:,:,ab_ind_a[0],ab_ind_a[1]]
         s[s_aaaa:f_aaaa] += temp_a[ij_ind_a[0],ij_ind_a[1]].reshape(n_doubles_aaaa)
         del temp_a
@@ -586,6 +620,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
             eris_OVvv = uadc_ao2mo.unpack_eri_1(eris.OVvv, nvir_a)
             s[s_a:f_a] += lib.einsum('imef,mfea->ia',r_abab, eris_OVvv, optimize = True).reshape(-1)
             temp_abab = lib.einsum('ie,jbae->ijab',r_a_ov, eris_OVvv, optimize = True)
+            del eris_OVvv
         s[s_abab:f_ab] += temp_abab.reshape(-1)
         del temp_abab
 #
@@ -613,6 +648,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
             temp_b += lib.einsum('ie,jbae->ijab',r_b_ov, eris_OVVV, optimize = True)
             temp_b += lib.einsum('je,iabe->ijab',r_b_ov, eris_OVVV, optimize = True)
             temp_b -= lib.einsum('je,ibae->ijab',r_b_ov, eris_OVVV, optimize = True)
+            del eris_OVVV
         temp_b = temp_b[:,:,ab_ind_b[0],ab_ind_b[1]]
         s[s_bbbb:f_bbbb] += temp_b[ij_ind_b[0],ij_ind_b[1]].reshape(n_doubles_bbbb)
         del temp_b
@@ -633,6 +669,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
             eris_ovVV = uadc_ao2mo.unpack_eri_1(eris.ovVV, nvir_b)
             s[s_b:f_b] += lib.einsum('mife,mfea->ia',r_abab, eris_ovVV, optimize = True).reshape(-1)
             temp_abab = lib.einsum('je,iabe->ijab',r_b_ov, eris_ovVV, optimize = True)
+            del eris_ovVV
         s[s_abab:f_ab] += temp_abab.reshape(-1)
         del temp_abab
 
@@ -662,11 +699,14 @@ def matvec(adc, M_ia_jb=None, eris=None):
         
         temp_a = temp_a[:,:,ab_ind_a[0],ab_ind_a[1]]
         s[s_aaaa:f_aaaa] += temp_a[ij_ind_a[0],ij_ind_a[1]].reshape(n_doubles_aaaa)
+        del temp_a
 
         s[s_abab:f_ab] += temp_abab.reshape(-1)
+        del temp_abab
 
         temp_b = temp_b[:,:,ab_ind_b[0],ab_ind_b[1]]
         s[s_bbbb:f_bbbb] += temp_b[ij_ind_b[0],ij_ind_b[1]].reshape(n_doubles_bbbb)
+        del temp_b
         #exit()
 
 #        print("norm of s after", np.linalg.norm(s))
@@ -677,14 +717,18 @@ def matvec(adc, M_ia_jb=None, eris=None):
                 interim = np.ascontiguousarray(r_oovv_u_a[:,:,ab_ind_a[0],ab_ind_a[1]]).reshape(nocc_a*nocc_a,-1)
                 interim_1 = np.dot(interim,eris.vvvv_p.T).reshape(nocc_a, nocc_a, -1)
                 s[s_aaaa:f_aaaa] += interim_1[ij_ind_a[0],ij_ind_a[1]].reshape(n_doubles_aaaa)
+                del interim
+                del interim_1
 
             elif isinstance(eris.vvvv_p, list) :
                 interim_1 = uadc_amplitudes.contract_ladder_antisym(adc,r_oovv_u_a,eris.vvvv_p)
                 s[s_aaaa:f_aaaa] += interim_1[ij_ind_a[0],ij_ind_a[1]].reshape(n_doubles_aaaa)
+                del interim_1
 
             else:
                 interim_1 = uadc_amplitudes.contract_ladder_antisym(adc,r_oovv_u_a,eris.Lvv)
                 s[s_aaaa:f_aaaa] += interim_1[ij_ind_a[0],ij_ind_a[1]].reshape(n_doubles_aaaa)
+                del interim_1
 
 
             if isinstance(eris.vVvV_p, np.ndarray):
@@ -698,13 +742,17 @@ def matvec(adc, M_ia_jb=None, eris=None):
                 interim = np.ascontiguousarray(r_oovv_u_b[:,:,ab_ind_b[0],ab_ind_b[1]]).reshape(nocc_b*nocc_b,-1)
                 interim_2 = np.dot(interim,eris.VVVV_p.T).reshape(nocc_b, nocc_b, -1)
                 s[s_bbbb:f_bbbb] += interim_2[ij_ind_b[0],ij_ind_b[1]].reshape(n_doubles_bbbb)
+                del interim
+                del interim_2
 
             elif isinstance(eris.VVVV_p, list) :
                 interim_1 = uadc_amplitudes.contract_ladder_antisym(adc,r_oovv_u_b,eris.VVVV_p)
                 s[s_bbbb:f_bbbb] += interim_1[ij_ind_b[0],ij_ind_b[1]].reshape(n_doubles_bbbb)
+                del interim_1
             else:
                 interim_1 = uadc_amplitudes.contract_ladder_antisym(adc,r_oovv_u_b,eris.LVV)
                 s[s_bbbb:f_bbbb] += interim_1[ij_ind_b[0],ij_ind_b[1]].reshape(n_doubles_bbbb)
+                del interim_1
 
             interim_a = lib.einsum('imae,jbem->ijab', r_oovv_u_a, eris.ovvo, optimize = True)
             interim_a -= lib.einsum('imae,mjbe->ijab', r_oovv_u_a, eris.oovv, optimize = True)
@@ -760,11 +808,14 @@ def matvec(adc, M_ia_jb=None, eris=None):
 
             interim_a = interim_a[:,:,ab_ind_a[0],ab_ind_a[1]]
             s[s_aaaa:f_aaaa] += interim_a[ij_ind_a[0],ij_ind_a[1]].reshape(n_doubles_aaaa)
+            del interim_a
 
             s[s_abab:f_ab] += interim_abab.reshape(-1)
+            del interim_abab
 
             interim_b = interim_b[:,:,ab_ind_b[0],ab_ind_b[1]]
             s[s_bbbb:f_bbbb] += interim_b[ij_ind_b[0],ij_ind_b[1]].reshape(n_doubles_bbbb)
+            del interim_b
             
         return s
 
