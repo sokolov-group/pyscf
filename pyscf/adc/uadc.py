@@ -55,6 +55,9 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     guess = adc.get_init_guess(nroots, diag, ascending = True)
 
+    if not isinstance(eris.oovv, np.ndarray):
+        guess = radc_ao2mo.write_dataset(guess)
+
     conv, adc.E, U = lib.linalg_helper.davidson1(
         lambda xs : [matvec(x) for x in xs],
         guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol,
@@ -330,7 +333,7 @@ class UADC(lib.StreamObject):
                     self.max_memory, lib.current_memory()[0])
         return self
 #
-    @profile
+    #@profile
     def kernel_gs(self):
         assert(self.mo_coeff is not None)
         assert(self.mo_occ is not None)
@@ -372,7 +375,7 @@ class UADC(lib.StreamObject):
 
         return self.e_corr, self.t1, self.t2
 
-    @profile
+   # @profile
     def kernel(self, nroots=1, guess=None, eris=None):
         assert(self.mo_coeff is not None)
         assert(self.mo_occ is not None)
