@@ -211,6 +211,9 @@ class UADC(lib.StreamObject):
             self.mo_energy_b = mo_energy_b.copy()
             self.chkfile = mf.chkfile
             self.method = "adc(2)"
+            self.opdm = False
+            self.tpdm = False
+            self.spin_c = False
             self.method_type = "ip"
             self.with_df = None
             self.compute_mpn_energy = True
@@ -246,6 +249,9 @@ class UADC(lib.StreamObject):
             self.conv_tol = getattr(__config__, 'adc_uadc_UADC_conv_tol', 1e-12)
             self.tol_residual = getattr(__config__, 'adc_uadc_UADC_tol_res', 1e-6)
     
+            self.opdm = False
+            self.tpdm = False
+            self.spin_c = False
             self.scf_energy = mf.e_tot
             self.frozen = frozen
             self.incore_complete = self.incore_complete or self.mol.incore_anyway
