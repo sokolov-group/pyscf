@@ -67,6 +67,10 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     if adc.compute_properties:
         adc.P,adc.X = adc.get_properties(nroots)
+    if adc.method_type == "ee":
+        TY, spin = adc.X
+        spin_c = spin[0]
+        print("Hello", spin_c)
 
     nfalse = np.shape(conv)[0] - np.sum(conv)
 
@@ -213,7 +217,7 @@ class UADC(lib.StreamObject):
             self.method = "adc(2)"
             self.opdm = False
             self.tpdm = False
-            self.spin_c = False
+            self.spin_c = True
             self.method_type = "ip"
             self.with_df = None
             self.compute_mpn_energy = True
@@ -251,7 +255,7 @@ class UADC(lib.StreamObject):
     
             self.opdm = False
             self.tpdm = False
-            self.spin_c = False
+            self.spin_c = True
             self.scf_energy = mf.e_tot
             self.frozen = frozen
             self.incore_complete = self.incore_complete or self.mol.incore_anyway
