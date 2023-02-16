@@ -69,9 +69,11 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         adc.P,adc.X = adc.get_properties(nroots)
     if adc.method_type == "ee":
         TY, spin = adc.X
-        spin_c = spin[0]
-        print("Hello", spin_c)
-
+        if adc.spin_c is True:
+            spin_c = spin[0]
+            opdm = spin[1]
+            opdm_a = opdm[0]
+            opdm_b = opdm[1]
     nfalse = np.shape(conv)[0] - np.sum(conv)
 
     header = ("\n*************************************************************"
@@ -87,7 +89,15 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
                         (adc.method, n, adc.E[n], adc.E[n]*27.2114))
         if adc.compute_properties:
             if (adc.method_type == "ee"):
-                print_string += ("|  Oscillator Strengths = %10.8f  " % adc.P[n])
+                print_string += ("|  Osc. Str. = %10.8f  " % adc.P[n])
+                if (adc.spin_c is True):
+                    print_string += ("|  S^2 = %10.8f  " % spin_c[n])
+                if (adc.spin_c is True):
+                    na = np.einsum("pp",opdm_a[n])
+                    print_string += ("|  na = %5.3f  " % na)
+                if (adc.spin_c is True):
+                    nb = np.einsum("pp",opdm_b[n])
+                    print_string += ("|  nb = %5.3f  " % nb)
             else:
                 print_string += ("|  Spec Factors = %10.8f  " % adc.P[n])
         print_string += ("|  conv = %s" % conv[n])
