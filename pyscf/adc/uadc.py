@@ -68,12 +68,13 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     if adc.compute_properties:
         adc.P,adc.X = adc.get_properties(nroots)
     if adc.method_type == "ee":
-        TY, spin = adc.X
+        TY, props = adc.X
+        spin, opdm, tpdm = props
         if adc.spin_c is True:
-            spin_c = spin[0]
-            opdm = spin[1]
-            opdm_a = opdm[0]
-            opdm_b = opdm[1]
+            spin, trace = spin
+            spin_c = spin
+            na = trace[0]
+            nb = trace[1]
     nfalse = np.shape(conv)[0] - np.sum(conv)
 
     header = ("\n*************************************************************"
@@ -93,11 +94,9 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
                 if (adc.spin_c is True):
                     print_string += ("|  S^2 = %10.8f  " % spin_c[n])
                 if (adc.spin_c is True):
-                    na = np.einsum("pp",opdm_a[n])
-                    print_string += ("|  na = %5.3f  " % na)
+                    print_string += ("|  na = %5.3f  " % na[n])
                 if (adc.spin_c is True):
-                    nb = np.einsum("pp",opdm_b[n])
-                    print_string += ("|  nb = %5.3f  " % nb)
+                    print_string += ("|  nb = %5.3f  " % nb[n])
             else:
                 print_string += ("|  Spec Factors = %10.8f  " % adc.P[n])
         print_string += ("|  conv = %s" % conv[n])

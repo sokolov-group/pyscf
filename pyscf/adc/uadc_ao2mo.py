@@ -138,6 +138,10 @@ def transform_integrals_outcore(myadc):
     dip_ints = -myadc.mol.intor('int1e_r',comp=3)
     myadc.dm_a = np.zeros_like((dip_ints))
     myadc.dm_b = np.zeros_like((dip_ints))
+    
+    charges = myadc.mol.atom_charges()
+    coords  = myadc.mol.atom_coords()
+    myadc.nucl_dip = lib.einsum('i,ix->x', charges, coords)
 
     for i in range(dip_ints.shape[0]):
         dip = dip_ints[i,:,:]
@@ -367,6 +371,10 @@ def transform_integrals_df(myadc):
     dip_ints = -myadc.mol.intor('int1e_r',comp=3)
     myadc.dm_a = np.zeros_like((dip_ints))
     myadc.dm_b = np.zeros_like((dip_ints))
+    
+    charges = myadc.mol.atom_charges()
+    coords  = myadc.mol.atom_coords()
+    myadc.nucl_dip = lib.einsum('i,ix->x', charges, coords)
 
     for i in range(dip_ints.shape[0]):
         dip = dip_ints[i,:,:]
