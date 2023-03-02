@@ -265,6 +265,7 @@ class UADC(lib.StreamObject):
             self.opdm = False
             self.tpdm = False
             self.spin_c = True
+            self.new_spin_c = False
             self.scf_energy = mf.e_tot
             self.frozen = frozen
             self.incore_complete = self.incore_complete or self.mol.incore_anyway
