@@ -1788,11 +1788,10 @@ def get_properties(adc, nroots=1):
     T_b = np.array(T_b)
 
     U = adc.U
-
+    
     #Spectroscopic amplitudes
     X_a = np.dot(T_a, U).reshape(-1,nroots)
     X_b = np.dot(T_b, U).reshape(-1,nroots)
-
     X = (X_a,X_b)
 
     #Spectroscopic factors

@@ -32,7 +32,7 @@ from pyscf import df
 from pyscf import scf
 from pyscf.data import nist
 
-@profile
+#@profile
 def get_imds(adc, eris=None):
 
     cput0 = (logger.process_clock(), logger.perf_counter())
@@ -296,7 +296,7 @@ def get_imds(adc, eris=None):
     return M_ia_jb
 
 
-@profile
+#@profile
 def get_diag(adc,M_ia_jb=None,eris=None):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -383,7 +383,7 @@ def get_diag(adc,M_ia_jb=None,eris=None):
 
     return diag
 
-@profile
+#@profile
 def matvec(adc, M_ia_jb=None, eris=None):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -2802,7 +2802,8 @@ def get_old_spin_contamination(adc):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
-
+    print("are you sure you want to use the old version of spin_c")
+    exit()
     method = adc.method
     dm_a = adc.dm_a.copy()
     dm_b = adc.dm_b.copy()
@@ -3689,7 +3690,7 @@ def get_old_spin_contamination(adc):
     
     return spin, (trace_a, trace_b)
 
-@profile
+#@profile
 def get_spin_contamination(adc):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -4452,7 +4453,7 @@ def get_spin_contamination(adc):
     return spin, (trace_a, trace_b)
 
 
-@profile
+#@profile
 def get_X(adc):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -4478,15 +4479,17 @@ def get_X(adc):
         t1_1_a = t1[2][0][:]
         t1_1_b = t1[2][1][:]
 
+    nmo_a = nocc_a + nvir_a
+    nmo_b = nocc_b + nvir_b
 
 
+    TY_a = np.zeros((nmo_a,nmo_a))
+    TY_b = np.zeros((nmo_b,nmo_b))
 
     dm_a = adc.dm_a.copy()
     dm_b = adc.dm_b.copy()
 
 
-    nmo_a = nocc_a + nvir_a
-    nmo_b = nocc_b + nvir_b
 
     n_singles_a = nocc_a * nvir_a
     n_singles_b = nocc_b * nvir_b
@@ -4496,8 +4499,6 @@ def get_X(adc):
 
     dim = n_singles_a + n_singles_b + n_doubles_aaaa + n_doubles_ab + n_doubles_bbbb
 
-    TY_a = np.zeros((nmo_a,nmo_a))
-    TY_b = np.zeros((nmo_b,nmo_b))
     
     e_occ_a = adc.mo_energy_a[:nocc_a]
     e_occ_b = adc.mo_energy_b[:nocc_b]
@@ -4524,7 +4525,8 @@ def get_X(adc):
     nroots = U.shape[0]
 
     x = np.array([])
-
+    TY_aa = []
+    TY_bb = []
     for r in range(U.shape[0]):
         
         Y_a = U[r][:f_a].reshape(nocc_a, nvir_a)
@@ -4721,15 +4723,17 @@ def get_X(adc):
             del Y1_oovv_u_a
             del Y1_oovv_u_b
 
-        TY = (TY_a, TY_b)
 
 
         dx = lib.einsum("rqp,qp->r", dm_a, TY_a, optimize = True)
         dx += lib.einsum("rqp,qp->r", dm_b, TY_b, optimize = True)
 
+        TY_aa = np.append(TY_aa,TY_a)
+        TY_bb = np.append(TY_bb,TY_b)
+        TY = (TY_aa, TY_bb)
+
         x = np.append(x,dx)
     x = x.reshape(nroots, 3)
-
 
     return TY, x
 
@@ -5167,62 +5171,75 @@ def get_X(adc):
 #                            print_doubles[1], print_doubles[2], print_doubles[0], doubles_bbb_val[idx])
 #
 #        logger.info(adc, "\n*************************************************************\n")
-#
-#
-#def analyze_spec_factor(adc):
-#
-#    X_a = adc.X[0]
-#    X_b = adc.X[1]
-#
-#    logger.info(adc, "Print spectroscopic factors > %E\n", adc.spec_factor_print_tol)
-#
-#    X_tot = (X_a, X_b)
-#
-#    for iter_idx, X in enumerate(X_tot):
-#        if iter_idx == 0:
-#            spin = "alpha"
-#        else:
-#            spin = "beta"
-#
-#        X_2 = (X.copy()**2)
-#
-#        thresh = adc.spec_factor_print_tol
-#
-#        for i in range(X_2.shape[1]):
-#
-#            sort = np.argsort(-X_2[:,i])
-#            X_2_row = X_2[:,i]
-#
-#            X_2_row = X_2_row[sort]
-#
-#            if not adc.mol.symmetry:
-#                sym = np.repeat(['A'], X_2_row.shape[0])
-#            else:
-#                if spin == "alpha":
-#                    sym = [symm.irrep_id2name(adc.mol.groupname, x) for x in adc._scf.mo_coeff[0].orbsym]
-#                    sym = np.array(sym)
-#                else:
-#                    sym = [symm.irrep_id2name(adc.mol.groupname, x) for x in adc._scf.mo_coeff[1].orbsym]
-#                    sym = np.array(sym)
-#
-#                sym = sym[sort]
-#
-#            spec_Contribution = X_2_row[X_2_row > thresh]
-#            index_mo = sort[X_2_row > thresh]+1
-#
-#            if np.sum(spec_Contribution) == 0.0:
-#                continue
-#
-#            logger.info(adc, '%s | root %d %s\n', adc.method, i, spin)
-#            logger.info(adc, "     HF MO     Spec. Contribution     Orbital symmetry")
-#            logger.info(adc, "-----------------------------------------------------------")
-#
-#            for c in range(index_mo.shape[0]):
-#                logger.info(adc, '     %3.d          %10.8f                %s',
-#                            index_mo[c], spec_Contribution[c], sym[c])
-#
-#            logger.info(adc, '\nPartial spec. factor sum = %10.8f', np.sum(spec_Contribution))
-#            logger.info(adc, "\n*************************************************************\n")
+
+
+def analyze_spec_factor(adc):
+    X_ab, props = adc.X
+
+
+    X_a = X_ab[0]
+    X_b = X_ab[1]
+    
+    logger.info(adc, "Print spectroscopic factors > %E\n", adc.spec_factor_print_tol)
+    
+    #print(X_a.shape)
+    #print(X_b.shape)
+    #exit()
+
+    X_tot = (X_a, X_b)
+
+    for iter_idx, X in enumerate(X_tot):
+        if iter_idx == 0:
+            spin = "alpha"
+            nmo = adc.nocc_a + adc.nvir_a
+        else:
+            spin = "beta"
+            nmo = adc.nocc_b + adc.nvir_b
+
+        X_2 = (X.copy()**2)
+
+        thresh = adc.spec_factor_print_tol
+
+        for i in range(X_2.shape[1]):
+
+            sort = np.argsort(-X_2[:,i])
+            X_2_row = X_2[:,i]
+
+            X_2_row = X_2_row[sort]
+            
+            for hp in range(nmo**2):
+                print(nmo)
+                P = X_2_row[hp] % nmo
+                H = X_2_row[hp] // nmo
+
+            if not adc.mol.symmetry:
+                sym = np.repeat(['A'], X_2_row.shape[0])
+            else:
+                if spin == "alpha":
+                    sym = [symm.irrep_id2name(adc.mol.groupname, x) for x in adc._scf.mo_coeff[0].orbsym]
+                    sym = np.array(sym)
+                else:
+                    sym = [symm.irrep_id2name(adc.mol.groupname, x) for x in adc._scf.mo_coeff[1].orbsym]
+                    sym = np.array(sym)
+
+                sym = sym[sort]
+
+            spec_Contribution = X_2_row[X_2_row > thresh]
+            index_mo = sort[X_2_row > thresh]+1
+
+            if np.sum(spec_Contribution) == 0.0:
+                continue
+
+            logger.info(adc, '%s | root %d %s\n', adc.method, i, spin)
+            logger.info(adc, "     HF MO     Spec. Contribution     Orbital symmetry")
+            logger.info(adc, "-----------------------------------------------------------")
+
+            for c in range(index_mo.shape[0]):
+                logger.info(adc, '     %3.d          %10.8f                %s',
+                            index_mo[c], spec_Contribution[c], sym[c])
+
+            logger.info(adc, '\nPartial spec. factor sum = %10.8f', np.sum(spec_Contribution))
+            logger.info(adc, "\n*************************************************************\n")
 
 
 #@profile
@@ -5230,6 +5247,11 @@ def get_properties(adc, nroots=1):
 
     #Transition moments
     TY, dx  = adc.get_X()
+
+    X_a = TY[0].reshape(-1,nroots)
+    X_b = TY[1].reshape(-1,nroots)
+
+    X = (X_a,X_b)
 
     if adc.opdm is True:
         opdm = adc.get_opdm()
@@ -5253,28 +5275,27 @@ def get_properties(adc, nroots=1):
 
     P = np.square(dx.T)*adc.E*(2/3)
     P = P[0] + P[1] + P[2]
+    
+    return P, (X,density_matrix)
 
 
-    return P, (TY,density_matrix)
+def analyze(myadc):
 
+  #  header = ("\n*************************************************************"
+  #            "\n           Eigenvector analysis summary"
+  #            "\n*************************************************************")
+  #  logger.info(myadc, header)
 
-#def analyze(myadc):
-#
-#    header = ("\n*************************************************************"
-#              "\n           Eigenvector analysis summary"
-#              "\n*************************************************************")
-#    logger.info(myadc, header)
-#
-#    myadc.analyze_eigenvector()
-#
-#    if myadc.compute_properties:
-#
-#        header = ("\n*************************************************************"
-#                  "\n            Spectroscopic factors analysis summary"
-#                  "\n*************************************************************")
-#        logger.info(myadc, header)
-#
-#        myadc.analyze_spec_factor()
+  #  myadc.analyze_eigenvector()
+
+    if myadc.compute_properties:
+
+        header = ("\n*************************************************************"
+                  "\n            Spectroscopic factors analysis summary"
+                  "\n*************************************************************")
+        logger.info(myadc, header)
+
+        myadc.analyze_spec_factor()
 
 
 #def compute_dyson_mo(myadc):
@@ -5397,9 +5418,9 @@ class UADCEE(uadc.UADC):
 #    get_trans_moments = get_trans_moments
     get_properties = get_properties
 
- #   analyze_spec_factor = analyze_spec_factor
- #   analyze_eigenvector = analyze_eigenvector
-#    analyze = analyze
+    analyze_spec_factor = analyze_spec_factor
+  #  analyze_eigenvector = analyze_eigenvector
+    analyze = analyze
   #  compute_dyson_mo = compute_dyson_mo
 
  #   @profile
