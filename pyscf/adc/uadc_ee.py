@@ -5177,69 +5177,80 @@ def analyze_spec_factor(adc):
     X_ab, props = adc.X
 
 
-    X_a = X_ab[0]
-    X_b = X_ab[1]
+    X_a = (X_ab[0].copy())**2
+    X_b = (X_ab[1].copy())**2
+
+    nmo_a = adc.nocc_a + adc.nvir_a
+    nmo_b = adc.nocc_b + adc.nvir_b
     
     logger.info(adc, "Print spectroscopic factors > %E\n", adc.spec_factor_print_tol)
     
-    #print(X_a.shape)
-    #print(X_b.shape)
-    #exit()
 
-    X_tot = (X_a, X_b)
+    if not adc.mol.symmetry:
+        sym = np.repeat(['A'], X_2_root.shape[0])
+    else:
+        sym_a = [symm.irrep_id2name(adc.mol.groupname, x) for x in adc._scf.mo_coeff[0].orbsym]
+        sym_b = [symm.irrep_id2name(adc.mol.groupname, x) for x in adc._scf.mo_coeff[1].orbsym]
 
-    for iter_idx, X in enumerate(X_tot):
-        if iter_idx == 0:
-            spin = "alpha"
-            nmo = adc.nocc_a + adc.nvir_a
-        else:
-            spin = "beta"
-            nmo = adc.nocc_b + adc.nvir_b
+    sym_a = np.array(sym_a)
+    sym_b = np.array(sym_b)
 
-        X_2 = (X.copy()**2)
+    spin_a = "Alpha"
+    spin_b = "Beta"
 
-        thresh = adc.spec_factor_print_tol
+    thresh = adc.spec_factor_print_tol
+    
+    for root_a in range(X_a.shape[0]):
 
-        for i in range(X_2.shape[1]):
 
-            sort = np.argsort(-X_2[:,i])
-            X_2_row = X_2[:,i]
+        X_a_root = X_a[root_a,:]
 
-            X_2_row = X_2_row[sort]
+        sort_a = np.argsort(-X_a_root)
+
+        X_a_root = X_a_root[sort_a]
+        
+        X_a_root = X_a_root[X_a_root > thresh]
+        
+        if np.sum(X_a_root) == 0.0:
+            continue
+
+        logger.info(adc, '%s | root %d %s\n', adc.method, root_a, spin_a)
+        logger.info(adc, "Hole_MO       Particle_MO        X_a^2       Orbital symmetry")
+        logger.info(adc, "-----------------------------------------------------------")
+
+        for hp in range(X_a_root.shape[0]):
+            P = ((sort_a[hp]) %  nmo_a)
+            H = ((sort_a[hp]) // nmo_a)
+
+            logger.info(adc, '%4.d           %4.d            %10.8f      %s -> %s ', (H+1), (P+1), X_a_root[hp], sym_a[H], sym_a[P])
+
+        logger.info(adc, '\nPartial norm of X_a = %10.8f', np.linalg.norm(np.sqrt(X_a_root)))
+        logger.info(adc, "*************************************************************\n")
+
+    for root_b in range(X_b.shape[0]):
+
+        X_b_root = X_b[root_b,:]
+
+        sort_b = np.argsort(-X_b_root)
+
+        X_b_root = X_b_root[sort_b]
+
+        X_b_root = X_b_root[X_b_root > thresh]
+
+        if np.sum(X_b_root) == 0.0:
+            continue
+        logger.info(adc, '%s | root %d %s\n', adc.method, root_b, spin_b)
+        logger.info(adc, "Hole_MO       Particle_MO        X_b^2       Orbital symmetry")
+        logger.info(adc, "-----------------------------------------------------------")
+
+        for hp in range(X_b_root.shape[0]):
+            P = sort_b[hp] %  nmo_b
+            H = sort_b[hp] // nmo_b
+
+            logger.info(adc, '%4.d           %4.d            %10.8f      %s -> %s ', (H+1), (P+1), X_b_root[hp], sym_b[H], sym_b[P])
             
-            for hp in range(nmo**2):
-                print(nmo)
-                P = X_2_row[hp] % nmo
-                H = X_2_row[hp] // nmo
-
-            if not adc.mol.symmetry:
-                sym = np.repeat(['A'], X_2_row.shape[0])
-            else:
-                if spin == "alpha":
-                    sym = [symm.irrep_id2name(adc.mol.groupname, x) for x in adc._scf.mo_coeff[0].orbsym]
-                    sym = np.array(sym)
-                else:
-                    sym = [symm.irrep_id2name(adc.mol.groupname, x) for x in adc._scf.mo_coeff[1].orbsym]
-                    sym = np.array(sym)
-
-                sym = sym[sort]
-
-            spec_Contribution = X_2_row[X_2_row > thresh]
-            index_mo = sort[X_2_row > thresh]+1
-
-            if np.sum(spec_Contribution) == 0.0:
-                continue
-
-            logger.info(adc, '%s | root %d %s\n', adc.method, i, spin)
-            logger.info(adc, "     HF MO     Spec. Contribution     Orbital symmetry")
-            logger.info(adc, "-----------------------------------------------------------")
-
-            for c in range(index_mo.shape[0]):
-                logger.info(adc, '     %3.d          %10.8f                %s',
-                            index_mo[c], spec_Contribution[c], sym[c])
-
-            logger.info(adc, '\nPartial spec. factor sum = %10.8f', np.sum(spec_Contribution))
-            logger.info(adc, "\n*************************************************************\n")
+        logger.info(adc, '\nPartial norm of X_b = %10.8f', np.linalg.norm(np.sqrt(X_b_root)))
+        logger.info(adc, "*************************************************************\n")
 
 
 #@profile
@@ -5248,8 +5259,8 @@ def get_properties(adc, nroots=1):
     #Transition moments
     TY, dx  = adc.get_X()
 
-    X_a = TY[0].reshape(-1,nroots)
-    X_b = TY[1].reshape(-1,nroots)
+    X_a = TY[0].reshape(nroots,-1)
+    X_b = TY[1].reshape(nroots,-1)
 
     X = (X_a,X_b)
 

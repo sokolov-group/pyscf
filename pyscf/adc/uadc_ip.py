@@ -1430,7 +1430,7 @@ def analyze_spec_factor(adc):
             spin = "alpha"
         else:
             spin = "beta"
-
+        
         X_2 = (X.copy()**2)
 
         thresh = adc.spec_factor_print_tol
