@@ -32,7 +32,7 @@ from pyscf import df
 from pyscf import scf
 from pyscf.data import nist
 
-#@profile
+##@profile
 def get_imds(adc, eris=None):
 
     cput0 = (logger.process_clock(), logger.perf_counter())
@@ -5185,9 +5185,12 @@ def analyze_spec_factor(adc):
     
     logger.info(adc, "Print spectroscopic factors > %E\n", adc.spec_factor_print_tol)
     
-
     if not adc.mol.symmetry:
         sym = np.repeat(['A'], X_2_root.shape[0])
+    
+    if isinstance(adc._scf, scf.rohf.ROHF):
+        sym_a = [symm.irrep_id2name(adc.mol.groupname, x) for x in adc._scf.mo_coeff.orbsym]
+        sym_b = [symm.irrep_id2name(adc.mol.groupname, x) for x in adc._scf.mo_coeff.orbsym]
     else:
         sym_a = [symm.irrep_id2name(adc.mol.groupname, x) for x in adc._scf.mo_coeff[0].orbsym]
         sym_b = [symm.irrep_id2name(adc.mol.groupname, x) for x in adc._scf.mo_coeff[1].orbsym]
