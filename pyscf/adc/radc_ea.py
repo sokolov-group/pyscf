@@ -30,7 +30,7 @@ from pyscf import __config__
 from pyscf import df
 from pyscf import symm
 
-
+@profile
 def get_imds(adc, eris=None):
 
     cput0 = (logger.process_clock(), logger.perf_counter())
@@ -288,6 +288,7 @@ def get_imds(adc, eris=None):
     return M_ab
 
 
+@profile
 def get_diag(adc,M_ab=None,eris=None):
 
     log = logger.Logger(adc.stdout, adc.verbose)
@@ -371,6 +372,7 @@ def get_diag(adc,M_ab=None,eris=None):
     return diag
 
 
+@profile
 def matvec(adc, M_ab=None, eris=None):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -407,6 +409,7 @@ def matvec(adc, M_ab=None, eris=None):
         M_ab = adc.get_imds()
 
     #Calculate sigma vector
+    @profile
     def sigma_(r):
         cput0 = (logger.process_clock(), logger.perf_counter())
         log = logger.Logger(adc.stdout, adc.verbose)
@@ -432,9 +435,19 @@ def matvec(adc, M_ab=None, eris=None):
                 eris_ovvv = dfadc.get_ovvv_df(adc, eris.Lov, eris.Lvv,
                                               p, chnk_size).reshape(-1,nvir,nvir,nvir)
                 k = eris_ovvv.shape[0]
-                s[s1:f1] +=  2. * lib.einsum('icab,ibc->a', eris_ovvv, r2[a:a+k], optimize=True)
-                s[s1:f1] -=  lib.einsum('ibac,ibc->a',   eris_ovvv, r2[a:a+k], optimize=True)
+                #s[s1:f1] +=  2. * lib.einsum('icab,ibc->a', eris_ovvv, r2[a:a+k], optimize=True)
+                
+                r2_temp_a = r2[a:a+k].transpose(0,2,1)
+                eris_temp_a = eris_ovvv
+                r2_temp_b = r2_temp_a.reshape(-1)
+                
+                eris_temp_b = eris_temp_a.reshape(k*nvir*nvir,nvir)
+                s[s1:f1] +=  2. * np.dot(r2_temp_b.T,eris_temp_b)
+                
 
+
+                s[s1:f1] -=  lib.einsum('ibac,ibc->a',   eris_ovvv, r2[a:a+k], optimize=True)
+                
                 temp_doubles[a:a+k] += lib.einsum('icab,a->ibc', eris_ovvv, r1, optimize=True)
                 del eris_ovvv
                 a += k

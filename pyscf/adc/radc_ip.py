@@ -30,7 +30,6 @@ from pyscf import __config__
 from pyscf import df
 from pyscf import symm
 
-
 def get_imds(adc, eris=None):
 
     cput0 = (logger.process_clock(), logger.perf_counter())

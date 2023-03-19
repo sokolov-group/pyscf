@@ -263,7 +263,7 @@ def calculate_chunk_size(myadc):
 
     return chnk_size
 
-
+@profile
 def unpack_eri_1(eri, norb):
 
     n_oo = norb * (norb + 1) // 2

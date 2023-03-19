@@ -30,7 +30,7 @@ from pyscf.adc import dfadc
 from pyscf import __config__
 from pyscf import df
 
-
+@profile
 def get_imds(adc, eris=None):
 
     cput0 = (logger.process_clock(), logger.perf_counter())
@@ -502,6 +502,7 @@ def get_imds(adc, eris=None):
     return M_ab
 
 
+@profile
 def get_diag(adc,M_ab=None,eris=None):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -676,6 +677,7 @@ def get_diag(adc,M_ab=None,eris=None):
     return diag
 
 
+@profile
 def matvec(adc, M_ab=None, eris=None):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -748,6 +750,7 @@ def matvec(adc, M_ab=None, eris=None):
     M_ab_a, M_ab_b = M_ab
 
     #Calculate sigma vector
+    @profile
     def sigma_(r):
         cput0 = (logger.process_clock(), logger.perf_counter())
         log = logger.Logger(adc.stdout, adc.verbose)

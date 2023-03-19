@@ -32,6 +32,7 @@ from pyscf import symm
 
 
 # Excited-state kernel
+@profile
 def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     adc.method = adc.method.lower()
