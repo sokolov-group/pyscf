@@ -46,6 +46,7 @@ def kernel(mycc, eris=None, t1=None, t2=None, max_cycle=50, tol=1e-8,
     log = logger.new_logger(mycc, verbose)
     if eris is None:
         eris = mycc.ao2mo(mycc.mo_coeff)
+    print('is eris.cvoo zero? ', numpy.linalg.norm(eris.ovoo[:2,2:,:,:]))
     if t1 is None and t2 is None:
         t1, t2 = mycc.get_init_guess(eris)
     elif t2 is None:
@@ -966,6 +967,9 @@ http://sunqm.net/pyscf/code-rule.html#api-rules for the details of API conventio
         self._nmo = None
         self.chkfile = mf.chkfile
         self.callback = None
+        self.ncvs = 0 
+        self.nfc_eom = 0
+        self.cvs_type = None 
 
         keys = set(('max_cycle', 'conv_tol', 'iterative_damping',
                     'conv_tol_normt', 'diis', 'diis_space', 'diis_file',
@@ -1392,6 +1396,18 @@ def _make_eris_incore(mycc, mo_coeff=None):
     nvir = nmo - nocc
 
     eri1 = ao2mo.incore.full(mycc._scf._eri, eris.mo_coeff)
+
+    #### toying with cvs eris ####
+    #eri1 = ao2mo.restore(1, eri1, nmo)
+    #ncvs = mycc.ncvs
+    #print('printing number of ncvs orbitals in make eris incore function = ', ncvs)
+    #eri1[:ncvs,ncvs:,:,:] = 0  
+    #eri1[ncvs:,:ncvs,:,:] = 0  
+    #eri1[:,:,:ncvs,ncvs:] = 0
+    #eri1[:,:,ncvs:,:ncvs] = 0
+    #print('Did I mess up the slicing of full integrals? ', numpy.linalg.norm(eri1[:ncvs,:ncvs,ncvs:,ncvs:]))
+    #### toying with cvs eris ####
+
     #:eri1 = ao2mo.restore(1, eri1, nmo)
     #:eris.oooo = eri1[:nocc,:nocc,:nocc,:nocc].copy()
     #:eris.ovoo = eri1[:nocc,nocc:,:nocc,:nocc].copy()
@@ -1423,6 +1439,10 @@ def _make_eris_incore(mycc, mo_coeff=None):
             oovv[i,j] = oovv[j,i] = buf[j,nocc:,nocc:]
         ij += i + 1
     eris.oovv = oovv
+    #print('norm of cvee = ', numpy.linalg.norm(eris.oovv[:ncvs,ncvs:,:,:]))
+    #print('norm of vcee = ', numpy.linalg.norm(eris.oovv[ncvs:,:ncvs,:,:]))
+    #print('norm of vcoo = ', numpy.linalg.norm(eris.oooo[ncvs:,:ncvs,:,:]))
+    #print('norm of cvoo = ', numpy.linalg.norm(eris.oooo[:ncvs,ncvs:,:,:]))
     oovv = None
 
     ij1 = 0

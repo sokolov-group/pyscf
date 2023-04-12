@@ -249,6 +249,7 @@ def _make_eris_incore(mycc, mo_coeff=None, ao2mofn=None):
     nocc = eris.nocc
     nmo = eris.fock.shape[0]
 
+
     if callable(ao2mofn):
         eri1 = ao2mofn(eris.mo_coeff).reshape([nmo]*4)
     else:
@@ -261,6 +262,7 @@ def _make_eris_incore(mycc, mo_coeff=None, ao2mofn=None):
     eris.ovvo = eri1[:nocc,nocc:,nocc:,:nocc].copy()
     eris.ovvv = eri1[:nocc,nocc:,nocc:,nocc:].copy()
     eris.vvvv = eri1[nocc:,nocc:,nocc:,nocc:].copy()
+
     logger.timer(mycc, 'CCSD integral transformation', *cput0)
     return eris
 

@@ -39,10 +39,10 @@ def kernel(eom, nroots=1, koopmans=False, guess=None, left=False,
 
     if imds is None:
         imds = eom.make_imds(eris)
-
     matvec, diag = eom.gen_matvec(imds, left=left, **kwargs)
 
     size = eom.vector_size()
+   
     nroots = min(nroots, size)
     if guess is not None:
         user_guess = True
@@ -99,6 +99,12 @@ class EOM(lib.StreamObject):
     def __init__(self, cc):
         self.mol = cc.mol
         self._cc = cc
+        nfc = self.nfc_eom = cc.nfc_eom
+        self._cc.t1[:nfc,:] = 0
+        self._cc.t2[:nfc,:nfc,:,:] = 0 
+        self._cc.t2[:nfc,:,:,:] = 0 
+        self._cc.t2[:,:nfc,:,:] = 0
+ 
         self.verbose = cc.verbose
         self.stdout = cc.stdout
         self.max_memory = cc.max_memory
@@ -114,6 +120,8 @@ class EOM(lib.StreamObject):
         self.v = None
         self.nocc = cc.nocc
         self.nmo = cc.nmo
+        self.ncvs = cc.ncvs
+        self.cvs_type = cc.cvs_type
         self._keys = set(self.__dict__.keys())
 
     def dump_flags(self, verbose=None):
@@ -274,12 +282,31 @@ def amplitudes_to_vector_ip(r1, r2):
     vector = np.hstack((r1, r2.ravel()))
     return vector
 
+def cvs_projector(eom, r1, r2, diag_bool=False):
+    ncvs = eom.ncvs
+    cvs_type = eom.cvs_type
+    shift = 1e15
+    if diag_bool:
+        r1[ncvs:] += shift
+        r2[ncvs:, ncvs:, :] += shift 
+        if cvs_type == 'cve':
+            r2[:ncvs, :ncvs, :] += shift 
+    else:
+        r1[ncvs:] = 0
+        r2[ncvs:, ncvs:, :] = 0 
+        if cvs_type == 'cve':
+            r2[:ncvs, :ncvs, :] = 0 
+    return r1, r2
+
 def ipccsd_matvec(eom, vector, imds=None, diag=None):
     # Ref: Nooijen and Snijders, J. Chem. Phys. 102, 1681 (1995) Eqs.(8)-(9)
     if imds is None: imds = eom.make_imds()
     nocc = eom.nocc
     nmo = eom.nmo
     r1, r2 = vector_to_amplitudes_ip(vector, nmo, nocc)
+
+    if eom.ncvs > 0:
+        r1, r2 = cvs_projector(eom, r1, r2)
 
     # 1h-1h block
     Hr1 = -np.einsum('ki,k->i', imds.Loo, r1)
@@ -314,6 +341,9 @@ def ipccsd_matvec(eom, vector, imds=None, diag=None):
         tmp = 2*np.einsum('lkdc,kld->c', imds.Woovv, r2)
         tmp += -np.einsum('kldc,kld->c', imds.Woovv, r2)
         Hr2 += -np.einsum('c,ijcb->ijb', tmp, imds.t2)
+    
+    if eom.ncvs > 0:
+        Hr1, Hr2 = cvs_projector(eom, Hr1, Hr2)
 
     vector = amplitudes_to_vector_ip(Hr1, Hr2)
     return vector
@@ -328,6 +358,9 @@ def lipccsd_matvec(eom, vector, imds=None, diag=None):
     nocc = eom.nocc
     nmo = eom.nmo
     r1, r2 = vector_to_amplitudes_ip(vector, nmo, nocc)
+
+    #if eom.ncvs > 0:
+    #    r1, r2 = cvs_projector(eom, r1, r2)
 
     # 1h-1h block
     Hr1 = -np.einsum('ki,i->k', imds.Loo, r1)
@@ -360,6 +393,8 @@ def lipccsd_matvec(eom, vector, imds=None, diag=None):
         tmp = np.einsum('ijcb,ijb->c', imds.t2, r2)
         Hr2 += -np.einsum('lkdc,c->kld', 2.*imds.Woovv-imds.Woovv.transpose(1,0,2,3), tmp)
 
+    #if eom.ncvs > 0:
+    #    Hr1, Hr2 = cvs_projector(eom, Hr1, Hr2)
     vector = amplitudes_to_vector_ip(Hr1, Hr2)
     return vector
 
@@ -393,7 +428,12 @@ def ipccsd_diag(eom, imds=None):
                     Hr2[i,j,b] += -2*np.dot(imds.Woovv[j,i,b,:], t2[i,j,:,b])
                     Hr2[i,j,b] += np.dot(imds.Woovv[i,j,b,:], t2[i,j,:,b])
 
+    if eom.ncvs > 0:
+       Hr1, Hr2 =  cvs_projector(eom, Hr1, Hr2, diag_bool=True)
     vector = amplitudes_to_vector_ip(Hr1, Hr2)
+    #if eom.ncvs > 0:
+    #    vector[vector < 1e-14] += 1e15
+
     return vector
 
 def ipccsd_star_contract(eom, ipccsd_evals, ipccsd_evecs, lipccsd_evecs, imds=None):
