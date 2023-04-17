@@ -162,6 +162,7 @@ class RADC(pyscf.adc.radc.RADC):
         self.compute_properties = True
         self.approx_trans_moments = True
 
+        self._ncvs = None
         self._nocc = None
         self._nmo = None
         self._nvir = None
@@ -219,6 +220,7 @@ class RADC(pyscf.adc.radc.RADC):
             self.check_sanity()
         self.dump_flags_gs()
 
+        #ncvs = self.ncvs
         nmo = self.nmo
         nocc = self.nocc
         nvir = nmo - nocc
@@ -258,6 +260,7 @@ class RADC(pyscf.adc.radc.RADC):
             self.check_sanity()
         self.dump_flags_gs()
 
+        #ncvs = self.ncvs
         nmo = self.nmo
         nocc = self.nocc
         nvir = nmo - nocc
