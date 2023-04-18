@@ -371,7 +371,7 @@ def get_imds(adc, eris=None):
 
 def cvs_projector(adc, r, diag=False):
     
-    ncvs = adc.ncvs
+    ncvs_proj = adc.ncvs_proj
     nkpts = adc.nkpts
     nocc = adc.nocc
     nvir = adc.nmo - adc.nocc
@@ -390,12 +390,12 @@ def cvs_projector(adc, r, diag=False):
     new_h2 = Pr[s2:f2].reshape((nkpts, nkpts, nvir, nocc, nocc)).copy()
 
     if diag:
-        Pr[ncvs:f1] += diag_shift 
-        new_h2[:,:,:,ncvs:,ncvs:] += diag_shift
+        Pr[ncvs_proj:f1] += diag_shift 
+        new_h2[:,:,:,ncvs_proj:,ncvs_proj:] += diag_shift
         Pr[s2:f2] = new_h2.reshape(-1)
     else:
-        Pr[ncvs:f1] = 0 
-        new_h2[:,:,:,ncvs:,ncvs:] = 0
+        Pr[ncvs_proj:f1] = 0 
+        new_h2[:,:,:,ncvs_proj:,ncvs_proj:] = 0
         Pr[s2:f2] = new_h2.reshape(-1)
     
     return Pr
@@ -454,7 +454,7 @@ def get_diag(adc,kshift,M_ij=None,eris=None):
 
     diag[s2:f2] = doubles.reshape(-1)
 
-    if adc.ncvs is not None:
+    if adc.ncvs_proj is not None:
         diag = cvs_projector(adc, diag, diag=True)
 
     diag = -diag
@@ -500,7 +500,7 @@ def matvec(adc, kshift, M_ij=None, eris=None):
         cput0 = (time.process_time(), time.time())
         log = logger.Logger(adc.stdout, adc.verbose)
 
-        if adc.ncvs is not None:
+        if adc.ncvs_proj is not None:
             r = cvs_projector(adc, r)
 
         r1 = r[s_singles:f_singles]
@@ -782,7 +782,7 @@ def matvec(adc, kshift, M_ij=None, eris=None):
         cput0 = log.timer_debug1("completed sigma vector calculation", *cput0)
         s *= -1.0
 
-        if adc.ncvs is not None:
+        if adc.ncvs_proj is not None:
             s = cvs_projector(adc, s)
 
         return s
@@ -1045,7 +1045,7 @@ class RADCIP(kadc_rhf.RADC):
         self.mo_occ = adc.mo_occ
         self.frozen = adc.frozen
 
-        self.ncvs = adc.ncvs
+        self.ncvs_proj = adc.ncvs_proj
         self._nocc = adc._nocc
         self._nmo = adc._nmo
         self._nvir = adc._nvir
@@ -1057,6 +1057,7 @@ class RADCIP(kadc_rhf.RADC):
         self.mo_energy = adc.mo_energy
         self.imds = adc.imds
         self.chnk_size = adc.chnk_size
+        self.ncvs_proj = adc.ncvs_proj
 
         keys = set(('tol_residual','conv_tol', 'e_corr', 'method', 'mo_coeff', 'mo_energy_b',
                    'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))

@@ -162,7 +162,8 @@ class RADC(pyscf.adc.radc.RADC):
         self.compute_properties = True
         self.approx_trans_moments = True
 
-        self._ncvs = None
+        self.ncvs = None
+        self.ncvs_proj = None
         self._nocc = None
         self._nmo = None
         self._nvir = None
@@ -289,12 +290,18 @@ class RADC(pyscf.adc.radc.RADC):
         self._finalize()
 
         self.method_type = self.method_type.lower()
+        self.ncvs_proj = self.ncvs_proj
+        self.ncvs = self.ncvs
         if(self.method_type == "ea"):
             e_exc, v_exc, spec_fac, x, adc_es = self.ea_adc(
                 nroots=nroots, guess=guess, eris=eris, kptlist=kptlist)
 
-        elif(self.method_type == "ip"):
+        elif(self.method_type == "ip" and self.ncvs == None):
             e_exc, v_exc, spec_fac, x, adc_es = self.ip_adc(
+                nroots=nroots, guess=guess, eris=eris, kptlist=kptlist)
+
+        elif(self.method_type == "ip" and type(self.ncvs) == int and self.ncvs > 0):
+            e_exc, v_exc, spec_fac, x, adc_es = self.ip_adc_cvs(
                 nroots=nroots, guess=guess, eris=eris, kptlist=kptlist)
 
         else:
@@ -311,6 +318,12 @@ class RADC(pyscf.adc.radc.RADC):
     def ea_adc(self, nroots=1, guess=None, eris=None, kptlist=None):
         from pyscf.pbc.adc import kadc_rhf_ea
         adc_es = kadc_rhf_ea.RADCEA(self)
+        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris, kptlist)
+        return e_exc, v_exc, spec_fac, x, adc_es
+
+    def ip_adc_cvs(self, nroots=1, guess=None, eris=None, kptlist=None):
+        from pyscf.pbc.adc import kadc_rhf_ip_cvs
+        adc_es = kadc_rhf_ip_cvs.RADCIPCVS(self)
         e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris, kptlist)
         return e_exc, v_exc, spec_fac, x, adc_es
 

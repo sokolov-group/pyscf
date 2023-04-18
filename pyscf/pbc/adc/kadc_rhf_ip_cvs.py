@@ -979,8 +979,8 @@ def get_properties(adc, kshift, U, nroots=1):
     return P,X
 
 
-class RADCIP(kadc_rhf.RADC):
-    '''restricted ADC for IP energies and spectroscopic amplitudes
+class RADCIPCVS(kadc_rhf.RADC):
+    '''restricted ADC for IP-CVS energies and spectroscopic amplitudes
 
     Attributes:
         verbose : int
@@ -1003,17 +1003,17 @@ class RADCIP(kadc_rhf.RADC):
             Number of roots (eigenvalues) requested. Default value is 1.
 
             >>> myadc = adc.RADC(mf).run()
-            >>> myadcip = adc.RADC(myadc).run()
+            >>> myadcipcvs = adc.RADC(myadc).run()
 
     Saved results
 
-        e_ip : float or list of floats
-            IP energy (eigenvalue). For nroots = 1, it is a single float number. If nroots > 1, it is a list
+        e_ip_cvs : float or list of floats
+            IP-CVS energy (eigenvalue). For nroots = 1, it is a single float number. If nroots > 1, it is a list
             of floats for the lowest nroots eigenvalues.
-        v_ip : array
-            Eigenvectors for each IP transition.
-        p_ip : float
-            Spectroscopic amplitudes for each IP transition.
+        v_ip_cvs : array
+            Eigenvectors for each IP-CVS transition.
+        p_ip_cvs : float
+            Spectroscopic amplitudes for each IP-CVS transition.
     '''
 
     def __init__(self, adc):
@@ -1057,6 +1057,7 @@ class RADCIP(kadc_rhf.RADC):
         self.mo_energy = adc.mo_energy
         self.imds = adc.imds
         self.chnk_size = adc.chnk_size
+        self.ncvs = adc.ncvs
 
         keys = set(('tol_residual','conv_tol', 'e_corr', 'method', 'mo_coeff', 'mo_energy_b',
                    'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))
