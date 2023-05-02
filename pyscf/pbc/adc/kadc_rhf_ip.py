@@ -90,7 +90,7 @@ def get_imds(adc, eris=None):
 
     # i-j block
     # Zeroth-order terms
-
+    print('running projected CVS')
     t2_1 = adc.t2[0]
     eris_ovov = eris.ovov
     for ki in range(nkpts):
@@ -393,6 +393,8 @@ def cvs_projector(adc, r, diag=False):
         Pr[ncvs_proj:f1] += diag_shift 
         new_h2[:,:,:,ncvs_proj:,ncvs_proj:] += diag_shift
         Pr[s2:f2] = new_h2.reshape(-1)
+        norm_func = np.linalg.norm
+        print(f'norm of proj diag^-1 = {norm_func(np.multiply(Pr, Pr.conj())**-1)}')
     else:
         Pr[ncvs_proj:f1] = 0 
         new_h2[:,:,:,ncvs_proj:,ncvs_proj:] = 0
@@ -495,6 +497,10 @@ def matvec(adc, kshift, M_ij=None, eris=None):
     if M_ij is None:
         M_ij = adc.get_imds()
 
+    ###for nkpts_i in range(nkpts):
+    ###    e_ij, _ = np.linalg.eig(M_ij[nkpts_i,:adc.ncvs_proj,:adc.ncvs_proj])
+    ###    print(f'e_ij_{nkpts_i} = {e_ij}')
+    ###exit()
     #Calculate sigma vector
     def sigma_(r):
         cput0 = (time.process_time(), time.time())
