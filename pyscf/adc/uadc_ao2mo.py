@@ -70,23 +70,6 @@ def transform_integrals_incore(myadc):
     eris.OVvo = ao2mo.general(myadc._scf._eri, (occ_b, vir_b, vir_a, occ_a), compact=False).reshape(nocc_b, nvir_b, nvir_a, nocc_a).copy()  # noqa: E501
     eris.OVvv = ao2mo.general(myadc._scf._eri, (occ_b, vir_b, vir_a, vir_a), compact=True).reshape(nocc_b, nvir_b, -1).copy()  # noqa: E501
 
-############################################################################################
-#ADC(3) integrals
-
-    eris.vvvv = ao2mo.general(myadc._scf._eri, (vir_a, vir_a, vir_a, vir_a), compact=False).reshape(nvir_a, nvir_a, nvir_a, nvir_a).copy()  # noqa: E501
-    eris.VVVV = ao2mo.general(myadc._scf._eri, (vir_b, vir_b, vir_b, vir_b), compact=False).reshape(nvir_b, nvir_b, nvir_b, nvir_b).copy()  # noqa: E501
-    eris.vvVV = ao2mo.general(myadc._scf._eri, (vir_a, vir_a, vir_b, vir_b), compact=False).reshape(nvir_a, nvir_a, nvir_b, nvir_b).copy()  # noqa: E501
-    eris.VVvv = ao2mo.general(myadc._scf._eri, (vir_b, vir_b, vir_a, vir_a), compact=False).reshape(nvir_b, nvir_b, nvir_a, nvir_a).copy()  # noqa: E501
-
-    eris.ooov = ao2mo.general(myadc._scf._eri, (occ_a, occ_a, occ_a, vir_a), compact=False).reshape(nocc_a, nocc_a, nocc_a, nvir_a).copy()  # noqa: E501
-    eris.OOOV = ao2mo.general(myadc._scf._eri, (occ_b, occ_b, occ_b, vir_b), compact=False).reshape(nocc_b, nocc_b, nocc_b, nvir_b).copy()  # noqa: E501
-    eris.OOov = ao2mo.general(myadc._scf._eri, (occ_b, occ_b, occ_a, vir_a), compact=False).reshape(nocc_b, nocc_b, nocc_a, nvir_a).copy()  # noqa: E501
-    eris.ooOV = ao2mo.general(myadc._scf._eri, (occ_a, occ_a, occ_b, vir_b), compact=False).reshape(nocc_a, nocc_a, nocc_b, nvir_b).copy()  # noqa: E501
-    eris.OOoo = ao2mo.general(myadc._scf._eri, (occ_b, occ_b, occ_a, occ_a), compact=False).reshape(nocc_b, nocc_b, nocc_a, nocc_a).copy()  # noqa: E501
-############################################################################################
-
-
-
     dip_ints = -myadc.mol.intor('int1e_r',comp=3)
     myadc.dm_a = np.zeros_like((dip_ints))
     myadc.dm_b = np.zeros_like((dip_ints))
