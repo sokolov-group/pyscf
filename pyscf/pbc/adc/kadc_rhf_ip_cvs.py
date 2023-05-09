@@ -23,6 +23,7 @@ import pyscf.adc
 import pyscf.adc.radc
 from pyscf.adc import radc_ao2mo
 import itertools
+import multiprocessing
 
 from itertools import product
 from pyscf import lib
@@ -542,6 +543,11 @@ def matvec(adc, kshift, M_ij=None, eris=None):
         madelung = tools.madelung(cell, kpts)
 
         eris_ovoo = eris.ovoo
+        eris_cecc = eris_ovoo[:,:,:,:ncvs,:,:ncvs,:ncvs].copy()
+        eris_cecv = eris_ovoo[:,:,:,:ncvs,:,:ncvs,ncvs:].copy()
+        eris_vecc = eris_ovoo[:,:,:,ncvs:,:,:ncvs,:ncvs].copy()
+
+        del eris_ovoo
 
 ############ ADC(2) ij block ############################
 
@@ -565,18 +571,31 @@ def matvec(adc, kshift, M_ij=None, eris=None):
                 #s[s1:f1] += 2. * lib.einsum('jaki,ajk->i', eris_vecc, r2_evc, optimize=True)
                 #s[s1:f1] -= lib.einsum('kaij,ajk->i', eris_cecv, r2_evc, optimize=True)
 
+                #s1 += 2. * lib.einsum('jaki,ajk->i',
+                #                      eris_ovoo[kj,ka,kk][:ncvs,:,:ncvs,:ncvs].conj(), r2_ecc[ka,kj], optimize=True)
+                #s1 -= lib.einsum('kaji,ajk->i',
+                #                 eris_ovoo[kk,ka,kj][:ncvs,:,:ncvs,:ncvs].conj(), r2_ecc[ka,kj], optimize=True)
+                #s1 += 2. * lib.einsum('jaik,ajk->i',
+                #                      eris_ovoo[kj,ka,ki][:ncvs,:,:ncvs,ncvs:].conj(), r2_ecv[ka,kj], optimize=True)
+                #s1 -= lib.einsum('kaji,ajk->i',
+                #                 eris_ovoo[kk,ka,kj][ncvs:,:,:ncvs,:ncvs].conj(), r2_ecv[ka,kj], optimize=True)
+                #s1 += 2. * lib.einsum('jaki,ajk->i',
+                #                      eris_ovoo[kj,ka,kk][ncvs:,:,:ncvs,:ncvs].conj(), r2_evc[ka,kj], optimize=True)
+                #s1 -= lib.einsum('kaij,ajk->i',
+                #                 eris_ovoo[kk,ka,ki][:ncvs,:,:ncvs,ncvs:].conj(), r2_evc[ka,kj], optimize=True)
+
                 s1 += 2. * lib.einsum('jaki,ajk->i',
-                                      eris_ovoo[kj,ka,kk][:ncvs,:,:ncvs,:ncvs].conj(), r2_ecc[ka,kj], optimize=True)
+                                      eris_cecc[kj,ka,kk].conj(), r2_ecc[ka,kj], optimize=True)
                 s1 -= lib.einsum('kaji,ajk->i',
-                                 eris_ovoo[kk,ka,kj][:ncvs,:,:ncvs,:ncvs].conj(), r2_ecc[ka,kj], optimize=True)
+                                 eris_cecc[kk,ka,kj].conj(), r2_ecc[ka,kj], optimize=True)
                 s1 += 2. * lib.einsum('jaik,ajk->i',
-                                      eris_ovoo[kj,ka,ki][:ncvs,:,:ncvs,ncvs:].conj(), r2_ecv[ka,kj], optimize=True)
+                                      eris_cecv[kj,ka,ki].conj(), r2_ecv[ka,kj], optimize=True)
                 s1 -= lib.einsum('kaji,ajk->i',
-                                 eris_ovoo[kk,ka,kj][ncvs:,:,:ncvs,:ncvs].conj(), r2_ecv[ka,kj], optimize=True)
+                                 eris_vecc[kk,ka,kj].conj(), r2_ecv[ka,kj], optimize=True)
                 s1 += 2. * lib.einsum('jaki,ajk->i',
-                                      eris_ovoo[kj,ka,kk][ncvs:,:,:ncvs,:ncvs].conj(), r2_evc[ka,kj], optimize=True)
+                                      eris_vecc[kj,ka,kk].conj(), r2_evc[ka,kj], optimize=True)
                 s1 -= lib.einsum('kaij,ajk->i',
-                                 eris_ovoo[kk,ka,ki][:ncvs,:,:ncvs,ncvs:].conj(), r2_evc[ka,kj], optimize=True)
+                                 eris_cecv[kk,ka,ki].conj(), r2_evc[ka,kj], optimize=True)
 
 #################### ADC(2) ajk - i block ############################
 
@@ -586,9 +605,13 @@ def matvec(adc, kshift, M_ij=None, eris=None):
                 #s[s2_ecv:f2_ecv] += lib.einsum('jaik,i->ajk', eris_cecv, r1, optimize=True).reshape(-1)
                 #s[s2_evc:f2_evc] += lib.einsum('jaki,i->ajk', eris_vecc, r1, optimize=True).reshape(-1)
 
-                s2_ecc[ka,kj] += lib.einsum('jaki,i->ajk', eris_ovoo[kj,ka,kk][:ncvs,:,:ncvs,:ncvs], r1, optimize=True)
-                s2_ecv[ka,kj] += lib.einsum('jaik,i->ajk', eris_ovoo[kj,ka,ki][:ncvs,:,:ncvs,ncvs:], r1, optimize=True)
-                s2_evc[ka,kj] += lib.einsum('jaki,i->ajk', eris_ovoo[kj,ka,kk][ncvs:,:,:ncvs,:ncvs], r1, optimize=True)
+                #s2_ecc[ka,kj] += lib.einsum('jaki,i->ajk', eris_ovoo[kj,ka,kk][:ncvs,:,:ncvs,:ncvs], r1, optimize=True)
+                #s2_ecv[ka,kj] += lib.einsum('jaik,i->ajk', eris_ovoo[kj,ka,ki][:ncvs,:,:ncvs,ncvs:], r1, optimize=True)
+                #s2_evc[ka,kj] += lib.einsum('jaki,i->ajk', eris_ovoo[kj,ka,kk][ncvs:,:,:ncvs,:ncvs], r1, optimize=True)
+
+                s2_ecc[ka,kj] += lib.einsum('jaki,i->ajk', eris_cecc[kj,ka,kk], r1, optimize=True)
+                s2_ecv[ka,kj] += lib.einsum('jaik,i->ajk', eris_cecv[kj,ka,ki], r1, optimize=True)
+                s2_evc[ka,kj] += lib.einsum('jaki,i->ajk', eris_vecc[kj,ka,kk], r1, optimize=True)
 
 ################# ADC(2) ajk - bil block ############################
 

@@ -35,7 +35,7 @@ from pyscf.pbc.adc import kadc_ao2mo
 from pyscf.pbc.adc import dfadc
 from pyscf import __config__
 from pyscf.pbc.mp.kmp2 import (get_nocc, get_nmo, padding_k_idx,_padding_k_idx,
-                               padded_mo_coeff, get_frozen_mask, _add_padding)
+                               padded_mo_coeff, get_frozen_mask, _add_padding, padded_mo_energy)
 from pyscf.pbc.cc.kccsd_rhf import _get_epq
 from pyscf.pbc.cc.kccsd_t_rhf import _get_epqr
 from pyscf.pbc.lib import kpts_helper
@@ -440,7 +440,6 @@ def get_diag(adc,kshift,M_ij=None,eris=None):
     diag = np.zeros((dim), dtype=np.complex128)
     doubles = np.zeros((nkpts,nkpts,nvir*nocc*nocc),dtype=np.complex128)
 
-    # Compute precond in h1-h1 block
     M_ij_diag = np.diagonal(M_ij[kshift])
     diag[s1:f1] = M_ij_diag.copy()
 
