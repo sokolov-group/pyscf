@@ -332,7 +332,6 @@ def get_imds(adc, eris=None):
             M_ab_b  += temp
 
         elif isinstance(eris.vvvv_p, type(None)):
-
             a = 0
             temp = np.zeros((nvir_a,nvir_a))
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
