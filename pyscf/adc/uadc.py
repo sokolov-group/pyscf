@@ -153,14 +153,6 @@ class UADC(lib.StreamObject):
             nalpha = mf.mol.nelec[0]
             nbeta = mf.mol.nelec[1]
 
-#            #########SPIN-CONTAMINATION##########
-#            self.mf = mf
-#            self.mol = mf.mol
-#            self.stdout = self.mol.stdout
-#            self.nalpha = mf.mol.nelec[0]
-#            self.nbeta = mf.mol.nelec[1]
-#            ####################################
-
             h1e = mf.get_hcore()
             dm = mf.make_rdm1()
             vhf = mf.get_veff(mf.mol, dm) 
