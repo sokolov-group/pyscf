@@ -609,14 +609,14 @@ def matvec(adc, kshift, M_ij=None, eris=None):
                         s2[ka,kj] += 0.5*lib.einsum('klba,bjl->ajk',
                                                     eris_oovv[kk,kl,kb],r2[kb,kj],optimize=True)
 
+                        kb = kconserv[ka, kj, kl]
+                        s2[ka,kj] +=  0.5*lib.einsum('jlba,blk->ajk',
+                                                     eris_oovv[kj,kl,kb],r2[kb,kl],optimize=True)
                         kb = kconserv[kl, kj, ka]
                         s2[ka,kj] +=  0.5*lib.einsum('jabl,bkl->ajk',
                                                      eris_ovvo[kj,ka,kb],r2[kb,kk],optimize=True)
                         s2[ka,kj] -=  lib.einsum('jabl,blk->ajk',
                                                  eris_ovvo[kj,ka,kb],r2[kb,kl],optimize=True)
-                        kb = kconserv[ka, kj, kl]
-                        s2[ka,kj] +=  0.5*lib.einsum('jlba,blk->ajk',
-                                                     eris_oovv[kj,kl,kb],r2[kb,kl],optimize=True)
 
                     for ki in range(nkpts):
                         kb = kconserv[ka, kk, ki]
