@@ -60,7 +60,8 @@ def vector_size(adc):
 
 def get_imds(adc, eris=None):
 
-    cput0 = (time.process_time(), time.time())
+    #cput0 = (time.process_time(), time.time())
+    cput0 = (time.process_time(), time.perf_counter())
     log = logger.Logger(adc.stdout, adc.verbose)
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -397,7 +398,11 @@ def cvs_projector(adc, r, diag=False):
         print(f'norm of proj diag^-1 = {norm_func(np.multiply(Pr, Pr.conj())**-1)}')
     else:
         Pr[ncvs_proj:f1] = 0 
+        #Pr[s1:f1] = 0 
         new_h2[:,:,:,ncvs_proj:,ncvs_proj:] = 0
+        #new_h2[:,:,:,:ncvs_proj,ncvs_proj:] = 0
+        #new_h2[:,:,:,ncvs_proj:,:ncvs_proj] = 0
+        #new_h2[:,:,:,:ncvs_proj,:ncvs_proj] = 0
         Pr[s2:f2] = new_h2.reshape(-1)
     
     return Pr
@@ -502,7 +507,8 @@ def matvec(adc, kshift, M_ij=None, eris=None):
     ###exit()
     #Calculate sigma vector
     def sigma_(r):
-        cput0 = (time.process_time(), time.time())
+        #cput0 = (time.process_time(), time.time())
+        cput0 = (time.process_time(), time.perf_counter())
         log = logger.Logger(adc.stdout, adc.verbose)
 
         if adc.ncvs_proj is not None:
@@ -512,6 +518,10 @@ def matvec(adc, kshift, M_ij=None, eris=None):
         r2 = r[s_doubles:f_doubles]
 
         r2 = r2.reshape(nkpts,nkpts,nvir,nocc,nocc)
+        ncvs = adc.ncvs_proj
+        r2_ecc = r2[:,:,:,:ncvs,:ncvs].copy()
+        r2_ecv = r2[:,:,:,:ncvs,ncvs:].copy()
+        r2_evc = r2[:,:,:,ncvs:,:ncvs].copy()
         s2 = np.zeros((nkpts,nkpts,nvir,nocc,nocc), dtype=np.complex128)
         cell = adc.cell
         kpts = adc.kpts
@@ -520,22 +530,54 @@ def matvec(adc, kshift, M_ij=None, eris=None):
         eris_ovoo = eris.ovoo
 
 ############ ADC(2) ij block ############################
-
+        #r1[ncvs:] = 0  
         s1 = lib.einsum('ij,j->i',M_ij[kshift],r1)
-
+        #s1[ncvs:] = 0
 ########### ADC(2) i - kja block #########################
         for kj in range(nkpts):
             for kk in range(nkpts):
                 ka = kconserv[kk, kshift, kj]
                 ki = kconserv[kj, kk, ka]
+                ncvs = adc.ncvs_proj
+
+                s_temp = np.zeros(s1.size, dtype=np.complex128)
 
                 s1 += 2. * lib.einsum('jaki,ajk->i',
                                       eris_ovoo[kj,ka,kk].conj(), r2[ka,kj], optimize=True)
                 s1 -= lib.einsum('kaji,ajk->i',
                                  eris_ovoo[kk,ka,kj].conj(), r2[ka,kj], optimize=True)
+
+
+                #s_temp[:ncvs] += 2. * lib.einsum('jaki,ajk->i',
+                #                      eris_ovoo[kj,ka,kk,:ncvs,:,:ncvs,:ncvs].conj(), r2_ecc[ka,kj], optimize=True)
+                #s_temp[:ncvs] -= lib.einsum('kaji,ajk->i',
+                #                 eris_ovoo[kk,ka,kj,:ncvs,:,:ncvs,:ncvs].conj(), r2_ecc[ka,kj], optimize=True)
+                #s_temp[:ncvs] += 2. * lib.einsum('jaki,ajk->i',
+                #                      eris_ovoo[kj,ka,kk,:ncvs,:,ncvs:,:ncvs].conj(), r2_ecv[ka,kj], optimize=True)
+                #s_temp[:ncvs] -= lib.einsum('kaji,ajk->i',
+                #                 eris_ovoo[kk,ka,kj,ncvs:,:,:ncvs,:ncvs].conj(), r2_ecv[ka,kj], optimize=True)
+                #s_temp[:ncvs] += 2. * lib.einsum('jaki,ajk->i',
+                #                      eris_ovoo[kj,ka,kk,ncvs:,:,:ncvs,:ncvs].conj(), r2_evc[ka,kj], optimize=True)
+                #s_temp[:ncvs] -= lib.einsum('kaji,ajk->i',
+                #                 eris_ovoo[kk,ka,kj,:ncvs,:,ncvs:,:ncvs].conj(), r2_evc[ka,kj], optimize=True)
+
+                #s1 += s_temp
 #################### ADC(2) ajk - i block ############################
 
                 s2[ka,kj] += lib.einsum('jaki,i->ajk', eris_ovoo[kj,ka,kk], r1, optimize=True)
+
+                ##r1[2:] = 0
+                #temp = np.zeros((nvir,nocc,nocc), dtype=np.complex128)
+                #temp1 = lib.einsum('jaki,i->ajk', eris_ovoo[kj,ka,kk], r1, optimize=True)
+                #temp[:,:ncvs,:ncvs] = temp1[:,:ncvs,:ncvs]
+                #temp[:,:ncvs,ncvs:] = temp1[:,:ncvs,ncvs:]
+                #temp[:,ncvs:,:ncvs] = temp1[:,ncvs:,:ncvs]
+                #temp[:,:ncvs,:ncvs] = lib.einsum('jaki,i->ajk', eris_ovoo[kj,ka,kk,:ncvs,:,:ncvs,:ncvs], r1[:ncvs], optimize=True)
+                #temp[:,:ncvs,ncvs:] = lib.einsum('jaki,i->ajk', eris_ovoo[kj,ka,kk,:ncvs,:,ncvs:,:ncvs], r1[:ncvs], optimize=True)
+                #temp[:,ncvs:,:ncvs] = lib.einsum('jaki,i->ajk', eris_ovoo[kj,ka,kk,ncvs:,:,:ncvs,:ncvs], r1[:ncvs], optimize=True)
+                #s2[ka,kj] += temp
+                #s2[ka,kj] += temp1
+                ##s1 *= 0
 
 ################# ADC(2) ajk - bil block ############################
 

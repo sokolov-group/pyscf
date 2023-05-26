@@ -144,7 +144,8 @@ cell.dimension=3 with large vacuum.""")
         log.info('j2c_eig_always = %s', self.j2c_eig_always)
         log.info('omega = %s', self.omega)
         log.info('ke_cutoff = %s', self.ke_cutoff)
-        log.info('mesh = %s (%d PWs)', self.mesh, np.prod(self.mesh))
+        if self.mesh is not None:
+            log.info('mesh = %s (%d PWs)', self.mesh, np.prod(self.mesh))
         log.info('mesh_compact = %s (%d PWs)', self.mesh_compact,
                  np.prod(self.mesh_compact))
         if self.auxcell is None:
@@ -222,6 +223,8 @@ cell.dimension=3 with large vacuum.""")
                                                 kmax=kmax,
                                                 round2odd=r2o)
 
+        self.mesh_compact = self.cell.symmetrize_mesh(self.mesh_compact)
+
         # build auxcell
         auxcell = make_auxmol(self.cell, self.auxbasis)
         # drop exponents
@@ -241,6 +244,7 @@ cell.dimension=3 with large vacuum.""")
         if self.mesh_j2c is None:
             self.mesh_j2c = rsdf_helper.estimate_mesh_for_omega(
                                     auxcell, self.omega_j2c, round2odd=True)[1]
+        self.mesh_j2c = self.cell.symmetrize_mesh(self.mesh_j2c)
         self.auxcell = auxcell
 
     def _kpts_build(self, kpts_band=None):
@@ -429,7 +433,8 @@ class _RSGDFBuilder(rsdf_builder._RSGDFBuilder):
         GauxI = np.asarray(Gaux.imag, order='C')
         return GauxR, GauxI
 
-    def gen_j3c_loader(self, h5group, kpt, kpt_ij_idx, ijlst_mapping, aosym):
+    def gen_j3c_loader(self, h5group, kpt, kpt_ij_idx, ijlst_mapping, aosym,
+                       dataname='j3c'):
         cell = self.cell
         kpts = self.kpts
         nkpts = len(self.kpts)
@@ -444,13 +449,13 @@ class _RSGDFBuilder(rsdf_builder._RSGDFBuilder):
             else:
                 ovlp = [s.ravel() for s in ovlp]
 
-        nsegs = len(h5group['j3c-junk/0'])
+        nsegs = len(h5group[f'{dataname}-junk/0'])
 
         def load_j3c(col0, col1):
             j3cR = []
             j3cI = []
             for kk in kpt_ij_idx:
-                v = np.hstack([h5group[f'j3c-junk/{ijlst_mapping[kk]}/{i}'][0,col0:col1]
+                v = np.hstack([h5group[f'{dataname}-junk/{ijlst_mapping[kk]}/{i}'][0,col0:col1]
                                for i in range(nsegs)])
                 vR = np.asarray(v.real, order='C')
                 kj = kk % nkpts
@@ -472,7 +477,7 @@ class _RSGDFBuilder(rsdf_builder._RSGDFBuilder):
         return load_j3c
 
     def make_j3c(self, cderi_file, intor='int3c2e', aosym='s2', comp=None,
-                 j_only=False, shls_slice=None, kptij_lst=None):
+                 j_only=False, dataname='j3c', shls_slice=None, kptij_lst=None):
         if self.cell.omega != 0:
             raise RuntimeError('RSGDF cannot be used to evaluate the long-range '
                                'HF exchange in RSH functionals.')
@@ -517,9 +522,8 @@ class _RSGDFBuilder(rsdf_builder._RSGDFBuilder):
             kptj_idx = members(kptij_lst[:,1], kpts)
             ijlst_mapping[kpti_idx * nkpts + kptj_idx] = np.arange(len(kptij_lst))
 
-        dataname = 'j3c'
         fswap = self.outcore_auxe2(cderi_file, intor, aosym, comp,
-                                   kptij_lst, j_only, 'j3c-junk', shls_slice)
+                                   kptij_lst, j_only, f'{dataname}-junk', shls_slice)
         cpu1 = log.timer_debug1('3c2e', *cpu1)
 
         supmol_ft = ft_ao._ExtendedMole.from_cell(self.rs_cell, self.bvk_kmesh, verbose=log)

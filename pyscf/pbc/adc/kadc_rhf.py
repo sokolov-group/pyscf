@@ -23,6 +23,9 @@ import pyscf.adc
 import pyscf.adc.radc
 from pyscf.adc import radc_ao2mo
 import itertools
+import concurrent
+#from pathos.multiprocessing import ProcessingPool
+from multiprocessing.pool import ThreadPool as Pool
 
 from itertools import product
 from pyscf import lib
@@ -43,7 +46,8 @@ from pyscf.lib.parameters import LOOSE_ZERO_TOL, LARGE_DENOM  # noqa
 
 import h5py
 import tempfile
-
+import sys
+np.set_printoptions(threshold=sys.maxsize)
 # Note : All interals are in Chemist's notation except for vvvv
 #        Eg.of momentum conservation :
 #        Chemist's  oovv(ijab) : ki - kj + ka - kb
@@ -64,6 +68,81 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
     if eris is None:
         eris = adc.transform_integrals()
 
+    def diag_full_M(matvec, diag, kpt_i, nroots):
+        r = np.identity(diag.size)
+        M = np.zeros((diag.size, diag.size))
+        for i in range(diag.size):
+             M[:,i] = matvec(r[:,i])
+
+        print("Hermiticity: ")
+        print("Full M: ", np.linalg.norm(M - M.T))
+        
+        if nroots == 'fullproj':
+            singles = adc.nocc
+        if nroots == 'fulleff':
+            singles = adc.ncvs
+
+        M_i_j = M[:singles,:singles]
+        M_i_ajk = M[:singles,singles:]   
+        M_ajk_i = M[singles:,:singles]
+        M_ajk_bli = M[singles:,singles:]
+        print("ADC Method Type: ", adc.method_type)
+        print('M_i_j - M_i_j.T: ', np.linalg.norm(M_i_j - M_i_j.T))
+        print('M_ajk_bli - M_ajk_bli.T: ', np.linalg.norm(M_ajk_bli - M_ajk_bli))
+        print('M_ajk_i - M_i_ajk.T: ', np.linalg.norm(M_ajk_i - M_i_ajk.T))
+        print('M norm: ', np.linalg.norm(M))
+        print('M_i_j norm: ', np.linalg.norm(M_i_j))
+        print('M_i_ajk norm: ', np.linalg.norm(M_i_ajk))
+        print('M_ajk_i norm: ', np.linalg.norm(M_ajk_i))
+        print('M_i_ajk sum: ', np.sum(M_i_ajk))
+        print('M_ajk_i sum: ', np.sum(M_ajk_i))
+        print('M_ajk_bli norm: ', np.linalg.norm(M_ajk_bli))
+
+        E,U = np.linalg.eig(M)
+        M_size = E.size    
+        U = U[:, E != 0]
+        E = E[E != 0]
+        idx_E_sort = np.argsort(E)
+        E = E[idx_E_sort]
+        U[:, idx_E_sort]
+        print(f'Energies for kpt_i = {kpt_i}: ')
+        with np.printoptions(threshold=np.inf):
+            print(np.column_stack(np.unique(np.around(E, decimals=8), return_counts=True))) 
+        #P, X = get_properties(adc, E.size ,U)
+        #idx_P_sort = np.argsort(-P)
+        #P = P[idx_P_sort]
+        #P_100 = P[:100]
+        P = None
+
+        #Mat_i_ajk = np.dot(M_i_ajk.conj().T, M_i_ajk)
+        Mat_i_ajk = np.dot(M_i_ajk.conj(), M_i_ajk.T)
+        #Mat_ajk_i = np.dot(M_ajk_i, M_ajk_i.conj().T)
+        Mat_ajk_i = np.dot(M_ajk_i.T, M_ajk_i.conj())
+        E_i_ajk,_ = np.linalg.eig(Mat_i_ajk)
+        E_ajk_i,_ = np.linalg.eigh(Mat_ajk_i)
+        print(f'eigvals for Mat_i_ajk {Mat_i_ajk.shape}: ')
+        with np.printoptions(threshold=np.inf):
+            print(np.column_stack(np.unique(np.around(E_i_ajk, decimals=8), return_counts=True))) 
+        print(f'eigvals for Mat_ajk_i {Mat_ajk_i.shape}: ')
+        with np.printoptions(threshold=np.inf):
+            print(np.column_stack(np.unique(np.around(E_ajk_i, decimals=8), return_counts=True))) 
+
+        E_P_size = (E, P, M_size)
+        return E_P_size 
+ 
+    #def kernel_micro(k):
+
+    #    matvec, diag = adc.gen_matvec(k, imds, eris)
+    #    diag_full_M(matvec, diag, k)
+    #    exit()
+
+    imds = adc.get_imds(eris)
+    if nroots == ('fullproj' or 'fulleff'):
+        for k in range(adc.nkpts):
+            matvec, diag = adc.gen_matvec(k, imds, eris)
+            diag_full_M(matvec, diag, k, nroots)
+            exit()
+
     size = adc.vector_size()
     nroots = min(nroots,size)
     nkpts = adc.nkpts
@@ -80,10 +159,41 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
     P = np.zeros((len(kptlist),nroots), np.float64)
     X = np.zeros((len(kptlist),nmo,nroots), dtype)
 
-    imds = adc.get_imds(eris)
+    #imds = adc.get_imds(eris)
 
-    for k, kshift in enumerate(kptlist):
-        matvec, diag = adc.gen_matvec(kshift, imds, eris)
+
+    #for k, kshift in enumerate(kptlist):
+    #    matvec, diag = adc.gen_matvec(kshift, imds, eris)
+
+    #    guess = adc.get_init_guess(nroots, diag, ascending=True)
+
+    #    conv_k,evals_k, evecs_k = lib.linalg_helper.davidson_nosym1(
+    #            lambda xs : [matvec(x) for x in xs], guess, diag,
+    #            nroots=nroots, verbose=log, tol=adc.conv_tol,
+    #            max_cycle=adc.max_cycle, max_space=adc.max_space,
+    #            tol_residual=adc.tol_residual)
+
+    #    evals_k = evals_k.real
+    #    evals[k] = evals_k
+    #    evecs[k] = evecs_k
+    #    conv[k] = conv_k.real
+
+    #    U = np.array(evecs[k]).T.copy()
+
+    #    if adc.compute_properties:
+    #        spec_fac,spec_amp = adc.get_properties(kshift,U,nroots)
+    #        P[k] = spec_fac
+    #        X[k] = spec_amp
+
+    #if nroots == 'full':
+    def kernel_micro(k):
+
+        matvec, diag = adc.gen_matvec(k, imds, eris)
+        #print(f'diag.size = {diag.size}')
+        #exit()
+        #ones_temp = np.ones(diag.size)
+        #out_norm = np.linalg.norm(matvec(diag))
+        #print(f'out norm for kpt = {k} is = {out_norm} ')
 
         guess = adc.get_init_guess(nroots, diag, ascending=True)
 
@@ -93,18 +203,54 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
                 max_cycle=adc.max_cycle, max_space=adc.max_space,
                 tol_residual=adc.tol_residual)
 
-        evals_k = evals_k.real
-        evals[k] = evals_k
-        evecs[k] = evecs_k
-        conv[k] = conv_k.real
 
-        U = np.array(evecs[k]).T.copy()
+        #U = np.array(evecs[k]).T.copy()
+        U = np.array(evecs_k).T.copy()
 
         if adc.compute_properties:
-            spec_fac,spec_amp = adc.get_properties(kshift,U,nroots)
-            P[k] = spec_fac
-            X[k] = spec_amp
+            P_k, X_k = adc.get_properties(k,U,nroots)
 
+        if adc.compute_properties:
+            return conv_k, evals_k, evecs_k, P_k, X_k
+        else:
+            return conv_k, evals_k, evecs_k
+
+    #result_list = []
+    #with concurrent.futures.ThreadPoolExecutor() as executor:
+    #    for k in kptlist:
+    #        result_list.append( executor.submit(kernel_micro, k) )
+    #result_list = ProcessingPool().map(kernel_micro, [kptlist])
+    #result_list = Pool().map(kernel_micro, [[k for k in kptlist]])
+    #for k in kptlist:
+    #    if adc.compute_properties:
+    #        conv_k, evals_k, evecs_k, P_k, X_k = kernel_micro(k)
+    #        P[k] = P_k
+    #        X[k] = X_k
+    #    else:
+    #        conv_k, evals_k, evecs_k = kernel_micro(k)
+    #    conv[k] = conv_k.real
+    #    evals[k] = evals_k.real
+    #    evecs[k] = evecs_k#.real
+
+    k = 0
+    #for result_k in result_list:
+    cput1 = (logger.process_clock(), logger.perf_counter())
+    #for k in kptlist:
+    #    kernel_micro(k)
+    #print('matvec operations finished')
+    #exit()
+    for k in kptlist:
+    #for result_k in Pool().map(kernel_micro, kptlist):
+        if adc.compute_properties:
+            conv_k, evals_k, evecs_k, P_k, X_k = kernel_micro(k)#result_k#.result()
+            P[k] = P_k
+            X[k] = X_k
+        else:
+            conv_k, evals_k, evecs_k = kernel_micro(k)#result_k#.result()
+        conv[k] = conv_k.real
+        evals[k] = evals_k.real
+        evecs[k] = evecs_k#.real
+        k += 1
     nfalse = np.shape(conv)[0] - np.sum(conv)
 
     str = ("\n*************************************************************"
@@ -112,7 +258,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
            "\n*************************************************************")
     logger.info(adc, str)
     if nfalse >= 1:
-        logger.warn(adc, "Davidson iterations for " + str(nfalse) + " root(s) not converged\n")
+        #logger.warn(adc, "Davidson iterations for " + str(nfalse) + " root(s) not converged\n")
+        logger.warn(adc, f'Davidson iterations for {nfalse} root(s) not converged\n')
 
     for k, kshift in enumerate(kptlist):
         for n in range(nroots):
@@ -124,6 +271,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
             logger.info(adc, print_string)
 
     log.timer('ADC', *cput0)
+    log.timer('ADC kernel micro', *cput1)
 
     return evals, evecs, P, X
 

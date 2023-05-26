@@ -60,7 +60,8 @@ def compute_amplitudes_energy(myadc, eris, verbose=None):
 
 def compute_amplitudes(myadc, eris):
 
-    cput0 = (time.process_time(), time.time())
+    #cput0 = (time.process_time(), time.time())
+    cput0 = (time.process_time(), time.perf_counter())
     log = logger.Logger(myadc.stdout, myadc.verbose)
 
     if myadc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
