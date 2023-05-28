@@ -435,6 +435,7 @@ class RADC(pyscf.adc.radc.RADC):
         self.e_corr, self.t1, self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
             self, eris=eris, verbose=self.verbose)
         print ("MPn:",self.e_corr)
+        exit()
         self._finalize()
 
         self.method_type = self.method_type.lower()

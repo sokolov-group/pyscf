@@ -194,6 +194,37 @@ def transform_integrals_outcore(myadc):
 
     return eris
 
+def density_fit(self, auxbasis=None, with_df=None):
+    from pyscf.pbc import df
+    if with_df is None:
+        self.with_df = df.DF(self._scf.mol)
+        self.with_df.max_memory = self.max_memory
+        self.with_df.stdout = self.stdout
+        self.with_df.verbose = self.verbose
+        if auxbasis is None:
+            self.with_df.auxbasis = self._scf.with_df.auxbasis
+        else:
+            self.with_df.auxbasis = auxbasis
+    else:
+        self.with_df = with_df
+    return self
+
+def calculate_chunk_size(myadc):
+
+    avail_mem = (myadc.max_memory - lib.current_memory()[0]) * 0.5
+    nocc = [np.count_nonzero(myadc.mo_occ[ikpt]) for ikpt in range(myadc.nkpts)]
+    nocc = np.amax(nocc)
+    nmo = [len(myadc.mo_occ[ikpt]) for ikpt in range(myadc.nkpts)]
+    nmo = np.max(nocc) + np.max(np.array(nmo) - np.array(nocc))
+    nvir = nmo - nocc
+    vvv_mem = (nvir**3) * 8/1e6
+
+    chnk_size =  int(avail_mem/vvv_mem)
+
+    if chnk_size <= 0 :
+        chnk_size = 1
+
+    return chnk_size
 
 def transform_integrals_df(myadc):
     from pyscf.ao2mo import _ao2mo
@@ -275,20 +306,3 @@ def transform_integrals_df(myadc):
                 #eris.ovvv[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Lvv[kr,ks])/nkpts
 
     return eris
-
-def calculate_chunk_size(myadc):
-
-    avail_mem = (myadc.max_memory - lib.current_memory()[0]) * 0.5
-    nocc = [np.count_nonzero(myadc.mo_occ[ikpt]) for ikpt in range(myadc.nkpts)]
-    nocc = np.amax(nocc)
-    nmo = [len(myadc.mo_occ[ikpt]) for ikpt in range(myadc.nkpts)]
-    nmo = np.max(nocc) + np.max(np.array(nmo) - np.array(nocc))
-    nvir = nmo - nocc
-    vvv_mem = (nvir**3) * 8/1e6
-
-    chnk_size =  int(avail_mem/vvv_mem)
-
-    if chnk_size <= 0 :
-        chnk_size = 1
-
-    return chnk_size
