@@ -296,10 +296,10 @@ def compute_energy(myadc, t2, eris):
 
     emp2 = 0.0
     eris_ovov = eris.ovov
-    t2_amp = t2[0][:]
+    t2_amp = t2[0]#[:]
 
     if (myadc.method == "adc(3)"):
-        t2_amp += t2[1][:]
+        t2_amp += t2[1]#[:]
 
     for ki, kj, ka in kpts_helper.loop_kkk(nkpts):
 
