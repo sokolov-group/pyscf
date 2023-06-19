@@ -258,6 +258,9 @@ def transform_integrals_df(myadc):
     eris.Lvv = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
     eris.Lov = np.empty((nkpts,nkpts,naux,nocc,nvir),dtype=dtype)
 
+    eris.Loo = np.empty((nkpts,nkpts,naux,nocc,nocc),dtype=dtype)
+    eris.Lvo = np.empty((nkpts,nkpts,naux,nvir,nocc),dtype=dtype)
+
     eris.vvvv = None
     eris.ovvv = None
 
@@ -279,9 +282,11 @@ def transform_integrals_df(myadc):
                     out = _ao2mo.r_e2(Lpq_ao, mo, (0, nmo, nmo, nmo+nmo), tao, ao_loc)
                 Lpq_mo[ki, kj] = out.reshape(-1, nmo, nmo)
 
-                Loo[ki,kj] = Lpq_mo[ki,kj][:,:nocc,:nocc]
+                #Loo[ki,kj] = Lpq_mo[ki,kj][:,:nocc,:nocc]
+                eris.Loo[ki,kj] = Loo[ki,kj] = Lpq_mo[ki,kj][:,:nocc,:nocc]
                 eris.Lov[ki,kj] = Lpq_mo[ki,kj][:,:nocc,nocc:]
-                Lvo[ki,kj] = Lpq_mo[ki,kj][:,nocc:,:nocc]
+                #Lvo[ki,kj] = Lpq_mo[ki,kj][:,nocc:,:nocc]
+                eris.Lvo[ki,kj] = Lvo[ki,kj] = Lpq_mo[ki,kj][:,nocc:,:nocc]
                 eris.Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:]
 
     eris.feri = feri = lib.H5TmpFile()

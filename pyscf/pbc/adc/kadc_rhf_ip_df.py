@@ -45,6 +45,8 @@ from pyscf.pbc import tools
 import h5py
 import tempfile
 
+print('Running KADC-IP using only Lpq integrals while avoiding eris_pqrs')
+
 def vector_size(adc):
 
     nkpts = adc.nkpts
@@ -56,7 +58,6 @@ def vector_size(adc):
     size = n_singles + n_doubles
 
     return size
-
 
 def get_imds(adc, eris=None):
 
@@ -1026,8 +1027,8 @@ def get_properties(adc, kshift, U, nroots=1):
     return P,X
 
 
-class RADCIP(kadc_rhf.RADC):
-    '''restricted ADC for IP energies and spectroscopic amplitudes
+class RADCIPDF(kadc_rhf.RADC):
+    '''restricted ADC for IP-DF energies and spectroscopic amplitudes
 
     Attributes:
         verbose : int
@@ -1050,17 +1051,17 @@ class RADCIP(kadc_rhf.RADC):
             Number of roots (eigenvalues) requested. Default value is 1.
 
             >>> myadc = adc.RADC(mf).run()
-            >>> myadcip = adc.RADC(myadc).run()
+            >>> myadcipdf = adc.RADC(myadc).run()
 
     Saved results
 
-        e_ip : float or list of floats
-            IP energy (eigenvalue). For nroots = 1, it is a single float number. If nroots > 1, it is a list
+        e_ip_df : float or list of floats
+            IP-DF energy (eigenvalue). For nroots = 1, it is a single float number. If nroots > 1, it is a list
             of floats for the lowest nroots eigenvalues.
-        v_ip : array
-            Eigenvectors for each IP transition.
-        p_ip : float
-            Spectroscopic amplitudes for each IP transition.
+        v_ip_df : array
+            Eigenvectors for each IP-DF transition.
+        p_ip_df : float
+            Spectroscopic amplitudes for each IP-DF transition.
     '''
 
     def __init__(self, adc):
@@ -1092,6 +1093,7 @@ class RADCIP(kadc_rhf.RADC):
         self.mo_occ = adc.mo_occ
         self.frozen = adc.frozen
 
+        self.Lpq_contract = adc.Lpq_contract
         self.ncvs_proj = adc.ncvs_proj
         self._nocc = adc._nocc
         self._nmo = adc._nmo

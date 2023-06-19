@@ -310,6 +310,7 @@ class RADC(pyscf.adc.radc.RADC):
         self.compute_properties = True
         self.approx_trans_moments = True
 
+        self.Lpq_contract = False
         self.ncvs = None
         self.ncvs_proj = None
         self._nocc = None
@@ -441,11 +442,13 @@ class RADC(pyscf.adc.radc.RADC):
         self.method_type = self.method_type.lower()
         self.ncvs_proj = self.ncvs_proj
         self.ncvs = self.ncvs
+
+        print(f'value of Lpq_contract == {self.Lpq_contract}')
         if(self.method_type == "ea"):
             e_exc, v_exc, spec_fac, x, adc_es = self.ea_adc(
                 nroots=nroots, guess=guess, eris=eris, kptlist=kptlist)
 
-        elif(self.method_type == "ip" and self.ncvs == None):
+        elif(self.method_type == "ip" and self.ncvs == None and self.Lpq_contract == False):
             e_exc, v_exc, spec_fac, x, adc_es = self.ip_adc(
                 nroots=nroots, guess=guess, eris=eris, kptlist=kptlist)
 
@@ -453,6 +456,10 @@ class RADC(pyscf.adc.radc.RADC):
             e_exc, v_exc, spec_fac, x, adc_es = self.ip_adc_cvs(
                 nroots=nroots, guess=guess, eris=eris, kptlist=kptlist)
 
+        elif(self.method_type == "ip" and self.Lpq_contract == True):
+            print('executing Lpq_contract elif statement')
+            e_exc, v_exc, spec_fac, x, adc_es = self.ip_adc_df(
+                nroots=nroots, guess=guess, eris=eris, kptlist=kptlist)
         else:
             raise NotImplementedError(self.method_type)
         self._adc_es = adc_es
@@ -473,6 +480,12 @@ class RADC(pyscf.adc.radc.RADC):
     def ip_adc_cvs(self, nroots=1, guess=None, eris=None, kptlist=None):
         from pyscf.pbc.adc import kadc_rhf_ip_cvs
         adc_es = kadc_rhf_ip_cvs.RADCIPCVS(self)
+        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris, kptlist)
+        return e_exc, v_exc, spec_fac, x, adc_es
+
+    def ip_adc_df(self, nroots=1, guess=None, eris=None, kptlist=None):
+        from pyscf.pbc.adc import kadc_rhf_ip_df
+        adc_es = kadc_rhf_ip_df.RADCIPDF(self)
         e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris, kptlist)
         return e_exc, v_exc, spec_fac, x, adc_es
 
