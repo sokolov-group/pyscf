@@ -399,7 +399,7 @@ def compute_amplitudes(myadc, eris):
         if isinstance(eris.OVVV, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(myadc)
             a = 0
-            for p in range(0,nocc_a,chnk_size):
+            for p in range(0,nocc_b,chnk_size):
                 eris_OVVV = dfadc.get_ovvv_spin_df(myadc, eris.LOV, eris.LVV, p, chnk_size).reshape(-1,nvir_b,nvir_b,nvir_b)
                 k = eris_OVVV.shape[0]
                 t2_2_b[:,a:a+k] += lib.einsum('id,jbad->ijab',t1_1_b,eris_OVVV, optimize = True)
