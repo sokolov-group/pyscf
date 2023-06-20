@@ -186,6 +186,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
     #        X[k] = spec_amp
 
     #if nroots == 'full':
+
     def kernel_micro(k):
 
         matvec, diag = adc.gen_matvec(k, imds, eris)

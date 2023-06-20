@@ -258,8 +258,13 @@ def transform_integrals_df(myadc):
     eris.Lvv = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
     eris.Lov = np.empty((nkpts,nkpts,naux,nocc,nvir),dtype=dtype)
 
-    eris.Loo = np.empty((nkpts,nkpts,naux,nocc,nocc),dtype=dtype)
-    eris.Lvo = np.empty((nkpts,nkpts,naux,nvir,nocc),dtype=dtype)
+    #eris.Loo = np.empty((nkpts,nkpts,naux,nocc,nocc),dtype=dtype)
+    #eris.Lvo = np.empty((nkpts,nkpts,naux,nvir,nocc),dtype=dtype)
+
+    #eris_Lpq.Lvv = np.zeros((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
+    #eris_Lpq.Lov = np.zeros((nkpts,nkpts,naux,nocc,nvir),dtype=dtype)
+    #eris_Lpq.Loo = np.zeros((nkpts,nkpts,naux,nocc,nocc),dtype=dtype)
+    #eris_Lpq.Lvo = np.zeros((nkpts,nkpts,naux,nvir,nocc),dtype=dtype)
 
     eris.vvvv = None
     eris.ovvv = None
@@ -282,11 +287,11 @@ def transform_integrals_df(myadc):
                     out = _ao2mo.r_e2(Lpq_ao, mo, (0, nmo, nmo, nmo+nmo), tao, ao_loc)
                 Lpq_mo[ki, kj] = out.reshape(-1, nmo, nmo)
 
-                #Loo[ki,kj] = Lpq_mo[ki,kj][:,:nocc,:nocc]
-                eris.Loo[ki,kj] = Loo[ki,kj] = Lpq_mo[ki,kj][:,:nocc,:nocc]
+                Loo[ki,kj] = Lpq_mo[ki,kj][:,:nocc,:nocc]
+                #eris.Loo[ki,kj] = Loo[ki,kj] = Lpq_mo[ki,kj][:,:nocc,:nocc]
                 eris.Lov[ki,kj] = Lpq_mo[ki,kj][:,:nocc,nocc:]
-                #Lvo[ki,kj] = Lpq_mo[ki,kj][:,nocc:,:nocc]
-                eris.Lvo[ki,kj] = Lvo[ki,kj] = Lpq_mo[ki,kj][:,nocc:,:nocc]
+                Lvo[ki,kj] = Lpq_mo[ki,kj][:,nocc:,:nocc]
+                #eris.Lvo[ki,kj] = Lvo[ki,kj] = Lpq_mo[ki,kj][:,nocc:,:nocc]
                 eris.Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:]
 
     eris.feri = feri = lib.H5TmpFile()
@@ -297,6 +302,11 @@ def transform_integrals_df(myadc):
     eris.ovov = feri.create_dataset('ovov', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nvir), dtype=dtype)
     eris.ovvo = feri.create_dataset('ovvo', (nkpts,nkpts,nkpts,nocc,nvir,nvir,nocc), dtype=dtype)
     #eris.ovvv = feri.create_dataset('ovvv', (nkpts,nkpts,nkpts,nocc,nvir,nvir,nvir), dtype=dtype)
+    #eris.oooo = np.empty((nkpts,nkpts,nkpts,nocc,nocc,nocc,nocc), dtype=dtype)
+    #eris.oovv = np.empty((nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir), dtype=dtype)
+    #eris.ovoo = np.empty((nkpts,nkpts,nkpts,nocc,nvir,nocc,nocc), dtype=dtype)
+    #eris.ovov = np.empty((nkpts,nkpts,nkpts,nocc,nvir,nocc,nvir), dtype=dtype)
+    #eris.ovvo = np.empty((nkpts,nkpts,nkpts,nocc,nvir,nvir,nocc), dtype=dtype)
 
     for kp in range(nkpts):
         for kq in range(nkpts):
@@ -311,3 +321,63 @@ def transform_integrals_df(myadc):
                 #eris.ovvv[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Lvv[kr,ks])/nkpts
 
     return eris
+
+def get_Lpq_incore(myadc):
+    from pyscf.ao2mo import _ao2mo
+    cell = myadc.cell
+    kpts = myadc.kpts
+    nkpts = myadc.nkpts
+    nocc = myadc.nocc
+    nmo = myadc.nmo
+    nvir = nmo - nocc
+    nao = cell.nao_nr()
+
+    if myadc._scf.with_df._cderi is None:
+        myadc._scf.with_df.build()
+    dtype = myadc.mo_coeff[0].dtype
+
+    mo_coeff = myadc.mo_coeff = padded_mo_coeff(myadc, myadc.mo_coeff)
+
+    kconserv = myadc.khelper.kconserv
+
+    # The momentum conservation array
+    kconserv = myadc.khelper.kconserv
+
+    with_df = myadc.with_df
+    naux = with_df.get_naoaux()
+    eris_Lpq = lambda:None
+
+    eris.dtype = dtype = np.result_type(dtype)
+    Lpq_mo = np.empty((nkpts, nkpts), dtype=object)
+    eris_Lpq.Loo = np.empty((nkpts,nkpts,naux,nocc,nocc),dtype=dtype)
+    #eris_Lpq.Lvo = np.empty((nkpts,nkpts,naux,nvir,nocc),dtype=dtype)
+    #eris_Lpq.Lvv = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
+    eris_Lpq.Lov = np.empty((nkpts,nkpts,naux,nocc,nvir),dtype=dtype)
+
+    eris.vvvv = None
+    eris.ovvv = None
+
+    with df._load3c(myadc._scf.with_df._cderi, 'j3c') as fload:
+        tao = []
+        ao_loc = None
+        for ki, kpti in enumerate(kpts):
+            for kj, kptj in enumerate(kpts):
+                Lpq_ao = np.asarray(fload(kpti, kptj))
+
+                mo = np.hstack((mo_coeff[ki], mo_coeff[kj]))
+                mo = np.asarray(mo, dtype=dtype, order='F')
+                if dtype == np.double:
+                    out = _ao2mo.nr_e2(Lpq_ao, mo, (0, nmo, nmo, nmo+nmo), aosym='s2')
+                else:
+                    #Note: Lpq.shape[0] != naux if linear dependency is found in auxbasis
+                    if Lpq_ao[0].size != nao**2:  # aosym = 's2'
+                        Lpq_ao = lib.unpack_tril(Lpq_ao).astype(np.complex128)
+                    out = _ao2mo.r_e2(Lpq_ao, mo, (0, nmo, nmo, nmo+nmo), tao, ao_loc)
+                Lpq_mo[ki, kj] = out.reshape(-1, nmo, nmo)
+
+                eris_Lpq.Loo[ki,kj] = Loo[ki,kj] = Lpq_mo[ki,kj][:,:nocc,:nocc]
+                eris_Lpq.Lov[ki,kj] = Lpq_mo[ki,kj][:,:nocc,nocc:]
+                #eris_Lpq.Lvo[ki,kj] = Lvo[ki,kj] = Lpq_mo[ki,kj][:,nocc:,:nocc]
+                #eris_Lpq.Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:]
+
+    return eris_Lpq

@@ -92,7 +92,7 @@ def get_imds(adc, eris=None):
 
     # i-j block
     # Zeroth-order terms
-    print('running projected CVS')
+    print('running projected CVS using Lpq integrals?')
     t2_1 = adc.t2[0]
     eris_ovov = eris.ovov
     for ki in range(nkpts):
@@ -469,7 +469,7 @@ def get_diag(adc,kshift,M_ij=None,eris=None):
 
     return diag
 
-
+#@profile
 def matvec(adc, kshift, M_ij=None, eris=None):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -507,6 +507,13 @@ def matvec(adc, kshift, M_ij=None, eris=None):
     ###    print(f'e_ij_{nkpts_i} = {e_ij}')
     ###exit()
     #Calculate sigma vector
+    ###from pyscf.pbc.adc.kadc_ao2mo import get_Lpq_incore
+    ###eris_Lpq = get_Lpq_incore(adc) 
+    ###eris_Lov = eris_Lpq.Lov
+    ###eris_Loo = eris_Lpq.Loo
+    eris_Lov = eris.Lov
+    eris_Loo = eris.Loo
+    #@profile
     def sigma_(r):
         #cput0 = (time.process_time(), time.time())
         cput0 = (time.process_time(), time.perf_counter())
@@ -528,7 +535,7 @@ def matvec(adc, kshift, M_ij=None, eris=None):
         kpts = adc.kpts
         madelung = tools.madelung(cell, kpts)
 
-        eris_ovoo = eris.ovoo
+        #eris_ovoo = eris.ovoo
 
 ############ ADC(2) ij block ############################
         #r1[ncvs:] = 0  
@@ -543,11 +550,21 @@ def matvec(adc, kshift, M_ij=None, eris=None):
 
                 s_temp = np.zeros(s1.size, dtype=np.complex128)
 
-                s1 += 2. * lib.einsum('jaki,ajk->i',
-                                      eris_ovoo[kj,ka,kk].conj(), r2[ka,kj], optimize=True)
-                s1 -= lib.einsum('kaji,ajk->i',
-                                 eris_ovoo[kk,ka,kj].conj(), r2[ka,kj], optimize=True)
+                #s1 += 2. * lib.einsum('jaki,ajk->i',
+                #                      eris_ovoo[kj,ka,kk].conj(), r2[ka,kj], optimize=True)
+                #s1 -= lib.einsum('kaji,ajk->i',
+                #                 eris_ovoo[kk,ka,kj].conj(), r2[ka,kj], optimize=True)
 
+                ##s1 += 2. * lib.einsum('Lja,Lki,ajk->i',
+                ##                      eris_Lov[kj,ka].conj(), eris_Loo[kk,ki].conj(), r2[ka,kj], optimize=True)/nkpts
+                s1_temp_a = lib.einsum('Lja,ajk->Lk', eris_Lov[kj,ka].conj(), r2[ka,kj], optimize=True)
+                s1 += 2. * lib.einsum('Lki,Lk->i',  eris_Loo[kk,ki].conj(), s1_temp_a, optimize=True)/nkpts
+                del s1_temp_a
+                ##s1 -= lib.einsum('Lka,Lji,ajk->i',
+                ##                 eris_Lov[kk,ka].conj(), eris_Loo[kj,ki].conj(), r2[ka,kj], optimize=True)/nkpts
+                s1_temp_b = lib.einsum('Lka,ajk->Lj', eris_Lov[kk,ka].conj(), r2[ka,kj], optimize=True)
+                s1 -= lib.einsum('Lji,Lj->i', eris_Loo[kj,ki].conj(), s1_temp_b, optimize=True)/nkpts
+                del s1_temp_b
 
                 #s_temp[:ncvs] += 2. * lib.einsum('jaki,ajk->i',
                 #                      eris_ovoo[kj,ka,kk,:ncvs,:,:ncvs,:ncvs].conj(), r2_ecc[ka,kj], optimize=True)
@@ -565,7 +582,13 @@ def matvec(adc, kshift, M_ij=None, eris=None):
                 #s1 += s_temp
 #################### ADC(2) ajk - i block ############################
 
-                s2[ka,kj] += lib.einsum('jaki,i->ajk', eris_ovoo[kj,ka,kk], r1, optimize=True)
+                ###s2[ka,kj] += lib.einsum('jaki,i->ajk', eris_ovoo[kj,ka,kk], r1, optimize=True)
+                #s2[ka,kj] += lib.einsum('Lja,Lki,i->ajk', eris_Lov[kj,ka], eris_Loo[kk,ki] ,r1, optimize=True)/nkpts
+
+                #temp_a = lib.einsum('Lki,i->Lki', eris_Loo[kk,ki], r1, optimize=True)
+                s2_temp = lib.einsum('Lki,i->Lk', eris_Loo[kk,ki], r1, optimize=True)
+                s2[ka,kj] += lib.einsum('Lja,Lk->ajk', eris_Lov[kj,ka], s2_temp, optimize=True)/nkpts
+                del s2_temp
 
                 ##r1[2:] = 0
                 #temp = np.zeros((nvir,nocc,nocc), dtype=np.complex128)

@@ -79,6 +79,7 @@ def compute_amplitudes(myadc, eris):
     tf = tempfile.TemporaryFile()
     f = h5py.File(tf, 'a')
     t2_1 = f.create_dataset('t2_1', (nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir), dtype=eris.ovov.dtype)
+    #t2_1 = np.empty((nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir), dtype=eris.ovov.dtype)
 
     mo_energy =  myadc.mo_energy
     mo_coeff =  myadc.mo_coeff

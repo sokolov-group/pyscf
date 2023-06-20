@@ -46,7 +46,7 @@ def kernel(mycc, eris=None, t1=None, t2=None, max_cycle=50, tol=1e-8,
     log = logger.new_logger(mycc, verbose)
     if eris is None:
         eris = mycc.ao2mo(mycc.mo_coeff)
-    print('is eris.cvoo zero? ', numpy.linalg.norm(eris.ovoo[:2,2:,:,:]))
+    #print('is eris.cvoo zero? ', numpy.linalg.norm(eris.ovoo[:2,2:,:,:]))
     if t1 is None and t2 is None:
         t1, t2 = mycc.get_init_guess(eris)
     elif t2 is None:
