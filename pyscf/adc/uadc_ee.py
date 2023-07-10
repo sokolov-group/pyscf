@@ -8537,8 +8537,8 @@ def analyze_spec_factor(adc):
         sym_b = [symm.irrep_id2name(adc.mol.groupname, x) for x in hf_symm.get_orbsym(adc.mol, adc.mo_coeff[1])]
 
     else:
-        sym_a = np.repeat(['A'], X_a.shape[0])
-        sym_b = np.repeat(['A'], X_b.shape[0])
+        sym_a = np.repeat(['A'], nmo_a)
+        sym_b = np.repeat(['A'], nmo_b)
 
     sym_a = np.array(sym_a)
     sym_b = np.array(sym_b)
