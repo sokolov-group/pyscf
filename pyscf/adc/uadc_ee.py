@@ -6690,6 +6690,57 @@ def get_old_spin_contamination(adc):
     return spin, (trace_a, trace_b)
 
 #@profile
+def get_ref_opdm(adc):
+    if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
+        raise NotImplementedError(adc.method)
+    t1 = adc.t1
+    t2 = adc.t2
+    
+    nocc_a = adc.nocc_a
+    nocc_b = adc.nocc_b
+    nvir_a = adc.nvir_a
+    nvir_b = adc.nvir_b
+
+
+    vir_list_a = range(nvir_a)
+    vir_list_b = range(nvir_b)
+    occ_list_a = range(nocc_a)
+    occ_list_b = range(nocc_b)
+
+    if adc.f_ov is None:
+        f_ov_a = np.zeros((nocc_a, nvir_a))
+        f_ov_b = np.zeros((nocc_b, nvir_b))
+        t1_ce_aa = np.zeros((nocc_a, nvir_a))
+        t1_ce_bb = np.zeros((nocc_b, nvir_b))
+    else:
+        f_ov_a, f_ov_b = adc.f_ov
+        t1_ce_aa = t1[2][0][:]
+        t1_ce_bb = t1[2][1][:]
+
+    t2_ce_aa = t1[0][0][:]
+    t2_ce_bb = t1[0][1][:]
+
+    t1_ccee_aaaa = t2[0][0][:]
+    t1_ccee_abab = t2[0][1][:]
+    t1_ccee_bbbb = t2[0][2][:]
+
+    t2_ccee_aaaa = t2[1][0][:]
+    t2_ccee_abab = t2[1][1][:]
+    t2_ccee_bbbb = t2[1][2][:]
+
+    nmo_a = nocc_a + nvir_a
+    nmo_b = nocc_b + nvir_b
+
+    OPDM_a = np.zeros((nmo_a,nmo_a))
+    OPDM_b = np.zeros((nmo_b,nmo_b))
+
+    print("Hello ref_opdm")
+    exit()
+
+
+    opdm = (OPDM_a, OPMD_b)
+    return opdm
+
 def get_spin_contamination(adc):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -8630,7 +8681,12 @@ def get_properties(adc, nroots=1):
     else:
         spin = None
    
-    density_matrix = (spin, opdm, tpdm)
+    if adc.ref_opdm is True:
+        opdm = adc.get_ref_opdm()
+    else:
+        ref_opdm = None
+
+    density_matrix = (spin, ref_opdm, opdm, tpdm)
 
     P = np.square(dx.T)*adc.E*(2/3)
     P = P[0] + P[1] + P[2]
@@ -8732,6 +8788,7 @@ class UADCEE(uadc.UADC):
         self.nucl_dip = adc.nucl_dip
         self.imds = adc.imds
         self.e_corr = adc.e_corr
+        self.ref_opdm = adc.ref_opdm
         self.method = adc.method
         self.method_type = adc.method_type
         self._scf = adc._scf
@@ -8772,6 +8829,7 @@ class UADCEE(uadc.UADC):
     get_X = get_X
     get_old_spin_contamination = get_old_spin_contamination
     get_spin_contamination = get_spin_contamination
+    get_ref_opdm = get_ref_opdm
     get_tpdm = get_tpdm
     get_opdm = get_opdm
 #    get_trans_moments = get_trans_moments

@@ -217,6 +217,7 @@ class UADC(lib.StreamObject):
             self.chkfile = mf.chkfile
             self.method = "adc(2)"
             self.opdm = False
+            self.ref_opdm = False
             self.tpdm = False
             self.old_spin_c = False
             self.spin_c = True
@@ -271,6 +272,7 @@ class UADC(lib.StreamObject):
             self.dm_a = None
             self.dm_b = None
             self.imds = lambda:None
+            self.ref_opdm = False
             self._nocc = mf.nelec
             self._nmo = (mo_coeff[0].shape[1], mo_coeff[1].shape[1])
             self._nvir = (self._nmo[0] - self._nocc[0], self._nmo[1] - self._nocc[1])
