@@ -8682,7 +8682,7 @@ def get_properties(adc, nroots=1):
         spin = None
    
     if adc.ref_opdm is True:
-        opdm = adc.get_ref_opdm()
+        ref_opdm = adc.get_ref_opdm()
     else:
         ref_opdm = None
 
