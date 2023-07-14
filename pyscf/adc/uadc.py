@@ -69,7 +69,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         adc.P,adc.X = adc.get_properties(nroots)
     if adc.method_type == "ee":
         TY, props = adc.X
-        spin, opdm, tpdm = props
+        spin, ref_opdm, opdm, tpdm = props
         if adc.spin_c is True:
             spin, trace = spin
             spin_c = spin

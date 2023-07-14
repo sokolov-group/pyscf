@@ -6696,11 +6696,12 @@ def get_ref_opdm(adc):
     t1 = adc.t1
     t2 = adc.t2
     
+    einsum_type = True
+    
     nocc_a = adc.nocc_a
     nocc_b = adc.nocc_b
     nvir_a = adc.nvir_a
     nvir_b = adc.nvir_b
-
 
     vir_list_a = range(nvir_a)
     vir_list_b = range(nvir_b)
@@ -6734,11 +6735,52 @@ def get_ref_opdm(adc):
     OPDM_a = np.zeros((nmo_a,nmo_a))
     OPDM_b = np.zeros((nmo_b,nmo_b))
 
-    print("Hello ref_opdm")
-    exit()
+    OPDM_a[:nocc_a, :nocc_a]  = lib.einsum('IL->IL', np.identity(nocc_a), optimize = einsum_type).copy()
+    OPDM_a[:nocc_a, :nocc_a] -= 1/2 * lib.einsum('Iiab,Liab->IL', t1_ccee_aaaa, t1_ccee_aaaa, optimize = einsum_type)
+    OPDM_a[:nocc_a, :nocc_a] -= lib.einsum('Ia,La->IL', t1_ce_aa, t1_ce_aa, optimize = einsum_type)
+    OPDM_a[:nocc_a, :nocc_a] -= lib.einsum('Iiab,Liab->IL', t1_ccee_abab, t1_ccee_abab, optimize = einsum_type)
 
+    OPDM_a[nocc_a:, nocc_a:]  = lib.einsum('iA,iC->AC', t1_ce_aa, t1_ce_aa, optimize = einsum_type)
+    OPDM_a[nocc_a:, nocc_a:] += 1/2 * lib.einsum('ijAa,ijCa->AC', t1_ccee_aaaa, t1_ccee_aaaa, optimize = einsum_type)
+    OPDM_a[nocc_a:, nocc_a:] += lib.einsum('ijAa,ijCa->AC', t1_ccee_abab, t1_ccee_abab, optimize = einsum_type)
 
-    opdm = (OPDM_a, OPMD_b)
+    OPDM_a[:nocc_a, nocc_a:]  = lib.einsum('IC->IC', t1_ce_aa, optimize = einsum_type).copy()
+    OPDM_a[:nocc_a, nocc_a:] += lib.einsum('IC->IC', t2_ce_aa, optimize = einsum_type).copy()
+    OPDM_a[:nocc_a, nocc_a:] += 1/2 * lib.einsum('IiCa,ia->IC', t1_ccee_aaaa, t1_ce_aa, optimize = einsum_type)
+    OPDM_a[:nocc_a, nocc_a:] += 1/2 * lib.einsum('IiCa,ia->IC', t1_ccee_abab, t1_ce_bb, optimize = einsum_type)
+
+    OPDM_a[nocc_a:, :nocc_a]  = lib.einsum('LA->AL', t1_ce_aa, optimize = einsum_type).copy()
+    OPDM_a[nocc_a:, :nocc_a]  += lib.einsum('LA->AL', t2_ce_aa, optimize = einsum_type).copy()
+    OPDM_a[nocc_a:, :nocc_a]  += 1/2 * lib.einsum('LiAa,ia->AL', t1_ccee_aaaa, t1_ce_aa, optimize = einsum_type)
+    OPDM_a[nocc_a:, :nocc_a]  += 1/2 * lib.einsum('LiAa,ia->AL', t1_ccee_abab, t1_ce_bb, optimize = einsum_type)
+    #---
+    OPDM_b[:nocc_b, :nocc_b]  = lib.einsum('il->il', np.identity(nocc_b), optimize = einsum_type).copy()
+    OPDM_b[:nocc_b, :nocc_b] -= 1/2 * lib.einsum('ijab,ljab->il', t1_ccee_bbbb, t1_ccee_bbbb, optimize = einsum_type)
+    OPDM_b[:nocc_b, :nocc_b] -= lib.einsum('ia,la->il', t1_ce_bb, t1_ce_bb, optimize = einsum_type)
+    OPDM_b[:nocc_b, :nocc_b] -= lib.einsum('jiab,jlab->il', t1_ccee_abab, t1_ccee_abab, optimize = einsum_type)
+
+    OPDM_b[nocc_b:, nocc_b:] = lib.einsum('ia,ic->ac', t1_ce_bb, t1_ce_bb, optimize = einsum_type)
+    OPDM_b[nocc_b:, nocc_b:] += lib.einsum('ijba,ijbc->ac', t1_ccee_abab, t1_ccee_abab, optimize = einsum_type)
+    OPDM_b[nocc_b:, nocc_b:] += 1/2 * lib.einsum('ijab,ijcb->ac', t1_ccee_bbbb, t1_ccee_bbbb, optimize = einsum_type)
+
+    OPDM_b[:nocc_b, nocc_b:]  = lib.einsum('ic->ic', t1_ce_bb, optimize = einsum_type).copy()
+    OPDM_b[:nocc_b, nocc_b:]  += lib.einsum('ic->ic', t2_ce_bb, optimize = einsum_type).copy()
+    OPDM_b[:nocc_b, nocc_b:]  += 1/2 * lib.einsum('ijca,ja->ic', t1_ccee_bbbb, t1_ce_bb, optimize = einsum_type)
+    OPDM_b[:nocc_b, nocc_b:]  += 1/2 * lib.einsum('jiac,ja->ic', t1_ccee_abab, t1_ce_aa, optimize = einsum_type)
+
+    OPDM_b[nocc_b:, :nocc_b]   = lib.einsum('la->al', t1_ce_bb, optimize = einsum_type).copy()
+    OPDM_b[nocc_b:, :nocc_b]  += lib.einsum('la->al', t2_ce_bb, optimize = einsum_type).copy()
+    OPDM_b[nocc_b:, :nocc_b]  += 1/2 * lib.einsum('liab,ib->al', t1_ccee_bbbb, t1_ce_bb, optimize = einsum_type)
+    OPDM_b[nocc_b:, :nocc_b]  += 1/2 * lib.einsum('ilba,ib->al', t1_ccee_abab, t1_ce_aa, optimize = einsum_type)
+    #---
+    # print("OPDM_a_H " + str(np.linalg.norm(OPDM_a - OPDM_a.transpose(1,0))))
+    # print("OPDM_b_H " + str(np.linalg.norm(OPDM_b - OPDM_b.transpose(1,0))))
+
+    # print("OPDM_a_trace " + str(np.einsum('pp',OPDM_a)))
+    # print("OPDM_b_trace " + str(np.einsum('pp',OPDM_b)))
+    # exit()
+
+    opdm = (OPDM_a, OPDM_b)
     return opdm
 
 def get_spin_contamination(adc):
@@ -8682,7 +8724,7 @@ def get_properties(adc, nroots=1):
         spin = None
    
     if adc.ref_opdm is True:
-        opdm = adc.get_ref_opdm()
+        ref_opdm = adc.get_ref_opdm()
     else:
         ref_opdm = None
 
