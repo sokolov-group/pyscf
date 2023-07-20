@@ -779,45 +779,139 @@ def matvec(adc, kshift, M_ij=None, eris=None):
                         ki = kconserv[kj, kl, kk]
                         
                         if cvs_normal == True:
-                            s2_ecc[ka,kj] -= lib.einsum('KIJl,alI->aJK',eris_cccv[kk,ki,kj],
+ 
+                            eris_oooo_kij = 1./nkpts * lib.einsum('Lki,Ljl->kijl'
+                                       , eris.Loo[kk,ki],eris.Loo[kj,kl],optimize=True)
+                            eris_oooo_jik = 1./nkpts * lib.einsum('Lji,Lkl->jikl'
+                                       , eris.Loo[kj,ki],eris.Loo[kk,kl],optimize=True)
+
+                            eris_cccv_kij = eris_oooo_kij[:ncvs,:ncvs,:ncvs,ncvs:].copy()   
+                            eris_vccv_kij = eris_oooo_kij[ncvs:,:ncvs,:ncvs,ncvs:].copy()
+                            eris_ccvv_kij = eris_oooo_kij[:ncvs,:ncvs,ncvs:,ncvs:].copy()
+                            eris_cccv_jik = eris_oooo_jik[:ncvs,:ncvs,:ncvs,ncvs:].copy()
+                            eris_cccc_jik = eris_oooo_jik[:ncvs,:ncvs,:ncvs,:ncvs].copy()
+                            eris_ccvv_jik = eris_oooo_jik[:ncvs,:ncvs,ncvs:,ncvs:].copy()
+                            eris_ccvc_jik = eris_oooo_jik[:ncvs,:ncvs,ncvs:,:ncvs].copy()
+                            eris_vccc_jik = eris_oooo_jik[ncvs:,:ncvs,:ncvs,:ncvs].copy()
+                            eris_vccv_jik = eris_oooo_jik[ncvs:,:ncvs,:ncvs,ncvs:].copy()
+ 
+                            s2_ecc[ka,kj] -= lib.einsum('KIJl,alI->aJK',eris_cccv_kij,
                                                   r2_evc[ka,kl],optimize=True)
-                            s2_ecc[ka,kj] -= lib.einsum('JIKl,aIl->aJK',eris_cccv[kj,ki,kk],
+                            s2_ecc[ka,kj] -= lib.einsum('JIKl,aIl->aJK',eris_cccv_jik,
                                                   r2_ecv[ka,ki],optimize=True)
-                            s2_ecc[ka,kj] -= lib.einsum('KLJI,aIL->aJK',eris_cccc[kk,kl,kj],
+                            s2_ecc[ka,kj] -= lib.einsum('JIKL,aIL->aJK',eris_cccc_jik,
                                                            r2_ecc[ka,ki],optimize=True)
-                            s2_ecv[ka,kj] -= lib.einsum('JIkl,aIl->aJk',eris_ccvv[kj,ki,kk],
+                            s2_ecv[ka,kj] -= lib.einsum('JIkl,aIl->aJk',eris_ccvv_jik,
                                                            r2_ecv[ka,ki],optimize=True)
-                            s2_ecv[ka,kj] -= lib.einsum('kIJl,alI->aJk',eris_oooo[kk,ki,kj,ncvs:,:ncvs,:ncvs,ncvs:],
+                            s2_ecv[ka,kj] -= lib.einsum('kIJl,alI->aJk',eris_vccv_kij,
                                                   r2_evc[ka,kl],optimize=True)
-                            s2_ecv[ka,kj] -= lib.einsum('JIkL,aIL->aJk',eris_oooo[kj,ki,kk,:ncvs,:ncvs,ncvs:,:ncvs],
+                            s2_ecv[ka,kj] -= lib.einsum('JIkL,aIL->aJk',eris_ccvc_jik,
                                                   r2_ecc[ka,ki],optimize=True)
-                            #eris_cvcv, eris_ccvv
-                            s2_evc[ka,kj] -= lib.einsum('KIjl,alI->ajK',eris_ccvv[kk,ki,kj],
+                            s2_evc[ka,kj] -= lib.einsum('KIjl,alI->ajK',eris_ccvv_kij,
                                                            r2_evc[ka,kl],optimize=True)
-                            s2_evc[ka,kj] -= lib.einsum('KljI,aIl->ajK',eris_oooo[kk,kl,kj,:ncvs,ncvs:,ncvs:,:ncvs],
+                            s2_evc[ka,kj] -= lib.einsum('jIKl,aIl->ajK',eris_vccv_jik,
                                                            r2_ecv[ka,ki],optimize=True)
-                            #ris_cccv
-                            s2_evc[ka,kj] -= lib.einsum('KLjI,aIL->ajK',eris_oooo[kk,kl,kj,:ncvs,:ncvs,ncvs:,:ncvs],
+                            s2_evc[ka,kj] -= lib.einsum('jIKL,aIL->ajK',eris_vccc_jik,
                                                            r2_ecc[ka,ki],optimize=True)
+
+                            kb = kconserv[ka, kk, kl]
+                            if kb <= ka:
+                                idx_p = eris.Lvv_idx_p[(kb,ka)]
+                                eris_ooee_klb = 1./nkpts * lib.einsum('Lkl,Lba->klba'
+                                                , eris.Loo[kk,kl], eris.Lvv_p[idx_p], optimize=True)
+                            if kb > ka:
+                                idx_p = eris.Lvv_idx_p[(ka,kb)]
+                                eris_ooee_klb = 1./nkpts * lib.einsum('Lkl,Lab->klba'
+                                                , eris.Loo[kk,kl], eris.Lvv_p[idx_p].conj(), optimize=True)
+                            #eris_oovv_klb = eris.oovv[kk,kl,kb]
+                            eris_ccee_klb = eris_ooee_klb[:ncvs,:ncvs].copy()
+                            eris_cvee_klb = eris_ooee_klb[:ncvs,ncvs:].copy()
+                            eris_vcee_klb = eris_ooee_klb[ncvs:,:ncvs].copy()
+                            eris_vvee_klb = eris_ooee_klb[ncvs:,ncvs:].copy()
+                            #eris_veev, eris_vvee
+                            s2_ecv[ka,kj] += lib.einsum('klba,bJl->aJk',eris_vvee_klb,
+                                              r2_ecv[kb,kj],optimize=True)
+                            s2_ecc[ka,kj] += lib.einsum('Klba,bJl->aJK',eris_cvee_klb,
+                                              r2_ecv[kb,kj],optimize=True)
+                            s2_ecc[ka,kj] += lib.einsum('KLba,bJL->aJK',eris_ccee_klb,
+                                              r2_ecc[kb,kj],optimize=True)
+                            s2_evc[ka,kj] += lib.einsum('KLba,bjL->ajK',eris_ccee_klb,
+                                                       r2_evc[kb,kj],optimize=True)
+                            s2_ecv[ka,kj] += lib.einsum('kLba,bJL->aJk',eris_vcee_klb,
+                                                 r2_ecc[kb,kj],optimize=True)
+
+                            #for kl in range(nkpts):
+                            kb = kconserv[ka, kj, kl]
+                            if kb <= ka:
+                                idx_p = eris.Lvv_idx_p[(kb,ka)]
+                                eris_ooee_jlb = 1./nkpts * lib.einsum('Ljl,Lba->jlba'
+                                                , eris.Loo[kj,kl], eris.Lvv_p[idx_p], optimize=True)
+                            if kb > ka:
+                                idx_p = eris.Lvv_idx_p[(ka,kb)]
+                                eris_ooee_jlb = 1./nkpts * lib.einsum('Ljl,Lab->jlba'
+                                                , eris.Loo[kj,kl], eris.Lvv_p[idx_p].conj(), optimize=True)
+                            #eris_oovv_jlb = eris.oovv[kj,kl,kb]
+                            eris_ccee_jlb = eris_ooee_jlb[:ncvs,:ncvs].copy()
+                            eris_cvee_jlb = eris_ooee_jlb[:ncvs,ncvs:].copy()
+                            eris_vcee_jlb = eris_ooee_jlb[ncvs:,:ncvs].copy()
+                            eris_vvee_jlb = eris_ooee_jlb[ncvs:,ncvs:].copy()
+
+                            s2_evc[ka,kj] += lib.einsum('jlba,blK->ajK',eris_vvee_jlb,
+                                                           r2_evc[kb,kl],optimize=True)
+                            s2_ecc[ka,kj] += lib.einsum('Jlba,blK->aJK',eris_cvee_jlb,
+                                                  r2_evc[kb,kl],optimize=True)
+                            s2_ecc[ka,kj] += lib.einsum('JLba,bLK->aJK',eris_ccee_jlb,
+                                                  r2_ecc[kb,kl],optimize=True)
+                            s2_ecv[ka,kj] += lib.einsum('JLba,bLk->aJk',eris_ccee_jlb,
+                                                  r2_ecv[kb,kl],optimize=True)
+                            s2_evc[ka,kj] += lib.einsum('jLba,bLK->ajK',eris_vcee_jlb,
+                                                           r2_ecc[kb,kl],optimize=True)
+
+                            eris_oeeo_jab = 1./nkpts * lib.einsum('Lja,Lbl->jabl'
+                                            , eris.Lov[kj,ka], eris.Lvo[kb,kl], optimize=True)
+
+                            s2_evc[ka,kj] += lib.einsum('jabl,bKl->ajK',eris_oeeo_jab[ncvs:,:,:,ncvs:],
+                                                  r2_ecv[kb,kk],optimize=True)
+                            s2_evc[ka,kj] -= 2*lib.einsum('jabl,blK->ajK',eris_oeeo_jab[ncvs:,:,:,ncvs:],
+                                                             r2_evc[kb,kl],optimize=True)
+                            s2_ecc[ka,kj] += lib.einsum('Jabl,bKl->aJK',eris_oeeo_jab[:ncvs,:,:,ncvs:],
+                                                  r2_ecv[kb,kk],optimize=True)
+                            s2_ecc[ka,kj] -= 2*lib.einsum('Jabl,blK->aJK',eris_oeeo_jab[:ncvs,:,:,ncvs:],
+                                                    r2_evc[kb,kl],optimize=True)
+                            #del eris_ccee
+                            s2_ecc[ka,kj] += lib.einsum('JabL,bKL->aJK',eris_oeeo_jab[:ncvs,:,:,:ncvs],
+                                                  r2_ecc[kb,kk],optimize=True)
+                            s2_ecc[ka,kj] -= 2*lib.einsum('JabL,bLK->aJK',eris_oeeo_jab[:ncvs,:,:,:ncvs],
+                                                    r2_ecc[kb,kl],optimize=True)
+                            s2_ecv[ka,kj] -= 2*lib.einsum('JabL,bLk->aJk',eris_oeeo_jab[:ncvs,:,:,:ncvs],
+                                                    r2_ecv[kb,kl],optimize=True)
+                            s2_ecv[ka,kj] += lib.einsum('JabL,bkL->aJk',eris_oeeo_jab[:ncvs,:,:,:ncvs:],
+                                                           r2_evc[kb,kk],optimize=True)
+
+                            #del eris_cvee
+                            s2_evc[ka,kj] += lib.einsum('jabL,bKL->ajK',eris_oeeo_jab[ncvs:,:,:,:ncvs],
+                                                  r2_ecc[kb,kk],optimize=True)
+                            s2_evc[ka,kj] -= 2*lib.einsum('jabL,bLK->ajK',eris_oeeo_jab[ncvs:,:,:,:ncvs],
+                                                            r2_ecc[kb,kl],optimize=True)
                         else:
-                            #eris_oooo_kij = 1./nkpts * lib.einsum('Lki,Ljl->kijl'
-                            #           , eris.Loo[kk,ki],eris.Loo[kj,kl],optimize=True)
-                            #eris_oooo_jik = 1./nkpts * lib.einsum('Lji,Lkl->jikl'
-                            #           , eris.Loo[kj,ki],eris.Loo[kk,kl],optimize=True)
-                            #eris_occv_kij = eris_oooo_kij[:,:ncvs,:ncvs,ncvs:].copy() 
-                            #eris_ccvv_kij = eris_oooo_kij[:ncvs,:ncvs,ncvs:,ncvs:].copy() 
-                            #eris_vcco_jik = eris_oooo_jik[ncvs:,:ncvs,:ncvs,:].copy()
-                            #eris_ccoo_jik = eris_oooo_jik[:ncvs,:ncvs].copy() 
+                            eris_oooo_kij = 1./nkpts * lib.einsum('Lki,Ljl->kijl'
+                                       , eris.Loo[kk,ki],eris.Loo[kj,kl],optimize=True)
+                            eris_oooo_jik = 1./nkpts * lib.einsum('Lji,Lkl->jikl'
+                                       , eris.Loo[kj,ki],eris.Loo[kk,kl],optimize=True)
+                            eris_occv_kij = eris_oooo_kij[:,:ncvs,:ncvs,ncvs:].copy() 
+                            eris_ccvv_kij = eris_oooo_kij[:ncvs,:ncvs,ncvs:,ncvs:].copy() 
+                            eris_vcco_jik = eris_oooo_jik[ncvs:,:ncvs,:ncvs,:].copy()
+                            eris_ccoo_jik = eris_oooo_jik[:ncvs,:ncvs].copy() 
 
                              
-                            eris_occv_kij = 1./nkpts * lib.einsum('Lki,Ljl->kijl'
-                                       , Loc[kk,ki],Lcv[kj,kl],optimize=True)
-                            eris_ccvv_kij = 1./nkpts * lib.einsum('Lki,Ljl->kijl'
-                                       , Lcc[kk,ki],Lvv[kj,kl],optimize=True)
-                            eris_ccoo_jik = 1./nkpts * lib.einsum('Lji,Lkl->jikl'
-                                       , Lcc[kj,ki],eris.Loo[kk,kl],optimize=True)
-                            eris_vcco_jik = 1./nkpts * lib.einsum('Lji,Lkl->jikl'
-                                       , Lvc[kj,ki],Lco[kk,kl],optimize=True)
+                            #eris_occv_kij = 1./nkpts * lib.einsum('Lki,Ljl->kijl'
+                            #           , Loc[kk,ki],Lcv[kj,kl],optimize=True)
+                            #eris_ccvv_kij = 1./nkpts * lib.einsum('Lki,Ljl->kijl'
+                            #           , Lcc[kk,ki],Lvv[kj,kl],optimize=True)
+                            #eris_ccoo_jik = 1./nkpts * lib.einsum('Lji,Lkl->jikl'
+                            #           , Lcc[kj,ki],eris.Loo[kk,kl],optimize=True)
+                            #eris_vcco_jik = 1./nkpts * lib.einsum('Lji,Lkl->jikl'
+                            #           , Lvc[kj,ki],Lco[kk,kl],optimize=True)
 
                             s2_eco[ka,kj] -= lib.einsum('JIKl,aIl->aJK',eris_ccoo_jik,
                                                   r2_eco[ka,ki],optimize=True)
@@ -828,69 +922,69 @@ def matvec(adc, kshift, M_ij=None, eris=None):
                             s2_evc[ka,kj] -= lib.einsum('jIKl,aIl->ajK',eris_vcco_jik,
                                                            r2_eco[ka,ki],optimize=True)
                         
-                        kb = kconserv[ka, kk, kl]
-                        if kb <= ka:
-                            idx_p = eris.Lvv_idx_p[(kb,ka)]
-                            eris_ooee_klb = 1./nkpts * lib.einsum('Lkl,Lba->klba'
-                                            , eris.Loo[kk,kl], eris.Lvv_p[idx_p], optimize=True)
-                        if kb > ka:
-                            idx_p = eris.Lvv_idx_p[(ka,kb)]
-                            eris_ooee_klb = 1./nkpts * lib.einsum('Lkl,Lab->klba'
-                                            , eris.Loo[kk,kl], eris.Lvv_p[idx_p].conj(), optimize=True)
-                        #eris_oovv_klb = eris.oovv[kk,kl,kb]
-                        eris_ccee_klb = eris_ooee_klb[:ncvs,:ncvs].copy()
-                            
-                        s2_eco[ka,kj] += lib.einsum('klba,bjl->ajk',
-                                                    eris_ooee_klb,r2_eco[kb,kj],optimize=True)
-                        s2_evc[ka,kj] += lib.einsum('klba,bjl->ajk',
-                                                    eris_ccee_klb,r2_evc[kb,kj],optimize=True)
+                            kb = kconserv[ka, kk, kl]
+                            if kb <= ka:
+                                idx_p = eris.Lvv_idx_p[(kb,ka)]
+                                eris_ooee_klb = 1./nkpts * lib.einsum('Lkl,Lba->klba'
+                                                , eris.Loo[kk,kl], eris.Lvv_p[idx_p], optimize=True)
+                            if kb > ka:
+                                idx_p = eris.Lvv_idx_p[(ka,kb)]
+                                eris_ooee_klb = 1./nkpts * lib.einsum('Lkl,Lab->klba'
+                                                , eris.Loo[kk,kl], eris.Lvv_p[idx_p].conj(), optimize=True)
+                            #eris_oovv_klb = eris.oovv[kk,kl,kb]
+                            eris_ccee_klb = eris_ooee_klb[:ncvs,:ncvs].copy()
+                                
+                            s2_eco[ka,kj] += lib.einsum('klba,bjl->ajk',
+                                                        eris_ooee_klb,r2_eco[kb,kj],optimize=True)
+                            s2_evc[ka,kj] += lib.einsum('klba,bjl->ajk',
+                                                        eris_ccee_klb,r2_evc[kb,kj],optimize=True)
 
-                        kb = kconserv[ka, kj, kl]
-                        if kb <= ka:
-                            idx_p = eris.Lvv_idx_p[(kb,ka)]
-                            eris_ooee_jlb = 1./nkpts * lib.einsum('Ljl,Lba->jlba'
-                                            , eris.Loo[kj,kl], eris.Lvv_p[idx_p], optimize=True)
-                        if kb > ka:
-                            idx_p = eris.Lvv_idx_p[(ka,kb)]
-                            eris_ooee_jlb = 1./nkpts * lib.einsum('Ljl,Lab->jlba'
-                                            , eris.Loo[kj,kl], eris.Lvv_p[idx_p].conj(), optimize=True)
+                            kb = kconserv[ka, kj, kl]
+                            if kb <= ka:
+                                idx_p = eris.Lvv_idx_p[(kb,ka)]
+                                eris_ooee_jlb = 1./nkpts * lib.einsum('Ljl,Lba->jlba'
+                                                , eris.Loo[kj,kl], eris.Lvv_p[idx_p], optimize=True)
+                            if kb > ka:
+                                idx_p = eris.Lvv_idx_p[(ka,kb)]
+                                eris_ooee_jlb = 1./nkpts * lib.einsum('Ljl,Lab->jlba'
+                                                , eris.Loo[kj,kl], eris.Lvv_p[idx_p].conj(), optimize=True)
 
-                        eris_ccee_jlb = eris_ooee_jlb[:ncvs,:ncvs].copy()
-                        #eris_coee_jlb = eris_oovv_jlb[:ncvs].copy()
-                        #eris_voee_jlb = eris_oovv_jlb[ncvs:].copy()
+                            eris_ccee_jlb = eris_ooee_jlb[:ncvs,:ncvs].copy()
+                            #eris_coee_jlb = eris_oovv_jlb[:ncvs].copy()
+                            #eris_voee_jlb = eris_oovv_jlb[ncvs:].copy()
 
-                        r2_ecc_bl = r2_eco[kb,kl,:,:,:ncvs].copy()
-                        r2_ecv_bl = r2_eco[kb,kl,:,:,ncvs:].copy()
-                        r2_evc_bl = r2_evc[kb,kl].copy()
+                            r2_ecc_bl = r2_eco[kb,kl,:,:,:ncvs].copy()
+                            r2_ecv_bl = r2_eco[kb,kl,:,:,ncvs:].copy()
+                            r2_evc_bl = r2_evc[kb,kl].copy()
 
-                        r2_eoc_bl = np.empty((nvir,nocc,ncvs),dtype=eris.Loo.dtype)
-                        r2_eoc_bl[:,:ncvs,:ncvs] = r2_ecc_bl                       
-                        r2_eoc_bl[:,ncvs:,:ncvs] = r2_evc_bl
-                        r2_eoc_bl = np.ascontiguousarray(r2_eoc_bl)                       
+                            r2_eoc_bl = np.empty((nvir,nocc,ncvs),dtype=eris.Loo.dtype)
+                            r2_eoc_bl[:,:ncvs,:ncvs] = r2_ecc_bl                       
+                            r2_eoc_bl[:,ncvs:,:ncvs] = r2_evc_bl
+                            r2_eoc_bl = np.ascontiguousarray(r2_eoc_bl)                       
  
-                        s2_eco[ka,kj,:,:,ncvs:] += lib.einsum('JLba,bLk->aJk',eris_ccee_jlb,
-                                              r2_ecv_bl,optimize=True)
-                        s2_eco[ka,kj,:,:,:ncvs] += lib.einsum('Jlba,blK->aJK',eris_ooee_jlb[:ncvs],
-                                              r2_eoc_bl,optimize=True)
-                        s2_evc[ka,kj] += lib.einsum('jLba,bLK->ajK',eris_ooee_jlb[ncvs:],
-                                                       r2_eoc_bl,optimize=True)
+                            s2_eco[ka,kj,:,:,ncvs:] += lib.einsum('JLba,bLk->aJk',eris_ccee_jlb,
+                                                  r2_ecv_bl,optimize=True)
+                            s2_eco[ka,kj,:,:,:ncvs] += lib.einsum('Jlba,blK->aJK',eris_ooee_jlb[:ncvs],
+                                                  r2_eoc_bl,optimize=True)
+                            s2_evc[ka,kj] += lib.einsum('jLba,bLK->ajK',eris_ooee_jlb[ncvs:],
+                                                           r2_eoc_bl,optimize=True)
            
-                        kb = kconserv[ka, kk, ki]
-                        eris_oeeo_jab = 1./nkpts * lib.einsum('Lja,Lbl->jabl'
-                                        , eris.Lov[kj,ka], eris.Lvo[kb,kl], optimize=True)
+                            kb = kconserv[ka, kk, ki]
+                            eris_oeeo_jab = 1./nkpts * lib.einsum('Lja,Lbl->jabl'
+                                            , eris.Lov[kj,ka], eris.Lvo[kb,kl], optimize=True)
 
-                        s2_evc[ka,kj] += lib.einsum('jabL,bKL->ajK',eris_oeeo_jab[ncvs:],
-                                              r2_eco[kb,kk],optimize=True)
-                        s2_evc[ka,kj] -= 2*lib.einsum('jabL,bLK->ajK',eris_oeeo_jab[ncvs:],
-                                                        r2_eoc_bl,optimize=True)
-                        s2_eco[ka,kj,:,:,:ncvs] += lib.einsum('JabL,bKL->aJK',eris_oeeo_jab[:ncvs],
-                                              r2_eco[kb,kk],optimize=True)
-                        s2_eco[ka,kj,:,:,ncvs:] += lib.einsum('JabL,bkL->aJk',eris_oeeo_jab[:ncvs,:,:,:ncvs],
-                                                       r2_evc[kb,kk],optimize=True)
-                        s2_eco[ka,kj,:,:,:ncvs] -= 2*lib.einsum('JabL,bLK->aJK',eris_oeeo_jab[:ncvs],
-                                                r2_eoc_bl,optimize=True)
-                        s2_eco[ka,kj,:,:,ncvs:] -= 2*lib.einsum('JabL,bLk->aJk',eris_oeeo_jab[:ncvs,:,:,:ncvs],
-                                                r2_ecv_bl,optimize=True)
+                            s2_evc[ka,kj] += lib.einsum('jabL,bKL->ajK',eris_oeeo_jab[ncvs:],
+                                                  r2_eco[kb,kk],optimize=True)
+                            s2_evc[ka,kj] -= 2*lib.einsum('jabL,bLK->ajK',eris_oeeo_jab[ncvs:],
+                                                            r2_eoc_bl,optimize=True)
+                            s2_eco[ka,kj,:,:,:ncvs] += lib.einsum('JabL,bKL->aJK',eris_oeeo_jab[:ncvs],
+                                                  r2_eco[kb,kk],optimize=True)
+                            s2_eco[ka,kj,:,:,ncvs:] += lib.einsum('JabL,bkL->aJk',eris_oeeo_jab[:ncvs,:,:,:ncvs],
+                                                           r2_evc[kb,kk],optimize=True)
+                            s2_eco[ka,kj,:,:,:ncvs] -= 2*lib.einsum('JabL,bLK->aJK',eris_oeeo_jab[:ncvs],
+                                                    r2_eoc_bl,optimize=True)
+                            s2_eco[ka,kj,:,:,ncvs:] -= 2*lib.einsum('JabL,bLk->aJk',eris_oeeo_jab[:ncvs,:,:,:ncvs],
+                                                    r2_ecv_bl,optimize=True)
 
                     '''
                     for kl in range(nkpts):
