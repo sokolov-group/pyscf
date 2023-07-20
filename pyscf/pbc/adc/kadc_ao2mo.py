@@ -387,8 +387,8 @@ def transform_integrals_df(myadc):
     #print(f'norm of Loo - Loo.transpose(1,0,2,4,3).conj() = {np.linalg.norm(Loo_sym)}')
     #exit()
 
-    outcore_eri_bool = False
-    #outcore_eri_bool = True
+    #outcore_eri_bool = False
+    outcore_eri_bool = True
     if outcore_eri_bool:
         eris.feri = feri = lib.H5TmpFile()
 
