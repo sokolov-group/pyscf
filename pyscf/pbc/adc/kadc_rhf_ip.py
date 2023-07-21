@@ -45,6 +45,7 @@ from pyscf.pbc import tools
 import h5py
 import tempfile
 from pyscf.pbc.adc.kadc_rhf_amplitudes import gen_t2_1
+import tracemalloc
 
 def vector_size(adc):
 
@@ -59,8 +60,13 @@ def vector_size(adc):
     return size
 
 
+tracemalloc.start()
+print(f'[memalloc current+max ERI-DF-post-pqrs [GB] = {np.array(tracemalloc.get_traced_memory())/1024**3}')
+tracemalloc.stop()
+
 def get_imds(adc, eris=None):
 
+    tracemalloc.start()
     #cput0 = (time.process_time(), time.time())
     cput0 = (time.process_time(), time.perf_counter())
     log = logger.Logger(adc.stdout, adc.verbose)
@@ -153,6 +159,8 @@ def get_imds(adc, eris=None):
                 #del t2_1
 
     cput0 = log.timer_debug1("Completed M_ij second-order terms ADC(2) calculation", *cput0)
+    print(f'[memalloc current+max imds [GB] = {np.array(tracemalloc.get_traced_memory())/1024**3}')
+    tracemalloc.stop()
     return M_ij
 
 def get_imds_off(adc, eris=None):
@@ -568,6 +576,7 @@ def get_diag(adc,kshift,M_ij=None,eris=None):
 
 def matvec(adc, kshift, M_ij=None, eris=None):
 
+    tracemalloc.start()
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
 
@@ -733,6 +742,8 @@ def matvec(adc, kshift, M_ij=None, eris=None):
         if adc.ncvs_proj is not None:
             s = cvs_projector(adc, s)
 
+        print(f'[memalloc current+max matvec [GB] = {np.array(tracemalloc.get_traced_memory())/1024**3}')
+        tracemalloc.stop()
         return s
     return sigma_
 
@@ -1373,6 +1384,7 @@ class RADCIP(kadc_rhf.RADC):
         self.chnk_size = adc.chnk_size
         self.ncvs_proj = adc.ncvs_proj
         self.eris_direct = adc.eris_direct
+        self.precision_single = adc.precision_single
 
         keys = set(('tol_residual','conv_tol', 'e_corr', 'method', 'mo_coeff', 'mo_energy_b',
                    'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))

@@ -90,12 +90,14 @@ def gen_t2_1(myadc,eris,kijab,cvs_idx_slice=None,ncvs=None):
 
     if cvs_idx_slice == 'i':
         eijab = eia[:ncvs, None, :, None] + ejb[:, None, :]
+        Lce_ia = eris.Lov[ki,ka,:,:ncvs].copy()
         t2_1_ij = 1./nkpts * lib.einsum('Lia,Ljb->ijab'
-                    , eris.Lce[ki,ka], eris.Lov[kj,kb], optimize=True).conj() / eijab
+                    , Lce_ia, eris.Lov[kj,kb], optimize=True).conj() / eijab
     elif cvs_idx_slice == 'j': 
         eijab = eia[:, None, :, None] + ejb[:ncvs, None, :]
+        Lce_jb = eris.Lov[kj,kb,:,:ncvs].copy()
         t2_1_ij = 1./nkpts * lib.einsum('Lia,Ljb->ijab'
-                    , eris.Lov[ki,ka], eris.Lce[kj,kb], optimize=True).conj() / eijab
+                    , eris.Lov[ki,ka], Lce_jb, optimize=True).conj() / eijab
     else:
         eijab = eia[:, None, :, None] + ejb[:, None, :]
         t2_1_ij = 1./nkpts * lib.einsum('Lia,Ljb->ijab'

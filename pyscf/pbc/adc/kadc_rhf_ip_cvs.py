@@ -46,6 +46,7 @@ from pyscf.pbc import tools
 import h5py
 import tempfile
 from pyscf.pbc.adc.kadc_rhf_amplitudes import gen_t2_1
+import tracemalloc 
 
 def vector_size(adc):
 
@@ -65,6 +66,7 @@ def vector_size(adc):
 
 def get_imds(adc, eris=None):
 
+    tracemalloc.start()
     #cput0 = (time.process_time(), time.time())
     cput0 = (time.process_time(), time.perf_counter())
     log = logger.Logger(adc.stdout, adc.verbose)
@@ -116,10 +118,12 @@ def get_imds(adc, eris=None):
                     eris_ovov_jdl = eris_ovov_idl = eris.ovov[ki,kd,kl,:ncvs]
                     eris_ovov_jel = eris_ovov_iel = eris.ovov[ki,ke,kl,:ncvs]
                 else:
+                    Lce_id = eris.Lov[ki,kd,:,:ncvs,:].copy()
+                    Lce_ie = eris.Lov[ki,ke,:,:ncvs,:].copy()
                     eris_ovov_jdl = eris_ovov_idl = 1./nkpts * lib.einsum('Ljd,Lle->jdle'
-                                    , eris.Lce[ki,kd], eris.Lov[kl,ke], optimize=True)
+                                    , Lce_id, eris.Lov[kl,ke], optimize=True)
                     eris_ovov_jel = eris_ovov_iel = 1./nkpts * lib.einsum('Lje,Lld->jeld'
-                                    , eris.Lce[ki,ke], eris.Lov[kl,kd], optimize=True)
+                                    , Lce_ie, eris.Lov[kl,kd], optimize=True)
                     t2_1_jld = t2_1_ild = gen_t2_1(adc,eris,(ki,kl,kd,ke), cvs_idx_slice='i',ncvs=ncvs)#[:ncvs]
 
                 M_ij[ki] += 0.5 * 0.5 * \
@@ -395,6 +399,8 @@ def get_imds(adc, eris=None):
     #    e_ij, _ = np.linalg.eig(M_ij[nkpts_i,:adc.ncvs,:adc.ncvs])
     #    print(f'e_ij_{nkpts_i} = {e_ij}')
     #exit()
+    print(f'[memalloc current+max imds [GB] = {np.array(tracemalloc.get_traced_memory())/1024**3}')
+    tracemalloc.stop()
     return M_ij
 
 def get_diag(adc,kshift,M_ij=None,eris=None):
@@ -494,6 +500,7 @@ def get_diag(adc,kshift,M_ij=None,eris=None):
 
 def matvec(adc, kshift, M_ij=None, eris=None):
 
+    tracemalloc.start()
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
 
@@ -1182,6 +1189,8 @@ def matvec(adc, kshift, M_ij=None, eris=None):
         cput0 = log.timer_debug1("completed sigma vector calculation", *cput0)
         s *= -1.0
 
+        print(f'[memalloc current+max matvec [GB] = {np.array(tracemalloc.get_traced_memory())/1024**3}')
+        tracemalloc.stop()
         return s
     return sigma_
 
@@ -2073,6 +2082,7 @@ class RADCIPCVS(kadc_rhf.RADC):
         self.ncvs = adc.ncvs
         self.eris_direct = adc.eris_direct
         self.cvs_compact = adc.cvs_compact
+        self.precision_single = adc.precision_single
 
         keys = set(('tol_residual','conv_tol', 'e_corr', 'method', 'mo_coeff', 'mo_energy_b',
                    'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))

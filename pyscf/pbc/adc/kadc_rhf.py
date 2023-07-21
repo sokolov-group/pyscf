@@ -329,6 +329,7 @@ class RADC(pyscf.adc.radc.RADC):
         self.ncvs_proj = None
         self.eris_direct = False
         self.cvs_compact = True
+        self.precision_single = True
         self._nocc = None
         self._nmo = None
         self._nvir = None
