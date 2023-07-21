@@ -388,8 +388,9 @@ def transform_integrals_df(myadc):
     #exit()
 
     #outcore_eri_bool = False
-    outcore_eri_bool = True
-    if outcore_eri_bool:
+    #outcore_eri_bool = True
+    #if outcore_eri_bool:
+    if not myadc.eris_direct:
         eris.feri = feri = lib.H5TmpFile()
 
         #eris.oooo = feri.create_dataset('oooo', (nkpts,nkpts,nkpts,nocc,nocc,nocc,nocc), dtype=dtype
@@ -405,15 +406,11 @@ def transform_integrals_df(myadc):
         #dtype=np.complex64
         eris.oooo = feri.create_dataset('oooo', (nkpts,nkpts,nkpts,nocc,nocc,nocc,nocc), dtype=dtype)
         eris.oovv = feri.create_dataset('oovv', (nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir), dtype=dtype)
-        eris.ovoo = feri.create_dataset('ovoo', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nocc), dtype=dtype)
+        eris.vooo = feri.create_dataset('ovoo', (nkpts,nkpts,nkpts,nvir,nocc,nocc,nocc), dtype=dtype)
         eris.ovov = feri.create_dataset('ovov', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nvir), dtype=dtype)
         eris.ovvo = feri.create_dataset('ovvo', (nkpts,nkpts,nkpts,nocc,nvir,nvir,nocc), dtype=dtype)
-        #eris.ovvv = feri.create_dataset('ovvv', (nkpts,nkpts,nkpts,nocc,nvir,nvir,nvir), dtype=dtype)
-        #eris.oooo = np.empty((nkpts,nkpts,nkpts,nocc,nocc,nocc,nocc), dtype=dtype)
-        #eris.oovv = np.empty((nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir), dtype=dtype)
-        #eris.ovoo = np.empty((nkpts,nkpts,nkpts,nocc,nvir,nocc,nocc), dtype=dtype)
-        #eris.ovov = np.empty((nkpts,nkpts,nkpts,nocc,nvir,nocc,nvir), dtype=dtype)
-        #eris.ovvo = np.empty((nkpts,nkpts,nkpts,nocc,nvir,nvir,nocc), dtype=dtype)
+        if myadc.method == 'adc(3)':
+            eris.ovoo = feri.create_dataset('ovoo', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nocc), dtype=dtype)
 
         for kp in range(nkpts):
             for kq in range(nkpts):
@@ -421,10 +418,12 @@ def transform_integrals_df(myadc):
                     ks = kconserv[kp,kq,kr]
                     eris.oooo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', Loo[kp,kq], Loo[kr,ks])/nkpts
                     eris.oovv[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', Loo[kp,kq], eris.Lvv[kr,ks])/nkpts
-                    eris.ovoo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Loo[kr,ks])/nkpts
                     eris.ovov[kp,kq,kr] = lib.einsum(
                         'Lpq,Lrs->pqrs', eris.Lov[kp,kq], eris.Lov[kr,ks])/nkpts
                     eris.ovvo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Lvo[kr,ks])/nkpts
+                    eris.vooo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lvo[kp,kq], Loo[kr,ks])/nkpts
+                    if myadc.method == 'adc(3)':
+                        eris.ovoo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Loo[kr,ks])/nkpts
                     #eris.ovvv[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Lvv[kr,ks])/nkpts
 
     cput2 = np.array((time.process_time(), time.perf_counter()))

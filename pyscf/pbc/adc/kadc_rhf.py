@@ -327,6 +327,8 @@ class RADC(pyscf.adc.radc.RADC):
         self.Lpq_contract = False
         self.ncvs = None
         self.ncvs_proj = None
+        self.eris_direct = False
+        self.cvs_compact = True
         self._nocc = None
         self._nmo = None
         self._nvir = None
@@ -449,15 +451,21 @@ class RADC(pyscf.adc.radc.RADC):
 
         eris = self.transform_integrals()
 
-        #self.e_corr, self.t1, self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
-        #    self, eris=eris, verbose=self.verbose)
-        #print ("MPn:",self.e_corr)
-        #exit()
-        #self._finalize()
+        if not myadc.eris_direct:
+            self.e_corr, self.t1, self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
+                self, eris=eris, verbose=self.verbose)
+        else:
+            self.e_corr = kadc_rhf_amplitudes.compute_amplitudes_energy(
+                self, eris=eris, verbose=self.verbose)
+
+        print ("MPn:",self.e_corr)
+        self._finalize()
 
         self.method_type = self.method_type.lower()
         self.ncvs_proj = self.ncvs_proj
         self.ncvs = self.ncvs
+        self.eris_direct = self.eris_direct
+        self.cvs_compact = self.cvs_compact
 
         print(f'value of Lpq_contract == {self.Lpq_contract}')
         if(self.method_type == "ea"):

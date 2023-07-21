@@ -108,10 +108,15 @@ def gen_t2_1(myadc,eris,kijab,cvs_idx_slice=None,ncvs=None):
 
 def compute_amplitudes_energy(myadc, eris, verbose=None):
 
-    t1,t2,myadc.imds.t2_1_vvvv = myadc.compute_amplitudes(eris)
+    t1,t2 = None
+    if not myadc.eris_direct:
+        t1,t2,myadc.imds.t2_1_vvvv = myadc.compute_amplitudes(eris)
     e_corr = myadc.compute_energy(t2, eris)
 
-    return e_corr, t1, t2
+    if not myadc.eris_direct:
+        return e_corr, t1, t2
+    else:
+        return e_corr
 
 
 def compute_amplitudes(myadc, eris):
@@ -134,9 +139,7 @@ def compute_amplitudes(myadc, eris):
     # Compute first-order doubles t2 (tijab)
     tf = tempfile.TemporaryFile()
     f = h5py.File(tf, 'a')
-    #t2_1 = f.create_dataset('t2_1', (nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir), dtype=eris.ovov.dtype)
     t2_1 = f.create_dataset('t2_1', (nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir), dtype=eris.Lov.dtype)
-    #t2_1 = np.empty((nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir), dtype=eris.ovov.dtype)
 
     mo_energy =  myadc.mo_energy
     mo_coeff =  myadc.mo_coeff
@@ -167,14 +170,10 @@ def compute_amplitudes(myadc, eris):
         eijab = eia[:, None, :, None] + ejb[:, None, :]
 
         t2_1[ki,kj,ka] = eris.ovov[ki,ka,kj].conj().transpose((0,2,1,3)) / eijab
-        #t2_1[ki,kj,ka] = np.einsum('Lia,Ljb->ijab', eris.Lov[ki,ka], eris.Lov[kj,kb], optimize=True).conj() / eijab
-        #t2_1[ki,kj,ka] /= nkpts
 
         if ka != kb:
             eijba = eijab.transpose(0, 1, 3, 2)
             t2_1[ki, kj, kb] = eris.ovov[ki,kb,kj].conj().transpose((0,2,1,3)) / eijba
-            #t2_1[ki,kj,kb] = np.einsum('Lib,Lja->ijba', eris.Lov[ki,kb], eris.Lov[kj,ka], optimize=True).conj() / eijab
-            #t2_1[ki,kj,kb] /= nkpts
 
         touched[ki, kj, ka] = touched[ki, kj, kb] = True
 
@@ -357,18 +356,33 @@ def compute_energy(myadc, t2, eris):
     nkpts = myadc.nkpts
 
     emp2 = 0.0
-    eris_ovov = eris.ovov
-    t2_amp = t2[0]#[:]
 
-    if (myadc.method == "adc(3)"):
-        t2_amp += t2[1]#[:]
+    if not myadc.eris_direct:
+        eris_ovov = eris.ovov
+        t2_amp = t2[0]#[:]
 
-    for ki, kj, ka in kpts_helper.loop_kkk(nkpts):
+        if (myadc.method == "adc(3)"):
+            t2_amp += t2[1]#[:]
 
-        emp2 += 2 * lib.einsum('ijab,iajb', t2_amp[ki,kj,ka], eris_ovov[ki,ka,kj],optimize=True)
-        emp2 -= 1 * lib.einsum('ijab,jaib', t2_amp[ki,kj,ka], eris_ovov[kj,ka,ki],optimize=True)
+        for ki, kj, ka in kpts_helper.loop_kkk(nkpts):
 
-    del t2_amp
+            emp2 += 2 * lib.einsum('ijab,iajb', t2_amp[ki,kj,ka], eris_ovov[ki,ka,kj],optimize=True)
+            emp2 -= 1 * lib.einsum('ijab,jaib', t2_amp[ki,kj,ka], eris_ovov[kj,ka,ki],optimize=True)
+    else:
+        for ki, kj, ka in kpts_helper.loop_kkk(nkpts):
+
+            kb = kconserv[ki,kj,ka]
+
+            eris_ovov_iaj = 1./nkpts * lib.einsum('Lia,Ljb->ijab'
+                    , eris.Lov[ki,ka], eris.Lov[kj,kb], optimize=True)
+            eris_ovov_jai = 1./nkpts * lib.einsum('Lia,Ljb->ijab'
+                    , eris.Lov[kj,ka], eris.Lov[ki,kb], optimize=True)
+
+            t2_amp_ija = gen_t2_1(myadc, eris, (ki,kj,ka,kb))
+            emp2 += 2 * lib.einsum('ijab,iajb', t2_amp_ija, eris_ovov_iaj,optimize=True)
+            emp2 -= 1 * lib.einsum('ijab,jaib', t2_amp_ija, eris_ovov_jai,optimize=True)
+
+    #del t2_amp
     emp2 = emp2.real / nkpts
     return emp2
 
