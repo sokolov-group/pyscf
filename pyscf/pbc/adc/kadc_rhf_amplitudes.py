@@ -108,10 +108,12 @@ def gen_t2_1(myadc,eris,kijab,cvs_idx_slice=None,ncvs=None):
 
 def compute_amplitudes_energy(myadc, eris, verbose=None):
 
-    t1,t2 = None
+    t1 = t2 = None
     if not myadc.eris_direct:
-        t1,t2,myadc.imds.t2_1_vvvv = myadc.compute_amplitudes(eris)
-    e_corr = myadc.compute_energy(t2, eris)
+        #t1,t2,myadc.imds.t2_1_vvvv = myadc.compute_amplitudes(eris)
+        t1,t2,myadc.imds.t2_1_vvvv = compute_amplitudes(myadc,eris)
+    #e_corr = myadc.compute_energy(t2, eris)
+    e_corr = compute_energy(myadc, t2, eris)
 
     if not myadc.eris_direct:
         return e_corr, t1, t2
@@ -354,6 +356,7 @@ def compute_amplitudes(myadc, eris):
 def compute_energy(myadc, t2, eris):
 
     nkpts = myadc.nkpts
+    kconserv = myadc.khelper.kconserv
 
     emp2 = 0.0
 
@@ -373,9 +376,9 @@ def compute_energy(myadc, t2, eris):
 
             kb = kconserv[ki,kj,ka]
 
-            eris_ovov_iaj = 1./nkpts * lib.einsum('Lia,Ljb->ijab'
+            eris_ovov_iaj = 1./nkpts * lib.einsum('Lia,Ljb->iajb'
                     , eris.Lov[ki,ka], eris.Lov[kj,kb], optimize=True)
-            eris_ovov_jai = 1./nkpts * lib.einsum('Lia,Ljb->ijab'
+            eris_ovov_jai = 1./nkpts * lib.einsum('Lja,Lib->jaib'
                     , eris.Lov[kj,ka], eris.Lov[ki,kb], optimize=True)
 
             t2_amp_ija = gen_t2_1(myadc, eris, (ki,kj,ka,kb))

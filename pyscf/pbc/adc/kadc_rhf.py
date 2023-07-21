@@ -451,7 +451,7 @@ class RADC(pyscf.adc.radc.RADC):
 
         eris = self.transform_integrals()
 
-        if not myadc.eris_direct:
+        if not self.eris_direct:
             self.e_corr, self.t1, self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
                 self, eris=eris, verbose=self.verbose)
         else:
