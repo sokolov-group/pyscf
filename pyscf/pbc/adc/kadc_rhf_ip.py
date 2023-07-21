@@ -105,7 +105,7 @@ def get_imds(adc, eris=None):
                 #t2_1 = adc.t2[0]
                 
                 if not adc.eris_direct:
-                    t2_1_jld, t2_1_ild = adc.t2[0][ki,kl,kd]
+                    t2_1_jld = t2_1_ild = adc.t2[0][ki,kl,kd]
                     eris_ovov_jdl = eris_ovov_idl = eris_ovov[ki,kd,kl]
                     eris_ovov_jel = eris_ovov_iel = eris_ovov[ki,ke,kl]
 
