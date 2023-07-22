@@ -265,19 +265,26 @@ def transform_integrals_df(myadc):
     eris.dtype = dtype = np.result_type(dtype)
     eris.Lpq_mo = Lpq_mo = np.empty((nkpts, nkpts), dtype=object)
     nkpts_p = nkpts*(nkpts-1)//2 + nkpts
-    eris.Lvv_p = np.empty((nkpts_p,naux,nvir,nvir),dtype=dtype)
 
     Loo = eris.Loo = np.empty((nkpts,nkpts,naux,nocc,nocc),dtype=dtype)
     eris.Lov = np.empty((nkpts,nkpts,naux,nocc,nvir),dtype=dtype)
     Lvo = eris.Lvo = np.empty((nkpts,nkpts,naux,nvir,nocc),dtype=dtype)
-    Lvv = eris.Lvv = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
+    if not myadc.eris_direct:
+        Lvv = eris.Lvv = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
+    else:
+        eris.Lvv_p = np.empty((nkpts_p,naux,nvir,nvir),dtype=dtype)
+
+    #eris.feri = feri = lib.H5TmpFile()
+    #eris.Lvv_p = {}
+    #for idx_p in range(nkpts_p):
+    #    eris.Lvv_p[idx_p] = feri.create_dataset(f'Lvv_p_{idx_p}', (naux,nvir,nvir), dtype=dtype)
 
     eris.vvvv = None
     eris.ovvv = None
 
     idx_p = 0
-    eris.Lvv_idx_p = {}
     Lvv_idx_p = {}
+    eris.Lvv_idx_p = {}
     with df._load3c(myadc._scf.with_df._cderi, 'j3c') as fload:
         tao = []
         ao_loc = None
@@ -305,6 +312,7 @@ def transform_integrals_df(myadc):
                 elif myadc.eris_direct and ki <= kj:
                     eris.Lvv_idx_p[(ki,kj)] = idx_p
                     eris.Lvv_p[idx_p] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
+                    #eris.Lvv_p[idx_p][:] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
                     idx_p += 1
 
     cput1 = np.array((time.process_time(), time.perf_counter()))

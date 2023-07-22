@@ -691,7 +691,7 @@ def matvec(adc, kshift, M_ij=None, eris=None):
                             if kb > ka:
                                 idx_p = eris.Lvv_idx_p[(ka,kb)]
                                 eris_oovv_klb = 1./nkpts * lib.einsum('Lkl,Lab->klba'
-                                                , eris.Loo[kk,kl], eris.Lvv_p[idx_p].conj(), optimize=True)
+                                                , eris.Loo[kk,kl], np.conj(eris.Lvv_p[idx_p]), optimize=True)
                         else:
                             eris_oovv_klb = eris.oovv[kk,kl,kb]
                             
@@ -708,7 +708,7 @@ def matvec(adc, kshift, M_ij=None, eris=None):
                             if kb > ka:
                                 idx_p = eris.Lvv_idx_p[(ka,kb)]
                                 eris_oovv_jlb = 1./nkpts * lib.einsum('Ljl,Lab->jlba'
-                                                , eris.Loo[kj,kl], eris.Lvv_p[idx_p].conj(), optimize=True)
+                                                , eris.Loo[kj,kl], np.conj(eris.Lvv_p[idx_p]), optimize=True)
                         else:
                             eris_oovv_jlb = eris.oovv[kj,kl,kb]
 
