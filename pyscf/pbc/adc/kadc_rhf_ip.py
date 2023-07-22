@@ -91,8 +91,8 @@ def get_imds(adc, eris=None):
     e_vir = np.array(e_vir)
 
     idn_occ = np.identity(nocc)
-    #M_ij = np.empty((nkpts,nocc,nocc),dtype=mo_coeff.dtype)
-    M_ij = np.empty((nkpts,nocc,nocc),dtype=eris.Loo.dtype)
+    M_ij = np.empty((nkpts,nocc,nocc),dtype=mo_coeff.dtype)
+    #M_ij = np.empty((nkpts,nocc,nocc),dtype=eris.Loo.dtype)
 
     if eris is None:
         eris = adc.transform_integrals()
@@ -607,6 +607,8 @@ def matvec(adc, kshift, M_ij=None, eris=None):
     if M_ij is None:
         M_ij = adc.get_imds()
 
+    e,_ = np.linalg.eig(M_ij[kshift])
+    print(f'M_ij eigenvalues ==> M_ij[{kshift}] = {e}')
     #Calculate sigma vector
     def sigma_(r):
         #cput0 = (time.process_time(), time.time())
@@ -623,7 +625,8 @@ def matvec(adc, kshift, M_ij=None, eris=None):
         r2 = r[s_doubles:f_doubles]
 
         r2 = r2.reshape(nkpts,nkpts,nvir,nocc,nocc)
-        s2 = np.zeros((nkpts,nkpts,nvir,nocc,nocc), dtype=r.dtype)
+        #s2 = np.zeros((nkpts,nkpts,nvir,nocc,nocc), dtype=r.dtype)
+        s2 = np.zeros((nkpts,nkpts,nvir,nocc,nocc), dtype=M_ij[kshift].dtype)
         cell = adc.cell
         kpts = adc.kpts
         madelung = tools.madelung(cell, kpts)
