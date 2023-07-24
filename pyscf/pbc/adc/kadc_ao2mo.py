@@ -332,10 +332,10 @@ def transform_integrals_df(myadc):
         #                                      , chunks=(1,1,1,nocc,nvir,nvir,nocc), compression='lzf')
         eris.oooo = feri.create_dataset('oooo', (nkpts,nkpts,nkpts,nocc,nocc,nocc,nocc), dtype=dtype)
         eris.oovv = feri.create_dataset('oovv', (nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir), dtype=dtype)
-        eris.vooo = feri.create_dataset('ovoo', (nkpts,nkpts,nkpts,nvir,nocc,nocc,nocc), dtype=dtype)
+        eris.vooo = feri.create_dataset('vooo', (nkpts,nkpts,nkpts,nvir,nocc,nocc,nocc), dtype=dtype)
         eris.ovov = feri.create_dataset('ovov', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nvir), dtype=dtype)
         eris.ovvo = feri.create_dataset('ovvo', (nkpts,nkpts,nkpts,nocc,nvir,nvir,nocc), dtype=dtype)
-        if myadc.method == 'adc(3)':
+        if myadc.method == 'adc(3)' or myadc.eris_direct is False:
             eris.ovoo = feri.create_dataset('ovoo', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nocc), dtype=dtype)
 
         for kp in range(nkpts):

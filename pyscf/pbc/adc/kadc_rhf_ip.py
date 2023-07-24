@@ -649,8 +649,8 @@ def matvec(adc, kshift, M_ij=None, eris=None):
                     eris_ovoo_jak = 1./nkpts * lib.einsum('Lja,Lki->jaki', eris.Lov[kj,ka], eris.Loo[kk,ki], optimize=True)
                     eris_ovoo_kaj = 1./nkpts * lib.einsum('Lka,Lji->kaji', eris.Lov[kk,ka], eris.Loo[kj,ki], optimize=True)
                 else:
-                    eris_ovoo_aji = eris.vooo[ka,kj,ki]
-                    eris_ovoo_aki = eris.vooo[ka,kk,ki]
+                    eris_ovoo_jak = eris.ovoo[kj,ka,kk]
+                    eris_ovoo_kaj = eris.ovoo[kk,ka,kj]
 
                 #s1 += 2. * lib.einsum('ajik,ajk->i',
                 #                      eris_vooo_aji, r2[ka,kj], optimize=True)
