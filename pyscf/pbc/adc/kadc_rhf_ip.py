@@ -644,20 +644,26 @@ def matvec(adc, kshift, M_ij=None, eris=None):
                 ncvs = adc.ncvs_proj
 
                 if adc.eris_direct:
-                    eris_vooo_aji = 1./nkpts * lib.einsum('Laj,Lik->ajik', eris.Lvo[ka,kj], eris.Loo[ki,kk], optimize=True)
-                    eris_vooo_aki = 1./nkpts * lib.einsum('Lak,Lij->akij', eris.Lvo[ka,kk], eris.Loo[ki,kj], optimize=True)
+                    #eris_vooo_aji = 1./nkpts * lib.einsum('Laj,Lik->ajik', eris.Lvo[ka,kj], eris.Loo[ki,kk], optimize=True)
+                    #eris_vooo_aki = 1./nkpts * lib.einsum('Lak,Lij->akij', eris.Lvo[ka,kk], eris.Loo[ki,kj], optimize=True)
+                    eris_ovoo_jak = 1./nkpts * lib.einsum('Lja,Lki->jaki', eris.Lov[kj,ka], eris.Loo[kk,ki], optimize=True)
+                    eris_ovoo_kaj = 1./nkpts * lib.einsum('Lka,Lji->kaji', eris.Lov[kk,ka], eris.Loo[kj,ki], optimize=True)
                 else:
-                    eris_vooo_aji = eris.vooo[ka,kj,ki]
-                    eris_vooo_aki = eris.vooo[ka,kk,ki]
+                    eris_ovoo_aji = eris.vooo[ka,kj,ki]
+                    eris_ovoo_aki = eris.vooo[ka,kk,ki]
 
-                s1 += 2. * lib.einsum('ajik,ajk->i',
-                                      eris_vooo_aji, r2[ka,kj], optimize=True)
-                s1 -= lib.einsum('akij,ajk->i',
-                                 eris_vooo_aki, r2[ka,kj], optimize=True)
+                #s1 += 2. * lib.einsum('ajik,ajk->i',
+                #                      eris_vooo_aji, r2[ka,kj], optimize=True)
+                #s1 -= lib.einsum('akij,ajk->i',
+                #                 eris_vooo_aki, r2[ka,kj], optimize=True)
+                s1 += 2. * lib.einsum('jaki,ajk->i',
+                                      eris_ovoo_jak.conj(), r2[ka,kj], optimize=True)
+                s1 -= lib.einsum('kaji,ajk->i',
+                                 eris_ovoo_kaj.conj(), r2[ka,kj], optimize=True)
 
 #################### ADC(2) ajk - i block ############################
 
-                s2[ka,kj] += lib.einsum('ajik,i->ajk', eris_vooo_aji.conj(), r1, optimize=True)
+                s2[ka,kj] += lib.einsum('jaki,i->ajk', eris_ovoo_jak, r1, optimize=True)
 
 ################# ADC(2) ajk - bil block ############################
 
