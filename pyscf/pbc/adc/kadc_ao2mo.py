@@ -269,6 +269,7 @@ def transform_integrals_df(myadc):
     Loo = eris.Loo = np.empty((nkpts,nkpts,naux,nocc,nocc),dtype=dtype)
     eris.Lov = np.empty((nkpts,nkpts,naux,nocc,nvir),dtype=dtype)
     Lvo = eris.Lvo = np.empty((nkpts,nkpts,naux,nvir,nocc),dtype=dtype)
+    Lvv = eris.Lvv = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
     if not myadc.eris_direct:
         Lvv = eris.Lvv = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
     else:
@@ -307,6 +308,7 @@ def transform_integrals_df(myadc):
                 Loo[ki,kj] = eris.Loo[ki,kj] = Lpq_mo[ki,kj][:,:nocc,:nocc].copy()
                 eris.Lov[ki,kj] = Lpq_mo[ki,kj][:,:nocc,nocc:].copy()
                 Lvo[ki,kj] = eris.Lvo[ki,kj] = Lpq_mo[ki,kj][:,nocc:,:nocc].copy()
+                Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
                 if not myadc.eris_direct:
                     Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
                 elif myadc.eris_direct and ki <= kj:
@@ -317,7 +319,9 @@ def transform_integrals_df(myadc):
 
     cput1 = np.array((time.process_time(), time.perf_counter()))
     print(f'eris.Lov.shape = {eris.Lov.shape}')
-    if not myadc.eris_direct:
+    compute_int = True
+    #if not myadc.eris_direct:
+    if compute_int:
         eris.feri = feri = lib.H5TmpFile()
 
         #eris.oooo = feri.create_dataset('oooo', (nkpts,nkpts,nkpts,nocc,nocc,nocc,nocc), dtype=dtype
@@ -335,6 +339,7 @@ def transform_integrals_df(myadc):
         eris.vooo = feri.create_dataset('vooo', (nkpts,nkpts,nkpts,nvir,nocc,nocc,nocc), dtype=dtype)
         eris.ovov = feri.create_dataset('ovov', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nvir), dtype=dtype)
         eris.ovvo = feri.create_dataset('ovvo', (nkpts,nkpts,nkpts,nocc,nvir,nvir,nocc), dtype=dtype)
+        eris.ovoo = feri.create_dataset('ovoo', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nocc), dtype=dtype)
         if myadc.method == 'adc(3)' or myadc.eris_direct is False:
             eris.ovoo = feri.create_dataset('ovoo', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nocc), dtype=dtype)
 
@@ -348,8 +353,9 @@ def transform_integrals_df(myadc):
                         'Lpq,Lrs->pqrs', eris.Lov[kp,kq], eris.Lov[kr,ks])/nkpts
                     eris.ovvo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Lvo[kr,ks])/nkpts
                     eris.vooo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lvo[kp,kq], Loo[kr,ks])/nkpts
-                    if myadc.method == 'adc(3)':
-                        eris.ovoo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Loo[kr,ks])/nkpts
+                    eris.ovoo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Loo[kr,ks])/nkpts
+                    #if myadc.method == 'adc(3)':
+                    #    eris.ovoo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Loo[kr,ks])/nkpts
                     #eris.ovvv[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Lvv[kr,ks])/nkpts
 
     cput2 = np.array((time.process_time(), time.perf_counter()))
