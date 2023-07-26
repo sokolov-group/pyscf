@@ -33,7 +33,7 @@ from pyscf.adc import radc_ip
 from pyscf.adc import radc_ea
 from pyscf.adc import uadc_ip
 from pyscf.adc import uadc_ea
-
+from pyscf.adc import uadc_ee
 
 def ADC(mf, frozen=None, mo_coeff=None, mo_occ=None):
     if not (frozen is None or frozen == 0):

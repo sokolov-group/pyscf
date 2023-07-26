@@ -8733,7 +8733,7 @@ def get_properties(adc, nroots=1):
     P = np.square(dx.T)*adc.E*(2/3)
     P = P[0] + P[1] + P[2]
     
-    return P, (X,density_matrix)
+    return P, X, density_matrix
 
 
 def analyze(myadc):

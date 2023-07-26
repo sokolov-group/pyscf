@@ -66,10 +66,9 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     adc.U = np.array(U).T.copy()
 
     if adc.compute_properties:
-        adc.P,adc.X = adc.get_properties(nroots)
+        adc.P,adc.X, adc.density= adc.get_properties(nroots)
     if adc.method_type == "ee":
-        TY, props = adc.X
-        spin, ref_opdm, opdm, tpdm = props
+        spin, ref_opdm, opdm, tpdm = adc.density
         if adc.spin_c is True:
             spin, trace = spin
             spin_c = spin
@@ -104,7 +103,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     log.timer('ADC', *cput0)
 
-    return adc.E, adc.U, adc.P, adc.X
+    return adc.E, adc.U, adc.P, adc.X, adc.density
 
 
 class UADC(lib.StreamObject):
@@ -433,18 +432,19 @@ class UADC(lib.StreamObject):
         self.method_type = self.method_type.lower()
         if(self.method_type == "ea"):
             e_exc, v_exc, spec_fac, X, adc_es = self.ea_adc(nroots=nroots, guess=guess, eris=eris)
+            opdm = None
 
         elif(self.method_type == "ip"):
-            e_exc, v_exc, spec_fac, X, adc_es = self.ip_adc(nroots=nroots, guess=guess, eris=eris)
+            e_exc, v_exc, spec_fac, X, adc_es, pdm = self.ip_adc(nroots=nroots, guess=guess, eris=eris)
 
         elif(self.method_type == "ee"):
-            e_exc, v_exc, spec_fac, X, adc_es = self.ee_adc(nroots=nroots, guess=guess, eris=eris)
+            e_exc, v_exc, spec_fac, X, adc_es, pdm = self.ee_adc(nroots=nroots, guess=guess, eris=eris)
 
         else:
             raise NotImplementedError(self.method_type)
 
         self._adc_es = adc_es
-        return e_exc, v_exc, spec_fac, X
+        return e_exc, v_exc, spec_fac, X, pdm
 
   #  @profile
     def _finalize(self):
@@ -462,15 +462,15 @@ class UADC(lib.StreamObject):
     def ip_adc(self, nroots=1, guess=None, eris=None):
         from pyscf.adc import uadc_ip
         adc_es = uadc_ip.UADCIP(self)
-        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
-        return e_exc, v_exc, spec_fac, x, adc_es
+        e_exc, v_exc, spec_fac, x, opdm = adc_es.kernel(nroots, guess, eris)
+        return e_exc, v_exc, spec_fac, x, adc_es, opdm
 
   #  @profile
     def ee_adc(self, nroots=1, guess=None, eris=None):
         from pyscf.adc import uadc_ee
         adc_es = uadc_ee.UADCEE(self)
-        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
-        return e_exc, v_exc, spec_fac, x, adc_es
+        e_exc, v_exc, spec_fac, x, density = adc_es.kernel(nroots, guess, eris)
+        return e_exc, v_exc, spec_fac, x, adc_es, density
 
   #  @profile
     def density_fit(self, auxbasis=None, with_df=None):
