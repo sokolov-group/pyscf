@@ -33,7 +33,7 @@ from pyscf import scf
 
 
 # Excited-state kernel
-#@profile
+@profile
 def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     adc.method = adc.method.lower()
