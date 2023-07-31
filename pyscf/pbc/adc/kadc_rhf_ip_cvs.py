@@ -589,9 +589,9 @@ def matvec(adc, kshift, M_ij=None, eris=None):
 
                 if adc.eris_direct:
                     eris_eooo_aji = 1./nkpts * lib.einsum('Laj,Lik->ajik'
-                                      , eris.Lvo[ka,kj], eris.Loo[ki,kk], optimize=True)
+                                      , eris.Lvo[ka,kj], eris.Loo[kshift,kk], optimize=True)
                     eris_eooo_aki = 1./nkpts * lib.einsum('Lak,Lij->akij'
-                                      , eris.Lvo[ka,kk], eris.Loo[ki,kj], optimize=True)
+                                      , eris.Lvo[ka,kk], eris.Loo[kshift,kj], optimize=True)
                 else:
                     eris_eooo_aji = eris.vooo[ka,kj,ki]
                     eris_eooo_aki = eris.vooo[ka,kk,ki]
@@ -869,7 +869,7 @@ def matvec(adc, kshift, M_ij=None, eris=None):
                             s2_evc[ka,kj] += lib.einsum('jLba,bLK->ajK',eris_ooee_jlb[ncvs:],
                                                            r2_eoc_bl,optimize=True)
            
-                            kb = kconserv[ka, kk, ki]
+                            #kb = kconserv[ka, kk, ki]
                             if adc.eris_direct: 
                                 eris_oeeo_jab = 1./nkpts * lib.einsum('Lja,Lbl->jabl'
                                                 , eris.Lov[kj,ka], eris.Lvo[kb,kl], optimize=True)

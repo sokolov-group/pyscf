@@ -355,7 +355,8 @@ def transform_integrals_df(myadc):
                     eris.vooo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lvo[kp,kq], Loo[kr,ks])/nkpts
                     eris.ovoo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Loo[kr,ks])/nkpts
                     #if myadc.method == 'adc(3)':
-                    #    eris.ovoo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Loo[kr,ks])/nkpts
+                    if myadc.method == 'adc(3)' or myadc.eris_direct is False:
+                        eris.ovoo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Loo[kr,ks])/nkpts
                     #eris.ovvv[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Lvv[kr,ks])/nkpts
 
     cput2 = np.array((time.process_time(), time.perf_counter()))

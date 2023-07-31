@@ -246,8 +246,15 @@ class RADC(pyscf.adc.radc.RADC):
             self.transform_integrals = outcore_transform
 
         eris = self.transform_integrals()
-        self.e_corr,self.t1,self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
-            self, eris=eris, verbose=self.verbose)
+        #self.e_corr,self.t1,self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
+        #    self, eris=eris, verbose=self.verbose)
+        if not self.eris_direct:
+            self.e_corr, self.t1, self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
+                self, eris=eris, verbose=self.verbose)
+        else:
+            self.e_corr = kadc_rhf_amplitudes.compute_amplitudes_energy(
+                self, eris=eris, verbose=self.verbose)
+            self.t1, self.t2 = None, None
         print ("MPn:",self.e_corr)
         self._finalize()
         return self.e_corr, self.t1,self.t2
@@ -728,14 +735,15 @@ class RADC(pyscf.adc.radc.RADC):
 
         eris = self.transform_integrals()
 
-        self.e_corr, self.t1, self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
-            self, eris=eris, verbose=self.verbose)
-        #if not self.eris_direct:
-        #    self.e_corr, self.t1, self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
-        #        self, eris=eris, verbose=self.verbose)
-        #else:
-        #    self.e_corr = kadc_rhf_amplitudes.compute_amplitudes_energy(
-        #        self, eris=eris, verbose=self.verbose)
+        #self.e_corr, self.t1, self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
+        #    self, eris=eris, verbose=self.verbose)
+        if not self.eris_direct:
+            self.e_corr, self.t1, self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
+                self, eris=eris, verbose=self.verbose)
+        else:
+            self.e_corr = kadc_rhf_amplitudes.compute_amplitudes_energy(
+                self, eris=eris, verbose=self.verbose)
+            self.t1, self.t2 = None, None
 
         print ("MPn:",self.e_corr)
         self._finalize()

@@ -91,8 +91,8 @@ def get_imds(adc, eris=None):
     e_vir = np.array(e_vir)
 
     idn_occ = np.identity(nocc)
-    M_ij = np.empty((nkpts,nocc,nocc),dtype=mo_coeff.dtype)
-    #M_ij = np.empty((nkpts,nocc,nocc),dtype=eris.Loo.dtype)
+    #M_ij = np.empty((nkpts,nocc,nocc),dtype=mo_coeff.dtype)
+    M_ij = np.empty((nkpts,nocc,nocc),dtype=eris.Loo.dtype)
 
     if eris is None:
         eris = adc.transform_integrals()
@@ -109,26 +109,26 @@ def get_imds(adc, eris=None):
         for kl in range(nkpts):
             for kd in range(nkpts):
                 ke = kconserv[kj,kd,kl]
-                t2_1 = adc.t2[0]
-                t2_1_jld = t2_1_ild = adc.t2[0][ki,kl,kd]
-                eris_ovov_jdl = eris_ovov_idl = 1./nkpts * lib.einsum('Ljd,Lle->jdle'
-                                , eris.Lov[ki,kd], eris.Lov[kl,ke], optimize=True)
-                eris_ovov_jel = eris_ovov_iel = 1./nkpts * lib.einsum('Lje,Lld->jeld'
-                                , eris.Lov[ki,ke], eris.Lov[kl,kd], optimize=True)
+                #t2_1 = adc.t2[0]
+                #t2_1_jld = t2_1_ild = adc.t2[0][ki,kl,kd]
+                #eris_ovov_jdl = eris_ovov_idl = 1./nkpts * lib.einsum('Ljd,Lle->jdle'
+                #                , eris.Lov[ki,kd], eris.Lov[kl,ke], optimize=True)
+                #eris_ovov_jel = eris_ovov_iel = 1./nkpts * lib.einsum('Lje,Lld->jeld'
+                #                , eris.Lov[ki,ke], eris.Lov[kl,kd], optimize=True)
                 #eris_ovov_jdl = eris_ovov_idl = eris_ovov[ki,kd,kl]
                 #eris_ovov_jel = eris_ovov_iel = eris_ovov[ki,ke,kl]
                 
-                #if not adc.eris_direct:
-                #    t2_1_jld = t2_1_ild = adc.t2[0][ki,kl,kd]
-                #    eris_ovov_jdl = eris_ovov_idl = eris_ovov[ki,kd,kl]
-                #    eris_ovov_jel = eris_ovov_iel = eris_ovov[ki,ke,kl]
-                #  
-                #else:
-                #    eris_ovov_jdl = eris_ovov_idl = 1./nkpts * lib.einsum('Ljd,Lle->jdle'
-                #                    , eris.Lov[ki,kd], eris.Lov[kl,ke], optimize=True)
-                #    eris_ovov_jel = eris_ovov_iel = 1./nkpts * lib.einsum('Lje,Lld->jeld'
-                #                    , eris.Lov[ki,ke], eris.Lov[kl,kd], optimize=True)
-                #    t2_1_jld = t2_1_ild = gen_t2_1(adc,eris,(ki,kl,kd,ke))
+                if not adc.eris_direct:
+                    t2_1_jld = t2_1_ild = adc.t2[0][ki,kl,kd]
+                    eris_ovov_jdl = eris_ovov_idl = eris_ovov[ki,kd,kl]
+                    eris_ovov_jel = eris_ovov_iel = eris_ovov[ki,ke,kl]
+                  
+                else:
+                    eris_ovov_jdl = eris_ovov_idl = 1./nkpts * lib.einsum('Ljd,Lle->jdle'
+                                    , eris.Lov[ki,kd], eris.Lov[kl,ke], optimize=True)
+                    eris_ovov_jel = eris_ovov_iel = 1./nkpts * lib.einsum('Lje,Lld->jeld'
+                                    , eris.Lov[ki,ke], eris.Lov[kl,kd], optimize=True)
+                    t2_1_jld = t2_1_ild = gen_t2_1(adc,eris,(ki,kl,kd,ke))
 
                 M_ij[ki] += 0.5 * 0.5 * \
                     lib.einsum('ilde,jdle->ij',t2_1_ild, eris_ovov_jdl,optimize=True)
@@ -138,11 +138,11 @@ def get_imds(adc, eris=None):
                                              eris_ovov_jdl,optimize=True)
                 #del t2_1_ild
 
-                t2_1_ljd = t2_1_lid = adc.t2[0][kl,ki,kd]
-                #if not adc.eris_direct:
-                #    t2_1_ljd = t2_1_lid = adc.t2[0][kl,ki,kd]
-                #else:
-                #    t2_1_ljd = t2_1_lid = gen_t2_1(adc,eris,(kl,ki,kd,ke))
+                #t2_1_ljd = t2_1_lid = adc.t2[0][kl,ki,kd]
+                if not adc.eris_direct:
+                    t2_1_ljd = t2_1_lid = adc.t2[0][kl,ki,kd]
+                else:
+                    t2_1_ljd = t2_1_lid = gen_t2_1(adc,eris,(kl,ki,kd,ke))
 
                 M_ij[ki] -= 0.5 * 0.5 * \
                     lib.einsum('lide,jdle->ij',t2_1_lid, eris_ovov_jdl,optimize=True)
@@ -575,6 +575,9 @@ def get_diag(adc,kshift,M_ij=None,eris=None):
 
     diag[s2:f2] = doubles.reshape(-1)
 
+    if adc.ncvs_proj is not None:
+        diag = cvs_projector(adc, diag, diag=True)
+
     diag = -diag
     log.timer_debug1("Completed ea_diag calculation")
 
@@ -997,6 +1000,7 @@ def matvec(adc, kshift, M_ij=None, eris=None):
     e,_ = np.linalg.eig(M_ij[kshift])
     print(f'M_ij eigenvalues ==> M_ij[{kshift}] = {e}')
     #Calculate sigma vector
+    print(f'using projector code')
     def sigma_(r):
         #cput0 = (time.process_time(), time.time())
         cput0 = (time.process_time(), time.perf_counter())
@@ -1012,8 +1016,8 @@ def matvec(adc, kshift, M_ij=None, eris=None):
         r2 = r[s_doubles:f_doubles]
 
         r2 = r2.reshape(nkpts,nkpts,nvir,nocc,nocc)
-        #s2 = np.zeros((nkpts,nkpts,nvir,nocc,nocc), dtype=r.dtype)
-        s2 = np.zeros((nkpts,nkpts,nvir,nocc,nocc), dtype=M_ij[kshift].dtype)
+        s2 = np.zeros((nkpts,nkpts,nvir,nocc,nocc), dtype=r.dtype)
+        #s2 = np.zeros((nkpts,nkpts,nvir,nocc,nocc), dtype=M_ij[kshift].dtype)
         cell = adc.cell
         kpts = adc.kpts
         madelung = tools.madelung(cell, kpts)
