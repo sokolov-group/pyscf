@@ -310,7 +310,12 @@ def compute_amplitudes(myadc, eris):
 
         if not isinstance(eris.oooo, np.ndarray):
             t2_1_vvvv_a = radc_ao2mo.write_dataset(t2_1_vvvv_a)
-        t2_2_a = t2_1_vvvv_a
+        if isinstance(eris.vvvv_p, np.ndarray) or isinstance(eris.vvvv_p, list):
+            t2_2_a = np.zeros((nocc_a,nocc_a,nvir_a,nvir_a))
+            t2_2_a[:,:,ab_ind_a[0],ab_ind_a[1]] = t2_1_vvvv_a[:]
+            t2_2_a[:,:,ab_ind_a[1],ab_ind_a[0]] = -t2_1_vvvv_a[:]
+        else:
+            t2_2_a = t2_1_vvvv_a
 #        t2_2_a = np.zeros((nocc_a,nocc_a,nvir_a,nvir_a))
 #        t2_2_a[:,:,ab_ind_a[0],ab_ind_a[1]] = t2_1_vvvv_a[:]
 #        t2_2_a[:,:,ab_ind_a[1],ab_ind_a[0]] = -t2_1_vvvv_a[:]
@@ -375,7 +380,13 @@ def compute_amplitudes(myadc, eris):
 
         if not isinstance(eris.oooo, np.ndarray):
             t2_1_vvvv_b = radc_ao2mo.write_dataset(t2_1_vvvv_b)
-        t2_2_b = t2_1_vvvv_b
+
+        if isinstance(eris.VVVV_p, np.ndarray) or isinstance(eris.VVVV_p, list):
+            t2_2_b = np.zeros((nocc_b,nocc_b,nvir_b,nvir_b))
+            t2_2_b[:,:,ab_ind_b[0],ab_ind_b[1]] = t2_1_vvvv_b[:]
+            t2_2_b[:,:,ab_ind_b[1],ab_ind_b[0]] = -t2_1_vvvv_b[:]
+        else:
+            t2_2_b = t2_1_vvvv_b
 #        t2_2_b = np.zeros((nocc_b,nocc_b,nvir_b,nvir_b))
 #        t2_2_b[:,:,ab_ind_b[0],ab_ind_b[1]] = t2_1_vvvv_b[:]
 #        t2_2_b[:,:,ab_ind_b[1],ab_ind_b[0]] = -t2_1_vvvv_b[:]
@@ -829,7 +840,7 @@ def compute_energy(myadc, t1, t2, eris):
 
     return e_mp
 
-@profile
+#@profile
 def contract_ladder(myadc,t_amp,vvvv_p, prefactor = 1.0, pack = False):
 
     nocc_a = t_amp.shape[0]
@@ -869,7 +880,7 @@ def contract_ladder(myadc,t_amp,vvvv_p, prefactor = 1.0, pack = False):
     return t
 
 
-@profile
+#@profile
 def contract_ladder_antisym(myadc,t_amp,vvvv_d):
 
     nocc = t_amp.shape[0]

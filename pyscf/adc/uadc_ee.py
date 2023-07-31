@@ -33,7 +33,7 @@ from pyscf import df
 from pyscf import scf
 from pyscf.data import nist
 
-@profile
+#@profile
 def get_imds(adc, eris=None):
 
     cput0 = (logger.process_clock(), logger.perf_counter())
@@ -2294,7 +2294,7 @@ def get_imds(adc, eris=None):
 
     return M_ia_jb
 
-@profile
+#@profile
 def get_diag(adc,M_ia_jb=None,eris=None):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -2381,7 +2381,7 @@ def get_diag(adc,M_ia_jb=None,eris=None):
 
     return diag
 
-@profile
+#@profile
 def matvec(adc, M_ia_jb=None, eris=None):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -2437,7 +2437,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
     d_ab_abab = e_vir_a[:,None]+e_vir_b
 
     #Calculate sigma vector
-    @profile
+    #@profile
     #@profile
     def sigma_(r):
         cput0 = (logger.process_clock(), logger.perf_counter())
@@ -3829,12 +3829,12 @@ def matvec(adc, M_ia_jb=None, eris=None):
             del r1_ab
             del r2_a
             del r2_b
-            exit() 
+            #exit() 
         return s
 
     return sigma_
 
-#@profile
+##@profile
 def get_opdm(adc):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):

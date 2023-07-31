@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import numpy as np
-@profile
+#@profile
 def get_ovvv_df(myadc, Lov, Lvv, p, chnk_size):
 
     ''' Returns approximate ovvv integrals used in restricted implementation'''
@@ -36,7 +36,7 @@ def get_ovvv_df(myadc, Lov, Lvv, p, chnk_size):
     return ovvv
 
 
-@profile
+#@profile
 def get_ovvv_spin_df(myadc, Lov, Lvv, p, chnk_size):
 
     ''' Returns approximate ovvv integrals (different spin cases) used in unrestricted implementation '''
@@ -61,7 +61,7 @@ def get_ovvv_spin_df(myadc, Lov, Lvv, p, chnk_size):
     return ovvv
 
 
-@profile
+#@profile
 def get_vvvv_df(myadc, Lvv, p, chnk_size, pack_34 = False):
 
     ''' Returns approximate vvvv integrals used in restricted implementation'''
@@ -122,7 +122,7 @@ def get_vvvv_df(myadc, Lvv, p, chnk_size, pack_34 = False):
 ####    vvvv = np.ascontiguousarray(vvvv[:, :, ind_vv_g[0], ind_vv_g[1]])
 ####
 ####    return vvvv
-@profile
+#@profile
 def get_vvvv_antisym_df(myadc, Lvv, p, chnk_size, pack = True):
 
     ''' Returns approximate antisymmetrized vvvv integrals (alpha/beta spin) used in unrestricted implementation'''
@@ -149,7 +149,7 @@ def get_vvvv_antisym_df(myadc, Lvv, p, chnk_size, pack = True):
 
     return vvvv
 
-@profile
+#@profile
 def get_vVvV_df(myadc, Lvv, LVV, p, chnk_size):
 
     ''' Returns approximate vvvv integrals (mixed spin) used in unrestricted implementation'''
