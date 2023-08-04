@@ -269,16 +269,21 @@ def transform_integrals_df(myadc):
     Loo = eris.Loo = np.empty((nkpts,nkpts,naux,nocc,nocc),dtype=dtype)
     eris.Lov = np.empty((nkpts,nkpts,naux,nocc,nvir),dtype=dtype)
     Lvo = eris.Lvo = np.empty((nkpts,nkpts,naux,nvir,nocc),dtype=dtype)
-    Lvv = eris.Lvv = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
+    #Lvv = eris.Lvv = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
     if not myadc.eris_direct:
         Lvv = eris.Lvv = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
     else:
         eris.Lvv_p = np.empty((nkpts_p,naux,nvir,nvir),dtype=dtype)
 
     #eris.feri = feri = lib.H5TmpFile()
-    #eris.Lvv_p = {}
-    #for idx_p in range(nkpts_p):
-    #    eris.Lvv_p[idx_p] = feri.create_dataset(f'Lvv_p_{idx_p}', (naux,nvir,nvir), dtype=dtype)
+    ##eris.Lvv_p = {}
+    ##for idx_p in range(nkpts_p):
+    ##    #eris.Lvv_p[idx_p] = feri.create_dataset(f'Lvv_p_{idx_p}', (naux,nvir,nvir), dtype=dtype)
+    ##    eris.Lvv_p[idx_p] = np.empty((naux,nvir,nvir), dtype=dtype)
+
+    #eris.Lvv_p = feri.create_dataset('Lvv_p', (nkpts_p,naux,nvir,nvir), dtype=dtype
+    #                                      , chunks=(1,naux,nvir,nvir))
+    #eris.Lvv_p = feri.create_dataset('Lvv_p', (nkpts_p,naux,nvir,nvir), dtype=dtype)
 
     eris.vvvv = None
     eris.ovvv = None
@@ -308,7 +313,7 @@ def transform_integrals_df(myadc):
                 Loo[ki,kj] = eris.Loo[ki,kj] = Lpq_mo[ki,kj][:,:nocc,:nocc].copy()
                 eris.Lov[ki,kj] = Lpq_mo[ki,kj][:,:nocc,nocc:].copy()
                 Lvo[ki,kj] = eris.Lvo[ki,kj] = Lpq_mo[ki,kj][:,nocc:,:nocc].copy()
-                Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
+                #Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
                 if not myadc.eris_direct:
                     Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
                 elif myadc.eris_direct and ki <= kj:
@@ -319,9 +324,9 @@ def transform_integrals_df(myadc):
 
     cput1 = np.array((time.process_time(), time.perf_counter()))
     print(f'eris.Lov.shape = {eris.Lov.shape}')
-    compute_int = True
-    #if not myadc.eris_direct:
-    if compute_int:
+    #compute_int = True
+    if not myadc.eris_direct:
+    #if compute_int:
         eris.feri = feri = lib.H5TmpFile()
 
         #eris.oooo = feri.create_dataset('oooo', (nkpts,nkpts,nkpts,nocc,nocc,nocc,nocc), dtype=dtype

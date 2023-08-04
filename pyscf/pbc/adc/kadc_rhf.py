@@ -248,15 +248,16 @@ class RADC(pyscf.adc.radc.RADC):
         eris = self.transform_integrals()
         #self.e_corr,self.t1,self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
         #    self, eris=eris, verbose=self.verbose)
-        if not self.eris_direct:
-            self.e_corr, self.t1, self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
-                self, eris=eris, verbose=self.verbose)
-        else:
-            self.e_corr = kadc_rhf_amplitudes.compute_amplitudes_energy(
-                self, eris=eris, verbose=self.verbose)
-            self.t1, self.t2 = None, None
-        print ("MPn:",self.e_corr)
-        self._finalize()
+        ##if not self.eris_direct:
+        ##    self.e_corr, self.t1, self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
+        ##        self, eris=eris, verbose=self.verbose)
+        ##else:
+        ##    self.e_corr = kadc_rhf_amplitudes.compute_amplitudes_energy(
+        ##        self, eris=eris, verbose=self.verbose)
+        ##    self.t1, self.t2 = None, None
+        ##print ("MPn:",self.e_corr)
+        ##self._finalize()
+        self.t1, self.t2, self.e_corr = None, None, None
         return self.e_corr, self.t1,self.t2
 
     def kernel(self, nroots=1, guess=None, eris=None, kptlist=None):
@@ -293,10 +294,10 @@ class RADC(pyscf.adc.radc.RADC):
 
         eris = self.transform_integrals()
 
-        self.e_corr, self.t1, self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
-            self, eris=eris, verbose=self.verbose)
-        print ("MPn:",self.e_corr)
-        self._finalize()
+        #self.e_corr, self.t1, self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
+        #    self, eris=eris, verbose=self.verbose)
+        #print ("MPn:",self.e_corr)
+        #self._finalize()
 
         self.method_type = self.method_type.lower()
         if(self.method_type == "ea"):
@@ -695,9 +696,10 @@ class RADC(pyscf.adc.radc.RADC):
         #self.e_corr,self.t1,self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
         #    self, eris=eris, verbose=self.verbose)
         #print ("MPn:",self.e_corr)
-        self.e_corr, self.t1,self.t2 = None
+        #self.e_corr, self.t1,self.t2 = None
         
         #self._finalize()
+        self.t1, self.t2, self.e_corr = None, None, None
         return self.e_corr, self.t1,self.t2
 
     def kernel(self, nroots=1, guess=None, eris=None, kptlist=None):
@@ -737,16 +739,16 @@ class RADC(pyscf.adc.radc.RADC):
 
         #self.e_corr, self.t1, self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
         #    self, eris=eris, verbose=self.verbose)
-        if not self.eris_direct:
-            self.e_corr, self.t1, self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
-                self, eris=eris, verbose=self.verbose)
-        else:
-            self.e_corr = kadc_rhf_amplitudes.compute_amplitudes_energy(
-                self, eris=eris, verbose=self.verbose)
-            self.t1, self.t2 = None, None
+        ##if not self.eris_direct:
+        ##    self.e_corr, self.t1, self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
+        ##        self, eris=eris, verbose=self.verbose)
+        ##else:
+        ##    self.e_corr = kadc_rhf_amplitudes.compute_amplitudes_energy(
+        ##        self, eris=eris, verbose=self.verbose)
+        ##    self.t1, self.t2 = None, None
 
-        print ("MPn:",self.e_corr)
-        self._finalize()
+        ##print ("MPn:",self.e_corr)
+        ##self._finalize()
 
         self.method_type = self.method_type.lower()
         self.ncvs_proj = self.ncvs_proj

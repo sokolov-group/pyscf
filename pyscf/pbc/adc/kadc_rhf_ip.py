@@ -1009,8 +1009,9 @@ def matvec(adc, kshift, M_ij=None, eris=None):
         if adc.ncvs_proj is not None:
             r = cvs_projector(adc, r)
 
-        if eris.Loo.dtype == np.complex64:
-            r = np.ndarray.astype(r, dtype=np.complex64)
+        #if eris.Loo.dtype == np.complex64:
+        #    r = np.ndarray.astype(r, dtype=np.complex64)
+        r = np.ndarray.astype(r, dtype=eris.Loo.dtype)
         print(f'r vector dtype = {r.dtype}')
         r1 = r[s_singles:f_singles]
         r2 = r[s_doubles:f_doubles]

@@ -363,9 +363,7 @@ def compute_energy(myadc, t2, eris):
     kconserv = myadc.khelper.kconserv
 
     emp2 = 0.0
-
-    #pass_bool = True
-    #if pass_bool:
+    print(f'inside compute_energy myadc.eris_direct = {myadc.eris_direct}')
     if not myadc.eris_direct:
         eris_ovov = eris.ovov
         t2_amp = t2[0]#[:]
