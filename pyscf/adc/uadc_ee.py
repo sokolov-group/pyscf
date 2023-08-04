@@ -6746,6 +6746,7 @@ def get_ref_opdm(adc):
 
     OPDM_a[:nocc_a, nocc_a:]  = lib.einsum('IC->IC', t1_ce_aa, optimize = einsum_type).copy()
     OPDM_a[:nocc_a, nocc_a:] += lib.einsum('IC->IC', t2_ce_aa, optimize = einsum_type).copy()
+    
     OPDM_a[:nocc_a, nocc_a:] += 1/2 * lib.einsum('IiCa,ia->IC', t1_ccee_aaaa, t1_ce_aa, optimize = einsum_type)
     OPDM_a[:nocc_a, nocc_a:] += 1/2 * lib.einsum('IiCa,ia->IC', t1_ccee_abab, t1_ce_bb, optimize = einsum_type)
 

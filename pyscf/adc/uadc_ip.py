@@ -28,6 +28,7 @@ from pyscf.adc import uadc_ao2mo
 from pyscf.adc import radc_ao2mo
 from pyscf.adc import dfadc
 from pyscf.adc import uadc_ee
+from pyscf import scf
 from pyscf import __config__
 from pyscf import df
 
@@ -1598,6 +1599,9 @@ def make_rdm1_eigenvectors(adc, L, R):
     t2_1_b = adc.t2[0][2][:]
     t1_2_a = adc.t1[0][0][:]
     t1_2_b = adc.t1[0][1][:]
+
+    if isinstance(adc._scf, scf.rhf.RHF):
+        print("hello", adc._nocc)
 
     nocc_a = adc.nocc_a
     nocc_b = adc.nocc_b
