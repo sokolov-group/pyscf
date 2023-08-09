@@ -161,6 +161,9 @@ class RADC(lib.StreamObject):
         self.P = None
         self.X = None
 
+        self.opdm = False
+        self.ref_opdm = False
+
 
 
         keys = set(('tol_residual','conv_tol', 'e_corr', 'method', 'mo_coeff',
@@ -276,7 +279,7 @@ class RADC(lib.StreamObject):
             e_exc, v_exc, spec_fac, x, adc_es = self.ea_adc(nroots=nroots, guess=guess, eris=eris)
 
         elif(self.method_type == "ip"):
-            e_exc, v_exc, spec_fac, x, adc_es, pdm = self.ip_adc(nroots=nroots, guess=guess, eris=eris)
+            e_exc, v_exc, spec_fac, x, adc_es, pdm= self.ip_adc(nroots=nroots, guess=guess, eris=eris)
 
         else:
             raise NotImplementedError(self.method_type)
@@ -298,7 +301,7 @@ class RADC(lib.StreamObject):
     def ip_adc(self, nroots=1, guess=None, eris=None):
         from pyscf.adc import radc_ip
         adc_es = radc_ip.RADCIP(self)
-        e_exc, v_exc, spec_fac, x, opdm= adc_es.kernel(nroots, guess, eris)
+        e_exc, v_exc, spec_fac, x, opdm = adc_es.kernel(nroots, guess, eris)
         return e_exc, v_exc, spec_fac, x, adc_es, opdm
 
     def density_fit(self, auxbasis=None, with_df = None):
