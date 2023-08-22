@@ -54,7 +54,6 @@ np.set_printoptions(threshold=sys.maxsize)
 #        Chemist's  oovv(ijab) : ki - kj + ka - kb
 #        Amplitudes t2(ijab)  : ki + kj - ka - kba
 
-
 def kernel_off(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
 
     adc.method = adc.method.lower()
@@ -134,7 +133,7 @@ def kernel_off(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None)
     return evals, evecs, P, X
 
 
-class RADC(pyscf.adc.radc.RADC):
+class RADC_off(pyscf.adc.radc.RADC):
 
     def __init__(self, mf, frozen=None, mo_coeff=None, mo_occ=None):
 
@@ -338,7 +337,7 @@ class RADC(pyscf.adc.radc.RADC):
         else:
             self.with_df = with_df
         return self
-
+@profile
 def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
 
     tracemalloc.start()
@@ -612,6 +611,7 @@ class RADC(pyscf.adc.radc.RADC):
         self.ncvs = None
         self.ncvs_proj = None
         self.eris_direct = False
+        self.Lvv_p_disk = False
         self.cvs_compact = True
         self.precision_single = True
         self._nocc = None
@@ -658,7 +658,7 @@ class RADC(pyscf.adc.radc.RADC):
     get_nocc = get_nocc
     get_nmo = get_nmo
 
-
+    @profile
     def kernel_gs(self):
         assert(self.mo_coeff is not None)
         assert(self.mo_occ is not None)
@@ -701,7 +701,7 @@ class RADC(pyscf.adc.radc.RADC):
         #self._finalize()
         self.t1, self.t2, self.e_corr = None, None, None
         return self.e_corr, self.t1,self.t2
-
+    @profile
     def kernel(self, nroots=1, guess=None, eris=None, kptlist=None):
         assert(self.mo_coeff is not None)
         assert(self.mo_occ is not None)
@@ -754,6 +754,7 @@ class RADC(pyscf.adc.radc.RADC):
         self.ncvs_proj = self.ncvs_proj
         self.ncvs = self.ncvs
         self.eris_direct = self.eris_direct
+        self.Lvv_p_disk = self.Lvv_p_disk
         self.cvs_compact = self.cvs_compact
 
         print(f'value of Lpq_contract == {self.Lpq_contract}')
@@ -777,7 +778,7 @@ class RADC(pyscf.adc.radc.RADC):
             raise NotImplementedError(self.method_type)
         self._adc_es = adc_es
         return e_exc, v_exc, spec_fac, x
-
+    @profile
     def ip_adc(self, nroots=1, guess=None, eris=None, kptlist=None):
         from pyscf.pbc.adc import kadc_rhf_ip
         adc_es = kadc_rhf_ip.RADCIP(self)
@@ -801,7 +802,7 @@ class RADC(pyscf.adc.radc.RADC):
         adc_es = kadc_rhf_ip_df.RADCIPDF(self)
         e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris, kptlist)
         return e_exc, v_exc, spec_fac, x, adc_es
-
+    @profile
     def density_fit(self, auxbasis=None, with_df=None):
         if with_df is None:
             self.with_df = df.DF(self._scf.mol)

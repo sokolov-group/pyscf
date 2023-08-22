@@ -63,7 +63,7 @@ def vector_size(adc):
 tracemalloc.start()
 print(f'[memalloc current+max ERI-DF-post-pqrs [GB] = {np.array(tracemalloc.get_traced_memory())/1024**3}')
 tracemalloc.stop()
-
+@profile
 def get_imds(adc, eris=None):
 
     tracemalloc.start()
@@ -520,7 +520,7 @@ def cvs_projector(adc, r, diag=False):
         Pr[s2:f2] = new_h2.reshape(-1)
     
     return Pr
-
+@profile
 def get_diag(adc,kshift,M_ij=None,eris=None):
 
     log = logger.Logger(adc.stdout, adc.verbose)
@@ -964,6 +964,7 @@ def matvec_off_on(adc, kshift, M_ij=None, eris=None):
 
         return s
     return sigma_
+@profile
 def matvec(adc, kshift, M_ij=None, eris=None):
 
     tracemalloc.start()
@@ -1001,6 +1002,7 @@ def matvec(adc, kshift, M_ij=None, eris=None):
     print(f'M_ij eigenvalues ==> M_ij[{kshift}] = {e}')
     #Calculate sigma vector
     print(f'using projector code')
+    @profile
     def sigma_(r):
         #cput0 = (time.process_time(), time.time())
         cput0 = (time.process_time(), time.perf_counter())
@@ -1675,7 +1677,7 @@ def get_trans_moments_orbital(adc, orb, kshift):
 
     return T
 
-
+@profile
 def renormalize_eigenvectors(adc, kshift, U, nroots=1):
 
     nkpts = adc.nkpts

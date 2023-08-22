@@ -49,7 +49,8 @@ import tempfile
 #        Eg.of momentum conservation :
 #        Chemist's  oovv(ijab) : ki - kj + ka - kb
 #        Amplitudes t2(ijab)  : ki + kj - ka - kba
-#def gen_t2_1(myadc, eris):
+#def gen_t2_1(myadc, eris):i
+@profile
 def gen_t2_1(myadc,eris,kijab,cvs_idx_slice=None,ncvs=None):
     
     ki,kj,ka,kb = kijab
@@ -107,7 +108,7 @@ def gen_t2_1(myadc,eris,kijab,cvs_idx_slice=None,ncvs=None):
     #t2_1 = t2_1_ij
 
     return t2_1_ij
-
+@profile
 def compute_amplitudes_energy(myadc, eris, verbose=None):
 
     #t1 = t2 = None
@@ -124,7 +125,7 @@ def compute_amplitudes_energy(myadc, eris, verbose=None):
     else:
         return e_corr
 
-
+@profile
 def compute_amplitudes(myadc, eris):
 
     #cput0 = (time.process_time(), time.time())
@@ -356,7 +357,7 @@ def compute_amplitudes(myadc, eris):
 
     return t1, t2, t2_1_vvvv
 
-
+@profile
 def compute_energy(myadc, t2, eris):
 
     nkpts = myadc.nkpts

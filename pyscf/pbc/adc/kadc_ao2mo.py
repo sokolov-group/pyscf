@@ -225,7 +225,7 @@ def calculate_chunk_size(myadc):
         chnk_size = 1
 
     return chnk_size
-
+@profile
 def transform_integrals_df(myadc):
     from pyscf.ao2mo import _ao2mo
     cell = myadc.cell
@@ -270,21 +270,26 @@ def transform_integrals_df(myadc):
     eris.Lov = np.empty((nkpts,nkpts,naux,nocc,nvir),dtype=dtype)
     Lvo = eris.Lvo = np.empty((nkpts,nkpts,naux,nvir,nocc),dtype=dtype)
     #Lvv = eris.Lvv = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
-    if not myadc.eris_direct:
-        Lvv = eris.Lvv = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
-    else:
-        eris.Lvv_p = np.empty((nkpts_p,naux,nvir,nvir),dtype=dtype)
-
-    #eris.feri = feri = lib.H5TmpFile()
-    ##eris.Lvv_p = {}
-    ##for idx_p in range(nkpts_p):
-    ##    #eris.Lvv_p[idx_p] = feri.create_dataset(f'Lvv_p_{idx_p}', (naux,nvir,nvir), dtype=dtype)
-    ##    eris.Lvv_p[idx_p] = np.empty((naux,nvir,nvir), dtype=dtype)
-
+    if myadc.method != 'adc(2)':
+        if not myadc.eris_direct:
+            Lvv = eris.Lvv = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
+        elif myadc.eris_direct and not myadc.Lvv_p_disk:
+            print('ram storage is being used')
+            eris.Lvv_p = np.empty((nkpts_p,naux,nvir,nvir),dtype=dtype)
+        elif myadc.eris_direct and myadc.Lvv_p_disk:
+            print('disk storage is being used')
+            eris.feri = feri = lib.H5TmpFile()
+            eris.Lvv_p = {}
+            #eris.Lvv_p = feri.create_dataset('Lvv_p', (nkpts_p,naux,nvir,nvir), dtype=dtype)
+            for idx_p in range(nkpts_p):
+                eris.Lvv_p[idx_p] = feri.create_dataset(f'Lvv_p_{idx_p}', (naux,nvir,nvir), dtype=dtype)
+               #eris.Lvv_p[idx_p] = np.empty((naux,nvir,nvir), dtype=dtype)
+    #print(f'myadc.method value is  === {myadc.method}')
+    #print(f'myadc.method != "adc(2)"  === {myadc.method != "adc(2)"}')
+    #exit()
     #eris.Lvv_p = feri.create_dataset('Lvv_p', (nkpts_p,naux,nvir,nvir), dtype=dtype
     #                                      , chunks=(1,naux,nvir,nvir))
     #eris.Lvv_p = feri.create_dataset('Lvv_p', (nkpts_p,naux,nvir,nvir), dtype=dtype)
-
     eris.vvvv = None
     eris.ovvv = None
 
@@ -311,17 +316,20 @@ def transform_integrals_df(myadc):
                 Lpq_mo[ki, kj] = out.reshape(-1, nmo, nmo)
 
                 Loo[ki,kj] = eris.Loo[ki,kj] = Lpq_mo[ki,kj][:,:nocc,:nocc].copy()
-                eris.Lov[ki,kj] = Lpq_mo[ki,kj][:,:nocc,nocc:].copy()
+                #eris.Lov[ki,kj] = Lpq_mo[ki,kj][:,:nocc,nocc:].copy()
                 Lvo[ki,kj] = eris.Lvo[ki,kj] = Lpq_mo[ki,kj][:,nocc:,:nocc].copy()
                 #Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
-                if not myadc.eris_direct:
-                    Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
-                elif myadc.eris_direct and ki <= kj:
-                    eris.Lvv_idx_p[(ki,kj)] = idx_p
-                    eris.Lvv_p[idx_p] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
-                    #eris.Lvv_p[idx_p][:] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
-                    idx_p += 1
+                if myadc.method != 'adc(2)':
+                    if not myadc.eris_direct:
+                        Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
+                    elif myadc.eris_direct and ki <= kj:
+                        eris.Lvv_idx_p[(ki,kj)] = idx_p
+                        eris.Lvv_p[idx_p] = Lpq_mo[ki,kj][:,nocc:,nocc:]#.copy()
+                        #eris.Lvv_p[idx_p][:] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
+                        idx_p += 1
 
+    print(f'[memalloc current+max ERI-DF-post-pqrs [GB] (arrays are populated) = {np.array(tracemalloc.get_traced_memory())/1024**3}')
+    #exit()
     cput1 = np.array((time.process_time(), time.perf_counter()))
     print(f'eris.Lov.shape = {eris.Lov.shape}')
     #compute_int = True
@@ -353,7 +361,8 @@ def transform_integrals_df(myadc):
                 for kr in range(nkpts):
                     ks = kconserv[kp,kq,kr]
                     eris.oooo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', Loo[kp,kq], Loo[kr,ks])/nkpts
-                    eris.oovv[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', Loo[kp,kq], eris.Lvv[kr,ks])/nkpts
+                    if myadc.method != 'adc(2)':
+                        eris.oovv[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', Loo[kp,kq], eris.Lvv[kr,ks])/nkpts
                     eris.ovov[kp,kq,kr] = lib.einsum(
                         'Lpq,Lrs->pqrs', eris.Lov[kp,kq], eris.Lov[kr,ks])/nkpts
                     eris.ovvo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Lvo[kr,ks])/nkpts
