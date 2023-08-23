@@ -318,8 +318,8 @@ def transform_integrals_df(myadc):
                     Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
                 elif myadc.eris_direct and ki <= kj:
                     eris.Lvv_idx_p[(ki,kj)] = idx_p
-                    eris.Lvv_p[idx_p] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
-                    #eris.Lvv_p[idx_p][:] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
+                    #eris.Lvv_p[idx_p] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
+                    eris.Lvv_p[idx_p][:] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
                     idx_p += 1
 
     cput1 = np.array((time.process_time(), time.perf_counter()))
