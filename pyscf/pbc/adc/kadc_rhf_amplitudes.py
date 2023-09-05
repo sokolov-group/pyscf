@@ -50,6 +50,7 @@ import tempfile
 #        Chemist's  oovv(ijab) : ki - kj + ka - kb
 #        Amplitudes t2(ijab)  : ki + kj - ka - kba
 #def gen_t2_1(myadc, eris):
+#@profile
 def gen_t2_1(myadc,eris,kijab,cvs_idx_slice=None,ncvs=None):
     
     ki,kj,ka,kb = kijab
@@ -125,6 +126,7 @@ def compute_amplitudes_energy(myadc, eris, verbose=None):
         return e_corr
 
 
+#@profile
 def compute_amplitudes(myadc, eris):
 
     #cput0 = (time.process_time(), time.time())

@@ -225,7 +225,7 @@ def calculate_chunk_size(myadc):
         chnk_size = 1
 
     return chnk_size
-
+#@profile
 def transform_integrals_df(myadc):
     from pyscf.ao2mo import _ao2mo
     cell = myadc.cell
@@ -270,17 +270,21 @@ def transform_integrals_df(myadc):
     eris.Lov = np.empty((nkpts,nkpts,naux,nocc,nvir),dtype=dtype)
     Lvo = eris.Lvo = np.empty((nkpts,nkpts,naux,nvir,nocc),dtype=dtype)
     #Lvv = eris.Lvv = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
+    #if myadc.method != 'adc(2)':
+    #    if not myadc.eris_direct:
+    #        Lvv = eris.Lvv = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
+    #    else:
+    #        eris.Lvv_p = np.empty((nkpts_p,naux,nvir,nvir),dtype=dtype)
+
+    if myadc.method != 'adc(2)' and myadc.eris_direct is True:
+        eris.feri = feri = lib.H5TmpFile()
+        eris.Lvv_p = {}
+        for idx_p in range(nkpts_p):
+            eris.Lvv_p[idx_p] = feri.create_dataset(f'Lvv_p_{idx_p}', (naux,nvir,nvir), dtype=dtype)
+            #eris.Lvv_p[idx_p] = np.empty((naux,nvir,nvir), dtype=dtype)
+
     if not myadc.eris_direct:
-        Lvv = eris.Lvv = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
-    else:
-        eris.Lvv_p = np.empty((nkpts_p,naux,nvir,nvir),dtype=dtype)
-
-    #eris.feri = feri = lib.H5TmpFile()
-    ##eris.Lvv_p = {}
-    ##for idx_p in range(nkpts_p):
-    ##    #eris.Lvv_p[idx_p] = feri.create_dataset(f'Lvv_p_{idx_p}', (naux,nvir,nvir), dtype=dtype)
-    ##    eris.Lvv_p[idx_p] = np.empty((naux,nvir,nvir), dtype=dtype)
-
+            Lvv = eris.Lvv = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
     #eris.Lvv_p = feri.create_dataset('Lvv_p', (nkpts_p,naux,nvir,nvir), dtype=dtype
     #                                      , chunks=(1,naux,nvir,nvir))
     #eris.Lvv_p = feri.create_dataset('Lvv_p', (nkpts_p,naux,nvir,nvir), dtype=dtype)
@@ -314,13 +318,14 @@ def transform_integrals_df(myadc):
                 eris.Lov[ki,kj] = Lpq_mo[ki,kj][:,:nocc,nocc:].copy()
                 Lvo[ki,kj] = eris.Lvo[ki,kj] = Lpq_mo[ki,kj][:,nocc:,:nocc].copy()
                 #Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
-                if not myadc.eris_direct:
-                    Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
-                elif myadc.eris_direct and ki <= kj:
-                    eris.Lvv_idx_p[(ki,kj)] = idx_p
-                    #eris.Lvv_p[idx_p] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
-                    eris.Lvv_p[idx_p][:] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
-                    idx_p += 1
+                if myadc.method != 'adc(2)':
+                    if not myadc.eris_direct:
+                        Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
+                    elif myadc.eris_direct and ki <= kj:
+                        eris.Lvv_idx_p[(ki,kj)] = idx_p
+                        #eris.Lvv_p[idx_p] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
+                        eris.Lvv_p[idx_p][:] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
+                        idx_p += 1
 
     cput1 = np.array((time.process_time(), time.perf_counter()))
     print(f'eris.Lov.shape = {eris.Lov.shape}')
@@ -345,7 +350,7 @@ def transform_integrals_df(myadc):
         eris.ovov = feri.create_dataset('ovov', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nvir), dtype=dtype)
         eris.ovvo = feri.create_dataset('ovvo', (nkpts,nkpts,nkpts,nocc,nvir,nvir,nocc), dtype=dtype)
         eris.ovoo = feri.create_dataset('ovoo', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nocc), dtype=dtype)
-        if myadc.method == 'adc(3)' or myadc.eris_direct is False:
+        if myadc.method == 'adc(3)' and myadc.eris_direct is False:
             eris.ovoo = feri.create_dataset('ovoo', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nocc), dtype=dtype)
 
         for kp in range(nkpts):
@@ -360,7 +365,7 @@ def transform_integrals_df(myadc):
                     eris.vooo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lvo[kp,kq], Loo[kr,ks])/nkpts
                     eris.ovoo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Loo[kr,ks])/nkpts
                     #if myadc.method == 'adc(3)':
-                    if myadc.method == 'adc(3)' or myadc.eris_direct is False:
+                    if myadc.method == 'adc(3)' and myadc.eris_direct is False:
                         eris.ovoo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Loo[kr,ks])/nkpts
                     #eris.ovvv[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Lvv[kr,ks])/nkpts
 
