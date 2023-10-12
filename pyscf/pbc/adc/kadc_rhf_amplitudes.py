@@ -51,6 +51,43 @@ import tempfile
 #        Amplitudes t2(ijab)  : ki + kj - ka - kba
 #def gen_t2_1(myadc, eris):
 #@profile
+def get_verbose(myadc):
+    
+    #cput0 = (time.process_time(), time.time())
+    cput0 = (time.process_time(), time.perf_counter())
+    log = logger.Logger(myadc.stdout, myadc.verbose)
+
+    if myadc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
+        raise NotImplementedError(myadc.method)
+
+    nmo = myadc.nmo
+    nocc = myadc.nocc
+    nvir = nmo - nocc
+    nkpts = myadc.nkpts
+    cell = myadc.cell
+    kpts = myadc.kpts
+    #ncvs = myadc.ncvs
+    #madelung = tools.madelung(cell, kpts)
+
+    mo_energy =  myadc.mo_energy
+    mo_coeff =  myadc.mo_coeff
+    #mo_coeff, mo_energy = _add_padding(myadc, mo_coeff, mo_energy)
+
+    #mo_e_o = [mo_energy[k][:nocc] for k in range(nkpts)]
+    #mo_e_v = [mo_energy[k][nocc:] for k in range(nkpts)]
+   
+    ki = kj = ka = kb = 0
+    # Get location of non-zero/padded elements in occupied and virtual space
+    #nonzero_opadding, nonzero_vpadding = padding_k_idx(myadc, kind="split")
+
+    #eia = _get_epq([0,nocc,ki,mo_e_o,nonzero_opadding],
+    #               [0,nvir,ka,mo_e_v,nonzero_vpadding],
+    #               fac=[1.0,-1.0])
+
+    #ejb = _get_epq([0,nocc,kj,mo_e_o,nonzero_opadding],
+    #               [0,nvir,kb,mo_e_v,nonzero_vpadding],
+    #               fac=[1.0,-1.0])
+
 def gen_t2_1(myadc,kijab,cvs_idx_slice=None,ncvs=None, eris=None):
     
     ki,kj,ka,kb = kijab
@@ -71,7 +108,8 @@ def gen_t2_1(myadc,kijab,cvs_idx_slice=None,ncvs=None, eris=None):
     cell = myadc.cell
     kpts = myadc.kpts
     #ncvs = myadc.ncvs
-    madelung = tools.madelung(cell, kpts)
+    #madelung = tools.madelung(cell, kpts)
+    madelung = myadc.madelung
 
     mo_energy =  myadc.mo_energy
     mo_coeff =  myadc.mo_coeff

@@ -45,6 +45,7 @@ from pyscf.pbc import tools
 import h5py
 import tempfile
 from pyscf.pbc.adc.kadc_rhf_amplitudes import gen_t2_1
+from pyscf.pbc.adc.kadc_rhf_amplitudes import get_verbose
 import tracemalloc
 
 def vector_size(adc):
@@ -67,6 +68,10 @@ tracemalloc.stop()
 #@profile
 def get_imds(adc, eris=None):
 
+    #print(f'before calling t2_1')
+    #get_verbose(adc)
+    #print(f'after calling t2_1')
+    #exit()
     tracemalloc.start()
     #cput0 = (time.process_time(), time.time())
     cput0 = (time.process_time(), time.perf_counter())
@@ -694,7 +699,8 @@ def matvec_off_on(adc, kshift, M_ij=None, eris=None):
         s2 = np.zeros((nkpts,nkpts,nvir,nocc,nocc), dtype=np.complex128)
         cell = adc.cell
         kpts = adc.kpts
-        madelung = tools.madelung(cell, kpts)
+        #madelung = tools.madelung(cell, kpts)
+        madelung = adc.madelung
 
         eris_ovoo = eris.ovoo
 
@@ -1027,7 +1033,8 @@ def matvec(adc, kshift, M_ij=None, eris=None):
         #s2 = np.zeros((nkpts,nkpts,nvir,nocc,nocc), dtype=M_ij[kshift].dtype)
         cell = adc.cell
         kpts = adc.kpts
-        madelung = tools.madelung(cell, kpts)
+        #madelung = tools.madelung(cell, kpts)
+        madelung = adc.madelung
 
 ############ ADC(2) ij block ############################
 
@@ -1976,6 +1983,7 @@ class RADCIP(kadc_rhf.RADC):
         self.conv_tol  = adc.conv_tol
         self.tol_residual  = adc.tol_residual
 
+        self.madelung = adc.madelung
         self.eris = adc.eris
         self.t1 = adc.t1
         self.t2 = adc.t2

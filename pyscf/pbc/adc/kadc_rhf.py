@@ -31,6 +31,7 @@ from pyscf import lib
 from pyscf.pbc import scf
 from pyscf.pbc import df
 from pyscf.pbc import mp
+from pyscf.pbc import tools
 from pyscf.lib import logger
 from pyscf.pbc.adc import kadc_rhf_amplitudes
 from pyscf.pbc.adc import kadc_ao2mo
@@ -670,10 +671,9 @@ class RADC(pyscf.adc.radc.RADC):
     def nmo(self):
         return self.get_nmo()
 
-
     get_nocc = get_nocc
     get_nmo = get_nmo
-
+    
 
     def kernel_gs(self):
         assert(self.mo_coeff is not None)
@@ -709,6 +709,7 @@ class RADC(pyscf.adc.radc.RADC):
             self.transform_integrals = outcore_transform
 
         eris = self.transform_integrals()
+        self.madelung = tools.madelung(self.cell, self.kpts) 
         #self.e_corr,self.t1,self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
         #    self, eris=eris, verbose=self.verbose)
         #print ("MPn:",self.e_corr)
@@ -759,6 +760,7 @@ class RADC(pyscf.adc.radc.RADC):
 
         eris = self.transform_integrals()
 
+        self.madelung = tools.madelung(self.cell, self.kpts) 
         #self.e_corr, self.t1, self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
         #    self, eris=eris, verbose=self.verbose)
         ##if not self.eris_direct:
