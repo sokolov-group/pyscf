@@ -49,7 +49,6 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     imds = adc.get_imds(eris)
     matvec, diag = adc.gen_matvec(imds, eris)
-
     guess = adc.get_init_guess(nroots, diag, ascending=True)
 
     conv, adc.E, U = lib.linalg_helper.davidson_nosym1(
@@ -59,6 +58,43 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     adc.U = np.array(U).T.copy()
 
+    #T_moments = adc.get_trans_moments()
+    #radc_rdm1 = adc.make_rdm1()[0]
+    #dim = np.shape(T_moments)[1]
+    #Identity = np.eye(dim)
+    #M_full = np.zeros((dim,dim))
+    #for i in range(dim):
+    #    M_full[:,i] = matvec(Identity[:,i])
+    #w,v = np.linalg.eig(M_full)
+    #v = adc.renormalize_eigenvectors(eigvecs=v)
+    #X_mo = np.dot(T_moments, v)
+    #X_mo_2 = np.dot(X_mo,X_mo.T)
+    #print(f'trace of M_mo_rdm1 = {np.einsum("pq,pq->",X_mo_2,radc_rdm1)}')
+    #import scipy as sp
+    #import scipy.linalg as la
+    ##v, l, r = la.eig(M_full, left = True) 
+    ##v = sp.diag(v)
+    #w,v = np.linalg.eig(M_full)
+    #idx = np.argsort(w)#[::-1]
+    #w, v = w[idx], v[:,idx]
+    #w = np.diag(w)
+    ##bool_match = np.linalg.norm(M_full - r@la.solve(r.T,v.T).T)
+    ##print(f'bool match = {bool_match}')
+    #print(f'shape of T_moments = {np.shape(T_moments)}')  
+    #print(f'shape of M_full = {np.shape(M_full)}') 
+    #v = adc.renormalize_eigenvectors(eigvecs=v)
+    #v = np.dot(v,w) 
+    #M_nmo_temp = np.dot(T_moments, v)
+    #M_nmo = np.dot(M_nmo_temp, T_moments.T)
+    #print(f'shape of M_nmo = {np.shape(M_nmo)}') 
+    #M_nmo_rdm1 = np.dot(M_nmo, radc_rdm1)
+    #print(f'trace of M_nmo_rdm1 = {np.trace(M_nmo_rdm1)}') 
+    #print(f'trace of M_nmo_rdm1 [2] = {np.einsum("pq,pq->",M_nmo,radc_rdm1)}')
+    ##print(f'first eigenvalue = {w[0]}') 
+    #
+
+    #print(f'shape of moments = {T_moments.shape}')
+    #print(f'shape of rdm1 = {radc_rdm1.shape}')
     if adc.compute_properties:
         adc.P,adc.X = adc.get_properties(nroots)
 

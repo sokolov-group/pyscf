@@ -51,9 +51,11 @@ import tempfile
 #        Amplitudes t2(ijab)  : ki + kj - ka - kba
 #def gen_t2_1(myadc, eris):
 #@profile
-def gen_t2_1(myadc,eris,kijab,cvs_idx_slice=None,ncvs=None):
+def gen_t2_1(myadc,kijab,cvs_idx_slice=None,ncvs=None, eris=None):
     
     ki,kj,ka,kb = kijab
+    if eris is None:
+        eris = myadc.eris
 
     #cput0 = (time.process_time(), time.time())
     cput0 = (time.process_time(), time.perf_counter())

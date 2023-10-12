@@ -87,8 +87,8 @@ def kernel_off(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None)
     X = np.zeros((len(kptlist),nmo,nroots), dtype)
 
     imds = adc.get_imds(eris)
-
     for k, kshift in enumerate(kptlist):
+
         matvec, diag = adc.gen_matvec(kshift, imds, eris)
 
         guess = adc.get_init_guess(nroots, diag, ascending=True)
@@ -425,6 +425,22 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
     #    exit()
 
     imds = adc.get_imds(eris)
+    #matvec, diag = adc.gen_matvec(0, imds, eris)
+    #print(f'shape of diag = {diag.shape}')
+    #nocc = adc.nocc 
+    #print(f'nocc = {nocc}')
+    #U_kop = np.zeros((diag.size, nocc))
+    #for idx in range(imds.shape[0]): 
+    #    ek, U_ij = np.linalg.eig(imds[idx])
+    #    U_kop[:nocc,:nocc] = U_ij.copy()
+    #    print(f'idx = {idx}')   
+    #    print(f'ek [real] = {ek.real}')   
+    #    #print(f'ek [imaginary] = {ek.imag}')   
+    #    P_k, X_k = adc.get_properties(0,U_kop,nocc)
+    #    print(f'P_k = {P_k}')   
+    #exit()
+
+
     if nroots == ('fullproj' or 'fulleff'):
         for k in range(adc.nkpts):
             matvec, diag = adc.gen_matvec(k, imds, eris)
@@ -485,7 +501,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
         #print(f'out norm for kpt = {k} is = {out_norm} ')
 
         guess = adc.get_init_guess(nroots, diag, ascending=True)
-
+        
         conv_k,evals_k, evecs_k = lib.linalg_helper.davidson_nosym1(
                 lambda xs : [matvec(x) for x in xs], guess, diag,
                 nroots=nroots, verbose=log, tol=adc.conv_tol,
@@ -705,6 +721,7 @@ class RADC(pyscf.adc.radc.RADC):
             print ("MPn:",self.e_corr)
         else:
             self.t1, self.t2, self.e_corr = None, None, None
+            self.eris = eris
         return self.e_corr, self.t1,self.t2
 
     def kernel(self, nroots=1, guess=None, eris=None, kptlist=None):
@@ -758,6 +775,7 @@ class RADC(pyscf.adc.radc.RADC):
             print ("MPn:",self.e_corr)
             self._finalize()
 
+        self.eris = eris
         self.method_type = self.method_type.lower()
         self.ncvs_proj = self.ncvs_proj
         self.ncvs = self.ncvs
