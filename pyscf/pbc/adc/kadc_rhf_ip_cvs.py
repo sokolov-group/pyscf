@@ -124,7 +124,7 @@ def get_imds(adc, eris=None):
                                     , Lce_id, eris.Lov[kl,ke], optimize=True)
                     eris_ovov_jel = eris_ovov_iel = 1./nkpts * lib.einsum('Lje,Lld->jeld'
                                     , Lce_ie, eris.Lov[kl,kd], optimize=True)
-                    t2_1_jld = t2_1_ild = gen_t2_1(adc,eris,(ki,kl,kd,ke), cvs_idx_slice='i',ncvs=ncvs)#[:ncvs]
+                    t2_1_jld = t2_1_ild = gen_t2_1(adc,(ki,kl,kd,ke), cvs_idx_slice='i',ncvs=ncvs,eris=eris)#[:ncvs]
 
                 M_ij[ki] += 0.5 * 0.5 * \
                     lib.einsum('ilde,jdle->ij',t2_1_ild, eris_ovov_jdl,optimize=True)
@@ -138,7 +138,7 @@ def get_imds(adc, eris=None):
                 if not adc.eris_direct:
                     t2_1_ljd = t2_1_lid = adc.t2[0][kl,ki,kd][:,:ncvs].copy()
                 else:
-                    t2_1_ljd = t2_1_lid = gen_t2_1(adc,eris,(kl,ki,kd,ke), cvs_idx_slice='j',ncvs=ncvs)#[:,:ncvs]
+                    t2_1_ljd = t2_1_lid = gen_t2_1(adc,(kl,ki,kd,ke), cvs_idx_slice='j',ncvs=ncvs,eris=eris)#[:,:ncvs]
                 M_ij[ki] -= 0.5 * 0.5 * \
                     lib.einsum('lide,jdle->ij',t2_1_lid, eris_ovov_jdl,optimize=True)
                 M_ij[ki] += 0.5 * 0.5 * \
@@ -2083,6 +2083,7 @@ class RADCIPCVS(kadc_rhf.RADC):
         self.eris_direct = adc.eris_direct
         self.cvs_compact = adc.cvs_compact
         self.precision_single = adc.precision_single
+        self.madelung = adc.madelung
 
         keys = set(('tol_residual','conv_tol', 'e_corr', 'method', 'mo_coeff', 'mo_energy_b',
                    'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))

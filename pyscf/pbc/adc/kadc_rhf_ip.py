@@ -1008,8 +1008,8 @@ def matvec(adc, kshift, M_ij=None, eris=None):
     if M_ij is None:
         M_ij = adc.get_imds()
 
-    e,_ = np.linalg.eig(M_ij[kshift])
-    print(f'M_ij eigenvalues ==> M_ij[{kshift}] = {e}')
+    #e,_ = np.linalg.eig(M_ij[kshift])
+    #print(f'M_ij eigenvalues ==> M_ij[{kshift}] = {e}')
     #Calculate sigma vector
     print(f'using projector code')
     #@profile
@@ -1035,13 +1035,15 @@ def matvec(adc, kshift, M_ij=None, eris=None):
         kpts = adc.kpts
         #madelung = tools.madelung(cell, kpts)
         madelung = adc.madelung
-
+        coupling = True
 ############ ADC(2) ij block ############################
 
         s1 = lib.einsum('ij,j->i',M_ij[kshift],r1)
 
 ########### ADC(2) i - kja block #########################
 
+        #Lvo = eris.Lvo.reshape((nkpts,nkpts,-1,nvir*nocc))
+        #Loo = eris.Loo.reshape((nkpts,nkpts,-1,nocc*nocc))
         for kj in range(nkpts):
             for kk in range(nkpts):
                 ka = kconserv[kk, kshift, kj] 
@@ -1050,14 +1052,18 @@ def matvec(adc, kshift, M_ij=None, eris=None):
 
                 #kk_consv = kconserv[ka, kj, ki]
                 #kj_consv = kconserv[ka, kk_consv, ki]
-                if adc.eris_direct:
-                    eris_vooo_aji = 1./nkpts * lib.einsum('Laj,Lik->ajik', eris.Lvo[ka,kj], eris.Loo[kshift,kk], optimize=True)
-                    eris_vooo_aki = 1./nkpts * lib.einsum('Lak,Lij->akij', eris.Lvo[ka,kk], eris.Loo[kshift,kj], optimize=True)
-                    #eris_ovoo_jak = 1./nkpts * lib.einsum('Lja,Lki->jaki', eris.Lov[kj,ka], eris.Loo[kk,kshift], optimize=True)
-                    #eris_ovoo_kaj = 1./nkpts * lib.einsum('Lka,Lji->kaji', eris.Lov[kk,ka], eris.Loo[kj,kshift], optimize=True)
-                else:
-                    eris_vooo_aji = eris.vooo[ka,kj,ki]
-                    eris_vooo_aki = eris.vooo[ka,kk,ki]
+                if coupling:
+                    if adc.eris_direct:
+                        eris_vooo_aji = 1./nkpts * lib.einsum('Laj,Lik->ajik', eris.Lvo[ka,kj], eris.Loo[kshift,kk], optimize=True)
+                        eris_vooo_aki = 1./nkpts * lib.einsum('Lak,Lij->akij', eris.Lvo[ka,kk], eris.Loo[kshift,kj], optimize=True)
+                        #eris_temp = 1./nkpts * np.dot(Lvo[ka,kj],Lvo[kshift,kk].T) 
+                        #eris_vooo_aji = 1./nkpts * np.dot(Lvo[ka,kj].T,Loo[kshift,kk]).reshape((nvir,nocc,nocc,nocc)) 
+                        #eris_vooo_aki = 1./nkpts * np.dot(Lvo[ka,kk].T,Loo[kshift,kj]).reshape((nvir,nocc,nocc,nocc)) 
+                        #eris_ovoo_jak = 1./nkpts * lib.einsum('Lja,Lki->jaki', eris.Lov[kj,ka], eris.Loo[kk,kshift], optimize=True)
+                        #eris_ovoo_kaj = 1./nkpts * lib.einsum('Lka,Lji->kaji', eris.Lov[kk,ka], eris.Loo[kj,kshift], optimize=True)
+                    else:
+                        eris_vooo_aji = eris.vooo[ka,kj,ki]
+                        eris_vooo_aki = eris.vooo[ka,kk,ki]
 
                 #eris_ovoo_jak_dir = 1./nkpts * lib.einsum('Lja,Lki->jaki', eris.Lov[kj,ka], eris.Loo[kk,kdummy], optimize=True)
                 #eris_ovoo_kaj_dir = 1./nkpts * lib.einsum('Lka,Lji->kaji', eris.Lov[kk,ka], eris.Loo[kj,kdummy], optimize=True)
@@ -1067,10 +1073,11 @@ def matvec(adc, kshift, M_ij=None, eris=None):
                 #dif2 = eris_ovoo_kaj_dir - eris_ovoo_kaj
                 #print(f'norm eris_ovoo_jak = {np.linalg.norm(dif1)}')
                 #print(f'norm eris_ovoo_kaj = {np.linalg.norm(dif2)}')
-                s1 += 2. * lib.einsum('ajik,ajk->i',
-                                      eris_vooo_aji, r2[ka,kj], optimize=True)
-                s1 -= lib.einsum('akij,ajk->i',
-                                 eris_vooo_aki, r2[ka,kj], optimize=True)
+                if coupling:
+                    s1 += 2. * lib.einsum('ajik,ajk->i',
+                                          eris_vooo_aji, r2[ka,kj], optimize=True)
+                    s1 -= lib.einsum('akij,ajk->i',
+                                     eris_vooo_aki, r2[ka,kj], optimize=True)
                 #s1 += 2. * lib.einsum('jaki,ajk->i',
                 #                      eris_ovoo_jak.conj(), r2[ka,kj], optimize=True)
                 #s1 -= lib.einsum('kaji,ajk->i',
@@ -1079,7 +1086,8 @@ def matvec(adc, kshift, M_ij=None, eris=None):
 #################### ADC(2) ajk - i block ############################
 
                 #s2[ka,kj] += lib.einsum('jaki,i->ajk', eris_ovoo_jak, r1, optimize=True)
-                s2[ka,kj] += lib.einsum('ajik,i->ajk', eris_vooo_aji.conj(), r1, optimize=True)
+                if coupling:
+                    s2[ka,kj] += lib.einsum('ajik,i->ajk', eris_vooo_aji.conj(), r1, optimize=True)
 
 ################# ADC(2) ajk - bil block ############################
 
@@ -2019,6 +2027,7 @@ class RADCIP(kadc_rhf.RADC):
         self.ncvs_proj = adc.ncvs_proj
         self.eris_direct = adc.eris_direct
         self.precision_single = adc.precision_single
+        self.madelung = adc.madelung
 
         keys = set(('tol_residual','conv_tol', 'e_corr', 'method', 'mo_coeff', 'mo_energy_b',
                    'max_memory', 't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'))

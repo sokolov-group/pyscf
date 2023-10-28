@@ -371,6 +371,9 @@ class RADC(lib.StreamObject):
     def make_rdm1(self):
         return self._adc_es.make_rdm1()
 
+    def get_T_matrix(self):
+        return self._adc_es.get_trans_moments()
+
 if __name__ == '__main__':
     from pyscf import scf
     from pyscf import gto

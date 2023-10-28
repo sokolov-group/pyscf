@@ -197,6 +197,7 @@ class RADC(pyscf.adc.radc.RADC):
     compute_amplitudes_energy = kadc_rhf_amplitudes.compute_amplitudes_energy
     get_chnk_size = kadc_ao2mo.calculate_chunk_size
 
+
     @property
     def nkpts(self):
         return len(self.kpts)
@@ -340,7 +341,7 @@ class RADC(pyscf.adc.radc.RADC):
             self.with_df = with_df
         return self
 
-def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
+def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None, imds=None):
 
     tracemalloc.start()
     adc.method = adc.method.lower()
@@ -425,7 +426,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
     #    diag_full_M(matvec, diag, k)
     #    exit()
 
-    imds = adc.get_imds(eris)
+    if imds is None:
+        imds = adc.get_imds(eris)
     #matvec, diag = adc.gen_matvec(0, imds, eris)
     #print(f'shape of diag = {diag.shape}')
     #nocc = adc.nocc 
@@ -507,7 +509,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
                 lambda xs : [matvec(x) for x in xs], guess, diag,
                 nroots=nroots, verbose=log, tol=adc.conv_tol,
                 max_cycle=adc.max_cycle, max_space=adc.max_space,
-                tol_residual=adc.tol_residual)
+                tol_residual=adc.tol_residual)#, follow_state=True)
 
         print(f'dtype = {dtype}')
         print(f'diag.dtype = {diag.dtype}')
@@ -642,6 +644,9 @@ class RADC(pyscf.adc.radc.RADC):
         self.e_corr = None
         self.chnk_size = None
         self.imds = lambda:None
+        
+        self.with_df = self._scf.with_df
+        self.madelung = tools.madelung(self.cell, self.kpts) 
 
         self.keep_exxdiv = False
         keys = set(('tol_residual','conv_tol', 'e_corr', 'method', 'mo_coeff',
@@ -658,6 +663,8 @@ class RADC(pyscf.adc.radc.RADC):
     #compute_energy = kadc_rhf_amplitudes.compute_energy
     #compute_amplitudes_energy = kadc_rhf_amplitudes.compute_amplitudes_energy
     get_chnk_size = kadc_ao2mo.calculate_chunk_size
+
+    transform_integrals_dfhack = kadc_ao2mo.transform_integrals_df
 
     @property
     def nkpts(self):
@@ -725,7 +732,7 @@ class RADC(pyscf.adc.radc.RADC):
             self.eris = eris
         return self.e_corr, self.t1,self.t2
 
-    def kernel(self, nroots=1, guess=None, eris=None, kptlist=None):
+    def kernel(self, nroots=1, guess=None, eris=None, kptlist=None, imds=None):
         assert(self.mo_coeff is not None)
         assert(self.mo_occ is not None)
 
@@ -791,7 +798,7 @@ class RADC(pyscf.adc.radc.RADC):
 
         elif(self.method_type == "ip" and self.ncvs == None and self.Lpq_contract == False):
             e_exc, v_exc, spec_fac, x, adc_es = self.ip_adc(
-                nroots=nroots, guess=guess, eris=eris, kptlist=kptlist)
+                nroots=nroots, guess=guess, eris=eris, kptlist=kptlist, imds=imds)
 
         elif(self.method_type == "ip" and type(self.ncvs) == int and self.ncvs > 0):
             e_exc, v_exc, spec_fac, x, adc_es = self.ip_adc_cvs(
@@ -806,10 +813,10 @@ class RADC(pyscf.adc.radc.RADC):
         self._adc_es = adc_es
         return e_exc, v_exc, spec_fac, x
 
-    def ip_adc(self, nroots=1, guess=None, eris=None, kptlist=None):
+    def ip_adc(self, nroots=1, guess=None, eris=None, kptlist=None, imds=None):
         from pyscf.pbc.adc import kadc_rhf_ip
         adc_es = kadc_rhf_ip.RADCIP(self)
-        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris, kptlist)
+        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris, kptlist, imds)
         return e_exc, v_exc, spec_fac, x, adc_es
 
     def ea_adc(self, nroots=1, guess=None, eris=None, kptlist=None):
