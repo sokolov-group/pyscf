@@ -275,6 +275,9 @@ class RADC(lib.StreamObject):
 
         elif(self.method_type == "ip"):
             e_exc, v_exc, spec_fac, x, adc_es = self.ip_adc(nroots=nroots, guess=guess, eris=eris)
+        
+        elif(self.method_type == "ee"):
+            e_exc, v_exc, spec_fac, x, adc_es = self.ee_adc(nroots=nroots, guess=guess, eris=eris)
 
         else:
             raise NotImplementedError(self.method_type)
@@ -296,6 +299,12 @@ class RADC(lib.StreamObject):
     def ip_adc(self, nroots=1, guess=None, eris=None):
         from pyscf.adc import radc_ip
         adc_es = radc_ip.RADCIP(self)
+        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
+        return e_exc, v_exc, spec_fac, x, adc_es
+    
+    def ee_adc(self, nroots=1, guess=None, eris=None):
+        from pyscf.adc import radc_ee
+        adc_es = radc_ee.RADCEE(self)
         e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
         return e_exc, v_exc, spec_fac, x, adc_es
 

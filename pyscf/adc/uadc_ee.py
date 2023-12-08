@@ -2276,7 +2276,7 @@ def get_imds(adc, eris=None):
             M_aabb += M_030_aabb
 
     print("M_a",np.linalg.norm(M_ia_jb_a))
-    print("M_b",np.linalg.norm(M_ia_jb_b))
+    #print("M_b",np.linalg.norm(M_ia_jb_b))
     print("M_aabb",np.linalg.norm(M_aabb))
 
     M_ia_jb_a = M_ia_jb_a.reshape(n_singles_a, n_singles_a)
@@ -2372,7 +2372,7 @@ def get_diag(adc,M_ia_jb=None,eris=None):
     # Compute precond
 
 
-#    print("diag", np.linalg.norm(diag))
+    print("diag", np.linalg.norm(diag))
 #    exit()
   
 
@@ -7587,7 +7587,7 @@ def get_spin_contamination(adc):
             IjCd += lib.einsum('ia,bj,klbc,ijda,kldc', S_ov_ab, S_vo_ab, t1_ccee_abab, Y_abab, Y_abab, optimize = True)
             IjCd += lib.einsum('ia,bj,klca,ijbd,klcd', S_ov_ab, S_vo_ab, t1_ccee_abab, Y_abab, Y_abab, optimize = True)
             IjCd -= 1/2 * lib.einsum('ia,bj,klac,ijbd,klcd', S_ov_ab, S_vo_ab, t1_ccee_bbbb, Y_abab, Y_bbbb, optimize = True)
-    
+        
         na = lib.einsum('pp',temp_a)
         nb = lib.einsum('pp',temp_b)
         
