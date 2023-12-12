@@ -280,40 +280,6 @@ def get_diag(adc,M_ij=None,eris=None):
 
     return diag
 
-def get_ref_opdm_original(adc):
-    ### ORIGINAL FROM PAPER 2ND ORDER ###
-    """
-    BOOK-KEEPING ONLY!!!!!!!
-    """
-    if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
-        raise NotImplementedError(adc.method)
-    t1 = adc.t1
-    t2 = adc.t2
-
-    t2_1 = t2[0][:]
-    t1_2 = t1[0][:]
-
-    ######################
-    einsum_type = True
-    nocc = adc._nocc
-    nvir = adc._nvir
-
-    t1_ccee = t2_1.copy()
-
-    nmo = nocc + nvir
-    OPDM = np.zeros((nmo,nmo))
-    ####### ADC(2) SPIN ADAPTED REF OPDM ################
-
-    t_bar = 2.0 * t2_1 - t2_1.transpose(0,1,3,2)
-    OPDM[:nocc, :nocc] = 2.0 * np.identity(nocc)
-    OPDM[:nocc, :nocc] += -2.0 * lib.einsum("jkab,ikab->ij", t_bar, t2_1)
-    OPDM[nocc:, nocc:] += 2.0 * lib.einsum("ijbc,ijac->ab", t_bar, t2_1)
-    OPDM[:nocc, nocc:] += 2.0 * t1_2.copy()
-    OPDM[nocc:, :nocc] += 2.0 * t1_2.T.copy()
-    print("trace of ip_sa: " + str(np.einsum("pp",OPDM)))
-    print("norm of ip_sa: " + str(np.linalg.norm(OPDM)))
-    return OPDM
-
 def get_ref_opdm(adc):
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
@@ -374,12 +340,8 @@ def get_ref_opdm(adc):
         OPDM[nocc:, nocc:] += 2 * lib.einsum('ijAa,ijBa->AB', t1_ccee, t2_ccee, optimize = einsum_type)
         OPDM[nocc:, nocc:] -= lib.einsum('ijAa,jiBa->AB', t1_ccee, t2_ccee, optimize = einsum_type)
         OPDM[nocc:, nocc:] += 2 * lib.einsum('ijBa,ijAa->AB', t1_ccee, t2_ccee, optimize = einsum_type)
-        OPDM[nocc:, nocc:] -= lib.einsum('ijBa,jiAa->AB', t1_ccee, t2_ccee, optimize = einsum_type)
-    print("trace of ip_sa: " + str(np.einsum("pp",2*OPDM)))
-    print("norm of ip_sa: " + str(np.linalg.norm(2*OPDM)))
-        
-
-    return OPDM
+        OPDM[nocc:, nocc:] -= lib.einsum('ijBa,jiAa->AB', t1_ccee, t2_ccee, optimize = einsum_type)       
+    return 2 * OPDM
         
     
 
