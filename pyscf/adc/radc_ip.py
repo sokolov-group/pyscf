@@ -242,7 +242,7 @@ def get_diag(adc,M_ij=None,eris=None):
 #    if (method == "adc(2)-x" or method == "adc(3)"):
 #
 #        if eris is None:
-#            eris = adc.transform_integrals()
+#            eris = adc.transform_integrals/()
 #
 #        if isinstance(eris.vvvv, np.ndarray):
 #
@@ -340,7 +340,7 @@ def get_ref_opdm(adc):
         OPDM[nocc:, nocc:] += 2 * lib.einsum('ijAa,ijBa->AB', t1_ccee, t2_ccee, optimize = einsum_type)
         OPDM[nocc:, nocc:] -= lib.einsum('ijAa,jiBa->AB', t1_ccee, t2_ccee, optimize = einsum_type)
         OPDM[nocc:, nocc:] += 2 * lib.einsum('ijBa,ijAa->AB', t1_ccee, t2_ccee, optimize = einsum_type)
-        OPDM[nocc:, nocc:] -= lib.einsum('ijBa,jiAa->AB', t1_ccee, t2_ccee, optimize = einsum_type)       
+        OPDM[nocc:, nocc:] -= lib.einsum('ijBa,jiAa->AB', t1_ccee, t2_ccee, optimize = einsum_type)
     return 2 * OPDM
         
     
