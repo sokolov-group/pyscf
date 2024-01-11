@@ -553,18 +553,18 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None, imd
     #    kernel_micro(k)
     #print('matvec operations finished')
     #exit()
-    for k in kptlist:
+    for idx,k in enumerate(kptlist):
     #for result_k in Pool().map(kernel_micro, kptlist):
         if adc.compute_properties:
             conv_k, evals_k, evecs_k, P_k, X_k = kernel_micro(k)#result_k#.result()
-            P[k] = P_k
-            X[k] = X_k
+            P[idx] = P_k
+            X[idx] = X_k
         else:
             conv_k, evals_k, evecs_k = kernel_micro(k)#result_k#.result()
-        conv[k] = conv_k.real
-        evals[k] = evals_k.real
-        evecs[k] = evecs_k#.real
-        k += 1
+        conv[idx] = conv_k.real
+        evals[idx] = evals_k.real
+        evecs[idx] = evecs_k#.real
+        #k += 1
     nfalse = np.shape(conv)[0] - np.sum(conv)
     print(f'[memalloc current+max Kernel-ERI-DF-post-Davidson [GB] = {np.array(tracemalloc.get_traced_memory())/1024**3}')
     tracemalloc.stop()
