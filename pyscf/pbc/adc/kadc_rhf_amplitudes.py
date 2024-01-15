@@ -150,19 +150,15 @@ def gen_t2_1(myadc,kijab,cvs_idx_slice=None,ncvs=None, eris=None):
     return t2_1_ij
 
 def compute_amplitudes_energy(myadc, eris, verbose=None):
-
-    #t1 = t2 = None
+ 
+    e_corr,t1,t2 = 0,0,0
     if not myadc.eris_direct:
-        #t1,t2,myadc.imds.t2_1_vvvv = myadc.compute_amplitudes(eris)
         t1,t2,myadc.imds.t2_1_vvvv = compute_amplitudes(myadc,eris)
-    #e_corr = myadc.compute_energy(t2, eris)
-    t1,t2,myadc.imds.t2_1_vvvv = compute_amplitudes(myadc,eris)
-    e_corr = compute_energy(myadc, t2, eris)
-
-    #return e_corr, t1, t2
-    if not myadc.eris_direct:
+        e_corr = compute_energy(myadc,t2, eris)
         return e_corr, t1, t2
     else:
+        #t1,t2,myadc.imds.t2_1_vvvv = myadc.compute_amplitudes(eris)
+        #e_corr = myadc.compute_energy(t2, eris)
         return e_corr
 
 

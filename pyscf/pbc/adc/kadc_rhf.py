@@ -193,8 +193,8 @@ class RADC(pyscf.adc.radc.RADC):
 
     transform_integrals = kadc_ao2mo.transform_integrals_incore
     compute_amplitudes = kadc_rhf_amplitudes.compute_amplitudes
-    compute_energy = kadc_rhf_amplitudes.compute_energy
-    compute_amplitudes_energy = kadc_rhf_amplitudes.compute_amplitudes_energy
+    #compute_energy = kadc_rhf_amplitudes.compute_energy
+    #compute_amplitudes_energy = kadc_rhf_amplitudes.compute_amplitudes_energy
     get_chnk_size = kadc_ao2mo.calculate_chunk_size
 
 
@@ -504,7 +504,19 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None, imd
         #print(f'out norm for kpt = {k} is = {out_norm} ')
 
         guess = adc.get_init_guess(nroots, diag, ascending=True)
-        
+       
+        def parallel_lambda(xs):
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                results = list(executor.map(matvec, xs))
+            return results
+
+        #conv_k,evals_k, evecs_k = lib.linalg_helper.davidson_nosym1(
+        #        parallel_lambda, guess, diag,
+        #        nroots=nroots, verbose=log, tol=adc.conv_tol,
+        #        max_cycle=adc.max_cycle, max_space=adc.max_space,
+        #        tol_residual=adc.tol_residual)#, follow_state=True)
+ 
         conv_k,evals_k, evecs_k = lib.linalg_helper.davidson_nosym1(
                 lambda xs : [matvec(x) for x in xs], guess, diag,
                 nroots=nroots, verbose=log, tol=adc.conv_tol,
@@ -631,6 +643,8 @@ class RADC(pyscf.adc.radc.RADC):
         self.ncvs = None
         self.ncvs_proj = None
         self.eris_direct = False
+        self.dask_arrays = False
+        self.dask_chunks = {}
         self.cvs_compact = True
         self.precision_single = True
         self._nocc = None
@@ -659,9 +673,9 @@ class RADC(pyscf.adc.radc.RADC):
         self.mo_energy = mf.mo_energy
 
     transform_integrals = kadc_ao2mo.transform_integrals_incore
-    #compute_amplitudes = kadc_rhf_amplitudes.compute_amplitudes
-    #compute_energy = kadc_rhf_amplitudes.compute_energy
-    #compute_amplitudes_energy = kadc_rhf_amplitudes.compute_amplitudes_energy
+    compute_amplitudes = kadc_rhf_amplitudes.compute_amplitudes
+    compute_energy = kadc_rhf_amplitudes.compute_energy
+    compute_amplitudes_energy = kadc_rhf_amplitudes.compute_amplitudes_energy
     get_chnk_size = kadc_ao2mo.calculate_chunk_size
 
     transform_integrals_dfhack = kadc_ao2mo.transform_integrals_df

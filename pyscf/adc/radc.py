@@ -51,11 +51,64 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     matvec, diag = adc.gen_matvec(imds, eris)
     guess = adc.get_init_guess(nroots, diag, ascending=True)
 
+    #conv, E, U = lib.linalg_helper.davidson_nosym1(
+    #    lambda xs : [matvec(x) for x in xs],
+    #    guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol,
+    #    max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual=adc.tol_residual)
+    
+    Eh2eV = 27.211386245988
+    kop_w, kop_v = np.linalg.eigh(imds)
+    kop_v = kop_v.T
+    kop_w = -kop_w
+    dim_kop = kop_v.shape[0]
+
+    for kop_root, w in enumerate(kop_w):
+        print("Koopman State #", kop_root, " Energy [Eh]: ", w, "  Energy [ev]: ", w*Eh2eV ) ## Only works for IP; need another print statement for EA
+
+    #if nkop_chk is True:
+    #   print("Initial Koopman's state checkpoint... exiting calculation")
+    #   exit()
+
+    kroots = 2
+    npick = slice(0,1)
+    dim_guess = np.shape(guess)[1]
+    guess = np.zeros((kroots,dim_guess))
+    guess[npick,:dim_kop] = kop_v[npick,:] 
+
+    max_nmom = 10
+    ovlp_tol = 0.05
+    T_moments = adc.get_trans_moments()
+    def eig_close_to_init_guess(w, v, nroots, envs):      
+      x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])      
+      #s = np.dot(np.asarray(U).conj(), np.asarray(x0).T)
+
+      ##x0 = adc.renormalize_eigenvectors(nroots=nroots,eigvecs=np.array(x0))
+      #X = np.dot(T, np.array(x0)).reshape(-1, nroots)
+      #P = 2.0*lib.einsum("pi,pi->i", X, X)
+      #idx = np.argsort(-P)
+      #P = P[idx]
+
+      '''
+      s = np.dot(np.asarray(guess), np.asarray(x0).conj().T)
+      snorm = np.einsum('pi,pi->i', s.conj(), s)
+      #idx = np.argsort(-snorm)[:nroots] 
+      idx = np.argsort(-snorm)
+      snorm = snorm[idx]
+      #print("snorm: ", snorm[:30])
+      '''
+      #idx = idx[snorm > ovlp_tol]
+      #idx = idx[:max_nmom]  
+      #nroots = idx.size
+      w = w[idx].real
+      v = v[:, idx].real
+      w, v, idx = lib.linalg_helper._eigs_cmplx2real(w, v, idx, real_eigenvectors = True)
+      return w, v, idx, nroots
+
     conv, adc.E, U = lib.linalg_helper.davidson_nosym1(
         lambda xs : [matvec(x) for x in xs],
         guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol,
-        max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual=adc.tol_residual)
-
+        max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual=adc.tol_residual, pick=eig_close_to_init_guess)
+    nroots = adc.E.size
     adc.U = np.array(U).T.copy()
 
     #T_moments = adc.get_trans_moments()

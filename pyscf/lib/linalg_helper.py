@@ -840,6 +840,7 @@ def davidson_nosym1(aop, x0, precond, tol=1e-12, max_cycle=50, max_space=20,
         w, v = scipy.linalg.eig(heff[:space,:space])
         if callable(pick):
             w, v, idx = pick(w, v, nroots, locals())
+            #w, v, idx, nroots = pick(w, v, nroots, locals())
             if len(w) == 0:
                 raise RuntimeError(f'Not enough eigenvalues found by {pick}')
 

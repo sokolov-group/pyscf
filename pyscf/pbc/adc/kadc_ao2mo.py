@@ -272,7 +272,7 @@ def transform_integrals_df(myadc):
     #Lvv = eris.Lvv = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
     if myadc.method != 'adc(2)':
         if not myadc.eris_direct:
-            Lvv  = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
+            eris.Lvv  = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
         else:
             eris.Lvv_p = np.empty((nkpts_p,naux,nvir,nvir),dtype=dtype)
 
@@ -321,7 +321,7 @@ def transform_integrals_df(myadc):
                 #Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
                 if myadc.method != 'adc(2)':
                     if not myadc.eris_direct:
-                        Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
+                        eris.Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
                     elif myadc.eris_direct and ki <= kj:
                         eris.Lvv_idx_p[(ki,kj)] = idx_p
                         #eris.Lvv_p[idx_p] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
@@ -334,40 +334,45 @@ def transform_integrals_df(myadc):
     if not myadc.eris_direct:
     #if compute_int:
         eris.feri = feri = lib.H5TmpFile()
-
-        #eris.oooo = feri.create_dataset('oooo', (nkpts,nkpts,nkpts,nocc,nocc,nocc,nocc), dtype=dtype
-        #                                      , chunks=(1,1,1,nocc,nocc,nocc,nocc), compression='lzf')
-        #eris.oovv = feri.create_dataset('oovv', (nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir), dtype=dtype
-        #                                      , chunks=(1,1,1,nocc,nocc,nvir,nvir), compression='lzf')
-        #eris.ovoo = feri.create_dataset('ovoo', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nocc), dtype=dtype
-        #                                      , chunks=(1,1,1,nocc,nvir,nocc,nocc), compression='lzf')
-        #eris.ovov = feri.create_dataset('ovov', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nvir), dtype=dtype
-        #                                      , chunks=(1,1,1,nocc,nvir,nocc,nvir), compression='lzf')
-        #eris.ovvo = feri.create_dataset('ovvo', (nkpts,nkpts,nkpts,nocc,nvir,nvir,nocc), dtype=dtype
-        #                                      , chunks=(1,1,1,nocc,nvir,nvir,nocc), compression='lzf')
-        eris.oooo = feri.create_dataset('oooo', (nkpts,nkpts,nkpts,nocc,nocc,nocc,nocc), dtype=dtype)
+        '''
+        eris.oooo = feri.create_dataset('oooo', (nkpts,nkpts,nkpts,nocc,nocc,nocc,nocc)
+        ,chunks=(1,1,1,nocc,nocc,nocc,nocc), dtype=dtype)
         #eris.oovv = feri.create_dataset('oovv', (nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir), dtype=dtype)
+        eris.vooo = feri.create_dataset('vooo', (nkpts,nkpts,nkpts,nvir,nocc,nocc,nocc)
+        ,chunks=(1,1,1,nvir,nocc,nocc,nocc), dtype=dtype)
+        eris.ovov = feri.create_dataset('ovov', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nvir)
+        ,chunks=(1,1,1,nocc,nvir,nocc,nvir), dtype=dtype)
+        eris.ovvo = feri.create_dataset('ovvo', (nkpts,nkpts,nkpts,nocc,nvir,nvir,nocc)
+        ,chunks=(1,1,1,nocc,nvir,nvir,nocc), dtype=dtype)
+        #eris.ovoo = feri.create_dataset('ovoo', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nocc), dtype=dtype)
+        if myadc.method != 'adc(2)' and myadc.eris_direct is False:
+            eris.oovv = feri.create_dataset('oovv', (nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir)
+            ,chunks=(1,1,1,nocc,nocc,nvir,nvir), dtype=dtype)
+        if myadc.method == 'adc(3)' and myadc.eris_direct is False:
+            eris.ovoo = feri.create_dataset('ovoo', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nocc)
+            ,chunks=(1,1,1,nocc,nvir,nocc,nocc), dtype=dtype)
+        '''
+        eris.oooo = feri.create_dataset('oooo', (nkpts,nkpts,nkpts,nocc,nocc,nocc,nocc), dtype=dtype)
         eris.vooo = feri.create_dataset('vooo', (nkpts,nkpts,nkpts,nvir,nocc,nocc,nocc), dtype=dtype)
         eris.ovov = feri.create_dataset('ovov', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nvir), dtype=dtype)
         eris.ovvo = feri.create_dataset('ovvo', (nkpts,nkpts,nkpts,nocc,nvir,nvir,nocc), dtype=dtype)
-        eris.ovoo = feri.create_dataset('ovoo', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nocc), dtype=dtype)
+        #eris.ovoo = feri.create_dataset('ovoo', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nocc), dtype=dtype)
         if myadc.method != 'adc(2)' and myadc.eris_direct is False:
             eris.oovv = feri.create_dataset('oovv', (nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir), dtype=dtype)
         if myadc.method == 'adc(3)' and myadc.eris_direct is False:
             eris.ovoo = feri.create_dataset('ovoo', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nocc), dtype=dtype)
-
         for kp in range(nkpts):
             for kq in range(nkpts):
                 for kr in range(nkpts):
                     ks = kconserv[kp,kq,kr]
                     eris.oooo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', Loo[kp,kq], Loo[kr,ks])/nkpts
                     if myadc.method != 'adc(2)' and myadc.eris_direct is False:
-                        eris.oovv[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', Loo[kp,kq], Lvv[kr,ks])/nkpts
+                        eris.oovv[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', Loo[kp,kq], eris.Lvv[kr,ks])/nkpts
                     eris.ovov[kp,kq,kr] = lib.einsum(
                         'Lpq,Lrs->pqrs', eris.Lov[kp,kq], eris.Lov[kr,ks])/nkpts
                     eris.ovvo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Lvo[kr,ks])/nkpts
                     eris.vooo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lvo[kp,kq], Loo[kr,ks])/nkpts
-                    eris.ovoo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Loo[kr,ks])/nkpts
+                    #eris.ovoo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Loo[kr,ks])/nkpts
                     #if myadc.method == 'adc(3)':
                     if myadc.method == 'adc(3)' and myadc.eris_direct is False:
                         eris.ovoo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Loo[kr,ks])/nkpts
