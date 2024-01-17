@@ -2448,8 +2448,6 @@ def matvec(adc, M_ia_jb=None, eris=None):
 
         r1_a_ov = r1_a.reshape(nocc_a, nvir_a)
         r1_b_ov = r1_b.reshape(nocc_b, nvir_b)
-        
-        
         r1_ab = r[s_abab:f_ab]
 
         r_vv_u_a = np.zeros((int((nocc_a * (nocc_a - 1))/2),nvir_a, nvir_a))
@@ -2471,8 +2469,6 @@ def matvec(adc, M_ia_jb=None, eris=None):
         del r_vv_u_b
 
         s = np.zeros(dim)
-
-
 ############## ADC(2) 1 block ############################
 #
         
@@ -2487,7 +2483,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
         D_ijab_a = (-d_ij_a.reshape(-1,1) + d_ab_a.reshape(-1)).reshape((nocc_a,nocc_a,nvir_a,nvir_a))[:,:,ab_ind_a[0],ab_ind_a[1]]
         s[s_aaaa:f_aaaa] = (D_ijab_a[ij_ind_a[0],ij_ind_a[1]].reshape(-1))*r[s_aaaa:f_aaaa]
         del D_ijab_a
-    
+   
         D_ijab_b = (-d_ij_b.reshape(-1,1) + d_ab_b.reshape(-1)).reshape((nocc_b,nocc_b,nvir_b,nvir_b))[:,:,ab_ind_b[0],ab_ind_b[1]]
         s[s_bbbb:f_bbbb] = (D_ijab_b[ij_ind_b[0],ij_ind_b[1]].reshape(-1))*r[s_bbbb:f_bbbb]
         del D_ijab_b
@@ -2548,8 +2544,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
             s[s_abab:f_ab] += temp_abab.reshape(-1)
             del temp_abab
             del eris_OVvv
-#
-#
+
         temp_b = np.zeros((nocc_b, nocc_b, nvir_b, nvir_b))
         if isinstance(eris.OVVV, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
@@ -2581,7 +2576,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
             del temp_b
             del eris_OVVV
 
-#
+
         temp_abab = np.zeros((nocc_a, nocc_b, nvir_a, nvir_b))
         if isinstance(eris.ovVV, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
@@ -2611,8 +2606,8 @@ def matvec(adc, M_ia_jb=None, eris=None):
         s[s_b:f_b] += 0.5*lib.einsum('mnae,mein->ia',r2_b, eris.OVOO, optimize = True).reshape(-1)
         s[s_b:f_b] -= lib.einsum('mnea,mein->ia',r1_ab, eris.ovOO, optimize = True).reshape(-1)
 
-#        # # M^(1)_h1_h0
-
+##        # # M^(1)_h1_h0
+#
         temp_a = lib.einsum('ma,ibjm->ijab',r1_a_ov, eris.ovoo, optimize = True)
         temp_a -= lib.einsum('ma,jbim->ijab',r1_a_ov, eris.ovoo, optimize = True)
         temp_a -= lib.einsum('mb,iajm->ijab',r1_a_ov, eris.ovoo, optimize = True)
@@ -2620,7 +2615,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
         temp_a = temp_a[:,:,ab_ind_a[0],ab_ind_a[1]]
         s[s_aaaa:f_aaaa] += temp_a[ij_ind_a[0],ij_ind_a[1]].reshape(n_doubles_aaaa)
         del temp_a
-
+#
         temp_b = lib.einsum('ma,ibjm->ijab',r1_b_ov, eris.OVOO, optimize = True)
         temp_b -= lib.einsum('ma,jbim->ijab',r1_b_ov, eris.OVOO, optimize = True)
         temp_b -= lib.einsum('mb,iajm->ijab',r1_b_ov, eris.OVOO, optimize = True)
@@ -2628,7 +2623,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
         temp_b = temp_b[:,:,ab_ind_b[0],ab_ind_b[1]]
         s[s_bbbb:f_bbbb] += temp_b[ij_ind_b[0],ij_ind_b[1]].reshape(n_doubles_bbbb)
         del temp_b
-
+#
         s[s_abab:f_ab] -= lib.einsum('ma,jbim->ijab',r1_a_ov, eris.OVoo, optimize = True).reshape(-1)
         s[s_abab:f_ab] -= lib.einsum('mb,iajm->ijab',r1_b_ov, eris.ovOO, optimize = True).reshape(-1)
 
@@ -2637,9 +2632,6 @@ def matvec(adc, M_ia_jb=None, eris=None):
             del r2_a
             del r2_b
 
-        #exit()
-
-#        print("norm of s after", np.linalg.norm(s))
 
         if (method == "adc(2)-x") or (method == "adc(3)"):
             

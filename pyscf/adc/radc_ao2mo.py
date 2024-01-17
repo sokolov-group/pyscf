@@ -45,7 +45,7 @@ def transform_integrals_incore(myadc):
 
     if (myadc.method == "adc(2)-x" and myadc.approx_trans_moments == False) or (myadc.method == "adc(3)"):
         eris.vvvv = ao2mo.general(myadc._scf._eri, (vir, vir, vir, vir), compact=False).reshape(nvir, nvir, nvir, nvir)
-        eris.vvvv = np.ascontiguousarray(eris.vvvv.transpose(0,2,1,3))
+#        eris.vvvv = np.ascontiguousarray(eris.vvvv.transpose(0,2,1,3))
         eris.vvvv = eris.vvvv.reshape(nvir*nvir, nvir*nvir)
 
     log.timer('ADC integral transformation', *cput0)
