@@ -7662,10 +7662,12 @@ def get_X(adc):
     U = adc.U.T
     nroots = U.shape[0]
 
+
     x = np.array([])
     TY_aa = []
     TY_bb = []
     for r in range(U.shape[0]):
+
         
         Y_a = U[r][:f_a].reshape(nocc_a, nvir_a)
         Y_b = U[r][f_a:f_b].reshape(nocc_b, nvir_b)

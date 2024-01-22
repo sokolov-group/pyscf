@@ -48,6 +48,9 @@ def get_imds(adc, eris=None):
 
     t1_2 = t1[0]
 
+    einsum = lib.einsum
+    einsum_type = True
+
     eris_ovvo = eris.ovvo
     ncore = adc._nocc
     nextern = adc._nvir
@@ -60,8 +63,6 @@ def get_imds(adc, eris=None):
 
     if eris is None:
         eris = adc.transform_integrals()
-    einsum = lib.einsum
-    einsum_type = True
 
     v_ccee = eris.oovv
     v_cece = eris.ovvo.transpose(0,1,3,2)
@@ -368,17 +369,161 @@ def matvec(adc, M_ab=None, eris=None):
     return sigma_
 
 
-def get_trans_moments(adc):
-
-    return T
 
 
 
+def renormalize_eigenvectors(adc, nroots=1):
+
+    nocc = adc._nocc
+    nvir = adc._nvir
+
+    n_singles = nocc * nvir
+
+    U = adc.U
+    for I in range(U.shape[1]):
+        U1 = U[:n_singles,I]
+        U2 = U[n_singles:,I].reshape(nocc,nocc,nvir,nvir)
+        UdotU = np.dot(U1, U1) + np.dot(U2.ravel(), U2.ravel())
+        U[:,I] /= np.sqrt(UdotU)
+
+    return U
 
 
 
 
+def get_X(adc):
+    U = renormalize_eigenvectors(adc)
 
+    #U = adc.U
+    U = U.T.copy()
+
+    nroots = U.shape[0]
+
+    dip_ints = -adc.mol.intor('int1e_r',comp=3)
+    dm = np.zeros_like((dip_ints))
+    for i in range(dip_ints.shape[0]):
+        dip = dip_ints[i,:,:]
+        dm[i,:,:] = np.dot(adc.mo_coeff.T,np.dot(dip,adc.mo_coeff))
+
+   
+
+    x = np.array([])
+    
+    nocc = adc._nocc
+    nvir = adc._nvir
+
+    nmo = nocc + nvir
+
+
+    n_singles = nocc * nvir
+    n_doubles = nocc * nocc * nvir * nvir
+
+
+    s1 = 0
+    f1 = n_singles
+    s2 = f1
+    f2 = s2 + n_doubles
+
+    t1 = adc.t1
+    t2 = adc.t2
+
+    t1_ccee = t2[0][:]
+    t2_ccee = t2[1][:]
+
+    t2_ce = t1[0]
+
+
+    einsum = lib.einsum
+    einsum_type = True
+
+    TY = np.zeros((nmo, nmo))
+
+    TY_ = []
+    x = np.array([])
+
+    for r in range(U.shape[0]):
+
+
+        r1 = U[r][s1:f1]
+
+        Y = r1.reshape(nocc, nvir).copy()
+        #print(np.linalg.norm(Y))
+        #exit()
+        
+       # print(np.linalg.norm(Y))
+       # exit()
+        r2 = U[r][s2:f2].reshape(nocc,nocc,nvir,nvir).copy()
+
+        TY[:nocc,nocc:] = Y.copy()
+
+        TY[nocc:,:nocc]  = einsum('ia,LiAa->AL', Y, t1_ccee, optimize = einsum_type)
+        TY[nocc:,:nocc] -= einsum('ia,iLAa->AL', Y, t1_ccee, optimize = einsum_type)
+
+        TY[:nocc,:nocc] =- einsum('Iiab,Liab->IL', r2, t1_ccee, optimize = einsum_type)
+        TY[:nocc,:nocc] += einsum('Iiab,Liba->IL', r2, t1_ccee, optimize = einsum_type)
+
+
+        TY[nocc:,nocc:]  = 2 * einsum('ijCa,ijAa->AC', r2, t1_ccee, optimize = einsum_type)
+        TY[nocc:,nocc:] -= 2 * einsum('ijCa,jiAa->AC', r2, t1_ccee, optimize = einsum_type)
+
+
+        TY[:nocc,:nocc] -= einsum('Iiab,Liab->IL', r2, t1_ccee, optimize = einsum_type)
+        TY[nocc:,nocc:] += einsum('ijCa,ijAa->AC', r2, t1_ccee, optimize = einsum_type)
+
+
+        TY[:nocc,:nocc] -= einsum('Ia,La->IL', Y, t2_ce, optimize = einsum_type)
+        TY[nocc:,nocc:] += einsum('iC,iA->AC', Y, t2_ce, optimize = einsum_type)
+
+        TY[:nocc,nocc:] -= einsum('Ia,ijab,ijCb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] += 1/2 * einsum('Ia,ijab,jiCb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] -= einsum('iC,ijab,Ijab->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] += 1/2 * einsum('iC,ijab,Ijba->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] += einsum('ia,ijab,IjCb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] -= 1/2 * einsum('ia,ijab,jICb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] -= 1/2 * einsum('ia,ijba,IjCb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] += 1/2 * einsum('ia,ijba,jICb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+
+        TY[nocc:,:nocc] += einsum('ia,LiAa->AL', Y, t2_ccee, optimize = einsum_type)
+        TY[nocc:,:nocc] -= einsum('ia,iLAa->AL', Y, t2_ccee, optimize = einsum_type)
+
+
+        dx = lib.einsum("rqp,qp->r", dm, TY, optimize = True)
+
+        TY_ = np.append(TY_,TY)
+
+        x = np.append(x,dx)
+    x = x.reshape(nroots, 3)
+
+    return TY_, x
+
+#def analyze_spec_factor(adc):
+
+
+
+
+def get_properties(adc,nroots):
+
+    TY, dx  = adc.get_X()
+
+
+    X = TY.reshape(nroots,-1)
+
+    P = np.square(dx.T)*adc.E*(2/3)
+    P = P[0] + P[1] + P[2]
+
+    return P, X
+
+
+def analyze(myadc):
+
+    if myadc.compute_properties:
+
+        header = ("\n*************************************************************"
+                  "\n            Spectroscopic factors analysis summary"
+                  "\n*************************************************************")
+        logger.info(myadc, header)
+
+        myadc.analyze_spec_factor()
 
 def compute_dyson_mo(myadc):
 
@@ -475,10 +620,11 @@ class RADCEE(radc.RADC):
     get_imds = get_imds
     matvec = matvec
     get_diag = get_diag
-#    get_trans_moments = get_trans_moments
-    #renormalize_eigenvectors = renormalize_eigenvectors
- #   get_properties = get_properties
- #   analyze_spec_factor = analyze_spec_factor
+    #get_trans_moments = get_trans_moments
+    renormalize_eigenvectors = renormalize_eigenvectors
+    get_X = get_X
+    get_properties = get_properties
+#    analyze_spec_factor = analyze_spec_factor
  #   analyze_eigenvector = analyze_eigenvector
  #   analyze = analyze
  #   compute_dyson_mo = compute_dyson_mo
