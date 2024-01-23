@@ -24,7 +24,7 @@ import pyscf.ao2mo as ao2mo
 from pyscf import lib
 from pyscf.lib import logger
 from pyscf.adc import radc
-from pyscf.adc import radc_ao2mo
+from pyscf.adc import radc_ao2mo, radc_amplitudes
 from pyscf.adc import dfadc
 from pyscf import __config__
 from pyscf import df
@@ -318,35 +318,57 @@ def matvec(adc, M_ab=None, eris=None):
         s[s2:f2] = (D_ijab.reshape(-1))*r[s2:f2]
         del D_ijab
 
-        v_ceee = radc_ao2mo.unpack_eri_1(eris.ovvv, nvir)
+        if isinstance(eris.ovvv, type(None)):
+            M_11Y0 = np.zeros((nocc,nocc,nvir,nvir))
+            chnk_size = radc_ao2mo.calculate_chunk_size(adc)
+            a = 0
+            for p in range(0,nocc,chnk_size):
+                v_ceee = dfadc.get_ovvv_df(adc, eris.Lov, eris.Lvv, p, chnk_size).reshape(-1,nvir,nvir,nvir)
+                k = v_ceee.shape[0]
+                M_11Y0[:,a:a+k,:,:] += einsum('Ia,JDaC->IJCD', Y, v_ceee, optimize = einsum_type)
+                M_11Y0[a:a+k,:,:,:] += einsum('Ja,ICaD->IJCD', Y, v_ceee, optimize = einsum_type)
+
+                s[s1:f1] += -einsum('Iiab,iabD->ID', r2[:,a:a+k,:,:], v_ceee, optimize = einsum_type).reshape(-1)
+                s[s1:f1] += 2*einsum('Iiab,ibDa->ID', r2[:,a:a+k,:,:], v_ceee, optimize = einsum_type).reshape(-1)
+                del v_ceee
+                a += k
+            s[s2:f2] += M_11Y0.reshape(-1)
+            del M_11Y0
+        else:
+            v_ceee = radc_ao2mo.unpack_eri_1(eris.ovvv, nvir)
+            M_11Y0 = einsum('Ia,JDaC->IJCD', Y, v_ceee, optimize = einsum_type)
+            M_11Y0 += einsum('Ja,ICaD->IJCD', Y, v_ceee, optimize = einsum_type)
+            s[s2:f2] += M_11Y0.reshape(-1)
 
 
-        M_11Y0 = einsum('Ia,JDaC->IJCD', Y, v_ceee, optimize = einsum_type)
-        M_11Y0 -= einsum('iC,JDIi->IJCD', Y, v_cecc, optimize = einsum_type)
-        
-        M_11Y0 += einsum('Ja,ICaD->IJCD', Y, v_ceee, optimize = einsum_type)
+            M_01Y1 = -einsum('Iiab,iabD->ID', r2, v_ceee, optimize = einsum_type)
+            M_01Y1 += 2*einsum('Iiab,ibDa->ID', r2, v_ceee, optimize = einsum_type)
+            s[s1:f1] += M_01Y1.reshape(-1)
+            del M_11Y0
+            del M_01Y1
+
+        M_11Y0 = -einsum('iC,JDIi->IJCD', Y, v_cecc, optimize = einsum_type)
         M_11Y0 -= einsum('iD,ICJi->IJCD', Y, v_cecc, optimize = einsum_type)
-
-
-
         s[s2:f2] += M_11Y0.reshape(-1)
 
-        M_01Y1 = -einsum('Iiab,iabD->ID', r2, v_ceee, optimize = einsum_type)
-        M_01Y1 += 2*einsum('Iiab,ibDa->ID', r2, v_ceee, optimize = einsum_type)
-        M_01Y1 -= 2*einsum('ijDa,jaiI->ID', r2, v_cecc, optimize = einsum_type)
+        M_01Y1 = -2*einsum('ijDa,jaiI->ID', r2, v_cecc, optimize = einsum_type)
         M_01Y1 += einsum('ijDa,iajI->ID', r2, v_cecc, optimize = einsum_type)
-
-
         s[s1:f1] += M_01Y1.reshape(-1)
 
-
         if (adc.method == "adc(2)-x"):
-            v_eeee = eris.vvvv.reshape(nvir, nvir, nvir,nvir)
             del Y
             Y = r2.copy()
 
-            M_1Y1_aa  = einsum('IJab,CDab->IJCD', Y, v_eeee, optimize = einsum_type)
-            M_1Y1_aa += 2 * einsum('IiCa,JDai->IJCD', Y, v_ceec, optimize = einsum_type)
+            if isinstance(eris.ovvv, type(None)):
+                s[s2:f2] += radc_amplitudes.contract_ladder(adc,Y,eris.Lvv).reshape(-1)
+            else:
+                v_eeee = eris.vvvv.reshape(nvir, nvir, nvir,nvir)
+                M_1Y1_aa  = einsum('IJab,CDab->IJCD', Y, v_eeee, optimize = einsum_type)
+                s[s2:f2] += M_1Y1_aa.reshape(-1)
+                del M_1Y1_aa
+            
+                
+            M_1Y1_aa = 2 * einsum('IiCa,JDai->IJCD', Y, v_ceec, optimize = einsum_type)
             M_1Y1_aa -= einsum('IiCa,iJDa->IJCD', Y, v_ccee, optimize = einsum_type)
             M_1Y1_aa -= einsum('IiaC,JDai->IJCD', Y, v_ceec, optimize = einsum_type)
             M_1Y1_aa -= einsum('IiaD,iJCa->IJCD', Y, v_ccee, optimize = einsum_type)
@@ -664,8 +686,8 @@ def contract_r_vvvv(myadc,r2,vvvv):
     nocc = myadc._nocc
     nvir = myadc._nvir
 
-    r2_vvvv = np.zeros((nocc,nvir,nvir))
-    r2 = np.ascontiguousarray(r2.reshape(nocc,-1))
+    r2_vvvv = np.zeros((nocc,nocc,nvir,nvir))
+    r2 = np.ascontiguousarray(r2.reshape(nocc*nocc,-1))
     chnk_size = radc_ao2mo.calculate_chunk_size(myadc)
 
     a = 0
@@ -681,7 +703,7 @@ def contract_r_vvvv(myadc,r2,vvvv):
             vvvv_p = dfadc.get_vvvv_df(myadc, vvvv, p, chnk_size)
             k = vvvv_p.shape[0]
             vvvv_p = vvvv_p.reshape(-1,nvir*nvir)
-            r2_vvvv[:,a:a+k] = np.dot(r2,vvvv_p.T).reshape(nocc,-1,nvir)
+            r2_vvvv[:,a:a+k] = np.dot(r2,vvvv_p.T).reshape(nocc*nocc,-1)
             del vvvv_p
             a += k
     else:
