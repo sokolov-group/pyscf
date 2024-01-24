@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Author: Samragni Banerjee <samragnibanerjee4@gmail.com>
+# Author: Terrenc Stahl <terrencestahl4@gmail.com>
 #         Alexander Sokolov <alexander.y.sokolov@gmail.com>
 #
 
@@ -409,7 +409,7 @@ def renormalize_eigenvectors(adc, nroots=1):
     for I in range(U.shape[1]):
         U1 = U[:n_singles,I]
         U2 = U[n_singles:,I].reshape(nocc,nocc,nvir,nvir)
-        UdotU = np.dot(U1, U1) + np.dot(U2.ravel(), U2.ravel())
+        UdotU = np.dot(U1, U1) + 2.*np.dot(U2.ravel(), U2.ravel()) - 4.*np.dot(U2.ravel(), U2.transpose(0,1,3,2).ravel())
         U[:,I] /= np.sqrt(UdotU)
 
     return U
