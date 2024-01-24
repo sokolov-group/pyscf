@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Author: Samragni Banerjee <samragnibanerjee4@gmail.com>
+# Author: Terrence Stahl <terrencestahl4@gmail.com>
 #         Alexander Sokolov <alexander.y.sokolov@gmail.com>
 #
 
