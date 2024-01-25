@@ -29,9 +29,11 @@ from pyscf.adc import radc_ao2mo
 from pyscf.adc import dfadc
 from pyscf import __config__
 from pyscf import df
+from pyscf import scf
 
 
 # Excited-state kernel
+#@profile
 def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     adc.method = adc.method.lower()
@@ -50,7 +52,11 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     imds = adc.get_imds(eris)
     matvec, diag = adc.gen_matvec(imds, eris)
 
-    guess = adc.get_init_guess(nroots, diag, ascending=True)
+
+    guess = adc.get_init_guess(nroots, diag, ascending = True)
+
+    if not isinstance(eris.oovv, np.ndarray):
+        guess = radc_ao2mo.write_dataset(guess)
 
     conv, adc.E, U = lib.linalg_helper.davidson1(
         lambda xs : [matvec(x) for x in xs],
@@ -61,7 +67,14 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     if adc.compute_properties:
         adc.P,adc.X = adc.get_properties(nroots)
-
+    if adc.method_type == "ee":
+        TY, props = adc.X
+        spin, ref_opdm, opdm, tpdm = props
+        if adc.spin_c is True:
+            spin, trace = spin
+            spin_c = spin
+            na = trace[0]
+            nb = trace[1]
     nfalse = np.shape(conv)[0] - np.sum(conv)
 
     header = ("\n*************************************************************"
@@ -76,7 +89,16 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         print_string = ('%s root %d  |  Energy (Eh) = %14.10f  |  Energy (eV) = %12.8f  ' %
                         (adc.method, n, adc.E[n], adc.E[n]*27.2114))
         if adc.compute_properties:
-            print_string += ("|  Spec factors = %10.8f  " % adc.P[n])
+            if (adc.method_type == "ee"):
+                print_string += ("|  Osc. Str. = %10.8f  " % adc.P[n])
+                if (adc.spin_c is True):
+                    print_string += ("|  S^2 = %10.8f  " % spin_c[n])
+                if (adc.spin_c is True):
+                    print_string += ("|  na = %5.3f  " % na[n])
+                if (adc.spin_c is True):
+                    print_string += ("|  nb = %5.3f  " % nb[n])
+            else:
+                print_string += ("|  Spec Factors = %10.8f  " % adc.P[n])
         print_string += ("|  conv = %s" % conv[n])
         logger.info(adc, print_string)
 
@@ -113,71 +135,200 @@ class UADC(lib.StreamObject):
     '''
     incore_complete = getattr(__config__, 'adc_uadc_UADC_incore_complete', False)
 
+   # @profile
     def __init__(self, mf, frozen=None, mo_coeff=None, mo_occ=None):
         from pyscf import gto
 
         if 'dft' in str(mf.__module__):
             raise NotImplementedError('DFT reference for UADC')
 
-        if mo_coeff is None:
-            mo_coeff = mf.mo_coeff
-        if mo_occ is None:
-            mo_occ = mf.mo_occ
+        if mo_coeff is None: mo_coeff = mf.mo_coeff
+        if mo_occ is None: mo_occ = mf.mo_occ
+        
+        if isinstance(mf, scf.rohf.ROHF):
+            print ("ROHF reference detected")
+            
+            mo_a = mo_coeff.copy()
+            self.nmo = mo_a.shape[1]
+            nalpha = mf.mol.nelec[0]
+            nbeta = mf.mol.nelec[1]
 
-        self.mol = mf.mol
-        self._scf = mf
-        self.verbose = self.mol.verbose
-        self.stdout = self.mol.stdout
-        self.max_memory = mf.max_memory
+            h1e = mf.get_hcore()
+            dm = mf.make_rdm1()
+            vhf = mf.get_veff(mf.mol, dm) 
 
-        self.max_space = getattr(__config__, 'adc_uadc_UADC_max_space', 12)
-        self.max_cycle = getattr(__config__, 'adc_uadc_UADC_max_cycle', 50)
-        self.conv_tol = getattr(__config__, 'adc_uadc_UADC_conv_tol', 1e-12)
-        self.tol_residual = getattr(__config__, 'adc_uadc_UADC_tol_res', 1e-6)
+            fock_a = h1e + vhf[0]
+            fock_b = h1e + vhf[1]
 
-        self.scf_energy = mf.e_tot
-        self.frozen = frozen
-        self.incore_complete = self.incore_complete or self.mol.incore_anyway
+            if nalpha > nbeta:
+                self.ndocc = nbeta
+                self.nsocc = nalpha - nbeta
+            else:
+                self.ndocc = nalpha
+                self.nsocc = nbeta - nalpha
 
-        self.mo_coeff = mo_coeff
-        self.mo_occ = mo_occ
-        self.e_corr = None
-        self.t1 = None
-        self.t2 = None
-        self.imds = lambda:None
-        self._nocc = mf.nelec
-        self._nmo = (mo_coeff[0].shape[1], mo_coeff[1].shape[1])
-        self._nvir = (self._nmo[0] - self._nocc[0], self._nmo[1] - self._nocc[1])
-        self.mo_energy_a = mf.mo_energy[0]
-        self.mo_energy_b = mf.mo_energy[1]
-        self.chkfile = mf.chkfile
-        self.method = "adc(2)"
-        self.method_type = "ip"
-        self.with_df = None
-        self.compute_mpn_energy = True
-        self.compute_spec = True
-        self.compute_properties = True
-        self.approx_trans_moments = False
-        self.evec_print_tol = 0.1
-        self.spec_factor_print_tol = 0.1
-        self.E = None
-        self.U = None
-        self.P = None
-        self.X = (None,)
-        self.ncvs = None
+            fock_a = np.dot(mo_a.T,np.dot(fock_a, mo_a))
+            fock_b = np.dot(mo_a.T,np.dot(fock_b, mo_a))
 
-        keys = set(('tol_residual','conv_tol', 'e_corr', 'method',
-                    'method_type', 'mo_coeff', 'mol', 'mo_energy_b',
-                    'max_memory', 'scf_energy', 'e_tot', 't1', 'frozen',
-                    'mo_energy_a', 'chkfile', 'max_space', 't2', 'mo_occ',
-                    'max_cycle'))
+#            # Semicanonicalize Ca using fock_a, nocc_a -> Ca, mo_energy_a, U_a, f_ov_a
+            C_a, mo_energy_a, f_ov_a, f_aa = self.semi_canonicalize_orbitals(fock_a, self.ndocc + self.nsocc, mo_a)
 
-        self._keys = set(self.__dict__.keys()).union(keys)
+            # Semicanonicalize Cb using fock_b, nocc_b -> Cb, mo_energy_b, U_b, f_ov_b
+            C_b, mo_energy_b, f_ov_b, f_bb = self.semi_canonicalize_orbitals(fock_b, self.ndocc, mo_a)
+
+            mo_a = C_a.copy()
+            mo_b = C_b.copy()
+
+            mo_coeff = np.zeros((2, mo_a.shape[0], mo_a.shape[1]))
+            mo_coeff[0, :, :] = mo_a.copy()
+            mo_coeff[1, :, :] = mo_b.copy()
+
+            f_ov = (f_ov_a, f_ov_b)
+
+            self.mol = mf.mol
+            self._scf = mf
+            self.f_ov = f_ov
+            self.verbose = self.mol.verbose
+            self.stdout = self.mol.stdout
+            self.max_memory = mf.max_memory
+    
+            self.max_space = getattr(__config__, 'adc_uadc_UADC_max_space', 12)
+            self.max_cycle = getattr(__config__, 'adc_uadc_UADC_max_cycle', 50)
+            self.conv_tol = getattr(__config__, 'adc_uadc_UADC_conv_tol', 1e-12)
+            self.tol_residual = getattr(__config__, 'adc_uadc_UADC_tol_res', 1e-6)
+    
+            self.scf_energy = mf.e_tot
+            self.frozen = frozen
+            self.incore_complete = self.incore_complete or self.mol.incore_anyway
+    
+            self.mo_coeff = mo_coeff
+            self.mo_occ = 0
+            self.e_corr = None
+            self.t1 = None
+            self.t2 = None
+            self.dm_a = None
+            self.dm_b = None
+            self.imds = lambda:None
+            self._nocc = mf.nelec
+            self._nmo = (mo_coeff[0].shape[1], mo_coeff[1].shape[1])
+            self._nvir = (self._nmo[0] - self._nocc[0], self._nmo[1] - self._nocc[1])
+            self.mo_energy_a = mo_energy_a.copy()
+            self.mo_energy_b = mo_energy_b.copy()
+            self.chkfile = mf.chkfile
+            self.method = "adc(2)"
+            self.opdm = False
+            self.ref_opdm = False
+            self.tpdm = False
+            self.old_spin_c = False
+            self.spin_c = True
+            self.method_type = "ip"
+            self.with_df = None
+            self.compute_mpn_energy = True
+            self.compute_spec = True
+            self.compute_properties = True
+            self.approx_trans_moments = False
+            self.evec_print_tol = 0.1
+            self.spec_factor_print_tol = 0.1
+            self.E = None
+            self.U = None
+            self.P = None
+            self.X = (None,)
+    
+            keys = set(('tol_residual','conv_tol', 'e_corr', 'method',
+                        'method_type', 'mo_coeff', 'mol', 'mo_energy_b',
+                        'max_memory', 'scf_energy', 'e_tot', 't1', 'frozen',
+                        'mo_energy_a', 'chkfile', 'max_space', 't2', 'mo_occ',
+                        'max_cycle'))
+    
+            self._keys = set(self.__dict__.keys()).union(keys)
+
+ 
+        else:
+
+            self.mol = mf.mol
+            self._scf = mf
+            self.verbose = self.mol.verbose
+            self.stdout = self.mol.stdout
+            self.max_memory = mf.max_memory
+    
+            self.max_space = getattr(__config__, 'adc_uadc_UADC_max_space', 12)
+            self.max_cycle = getattr(__config__, 'adc_uadc_UADC_max_cycle', 50)
+            self.conv_tol = getattr(__config__, 'adc_uadc_UADC_conv_tol', 1e-12)
+            self.tol_residual = getattr(__config__, 'adc_uadc_UADC_tol_res', 1e-6)
+    
+            self.opdm = False
+            self.tpdm = False
+            self.old_spin_c = False
+            self.spin_c = True
+            self.scf_energy = mf.e_tot
+            self.frozen = frozen
+            self.incore_complete = self.incore_complete or self.mol.incore_anyway
+            self.mo_coeff = mo_coeff
+            self.mo_occ = mo_occ
+            self.e_corr = None
+            self.f_ov = None
+            self.t1 = None
+            self.t2 = None
+            self.dm_a = None
+            self.dm_b = None
+            self.imds = lambda:None
+            self.ref_opdm = False
+            self._nocc = mf.nelec
+            self._nmo = (mo_coeff[0].shape[1], mo_coeff[1].shape[1])
+            self._nvir = (self._nmo[0] - self._nocc[0], self._nmo[1] - self._nocc[1])
+            self.mo_energy_a = mf.mo_energy[0]
+            self.mo_energy_b = mf.mo_energy[1]
+            self.chkfile = mf.chkfile
+            self.method = "adc(2)"
+            self.method_type = "ip"
+            self.with_df = None
+            self.compute_mpn_energy = True
+            self.compute_spec = True
+            self.compute_properties = True
+            self.approx_trans_moments = False
+            self.evec_print_tol = 0.1
+            self.spec_factor_print_tol = 0.1
+            self.E = None
+            self.U = None
+            self.P = None
+            self.X = (None,)
+    
+            keys = set(('tol_residual','conv_tol', 'e_corr', 'method',
+                        'method_type', 'mo_coeff', 'mol', 'mo_energy_b',
+                        'max_memory', 'scf_energy', 'e_tot', 't1', 'frozen',
+                        'mo_energy_a', 'chkfile', 'max_space', 't2', 'mo_occ',
+                        'max_cycle'))
+    
+            self._keys = set(self.__dict__.keys()).union(keys)
 
     compute_amplitudes = uadc_amplitudes.compute_amplitudes
     compute_energy = uadc_amplitudes.compute_energy
     transform_integrals = uadc_ao2mo.transform_integrals_incore
 
+  #  @profile
+    def semi_canonicalize_orbitals(self, f, nocc, C): 
+ 
+         # Diagonalize occ-occ block
+         evals_oo, evecs_oo = np.linalg.eigh(f[:nocc, :nocc])
+ 
+         # Diagonalize virt-virt block
+         evals_vv, evecs_vv = np.linalg.eigh(f[nocc:, nocc:])
+ 
+         evals = np.hstack((evals_oo, evals_vv))
+ 
+         U = np.zeros_like(f)
+ 
+         U[:nocc, :nocc] = evecs_oo
+         U[nocc:, nocc:] = evecs_vv
+ 
+         C = np.dot(C, U)
+ 
+         transform_f = np.dot(U.T, np.dot(f, U)) 
+         f_ov = transform_f[:nocc, nocc:].copy()
+ 
+         return C, evals, f_ov, transform_f
+
+ #   @profile
     def dump_flags(self, verbose=None):
         logger.info(self, '')
         logger.info(self, '******** %s ********', self.__class__)
@@ -189,16 +340,18 @@ class UADC(lib.StreamObject):
                     self.max_memory, lib.current_memory()[0])
         return self
 
+#    @profile
     def dump_flags_gs(self, verbose=None):
         logger.info(self, '')
         logger.info(self, '******** %s ********', self.__class__)
         logger.info(self, 'max_memory %d MB (current use %d MB)',
                     self.max_memory, lib.current_memory()[0])
         return self
-
+#
+    #@profile
     def kernel_gs(self):
-        assert (self.mo_coeff is not None)
-        assert (self.mo_occ is not None)
+        assert(self.mo_coeff is not None)
+        assert(self.mo_occ is not None)
 
         self.method = self.method.lower()
         if self.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -232,15 +385,15 @@ class UADC(lib.StreamObject):
 
         eris = self.transform_integrals()
 
-        self.e_corr, self.t1, self.t2 = uadc_amplitudes.compute_amplitudes_energy(
-            self, eris=eris, verbose=self.verbose)
+        self.e_corr, self.t1, self.t2 = uadc_amplitudes.compute_amplitudes_energy(self, eris=eris, verbose=self.verbose)
         self._finalize()
 
         return self.e_corr, self.t1, self.t2
 
+   # @profile
     def kernel(self, nroots=1, guess=None, eris=None):
-        assert (self.mo_coeff is not None)
-        assert (self.mo_occ is not None)
+        assert(self.mo_coeff is not None)
+        assert(self.mo_occ is not None)
 
         self.method = self.method.lower()
         if self.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -274,28 +427,26 @@ class UADC(lib.StreamObject):
 
         eris = self.transform_integrals()
 
-        self.e_corr, self.t1, self.t2 = uadc_amplitudes.compute_amplitudes_energy(
-            self, eris=eris, verbose=self.verbose)
+        self.e_corr, self.t1, self.t2 = uadc_amplitudes.compute_amplitudes_energy(self, eris=eris, verbose=self.verbose)
         self._finalize()
 
         self.method_type = self.method_type.lower()
-        if (self.method_type == "ea"):
+        if(self.method_type == "ea"):
             e_exc, v_exc, spec_fac, X, adc_es = self.ea_adc(nroots=nroots, guess=guess, eris=eris)
 
         elif(self.method_type == "ip"):
+            e_exc, v_exc, spec_fac, X, adc_es = self.ip_adc(nroots=nroots, guess=guess, eris=eris)
 
-            if not isinstance(self.ncvs, type(None)) and self.ncvs > 0:
-                e_exc, v_exc, spec_fac, X, adc_es = self.ip_cvs_adc(
-                    nroots=nroots, guess=guess, eris=eris)
-            else:
-                e_exc, v_exc, spec_fac, X, adc_es = self.ip_adc(
-                    nroots=nroots, guess=guess, eris=eris)
+        elif(self.method_type == "ee"):
+            e_exc, v_exc, spec_fac, X, adc_es = self.ee_adc(nroots=nroots, guess=guess, eris=eris)
+
         else:
             raise NotImplementedError(self.method_type)
 
         self._adc_es = adc_es
         return e_exc, v_exc, spec_fac, X
 
+  #  @profile
     def _finalize(self):
         '''Hook for dumping results and clearing up the object.'''
         logger.note(self, 'E_corr = %.8f',
@@ -314,12 +465,14 @@ class UADC(lib.StreamObject):
         e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
         return e_exc, v_exc, spec_fac, x, adc_es
 
-    def ip_cvs_adc(self, nroots=1, guess=None, eris=None):
-        from pyscf.adc import uadc_ip_cvs
-        adc_es = uadc_ip_cvs.UADCIPCVS(self)
+  #  @profile
+    def ee_adc(self, nroots=1, guess=None, eris=None):
+        from pyscf.adc import uadc_ee
+        adc_es = uadc_ee.UADCEE(self)
         e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
         return e_exc, v_exc, spec_fac, x, adc_es
 
+  #  @profile
     def density_fit(self, auxbasis=None, with_df=None):
         if with_df is None:
             self.with_df = df.DF(self._scf.mol)
@@ -340,8 +493,6 @@ class UADC(lib.StreamObject):
     def compute_dyson_mo(self):
         return self._adc_es.compute_dyson_mo()
 
-    def make_rdm1(self):
-        return self._adc_es.make_rdm1()
 
 if __name__ == '__main__':
     from pyscf import scf
@@ -351,8 +502,8 @@ if __name__ == '__main__':
     r = 1.098
     mol = gto.Mole()
     mol.atom = [
-        ['N', (0., 0.    , -r/2   )],
-        ['N', (0., 0.    ,  r/2)],]
+        ['N', ( 0., 0.    , -r/2   )],
+        ['N', ( 0., 0.    ,  r/2)],]
     mol.basis = {'N':'aug-cc-pvdz'}
     mol.verbose = 0
     mol.build()
@@ -364,7 +515,7 @@ if __name__ == '__main__':
     ecorr, t_amp1, t_amp2 = myadc.kernel_gs()
     print(ecorr -  -0.32201692499346535)
 
-    myadcip = adc.uadc_ip.UADCIP(myadc)
+    myadcip = UADCIP(myadc)
     e,v,p = kernel(myadcip,nroots=3)
     print("ADC(2) IP energies")
     print (e[0] - 0.5434389897908212)
@@ -376,7 +527,7 @@ if __name__ == '__main__':
     print (p[1] - 0.8844048539643351)
     print (p[2] - 0.9096460559671828)
 
-    myadcea = adc.uadc_ea.UADCEA(myadc)
+    myadcea = UADCEA(myadc)
     e,v,p = kernel(myadcea,nroots=3)
     print("ADC(2) EA energies")
     print (e[0] - 0.09617819143037348)
@@ -393,7 +544,7 @@ if __name__ == '__main__':
     ecorr, t_amp1, t_amp2 = myadc.kernel_gs()
     print(ecorr - -0.31694173142858517)
 
-    myadcip = adc.uadc_ip.UADCIP(myadc)
+    myadcip = UADCIP(myadc)
     e,v,p = kernel(myadcip,nroots=3)
     print("ADC(3) IP energies")
     print (e[0] - 0.5667526838174817)
@@ -405,7 +556,7 @@ if __name__ == '__main__':
     print (p[1] - 0.9086596190173993)
     print (p[2] - 0.9214613318791076)
 
-    myadcea = adc.uadc_ea.UADCEA(myadc)
+    myadcea = UADCEA(myadc)
     e,v,p = kernel(myadcea,nroots=3)
 
     print("ADC(3) EA energies")
