@@ -276,6 +276,10 @@ class RADC(lib.StreamObject):
         if (self.method_type == "ea"):
             e_exc, v_exc, spec_fac, x, adc_es = self.ea_adc(nroots=nroots, guess=guess, eris=eris)
 
+        elif (self.method_type == "ee"):
+            e_exc, v_exc, spec_fac, x, adc_es = self.ee_adc(nroots=nroots, guess=guess, eris=eris)
+
+
         elif(self.method_type == "ip"):
             if not isinstance(self.ncvs, type(None)) and self.ncvs > 0:
                 e_exc, v_exc, spec_fac, x, adc_es = self.ip_cvs_adc(
@@ -293,6 +297,12 @@ class RADC(lib.StreamObject):
         logger.note(self, 'E_corr = %.8f',
                     self.e_corr)
         return self
+
+    def ee_adc(self, nroots=1, guess=None, eris=None):
+        from pyscf.adc import radc_ee
+        adc_es = radc_ee.RADCEE(self)
+        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
+        return e_exc, v_exc, spec_fac, x, adc_es
 
     def ea_adc(self, nroots=1, guess=None, eris=None):
         from pyscf.adc import radc_ea

@@ -293,6 +293,10 @@ class RADC(pyscf.adc.radc.RADC):
         elif(self.method_type == "ip"):
             e_exc, v_exc, spec_fac, x, adc_es = self.ip_adc(
                 nroots=nroots, guess=guess, eris=eris, kptlist=kptlist)
+        
+        elif(self.method_type == "ee"):
+            e_exc, v_exc, spec_fac, x, adc_es = self.ee_adc(
+                nroots=nroots, guess=guess, eris=eris, kptlist=kptlist)
 
         else:
             raise NotImplementedError(self.method_type)
@@ -308,6 +312,12 @@ class RADC(pyscf.adc.radc.RADC):
     def ea_adc(self, nroots=1, guess=None, eris=None, kptlist=None):
         from pyscf.pbc.adc import kadc_rhf_ea
         adc_es = kadc_rhf_ea.RADCEA(self)
+        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris, kptlist)
+        return e_exc, v_exc, spec_fac, x, adc_es
+    
+    def ee_adc(self, nroots=1, guess=None, eris=None, kptlist=None):
+        from pyscf.pbc.adc import kadc_rhf_ee
+        adc_es = kadc_rhf_ee.RADCEE(self)
         e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris, kptlist)
         return e_exc, v_exc, spec_fac, x, adc_es
 

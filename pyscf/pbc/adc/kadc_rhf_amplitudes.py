@@ -118,7 +118,7 @@ def compute_amplitudes(myadc, eris):
     cput0 = log.timer_debug1("Completed t2_1 amplitude calculation", *cput0)
 
     t1_2 = None
-    if myadc.approx_trans_moments is False or myadc.method == "adc(3)":
+    if myadc.approx_trans_moments is False or myadc.method == "adc(3)" or myadc.method == "adc(2)" or myadc.method == "adc(2)-x":
         # Compute second-order singles t1 (tij)
         t1_2 = np.zeros((nkpts,nocc,nvir), dtype=t2_1.dtype)
         eris_ovoo = eris.ovoo

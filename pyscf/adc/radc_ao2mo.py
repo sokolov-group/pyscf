@@ -149,7 +149,7 @@ def transform_integrals_outcore(myadc):
 
     ############### forming eris_vvvv ########################################
 
-    if (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False) or (myadc.method == "adc(3)"):
+    if (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False) or (myadc.method == "adc(3)") or (myadc.method == "adc(2)"):
         eris.vvvv = []
 
         cput3 = logger.process_clock(), logger.perf_counter()
