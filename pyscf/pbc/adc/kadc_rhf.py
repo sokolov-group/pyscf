@@ -100,11 +100,11 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
 
         U = np.array(evecs[k]).T.copy()
 
+
         if adc.compute_properties:
             spec_fac,spec_amp = adc.get_properties(kshift,U,nroots)
             P[k] = spec_fac
             X[k] = spec_amp
-
     nfalse = np.shape(conv)[0] - np.sum(conv)
 
     msg = ("\n*************************************************************"
