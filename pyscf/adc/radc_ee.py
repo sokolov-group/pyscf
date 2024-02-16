@@ -85,10 +85,18 @@ def get_imds(adc, eris=None):
     
     ####010#####################
 
-#    M_ab -= einsum('ILAD->IDLA', v_ccee, optimize = einsum_type).copy()
-#    M_ab += einsum('LADI->IDLA', v_ceec, optimize = einsum_type).copy()
-    
-#    M_ab += einsum('LADI->IDLA', v_ceec, optimize = einsum_type).copy()
+  #  M_ab = -einsum('ILAD->IDLA', v_ccee, optimize = einsum_type).copy()
+
+
+
+
+
+    #M_ab = einsum('LADI->IDLA', v_ceec, optimize = einsum_type).copy()
+   
+    #M_ab += einsum('LADI->IDLA', v_ceec, optimize = einsum_type).copy()
+    e, v = np.linalg.eigh(M_ab.reshape(n_singles, n_singles))
+    print("e",e)
+
 #
 #    ####020#####################
 #
@@ -318,7 +326,7 @@ def matvec(adc, M_ab=None, eris=None):
 #        D_ijab = (-d_ij.reshape(-1,1) + d_ab.reshape(-1)).reshape((nocc,nocc,nvir,nvir))
 #        s[s2:f2] = (D_ijab.reshape(-1))*r[s2:f2]
 #        del D_ijab
-#
+
 #        if isinstance(eris.ovvv, type(None)):
 #            M_11Y0 = np.zeros((nocc,nocc,nvir,nvir))
 #            chnk_size = radc_ao2mo.calculate_chunk_size(adc)
@@ -355,36 +363,36 @@ def matvec(adc, M_ab=None, eris=None):
 #        M_01Y1 = -2*einsum('ijDa,jaiI->ID', r2, v_cecc, optimize = einsum_type)
 #        M_01Y1 += einsum('ijDa,iajI->ID', r2, v_cecc, optimize = einsum_type)
 #        s[s1:f1] += M_01Y1.reshape(-1)
-
-        if (adc.method == "adc(2)-x"):
-            del Y
-            Y = r2.copy()
-
-            if isinstance(eris.ovvv, type(None)):
-                s[s2:f2] += radc_amplitudes.contract_ladder(adc,Y,eris.Lvv).reshape(-1)
-            else:
-                v_eeee = eris.vvvv.reshape(nvir, nvir, nvir,nvir)
-                M_1Y1_aa  = einsum('IJab,CDab->IJCD', Y, v_eeee, optimize = einsum_type)
-                s[s2:f2] += M_1Y1_aa.reshape(-1)
-                del M_1Y1_aa
-            
-                
-            M_1Y1_aa = 2 * einsum('IiCa,JDai->IJCD', Y, v_ceec, optimize = einsum_type)
-            M_1Y1_aa -= einsum('IiCa,iJDa->IJCD', Y, v_ccee, optimize = einsum_type)
-            M_1Y1_aa -= einsum('IiaC,JDai->IJCD', Y, v_ceec, optimize = einsum_type)
-            M_1Y1_aa -= einsum('IiaD,iJCa->IJCD', Y, v_ccee, optimize = einsum_type)
-            M_1Y1_aa += 2 * einsum('JiDa,ICai->IJCD', Y, v_ceec, optimize = einsum_type)
-            M_1Y1_aa -= einsum('JiDa,iICa->IJCD', Y, v_ccee, optimize = einsum_type)
-            M_1Y1_aa -= einsum('JiaC,iIDa->IJCD', Y, v_ccee, optimize = einsum_type)
-            M_1Y1_aa -= einsum('JiaD,ICai->IJCD', Y, v_ceec, optimize = einsum_type)
-            M_1Y1_aa += einsum('ijCD,IiJj->IJCD', Y, v_cccc, optimize = einsum_type)
-
-
-
-
-
-
-            s[s2:f2] += M_1Y1_aa.reshape(-1)
+#
+#        if (adc.method == "adc(2)-x"):
+#            del Y
+#            Y = r2.copy()
+#
+#            if isinstance(eris.ovvv, type(None)):
+#                s[s2:f2] += radc_amplitudes.contract_ladder(adc,Y,eris.Lvv).reshape(-1)
+#            else:
+#                v_eeee = eris.vvvv.reshape(nvir, nvir, nvir,nvir)
+#                M_1Y1_aa  = einsum('IJab,CDab->IJCD', Y, v_eeee, optimize = einsum_type)
+#                s[s2:f2] += M_1Y1_aa.reshape(-1)
+#                del M_1Y1_aa
+#            
+#                
+#            M_1Y1_aa = 2 * einsum('IiCa,JDai->IJCD', Y, v_ceec, optimize = einsum_type)
+#            M_1Y1_aa -= einsum('IiCa,iJDa->IJCD', Y, v_ccee, optimize = einsum_type)
+#            M_1Y1_aa -= einsum('IiaC,JDai->IJCD', Y, v_ceec, optimize = einsum_type)
+#            M_1Y1_aa -= einsum('IiaD,iJCa->IJCD', Y, v_ccee, optimize = einsum_type)
+#            M_1Y1_aa += 2 * einsum('JiDa,ICai->IJCD', Y, v_ceec, optimize = einsum_type)
+#            M_1Y1_aa -= einsum('JiDa,iICa->IJCD', Y, v_ccee, optimize = einsum_type)
+#            M_1Y1_aa -= einsum('JiaC,iIDa->IJCD', Y, v_ccee, optimize = einsum_type)
+#            M_1Y1_aa -= einsum('JiaD,ICai->IJCD', Y, v_ceec, optimize = einsum_type)
+#            M_1Y1_aa += einsum('ijCD,IiJj->IJCD', Y, v_cccc, optimize = einsum_type)
+#
+#
+#
+#
+#
+        M_1Y1_aa = np.zeros((nocc,nocc,nvir,nvir))
+        s[s2:f2] += M_1Y1_aa.reshape(-1)
 
 
 

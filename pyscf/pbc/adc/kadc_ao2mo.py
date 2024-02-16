@@ -58,6 +58,9 @@ def transform_integrals_incore(myadc):
     eris.ovvv = np.empty((nkpts,nkpts,nkpts,nocc,nvir,nvir,nvir), dtype=dtype)
     eris.ovvo = np.empty((nkpts,nkpts,nkpts,nocc,nvir,nvir,nocc), dtype=dtype)
 
+    eris.vvoo = np.empty((nkpts,nkpts,nkpts,nvir,nvir,nocc,nocc), dtype=dtype)
+
+
     for (ikp,ikq,ikr) in khelper.symm_map.keys():
         iks = kconserv[ikp,ikq,ikr]
         eri_kpt = fao2mo((mo_coeff[ikp],mo_coeff[ikq],mo_coeff[ikr],mo_coeff[iks]),
@@ -73,6 +76,8 @@ def transform_integrals_incore(myadc):
             eris.ovov[kp,kq,kr] = eri_kpt_symm[:nocc,nocc:,:nocc,nocc:]/nkpts
             eris.ovvv[kp,kq,kr] = eri_kpt_symm[:nocc,nocc:,nocc:,nocc:]/nkpts
             eris.ovvo[kp,kq,kr] = eri_kpt_symm[:nocc,nocc:,nocc:,:nocc]/nkpts
+            
+            eris.vvoo[kp,kq,kr] = eri_kpt_symm[nocc:,nocc:,:nocc,:nocc]/nkpts
 
     if (myadc.method == "adc(2)-x" and myadc.higher_excitations is True) or (myadc.method == "adc(3)") or (myadc.method == "adc(2)"):
         eris.vvvv = myadc._scf.with_df.ao2mo_7d(orbv, factor=1./nkpts).transpose(0,2,1,3,5,4,6)
@@ -104,6 +109,7 @@ def transform_integrals_outcore(myadc):
     eris = lambda:None
     eris.feri = feri = lib.H5TmpFile()
 
+    log.info('using outcore ERI storage')
     # The momentum conservation array
     kconserv = myadc.khelper.kconserv
 
@@ -204,6 +210,7 @@ def transform_integrals_df(myadc):
     nmo = myadc.nmo
     nvir = nmo - nocc
     nao = cell.nao_nr()
+    log = logger.Logger(myadc.stdout, myadc.verbose)
 
     if myadc._scf.with_df._cderi is None:
         myadc._scf.with_df.build()
@@ -220,6 +227,7 @@ def transform_integrals_df(myadc):
     naux = with_df.get_naoaux()
     eris = lambda:None
 
+    log.info('using DF-Integrals ERI storage')
     eris.dtype = dtype = np.result_type(dtype)
     eris.Lpq_mo = Lpq_mo = np.empty((nkpts, nkpts), dtype=object)
     Loo = np.empty((nkpts,nkpts,naux,nocc,nocc),dtype=dtype)

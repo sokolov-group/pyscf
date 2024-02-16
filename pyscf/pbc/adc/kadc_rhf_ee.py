@@ -51,14 +51,14 @@ def vector_size(adc):
     nocc = adc.nocc
     nvir = adc.nmo - adc.nocc
 
-    n_singles = nkpts*nocc * nvir
+    n_singles = nkpts * nocc * nvir
     n_doubles = nkpts * nkpts * nkpts * nocc * nocc * nvir * nvir
     size = n_singles + n_doubles
 
     return size
 
 
-def get_imds(adc, eris=None):
+def get_imds(adc, kshift, eris=None):
 
     cput0 = (time.process_time(), time.time())
     log = logger.Logger(adc.stdout, adc.verbose)
@@ -79,6 +79,11 @@ def get_imds(adc, eris=None):
 
     e_core = [mo_energy[k][:ncore] for k in range(nkpts)]
     e_extern = [mo_energy[k][ncore:] for k in range(nkpts)]
+    
+    
+
+    kshift_ia = kconserv[:,kshift,0].copy()
+    kshift_ld = kconserv[:,kshift,0].copy()
 
     e_core = np.array(e_core)
     e_extern = np.array(e_extern)
@@ -86,8 +91,8 @@ def get_imds(adc, eris=None):
     idn_vir = np.identity(nextern)
     if eris is None:
         eris = adc.transform_integrals()
-
     v_ccee = eris.oovv
+    v_eecc = eris.vvoo
     v_cece = eris.ovvo
     v_ceec = eris.ovvo
     v_cccc = eris.oooo
@@ -96,25 +101,35 @@ def get_imds(adc, eris=None):
 
     # Zeroth-order terms
 
-    M_ = np.empty((nkpts,nkpts,nkpts,ncore,nextern,ncore,nextern),dtype=np.complex128)
-
+    M_ = np.zeros((nkpts,nkpts,ncore,nextern,ncore,nextern),mo_coeff.dtype)
 
     einsum = lib.einsum
     einsum_type = True
-
+#    temp_M = 0
     for ki in range(nkpts):
-        kl = ki
-        for kd in range(nkpts):
-            ka = kconserv[ki,kd,kl]
+        ka = kshift_ia[ki]
+        for kl in range(nkpts):
+            kd = kshift_ld[kl]
+            #M_[ki,kl] = -einsum('ADIL->IDLA', v_eecc[ka,kd,ki], optimize = einsum_type).copy()
+            #M_[ki,kl] = 2*einsum('LADI->IDLA', v_ceec[kl,ka,kd].conj(), optimize = einsum_type)
+            if ki == kl and ka == kd:
+                M_[ki,kl] = einsum('A,AD,IL->IDLA', e_extern[ka], np.identity(nextern), np.identity(ncore), optimize = einsum_type)
+                M_[ki,kl] -= einsum('L,AD,IL->IDLA', e_core[kl], np.identity(nextern), np.identity(ncore), optimize = einsum_type)
+            
+            
+#            temp_M = -einsum('ADIL->IDLA', v_eecc[ka,kd,ki], optimize = einsum_type).copy()
+#            temp_M += 2*einsum('LADI->IDLA', v_ceec[kl,ka,kd].conj(), optimize = einsum_type)
 
-            M_[ki,kd,kl] = einsum('A,AD,IL->IDLA', e_extern[ka], np.identity(nextern), np.identity(ncore), optimize = einsum_type)
-            M_[ki,kd,kl] -= einsum('L,AD,IL->IDLA', e_core[kl], np.identity(nextern), np.identity(ncore), optimize = einsum_type)
+#                temp_M += einsum('A,AD,IL->IDLA', e_extern[ka], np.identity(nextern), np.identity(ncore), optimize = einsum_type)
+#                temp_M -= einsum('L,AD,IL->IDLA', e_core[kl], np.identity(nextern), np.identity(ncore), optimize = einsum_type)
+#        e, v = np.linalg.eig(temp_M.reshape(ncore*nextern,ncore*nextern))
+#        print("ki",ki)
+#        print("kl",kl)
+#        print("e",e)
+#    exit()
 
-            #M_[ki,kd,kl] -= einsum('ILAD->IDLA', v_ccee[ki,kl,ke], optimize = einsum_type).copy()
-            #M_[ki,kd,kl] += einsum('LADI->IDLA', v_ceec[kl,ke,kd].conj(), optimize = einsum_type).copy()
-            #M_[ki,kd,kl] += einsum('LADI->IDLA', v_ceec[kl,ka,kd].conj(), optimize = einsum_type).copy()
-
-                #t1_ccee = adc.t2[0][km,kl,ka]
+#
+#                #t1_ccee = adc.t2[0][km,kl,ka]
 #
 #                v_cece = v_ceec[kl,kb,km].copy()
 #
@@ -223,8 +238,18 @@ def get_imds(adc, eris=None):
 
 
 
-    M_ = M_.reshape(nkpts,nkpts,nkpts,ncore*nextern,ncore*nextern)
-
+    M_ = M_.reshape(nkpts,nkpts,ncore*nextern,ncore*nextern)
+    #for ki in range(nkpts):
+    #    for kl in range(nkpts):
+    del ki, kd, kl, ka
+    for ki in range(nkpts):
+        for kl in range(nkpts):
+            e, v = np.linalg.eigh(M_[ki,kl])
+            print("ki",ki)
+            print("kl",kl)
+            print("e", e)
+    #exit()
+    
     return M_
 
 
@@ -247,7 +272,7 @@ def get_diag(adc,kshift,M_ab=None,eris=None):
     nocc = adc.nocc
     nvir = adc.nmo - adc.nocc
     n_singles = nkpts * nocc * nvir
-    n_doubles = nkpts * nkpts * nkpts * nocc * nocc * nvir * nvir
+    n_doubles = nkpts * nkpts* nkpts * nocc * nocc * nvir * nvir
 
     dim = n_singles + n_doubles
 
@@ -272,20 +297,44 @@ def get_diag(adc,kshift,M_ab=None,eris=None):
     diag = np.zeros((dim), dtype=np.complex128)
     doubles = np.zeros((nkpts,nkpts,nkpts,nocc*nocc*nvir*nvir),dtype=np.complex128)
     singles = np.zeros((nkpts,nocc*nvir),dtype=np.complex128)
-    
-    #singles += np.diagonal(M_[])
+
+    kshift_ia = kconserv[:,kshift,0].copy()
+    kshift_ld = kconserv[:,kshift,0].copy()
 
     for ki in range(nkpts):
-        for kj in range(nkpts):
-            for ka in range(nkpts):
-                kb = kconserv[ki,kj,ka]
+        singles[ki] = np.diagonal(M_[ki,ki])
+        #e, v = np.linalg.eigh(M_[ki,kl])
+        #print("e", e)
+    #exit()
+
+    del ki
 
 
-                d_ij = e_occ[ki][:,None]+e_occ[kj]
-                d_ab = e_vir[ka][:,None]+e_vir[kb]
+    cell = adc.cell
+    kpts = adc.kpts
+    nkpts = kpts.shape[0]
+    a = cell.lattice_vectors() / (2 * np.pi)
+ 
+    kconserv_r2 = np.zeros((nkpts, nkpts, nkpts), dtype=int)
+    kvKLM = kpts[:, None, None, :] - kpts[:, None, :] + kpts
+    # Apply k shift
+    kvKLM = kvKLM - kpts[kshift]
+    for N, kvN in enumerate(kpts):
+        kvKLMN = np.einsum('wx,klmx->wklm', a, kvKLM - kvN)
+        # check whether (1/(2pi) k_{KLMN} dot a) is an integer
+        kvKLMN_int = np.rint(kvKLMN)
+        mask = np.einsum('wklm->klm', abs(kvKLMN - kvKLMN_int)) < 1e-9
+        kconserv_r2[mask] = N
 
-                D_ijab = (-d_ij.reshape(-1,1) + d_ab.reshape(-1))
-                doubles[ki,kj,ka] += D_ijab.reshape(-1)
+    for ki, kj, ka in kpts_helper.loop_kkk(nkpts):
+
+        kb = kconserv_r2[ki,ka,kj]
+
+        d_ij = e_occ[ki][:,None]+e_occ[kj]
+        d_ab = e_vir[ka][:,None]+e_vir[kb]
+
+        D_ijab = (-d_ij.reshape(-1,1) + d_ab.reshape(-1))
+        doubles[ki,kj,ka] = D_ijab.reshape(-1)
 
     diag[s2:f2] += doubles.reshape(-1) 
 
@@ -330,6 +379,25 @@ def matvec(adc, kshift, M_ab=None, eris=None):
     v_cccc = eris.oooo
     v_cecc = eris.ovoo
     v_ceee = eris.ovvv
+    
+    kshift_ia = kconserv[:,kshift,0].copy()
+    kshift_ld = kconserv[:,kshift,0].copy()
+
+    cell = adc.cell
+    kpts = adc.kpts
+    nkpts = kpts.shape[0]
+    a = cell.lattice_vectors() / (2 * np.pi)
+ 
+    kconserv_r2 = np.zeros((nkpts, nkpts, nkpts), dtype=int)
+    kvKLM = kpts[:, None, None, :] - kpts[:, None, :] + kpts
+    # Apply k shift
+    kvKLM = kvKLM - kpts[kshift]
+    for N, kvN in enumerate(kpts):
+        kvKLMN = np.einsum('wx,klmx->wklm', a, kvKLM - kvN)
+        # check whether (1/(2pi) k_{KLMN} dot a) is an integer
+        kvKLMN_int = np.rint(kvKLMN)
+        mask = np.einsum('wklm->klm', abs(kvKLMN - kvKLMN_int)) < 1e-9
+        kconserv_r2[mask] = N
 
     if M_ab is None:
         M_ab = adc.get_imds()
@@ -341,7 +409,7 @@ def matvec(adc, kshift, M_ab=None, eris=None):
 
         s1 = np.zeros((nkpts,nocc*nvir), dtype=np.complex128)
         r1 = r[s_singles:f_singles]
-        r1_s = r1.reshape(nkpts,nocc*nvir)
+        r1_s = r[s_singles:f_singles].reshape(nkpts,nocc*nvir)
         r2 = r[s_doubles:f_doubles]
         r2 = r2.reshape(nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir)
         s2 = np.zeros((nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir), dtype=np.complex128)
@@ -354,19 +422,21 @@ def matvec(adc, kshift, M_ab=None, eris=None):
 #        einsum = lib.einsum
 #        einsum_type = True
 #
-        for ki in range(nkpts):
-            for kj in range(nkpts):
-                for kc in range(nkpts):
-                    kd = kconserv[ki,kc,kj]
-                    s1[kshift] = lib.einsum('ab,b->a',M_ab[kshift,kc,kj],r1_s[kshift])
 
-#                    d_ij = e_occ[ki][:,None]+e_occ[kj]
-#                    d_ab = e_vir[kc][:,None]+e_vir[kd]
+        for ki in range(nkpts):
+            s1[ki] = lib.einsum('ab,b->a',M_ab[ki,ki],r1_s[ki])
+
+#        for ki, kj, ka in kpts_helper.loop_kkk(nkpts):
 #
-#                    D_ijab = (-d_ij.reshape(-1,1) + d_ab.reshape(-1))
-#                    interm = D_ijab.reshape(-1)*r2[ki,kj,kc].reshape(-1)
-#                    s2[ki,kj,kc] += interm.reshape(nocc,nocc,nvir,nvir)
+#            kb = kconserv_r2[ki,ka,kj]
 #
+#            d_ij = e_occ[ki][:,None]+e_occ[kj]
+#            d_ab = e_vir[ka][:,None]+e_vir[kb]
+#
+#            D_ijab = (-d_ij.reshape(-1,1) + d_ab.reshape(-1))
+#            interm = D_ijab.reshape(-1)*r2[ki,ka,kj].reshape(-1)
+#            s2[ki,kj,ka] += interm.reshape(nocc,nocc,nvir,nvir)
+
 #                    s2[kb,ki] += einsum('Ia,JDaC->IJCD', Y, v_ceee[ki,kj,kshift], optimize = einsum_type)
 #                    s2[kb,ki] += einsum('Ja,ICaD->IJCD', Y, v_ceee[ki,kj,kshift], optimize = einsum_type)
 #                    s2[kb,ki] -= einsum('iC,JDIi->IJCD', Y, v_cecc[ki,kj,kshift], optimize = einsum_type)
@@ -701,7 +771,7 @@ class RADCEE(kadc_rhf.RADC):
 
     def gen_matvec(self,kshift,imds=None, eris=None):
         if imds is None:
-            imds = self.get_imds(eris)
+            imds = self.get_imds(kshift,eris)
         diag = self.get_diag(kshift,imds,eris)
         matvec = self.matvec(kshift, imds, eris)
         return matvec, diag

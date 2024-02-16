@@ -79,8 +79,11 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
     conv = np.zeros((len(kptlist),nroots), np.bool_)
     P = np.zeros((len(kptlist),nroots), np.float64)
     X = np.zeros((len(kptlist),nmo,nroots), dtype)
-
-    imds = adc.get_imds(eris)
+    if adc.method_type == "ip" or adc.method_type == "ea":
+        imds = adc.get_imds(eris)
+        #kshift = None
+    else:
+        imds = None
 
     for k, kshift in enumerate(kptlist):
         matvec, diag = adc.gen_matvec(kshift, imds, eris)
@@ -105,6 +108,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
             spec_fac,spec_amp = adc.get_properties(kshift,U,nroots)
             P[k] = spec_fac
             X[k] = spec_amp
+
     nfalse = np.shape(conv)[0] - np.sum(conv)
 
     msg = ("\n*************************************************************"
@@ -228,18 +232,29 @@ class RADC(pyscf.adc.radc.RADC):
         mem_incore *= 16 /1e6
         mem_now = lib.current_memory()[0]
 
-        if isinstance(self._scf.with_df, df.GDF):
-            self.chnk_size = self.get_chnk_size()
-            self.with_df = self._scf.with_df
-            def df_transform():
-                return kadc_ao2mo.transform_integrals_df(self)
-            self.transform_integrals = df_transform
-        elif (mem_incore+mem_now >= self.max_memory and not self.incore_complete):
-            def outcore_transform():
-                return kadc_ao2mo.transform_integrals_outcore(self)
-            self.transform_integrals = outcore_transform
+      #  if isinstance(self._scf.with_df, df.GDF):
+      #      self.chnk_size = self.get_chnk_size()
+      #      self.with_df = self._scf.with_df
+      #      def df_transform():
+      #          return kadc_ao2mo.transform_integrals_df(self)
+      #      self.transform_integrals = df_transform
+      #  elif (mem_incore+mem_now >= self.max_memory and not self.incore_complete):
+      #      def outcore_transform():
+      #          return kadc_ao2mo.transform_integrals_outcore(self)
+      #      self.transform_integrals = outcore_transform
+
+      #  eris = self.transform_integrals()
+
+        def transform_incore():
+            return kadc_ao2mo.transform_integrals_incore(self)
+
+        self.transform_integrals = transform_incore
 
         eris = self.transform_integrals()
+
+
+
+
         self.e_corr,self.t1,self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
             self, eris=eris, verbose=self.verbose)
         print ("MPn:",self.e_corr)
@@ -267,18 +282,27 @@ class RADC(pyscf.adc.radc.RADC):
         mem_incore *= 16 /1e6
         mem_now = lib.current_memory()[0]
 
-        if isinstance(self._scf.with_df, df.GDF):
-            self.chnk_size = self.get_chnk_size()
-            self.with_df = self._scf.with_df
-            def df_transform():
-                return kadc_ao2mo.transform_integrals_df(self)
-            self.transform_integrals = df_transform
-        elif (mem_incore+mem_now >= self.max_memory and not self.incore_complete):
-            def outcore_transform():
-                return kadc_ao2mo.transform_integrals_outcore(self)
-            self.transform_integrals = outcore_transform
+#        if isinstance(self._scf.with_df, df.GDF):
+#            self.chnk_size = self.get_chnk_size()
+#            self.with_df = self._scf.with_df
+#            def df_transform():
+#                return kadc_ao2mo.transform_integrals_df(self)
+#            self.transform_integrals = df_transform
+#        elif (mem_incore+mem_now >= self.max_memory and not self.incore_complete):
+#            def outcore_transform():
+#                return kadc_ao2mo.transform_integrals_outcore(self)
+#            self.transform_integrals = outcore_transform
+#
+#        eris = self.transform_integrals()
+
+        def transform_incore():
+            return kadc_ao2mo.transform_integrals_incore(self)
+
+        self.transform_integrals = transform_incore
 
         eris = self.transform_integrals()
+
+
 
         self.e_corr, self.t1, self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
             self, eris=eris, verbose=self.verbose)

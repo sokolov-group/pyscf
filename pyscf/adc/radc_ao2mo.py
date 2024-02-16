@@ -34,7 +34,7 @@ def transform_integrals_incore(myadc):
 
     nocc = occ.shape[1]
     nvir = vir.shape[1]
-
+    print("INCORE mo code")
     eris = lambda:None
 
     eris.oooo = ao2mo.general(myadc._scf._eri, (occ, occ, occ, occ), compact=False).reshape(nocc, nocc, nocc, nocc).copy()  # noqa: E501
@@ -49,7 +49,7 @@ def transform_integrals_incore(myadc):
         eris.vvvv = np.ascontiguousarray(eris.vvvv.transpose(0,2,1,3))
         eris.vvvv = eris.vvvv.reshape(nvir*nvir, nvir*nvir)
 
-    log.timer('ADC integral transformation', *cput0)
+    log.timer('INCORE ADC integral transformation', *cput0)
     return eris
 
 
@@ -177,7 +177,7 @@ def transform_integrals_outcore(myadc):
             vvvv = None
         cput3 = log.timer_debug1('transforming vvvv', *cput3)
 
-    log.timer('ADC integral transformation', *cput0)
+    log.timer('OUT of CORE ADC integral transformation', *cput0)
 
     return eris
 
