@@ -87,7 +87,6 @@ def get_imds(adc, eris=None):
 
     if eris is None:
         eris = adc.transform_integrals()
-
     # i-j block
     # Zeroth-order terms
 

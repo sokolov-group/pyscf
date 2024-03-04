@@ -71,6 +71,7 @@ def kernel(cis, nroots=1, eris=None, kptlist=None, **kargs):
     nvir = cis.nmo - nocc
     dtype = eris.dtype
 
+
     if kptlist is None:
         kptlist = range(nkpts)
 
@@ -94,6 +95,7 @@ def kernel(cis, nroots=1, eris=None, kptlist=None, **kargs):
             def precond(r, e0, x0):
                 return r/(e0-diag+1e-12)
 
+
             eig = lib.davidson_nosym1
             conv, eigval, eigvec = eig(matvec, guess, precond, tol=cis.conv_tol,
                                        max_cycle=cis.max_cycle, max_space=cis.max_space,
@@ -111,6 +113,7 @@ def kernel(cis, nroots=1, eris=None, kptlist=None, **kargs):
                 H = cis_H(cis, kshift, eris=eris)
 
             eigval, eigvec = np.linalg.eig(H)
+            print("eigval",eigval)
             idx = eigval.argsort()[:nroots]
             eigval = eigval[idx]
             eigvec = eigvec[:, idx]
@@ -156,7 +159,6 @@ def cis_matvec_singlet(cis, vector, kshift, eris=None):
 
     # Should use Fock diagonal elements to build (e_a - e_i) matrix
     epsilons = [eris.fock[k].diagonal().real for k in range(nkpts)]
-
     Hr = np.zeros_like(r)
     for ki in range(nkpts):
         ka = kconserv_r[ki]
@@ -219,6 +221,7 @@ def cis_H(cis, kshift, eris=None):
     nmo = cis.nmo
     nvir = nmo - nocc
 
+
     nov = nocc * nvir
     r_size = nkpts * nov
 
@@ -240,6 +243,9 @@ def cis_H(cis, kshift, eris=None):
         np.fill_diagonal(H[ki, ki], diag_ia)
 
     # <ia|H|jb> <- 2<ja|bi> - <ja|ib>
+    print("You made ovov",np.linalg.norm(eris.ovov))
+    print("You made voov",np.linalg.norm(eris.voov))
+
     if not cis.direct:
         for ki in range(nkpts):
             ka = kconserv_r[ki]
@@ -247,6 +253,7 @@ def cis_H(cis, kshift, eris=None):
                 kb = kconserv_r[kj]
                 # contribution from 2 <ja|bi> = 2 <aj|ib>
                 tmp =  2. * eris.voov[ka, kj, ki].transpose(2,0,1,3)
+
                 # contribution from -<ja|ib>
                 tmp -= eris.ovov[kj, ka, ki].transpose(2,1,0,3)
                 H[ki, kj] += tmp.reshape(nov, nov)
@@ -267,6 +274,7 @@ def cis_H(cis, kshift, eris=None):
                 H[ki, kj] += tmp.reshape(nov, nov)
 
     H = H.reshape(nkpts, nkpts, nocc, nvir, nocc, nvir).transpose(0,2,3,1,4,5).reshape(r_size, r_size)
+    print("H",H.shape)
     log.timer("build full CIS Hamiltonian", *cpu0)
     return H
 
