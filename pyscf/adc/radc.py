@@ -157,6 +157,7 @@ class RADC(lib.StreamObject):
         self.approx_trans_moments = False
         self.evec_print_tol = 0.1
         self.spec_factor_print_tol = 0.1
+        self.ncvs = None
 
         self.E = None
         self.U = None
@@ -286,12 +287,12 @@ class RADC(lib.StreamObject):
                 e_exc, v_exc, spec_fac, x, adc_es = self.ip_cvs_adc(
                     nroots=nroots, guess=guess, eris=eris)
             else:
-                e_exc, v_exc, spec_fac, x, adc_es = self.ip_adc(
+                e_exc, v_exc, spec_fac, x, OPDM, adc_es = self.ip_adc(
                     nroots=nroots, guess=guess, eris=eris)
         else:
             raise NotImplementedError(self.method_type)
         self._adc_es = adc_es
-        return e_exc, v_exc, spec_fac, x
+        return e_exc, v_exc, spec_fac, x, OPDM
 
     def _finalize(self):
         '''Hook for dumping results and clearing up the object.'''
@@ -308,8 +309,8 @@ class RADC(lib.StreamObject):
     def ip_adc(self, nroots=1, guess=None, eris=None):
         from pyscf.adc import radc_ip
         adc_es = radc_ip.RADCIP(self)
-        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
-        return e_exc, v_exc, spec_fac, x, adc_es
+        e_exc, v_exc, spec_fac, x, OPDM = adc_es.kernel(nroots, guess, eris)
+        return e_exc, v_exc, spec_fac, x, OPDM, adc_es
 
     def ip_cvs_adc(self, nroots=1, guess=None, eris=None):
         from pyscf.adc import radc_ip_cvs
