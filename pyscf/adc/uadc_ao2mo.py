@@ -33,6 +33,13 @@ def transform_integrals_incore(myadc):
     vir_a = myadc.mo_coeff[0][:,myadc._nocc[0]:]
     vir_b = myadc.mo_coeff[1][:,myadc._nocc[1]:]
 
+
+    alpha = myadc.mo_coeff[0]
+    beta = myadc.mo_coeff[1]
+
+
+
+
     nocc_a = occ_a.shape[1]
     nocc_b = occ_b.shape[1]
     nvir_a = vir_a.shape[1]

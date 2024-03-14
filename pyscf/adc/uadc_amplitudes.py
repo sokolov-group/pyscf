@@ -29,7 +29,7 @@ from pyscf.adc import dfadc
 from pyscf.adc.radc_amplitudes import _create_t2_h5cache
 from pyscf import __config__
 from pyscf import df
-
+from pyscf import scf
 
 def compute_amplitudes_energy(myadc, eris, verbose=None):
 
