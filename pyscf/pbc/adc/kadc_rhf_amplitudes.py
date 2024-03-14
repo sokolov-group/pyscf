@@ -49,18 +49,124 @@ import tempfile
 #        Eg.of momentum conservation :
 #        Chemist's  oovv(ijab) : ki - kj + ka - kb
 #        Amplitudes t2(ijab)  : ki + kj - ka - kba
+#def gen_t2_1(myadc, eris):
+#@profile
+def get_verbose(myadc):
+    
+    #cput0 = (time.process_time(), time.time())
+    cput0 = (time.process_time(), time.perf_counter())
+    log = logger.Logger(myadc.stdout, myadc.verbose)
+
+    if myadc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
+        raise NotImplementedError(myadc.method)
+
+    nmo = myadc.nmo
+    nocc = myadc.nocc
+    nvir = nmo - nocc
+    nkpts = myadc.nkpts
+    cell = myadc.cell
+    kpts = myadc.kpts
+    #ncvs = myadc.ncvs
+    #madelung = tools.madelung(cell, kpts)
+
+    mo_energy =  myadc.mo_energy
+    mo_coeff =  myadc.mo_coeff
+    #mo_coeff, mo_energy = _add_padding(myadc, mo_coeff, mo_energy)
+
+    #mo_e_o = [mo_energy[k][:nocc] for k in range(nkpts)]
+    #mo_e_v = [mo_energy[k][nocc:] for k in range(nkpts)]
+   
+    ki = kj = ka = kb = 0
+    # Get location of non-zero/padded elements in occupied and virtual space
+    #nonzero_opadding, nonzero_vpadding = padding_k_idx(myadc, kind="split")
+
+    #eia = _get_epq([0,nocc,ki,mo_e_o,nonzero_opadding],
+    #               [0,nvir,ka,mo_e_v,nonzero_vpadding],
+    #               fac=[1.0,-1.0])
+
+    #ejb = _get_epq([0,nocc,kj,mo_e_o,nonzero_opadding],
+    #               [0,nvir,kb,mo_e_v,nonzero_vpadding],
+    #               fac=[1.0,-1.0])
+
+def gen_t2_1(myadc,kijab,cvs_idx_slice=None,ncvs=None, eris=None):
+    
+    ki,kj,ka,kb = kijab
+    if eris is None:
+        eris = myadc.eris
+
+    #cput0 = (time.process_time(), time.time())
+    cput0 = (time.process_time(), time.perf_counter())
+    log = logger.Logger(myadc.stdout, myadc.verbose)
+
+    if myadc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
+        raise NotImplementedError(myadc.method)
+
+    nmo = myadc.nmo
+    nocc = myadc.nocc
+    nvir = nmo - nocc
+    nkpts = myadc.nkpts
+    cell = myadc.cell
+    kpts = myadc.kpts
+    #ncvs = myadc.ncvs
+    #madelung = tools.madelung(cell, kpts)
+    madelung = myadc.madelung
+
+    mo_energy =  myadc.mo_energy
+    mo_coeff =  myadc.mo_coeff
+    mo_coeff, mo_energy = _add_padding(myadc, mo_coeff, mo_energy)
+
+    mo_e_o = [mo_energy[k][:nocc] for k in range(nkpts)]
+    mo_e_v = [mo_energy[k][nocc:] for k in range(nkpts)]
+
+    # Get location of non-zero/padded elements in occupied and virtual space
+    nonzero_opadding, nonzero_vpadding = padding_k_idx(myadc, kind="split")
+
+    eia = _get_epq([0,nocc,ki,mo_e_o,nonzero_opadding],
+                   [0,nvir,ka,mo_e_v,nonzero_vpadding],
+                   fac=[1.0,-1.0])
+
+    ejb = _get_epq([0,nocc,kj,mo_e_o,nonzero_opadding],
+                   [0,nvir,kb,mo_e_v,nonzero_vpadding],
+                   fac=[1.0,-1.0])
+
+    if cvs_idx_slice == 'i':
+        eijab = eia[:ncvs, None, :, None] + ejb[:, None, :]
+        Lce_ia = eris.Lov[ki,ka,:,:ncvs].copy()
+        t2_1_ij = 1./nkpts * lib.einsum('Lia,Ljb->ijab'
+                    , Lce_ia, eris.Lov[kj,kb], optimize=True).conj() / eijab
+    elif cvs_idx_slice == 'j': 
+        eijab = eia[:, None, :, None] + ejb[:ncvs, None, :]
+        Lce_jb = eris.Lov[kj,kb,:,:ncvs].copy()
+        t2_1_ij = 1./nkpts * lib.einsum('Lia,Ljb->ijab'
+                    , eris.Lov[ki,ka], Lce_jb, optimize=True).conj() / eijab
+    else:
+        eijab = eia[:, None, :, None] + ejb[:, None, :]
+        t2_1_ij = 1./nkpts * lib.einsum('Lia,Ljb->ijab'
+                    , eris.Lov[ki,ka], eris.Lov[kj,kb], optimize=True).conj() / eijab
+
+    #cput0 = log.timer_debug1("Completed t2_1 amplitude calculation", *cput0)
+    #t2_1 = t2_1_ij
+
+    return t2_1_ij
 
 def compute_amplitudes_energy(myadc, eris, verbose=None):
+ 
+    e_corr,t1,t2 = 0,0,0
+    if not myadc.eris_direct:
+        t1,t2,myadc.imds.t2_1_vvvv = compute_amplitudes(myadc,eris)
+        e_corr = compute_energy(myadc,t2, eris)
+        return e_corr, t1, t2
+    else:
+        #t1,t2,myadc.imds.t2_1_vvvv = myadc.compute_amplitudes(eris)
+        #e_corr = myadc.compute_energy(t2, eris)
+        return e_corr
 
-    t1,t2,myadc.imds.t2_1_vvvv = myadc.compute_amplitudes(eris)
-    e_corr = myadc.compute_energy(t2, eris)
 
-    return e_corr, t1, t2
-
-
+#@profile
 def compute_amplitudes(myadc, eris):
 
-    cput0 = (time.process_time(), time.time())
+    #cput0 = (time.process_time(), time.time())
+    cput0 = (time.process_time(), time.perf_counter())
     log = logger.Logger(myadc.stdout, myadc.verbose)
 
     if myadc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -77,7 +183,7 @@ def compute_amplitudes(myadc, eris):
     # Compute first-order doubles t2 (tijab)
     tf = tempfile.TemporaryFile()
     f = h5py.File(tf, 'a')
-    t2_1 = f.create_dataset('t2_1', (nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir), dtype=eris.ovov.dtype)
+    t2_1 = f.create_dataset('t2_1', (nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir), dtype=eris.Lov.dtype)
 
     mo_energy =  myadc.mo_energy
     mo_coeff =  myadc.mo_coeff
@@ -292,20 +398,36 @@ def compute_amplitudes(myadc, eris):
 def compute_energy(myadc, t2, eris):
 
     nkpts = myadc.nkpts
+    kconserv = myadc.khelper.kconserv
 
     emp2 = 0.0
-    eris_ovov = eris.ovov
-    t2_amp = t2[0][:]
+    print(f'inside compute_energy myadc.eris_direct = {myadc.eris_direct}')
+    if not myadc.eris_direct:
+        eris_ovov = eris.ovov
+        t2_amp = t2[0]#[:]
 
-    if (myadc.method == "adc(3)"):
-        t2_amp += t2[1][:]
+        if (myadc.method == "adc(3)"):
+            t2_amp += t2[1]#[:]
 
-    for ki, kj, ka in kpts_helper.loop_kkk(nkpts):
+        for ki, kj, ka in kpts_helper.loop_kkk(nkpts):
 
-        emp2 += 2 * lib.einsum('ijab,iajb', t2_amp[ki,kj,ka], eris_ovov[ki,ka,kj],optimize=True)
-        emp2 -= 1 * lib.einsum('ijab,jaib', t2_amp[ki,kj,ka], eris_ovov[kj,ka,ki],optimize=True)
+            emp2 += 2 * lib.einsum('ijab,iajb', t2_amp[ki,kj,ka], eris_ovov[ki,ka,kj],optimize=True)
+            emp2 -= 1 * lib.einsum('ijab,jaib', t2_amp[ki,kj,ka], eris_ovov[kj,ka,ki],optimize=True)
+    else:
+        for ki, kj, ka in kpts_helper.loop_kkk(nkpts):
 
-    del t2_amp
+            kb = kconserv[ki,kj,ka]
+
+            eris_ovov_iaj = 1./nkpts * lib.einsum('Lia,Ljb->iajb'
+                    , eris.Lov[ki,ka], eris.Lov[kj,kb], optimize=True)
+            eris_ovov_jai = 1./nkpts * lib.einsum('Lja,Lib->jaib'
+                    , eris.Lov[kj,ka], eris.Lov[ki,kb], optimize=True)
+
+            t2_amp_ija = gen_t2_1(myadc, eris, (ki,kj,ka,kb))
+            emp2 += 2 * lib.einsum('ijab,iajb', t2_amp_ija, eris_ovov_iaj,optimize=True)
+            emp2 -= 1 * lib.einsum('ijab,jaib', t2_amp_ija, eris_ovov_jai,optimize=True)
+
+    #del t2_amp
     emp2 = emp2.real / nkpts
     return emp2
 

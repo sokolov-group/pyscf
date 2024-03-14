@@ -194,87 +194,20 @@ def transform_integrals_outcore(myadc):
 
     return eris
 
-
-def transform_integrals_df(myadc):
-    from pyscf.ao2mo import _ao2mo
-    cell = myadc.cell
-    kpts = myadc.kpts
-    nkpts = myadc.nkpts
-    nocc = myadc.nocc
-    nmo = myadc.nmo
-    nvir = nmo - nocc
-    nao = cell.nao_nr()
-
-    if myadc._scf.with_df._cderi is None:
-        myadc._scf.with_df.build()
-    dtype = myadc.mo_coeff[0].dtype
-
-    mo_coeff = myadc.mo_coeff = padded_mo_coeff(myadc, myadc.mo_coeff)
-
-    kconserv = myadc.khelper.kconserv
-
-    # The momentum conservation array
-    kconserv = myadc.khelper.kconserv
-
-    with_df = myadc.with_df
-    naux = with_df.get_naoaux()
-    eris = lambda:None
-
-    eris.dtype = dtype = np.result_type(dtype)
-    eris.Lpq_mo = Lpq_mo = np.empty((nkpts, nkpts), dtype=object)
-    Loo = np.empty((nkpts,nkpts,naux,nocc,nocc),dtype=dtype)
-    Lvo = np.empty((nkpts,nkpts,naux,nvir,nocc),dtype=dtype)
-    eris.Lvv = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
-    eris.Lov = np.empty((nkpts,nkpts,naux,nocc,nvir),dtype=dtype)
-
-    eris.vvvv = None
-    eris.ovvv = None
-
-    with df._load3c(myadc._scf.with_df._cderi, 'j3c') as fload:
-        tao = []
-        ao_loc = None
-        for ki, kpti in enumerate(kpts):
-            for kj, kptj in enumerate(kpts):
-                Lpq_ao = np.asarray(fload(kpti, kptj))
-
-                mo = np.hstack((mo_coeff[ki], mo_coeff[kj]))
-                mo = np.asarray(mo, dtype=dtype, order='F')
-                if dtype == np.double:
-                    out = _ao2mo.nr_e2(Lpq_ao, mo, (0, nmo, nmo, nmo+nmo), aosym='s2')
-                else:
-                    #Note: Lpq.shape[0] != naux if linear dependency is found in auxbasis
-                    if Lpq_ao[0].size != nao**2:  # aosym = 's2'
-                        Lpq_ao = lib.unpack_tril(Lpq_ao).astype(np.complex128)
-                    out = _ao2mo.r_e2(Lpq_ao, mo, (0, nmo, nmo, nmo+nmo), tao, ao_loc)
-                Lpq_mo[ki, kj] = out.reshape(-1, nmo, nmo)
-
-                Loo[ki,kj] = Lpq_mo[ki,kj][:,:nocc,:nocc]
-                eris.Lov[ki,kj] = Lpq_mo[ki,kj][:,:nocc,nocc:]
-                Lvo[ki,kj] = Lpq_mo[ki,kj][:,nocc:,:nocc]
-                eris.Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:]
-
-    eris.feri = feri = lib.H5TmpFile()
-
-    eris.oooo = feri.create_dataset('oooo', (nkpts,nkpts,nkpts,nocc,nocc,nocc,nocc), dtype=dtype)
-    eris.oovv = feri.create_dataset('oovv', (nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir), dtype=dtype)
-    eris.ovoo = feri.create_dataset('ovoo', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nocc), dtype=dtype)
-    eris.ovov = feri.create_dataset('ovov', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nvir), dtype=dtype)
-    eris.ovvo = feri.create_dataset('ovvo', (nkpts,nkpts,nkpts,nocc,nvir,nvir,nocc), dtype=dtype)
-    #eris.ovvv = feri.create_dataset('ovvv', (nkpts,nkpts,nkpts,nocc,nvir,nvir,nvir), dtype=dtype)
-
-    for kp in range(nkpts):
-        for kq in range(nkpts):
-            for kr in range(nkpts):
-                ks = kconserv[kp,kq,kr]
-                eris.oooo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', Loo[kp,kq], Loo[kr,ks])/nkpts
-                eris.oovv[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', Loo[kp,kq], eris.Lvv[kr,ks])/nkpts
-                eris.ovoo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Loo[kr,ks])/nkpts
-                eris.ovov[kp,kq,kr] = lib.einsum(
-                    'Lpq,Lrs->pqrs', eris.Lov[kp,kq], eris.Lov[kr,ks])/nkpts
-                eris.ovvo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Lvo[kr,ks])/nkpts
-                #eris.ovvv[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Lvv[kr,ks])/nkpts
-
-    return eris
+def density_fit(self, auxbasis=None, with_df=None):
+    from pyscf.pbc import df
+    if with_df is None:
+        self.with_df = df.DF(self._scf.mol)
+        self.with_df.max_memory = self.max_memory
+        self.with_df.stdout = self.stdout
+        self.with_df.verbose = self.verbose
+        if auxbasis is None:
+            self.with_df.auxbasis = self._scf.with_df.auxbasis
+        else:
+            self.with_df.auxbasis = auxbasis
+    else:
+        self.with_df = with_df
+    return self
 
 def calculate_chunk_size(myadc):
 
@@ -292,3 +225,163 @@ def calculate_chunk_size(myadc):
         chnk_size = 1
 
     return chnk_size
+#@profile
+def transform_integrals_df(myadc):
+    from pyscf.ao2mo import _ao2mo
+    cell = myadc.cell
+    kpts = myadc.kpts
+    nkpts = myadc.nkpts
+    nocc = myadc.nocc
+    nmo = myadc.nmo
+    nvir = nmo - nocc
+    nao = cell.nao_nr()
+
+    import tracemalloc
+    tracemalloc.start()
+    cput0 = np.array((time.process_time(), time.perf_counter()))
+    #log = logger.Logger(adc.stdout, adc.verbose)
+
+    if myadc._scf.with_df._cderi is None:
+        myadc._scf.with_df.build()
+    dtype = myadc.mo_coeff[0].dtype
+
+    mo_coeff = myadc.mo_coeff = padded_mo_coeff(myadc, myadc.mo_coeff)
+
+    kconserv = myadc.khelper.kconserv
+
+    # The momentum conservation array
+    kconserv = myadc.khelper.kconserv
+
+    with_df = myadc.with_df
+    naux = with_df.get_naoaux()
+    eris = lambda:None
+    print(f'[memalloc current+max ERI-DF-pre-Lpq [GB] = {np.array(tracemalloc.get_traced_memory())/1024**3}')
+
+    dtype64_bool = myadc.precision_single
+    if (dtype64_bool == True) and (np.result_type(dtype) != 'float64'):
+        #dtype = np.complex64
+        dtype = np.csingle
+    print(f'value or ERI dtype = {dtype}')
+    eris.dtype = dtype = np.result_type(dtype)
+    eris.Lpq_mo = Lpq_mo = np.empty((nkpts, nkpts), dtype=object)
+    nkpts_p = nkpts*(nkpts-1)//2 + nkpts
+
+    Loo = eris.Loo = np.empty((nkpts,nkpts,naux,nocc,nocc),dtype=dtype)
+    eris.Lov = np.empty((nkpts,nkpts,naux,nocc,nvir),dtype=dtype)
+    Lvo = eris.Lvo = np.empty((nkpts,nkpts,naux,nvir,nocc),dtype=dtype)
+    #Lvv = eris.Lvv = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
+    if myadc.method != 'adc(2)':
+        if not myadc.eris_direct:
+            eris.Lvv  = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
+        else:
+            eris.Lvv_p = np.empty((nkpts_p,naux,nvir,nvir),dtype=dtype)
+
+    #if myadc.method != 'adc(2)' and myadc.eris_direct is True:
+    #    eris.feri = feri = lib.H5TmpFile()
+    #    eris.Lvv_p = {}
+    #    for idx_p in range(nkpts_p):
+    #        eris.Lvv_p[idx_p] = feri.create_dataset(f'Lvv_p_{idx_p}', (naux,nvir,nvir), dtype=dtype)
+    #        #eris.Lvv_p[idx_p] = np.empty((naux,nvir,nvir), dtype=dtype)
+
+    #if not myadc.eris_direct:
+    #        Lvv = eris.Lvv = np.empty((nkpts,nkpts,naux,nvir,nvir),dtype=dtype)
+    #eris.Lvv_p = feri.create_dataset('Lvv_p', (nkpts_p,naux,nvir,nvir), dtype=dtype
+    #                                      , chunks=(1,naux,nvir,nvir))
+    #eris.Lvv_p = feri.create_dataset('Lvv_p', (nkpts_p,naux,nvir,nvir), dtype=dtype)
+
+    eris.vvvv = None
+    eris.ovvv = None
+
+    idx_p = 0
+    Lvv_idx_p = {}
+    eris.Lvv_idx_p = {}
+    print(f'inside ao2mo = {np.shape(kpts)}')
+    with df._load3c(myadc._scf.with_df._cderi, 'j3c') as fload:
+        tao = []
+        ao_loc = None
+        for ki, kpti in enumerate(kpts):
+            for kj, kptj in enumerate(kpts):
+                Lpq_ao = np.asarray(fload(kpti, kptj))
+
+                mo = np.hstack((mo_coeff[ki], mo_coeff[kj]))
+                mo = np.asarray(mo, dtype=dtype, order='F')
+                if dtype == np.double:
+                    out = _ao2mo.nr_e2(Lpq_ao, mo, (0, nmo, nmo, nmo+nmo), aosym='s2')
+                else:
+                    #Note: Lpq.shape[0] != naux if linear dependency is found in auxbasis
+                    if Lpq_ao[0].size != nao**2:  # aosym = 's2'
+                        Lpq_ao = lib.unpack_tril(Lpq_ao).astype(np.complex128)
+                        #Lpq_ao = lib.unpack_tril(Lpq_ao).astype(np.complex64)
+                    out = _ao2mo.r_e2(Lpq_ao, mo, (0, nmo, nmo, nmo+nmo), tao, ao_loc)
+                Lpq_mo[ki, kj] = out.reshape(-1, nmo, nmo)
+
+                Loo[ki,kj] = eris.Loo[ki,kj] = Lpq_mo[ki,kj][:,:nocc,:nocc].copy()
+                eris.Lov[ki,kj] = Lpq_mo[ki,kj][:,:nocc,nocc:].copy()
+                Lvo[ki,kj] = eris.Lvo[ki,kj] = Lpq_mo[ki,kj][:,nocc:,:nocc].copy()
+                #Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
+                if myadc.method != 'adc(2)':
+                    if not myadc.eris_direct:
+                        eris.Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
+                    elif myadc.eris_direct and ki <= kj:
+                        eris.Lvv_idx_p[(ki,kj)] = idx_p
+                        #eris.Lvv_p[idx_p] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
+                        eris.Lvv_p[idx_p][:] = Lpq_mo[ki,kj][:,nocc:,nocc:].copy()
+                        idx_p += 1
+
+    cput1 = np.array((time.process_time(), time.perf_counter()))
+    print(f'eris.Lov.shape = {eris.Lov.shape}')
+    #compute_int = True
+    if not myadc.eris_direct:
+    #if compute_int:
+        eris.feri = feri = lib.H5TmpFile()
+        '''
+        eris.oooo = feri.create_dataset('oooo', (nkpts,nkpts,nkpts,nocc,nocc,nocc,nocc)
+        ,chunks=(1,1,1,nocc,nocc,nocc,nocc), dtype=dtype)
+        #eris.oovv = feri.create_dataset('oovv', (nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir), dtype=dtype)
+        eris.vooo = feri.create_dataset('vooo', (nkpts,nkpts,nkpts,nvir,nocc,nocc,nocc)
+        ,chunks=(1,1,1,nvir,nocc,nocc,nocc), dtype=dtype)
+        eris.ovov = feri.create_dataset('ovov', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nvir)
+        ,chunks=(1,1,1,nocc,nvir,nocc,nvir), dtype=dtype)
+        eris.ovvo = feri.create_dataset('ovvo', (nkpts,nkpts,nkpts,nocc,nvir,nvir,nocc)
+        ,chunks=(1,1,1,nocc,nvir,nvir,nocc), dtype=dtype)
+        #eris.ovoo = feri.create_dataset('ovoo', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nocc), dtype=dtype)
+        if myadc.method != 'adc(2)' and myadc.eris_direct is False:
+            eris.oovv = feri.create_dataset('oovv', (nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir)
+            ,chunks=(1,1,1,nocc,nocc,nvir,nvir), dtype=dtype)
+        if myadc.method == 'adc(3)' and myadc.eris_direct is False:
+            eris.ovoo = feri.create_dataset('ovoo', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nocc)
+            ,chunks=(1,1,1,nocc,nvir,nocc,nocc), dtype=dtype)
+        '''
+        eris.oooo = feri.create_dataset('oooo', (nkpts,nkpts,nkpts,nocc,nocc,nocc,nocc), dtype=dtype)
+        eris.vooo = feri.create_dataset('vooo', (nkpts,nkpts,nkpts,nvir,nocc,nocc,nocc), dtype=dtype)
+        eris.ovov = feri.create_dataset('ovov', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nvir), dtype=dtype)
+        eris.ovvo = feri.create_dataset('ovvo', (nkpts,nkpts,nkpts,nocc,nvir,nvir,nocc), dtype=dtype)
+        #eris.ovoo = feri.create_dataset('ovoo', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nocc), dtype=dtype)
+        if myadc.method != 'adc(2)' and myadc.eris_direct is False:
+            eris.oovv = feri.create_dataset('oovv', (nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir), dtype=dtype)
+        if myadc.method == 'adc(3)' and myadc.eris_direct is False:
+            eris.ovoo = feri.create_dataset('ovoo', (nkpts,nkpts,nkpts,nocc,nvir,nocc,nocc), dtype=dtype)
+        for kp in range(nkpts):
+            for kq in range(nkpts):
+                for kr in range(nkpts):
+                    ks = kconserv[kp,kq,kr]
+                    eris.oooo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', Loo[kp,kq], Loo[kr,ks])/nkpts
+                    if myadc.method != 'adc(2)' and myadc.eris_direct is False:
+                        eris.oovv[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', Loo[kp,kq], eris.Lvv[kr,ks])/nkpts
+                    eris.ovov[kp,kq,kr] = lib.einsum(
+                        'Lpq,Lrs->pqrs', eris.Lov[kp,kq], eris.Lov[kr,ks])/nkpts
+                    eris.ovvo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Lvo[kr,ks])/nkpts
+                    eris.vooo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lvo[kp,kq], Loo[kr,ks])/nkpts
+                    #eris.ovoo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Loo[kr,ks])/nkpts
+                    #if myadc.method == 'adc(3)':
+                    if myadc.method == 'adc(3)' and myadc.eris_direct is False:
+                        eris.ovoo[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Loo[kr,ks])/nkpts
+                    #eris.ovvv[kp,kq,kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp,kq], Lvv[kr,ks])/nkpts
+
+    cput2 = np.array((time.process_time(), time.perf_counter()))
+    print(f'completed ERI transformation = {cput2 - cput1}')
+    print(f'[memalloc current+max ERI-DF-post-pqrs [GB] = {np.array(tracemalloc.get_traced_memory())/1024**3}')
+    tracemalloc.stop()
+    #exit()
+    return eris
+
