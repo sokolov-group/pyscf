@@ -50,7 +50,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     imds = adc.get_imds(eris)
     matvec, diag = adc.gen_matvec(imds, eris)
 
-    guess = adc.get_init_guess(nroots, diag, ascending=True)
+    guess = adc.get_init_guess(nroots, diag, ascending = True)
 
     conv, adc.E, U = lib.linalg_helper.davidson_nosym1(
         lambda xs : [matvec(x) for x in xs],
@@ -60,7 +60,11 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     adc.U = np.array(U).T.copy()
 
     if adc.compute_properties:
-        adc.P,adc.X = adc.get_properties(nroots)
+        adc.P,adc.X, adc.density = adc.get_properties(nroots)
+    else:
+        adc.density = None
+
+    nfalse = np.shape(conv)[0] - np.sum(conv)
 
     header = ("\n*************************************************************"
               "\n            ADC calculation summary"
@@ -77,7 +81,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     log.timer('ADC', *cput0)
 
-    return adc.E, adc.U, adc.P, adc.X
+    return adc.E, adc.U, adc.P, adc.X, adc.density
 
 
 class RADC(lib.StreamObject):
@@ -117,10 +121,8 @@ class RADC(lib.StreamObject):
         if 'dft' in str(mf.__module__):
             raise NotImplementedError('DFT reference for UADC')
 
-        if mo_coeff is None:
-            mo_coeff = mf.mo_coeff
-        if mo_occ is None:
-            mo_occ = mf.mo_occ
+        if mo_coeff is None: mo_coeff = mf.mo_coeff
+        if mo_occ is None: mo_occ = mf.mo_occ
 
         self.mol = mf.mol
         self._scf = mf
@@ -155,12 +157,16 @@ class RADC(lib.StreamObject):
         self.approx_trans_moments = False
         self.evec_print_tol = 0.1
         self.spec_factor_print_tol = 0.1
-        self.ncvs = None
 
         self.E = None
         self.U = None
         self.P = None
         self.X = None
+
+        self.opdm = False
+        self.ref_opdm = False
+
+
 
         keys = set(('tol_residual','conv_tol', 'e_corr', 'method', 'mo_coeff',
                     'mol', 'mo_energy', 'max_memory', 'incore_complete',
@@ -191,8 +197,8 @@ class RADC(lib.StreamObject):
         return self
 
     def kernel_gs(self):
-        assert (self.mo_coeff is not None)
-        assert (self.mo_occ is not None)
+        assert(self.mo_coeff is not None)
+        assert(self.mo_occ is not None)
 
         self.method = self.method.lower()
         if self.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -226,15 +232,14 @@ class RADC(lib.StreamObject):
 
         eris = self.transform_integrals()
 
-        self.e_corr, self.t1, self.t2 = radc_amplitudes.compute_amplitudes_energy(
-            self, eris=eris, verbose=self.verbose)
+        self.e_corr, self.t1, self.t2 = radc_amplitudes.compute_amplitudes_energy(self, eris=eris, verbose=self.verbose)
         self._finalize()
 
         return self.e_corr, self.t1, self.t2
 
     def kernel(self, nroots=1, guess=None, eris=None):
-        assert (self.mo_coeff is not None)
-        assert (self.mo_occ is not None)
+        assert(self.mo_coeff is not None)
+        assert(self.mo_occ is not None)
 
         self.method = self.method.lower()
         if self.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
