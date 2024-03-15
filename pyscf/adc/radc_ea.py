@@ -946,8 +946,8 @@ def make_rdm1_eigenvectors(adc, L, R):
     nvir = adc._nvir
     nmo = nocc + nvir
     t1_ccee = t2_1.copy()
-    n_singles = nocc
-    n_doubles = nvir * nocc * nocc
+    n_singles = nvir
+    n_doubles = nvir * nvir * nocc
 
     s1 = 0
     f1 = n_singles
@@ -962,13 +962,31 @@ def make_rdm1_eigenvectors(adc, L, R):
     R1 = R[s1:f1]
     R2 = R[s2:f2]
 
-    L2 = L2.reshape(nvir,nocc,nocc)
-    R2 = R2.reshape(nvir,nocc,nocc)
-    einsum = np.einsum 
+    L2 = L2.reshape(nocc,nvir,nvir)
+    R2 = R2.reshape(nocc,nvir,nvir)
+    einsum = lib.einsum 
     einsum_type = True
 
+    #### IJ #####
     ### 000 ###
-    rdm1[:nocc, :nocc] = 2 * einsum('a,a,IJ->IJ', L1, R1, np.identity(nocc), optimize = einsum_type)
+    rdm1[:nocc, :nocc] += 2 * np.einsum('a,a,IJ->IJ', L1, R1, np.identity(nocc), optimize = einsum_type)
+
+    ### 020 ###
+    rdm1[:nocc, :nocc] -= 2 * einsum('a,a,Iibc,Jibc->IJ', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+    rdm1[:nocc, :nocc] += einsum('a,a,Iibc,Jicb->IJ', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+    rdm1[:nocc, :nocc] += 2 * einsum('a,b,Iiac,Jibc->IJ', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+    rdm1[:nocc, :nocc] -= einsum('a,b,Iiac,Jicb->IJ', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+    rdm1[:nocc, :nocc] -= einsum('a,b,Iica,Jibc->IJ', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+    rdm1[:nocc, :nocc] += einsum('a,b,Iica,Jicb->IJ', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+    rdm1[:nocc, :nocc] -= 2 * einsum('a,a,Iibc,Jibc->IJ', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+    rdm1[:nocc, :nocc] += einsum('a,a,Iibc,Jicb->IJ', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+    rdm1[:nocc, :nocc] += einsum('a,b,Iica,Jicb->IJ', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+
+    #### AB ####
+    ### 000 ###
+    rdm1[nocc:, nocc:] += einsum('A,B->AB', L1, R1, optimize = einsum_type)
+
+
     return rdm1
 
 
