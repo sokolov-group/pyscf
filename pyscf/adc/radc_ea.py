@@ -887,11 +887,16 @@ def get_properties(adc, nroots=1):
     #Spectroscopic amplitudes
     U = adc.renormalize_eigenvectors(nroots)
     X = np.dot(T, U).reshape(-1, nroots)
+    opdm = adc.make_rdm1()
+
+    test_opdm = np.array(opdm)[0]
+    print('NORM:', np.linalg.norm(test_opdm))
+    print('TRACE:', np.einsum('pp', test_opdm))
 
     #Spectroscopic factors
     P = 2.0*lib.einsum("pi,pi->i", X, X)
 
-    return P,X
+    return P,X, opdm
 
 
 def analyze(myadc):
@@ -911,6 +916,60 @@ def analyze(myadc):
         logger.info(myadc, header)
 
         myadc.analyze_spec_factor()
+
+def make_rdm1(adc):
+
+    cput0 = (logger.process_clock(), logger.perf_counter())
+    log = logger.Logger(adc.stdout, adc.verbose)
+
+    nroots = adc.U.shape[1]
+    U = adc.renormalize_eigenvectors(nroots)
+
+    list_rdm1 = []
+
+    for i in range(U.shape[1]):
+        rdm1 = make_rdm1_eigenvectors(adc, U[:,i], U[:,i])
+        list_rdm1.append(rdm1)
+
+    cput0 = log.timer_debug1("completed OPDM calculation", *cput0)
+    return list_rdm1
+
+def make_rdm1_eigenvectors(adc, L, R):
+    # Using SQA EA
+    L = np.array(L).ravel()
+    R = np.array(R).ravel()
+
+    t2_1 = adc.t2[0][:]
+    t1_2 = adc.t1[0][:]
+
+    nocc = adc._nocc
+    nvir = adc._nvir
+    nmo = nocc + nvir
+    t1_ccee = t2_1.copy()
+    n_singles = nocc
+    n_doubles = nvir * nocc * nocc
+
+    s1 = 0
+    f1 = n_singles
+    s2 = f1
+    f2 = s2 + n_doubles
+
+    rdm1  = np.zeros((nmo,nmo))
+    kd_oc = np.identity(nocc)
+
+    L1 = L[s1:f1]
+    L2 = L[s2:f2]
+    R1 = R[s1:f1]
+    R2 = R[s2:f2]
+
+    L2 = L2.reshape(nvir,nocc,nocc)
+    R2 = R2.reshape(nvir,nocc,nocc)
+    einsum = np.einsum 
+    einsum_type = True
+
+    ### 000 ###
+    rdm1[:nocc, :nocc] = 2 * einsum('a,a,IJ->IJ', L1, R1, np.identity(nocc), optimize = einsum_type)
+    return rdm1
 
 
 def compute_dyson_mo(myadc):
@@ -1016,6 +1075,7 @@ class RADCEA(radc.RADC):
     analyze_eigenvector = analyze_eigenvector
     analyze = analyze
     compute_dyson_mo = compute_dyson_mo
+    make_rdm1 = make_rdm1
 
     def get_init_guess(self, nroots=1, diag=None, ascending=True):
         if diag is None :
