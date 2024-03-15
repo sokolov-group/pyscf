@@ -68,7 +68,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         adc.P,adc.X = adc.get_properties(nroots)
     if adc.method_type == "ee":
         TY, props = adc.X
-        spin, ref_opdm, opdm, tpdm = props
+        spin, opdm  = props
         if adc.spin_c is True:
             spin, trace = spin
             spin_c = spin
@@ -201,7 +201,8 @@ class UADC(lib.StreamObject):
             self.incore_complete = self.incore_complete or self.mol.incore_anyway
     
             self.mo_coeff = mo_coeff
-            self.mo_occ = 0
+            self.ncvs = 0
+            self.mo_occ = mo_occ
             self.e_corr = None
             self.t1 = None
             self.t2 = None
@@ -216,9 +217,6 @@ class UADC(lib.StreamObject):
             self.chkfile = mf.chkfile
             self.method = "adc(2)"
             self.opdm = False
-            self.ref_opdm = False
-            self.tpdm = False
-            self.old_spin_c = False
             self.spin_c = True
             self.method_type = "ip"
             self.with_df = None
@@ -255,9 +253,8 @@ class UADC(lib.StreamObject):
             self.conv_tol = getattr(__config__, 'adc_uadc_UADC_conv_tol', 1e-12)
             self.tol_residual = getattr(__config__, 'adc_uadc_UADC_tol_res', 1e-6)
     
+            self.ncvs = 0
             self.opdm = False
-            self.tpdm = False
-            self.old_spin_c = False
             self.spin_c = True
             self.scf_energy = mf.e_tot
             self.frozen = frozen

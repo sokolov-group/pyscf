@@ -409,7 +409,7 @@ def renormalize_eigenvectors(adc, nroots=1):
     for I in range(U.shape[1]):
         U1 = U[:n_singles,I]
         U2 = U[n_singles:,I].reshape(nocc,nocc,nvir,nvir)
-        UdotU = np.dot(U1, U1) + 2.*np.dot(U2.ravel(), U2.ravel()) - 4.*np.dot(U2.ravel(), U2.transpose(0,1,3,2).ravel())
+        UdotU = np.dot(U1, U1) + 2.*np.dot(U2.ravel(), U2.ravel()) - np.dot(U2.ravel(), U2.transpose(0,1,3,2).ravel())
         U[:,I] /= np.sqrt(UdotU)
 
     return U
@@ -537,7 +537,8 @@ def get_properties(adc,nroots):
     P = np.square(dx.T)*adc.E*(2/3)
     P = P[0] + P[1] + P[2]
 
-    return P, X
+    density = None
+    return P, X, density
 
 
 def analyze(myadc):

@@ -316,9 +316,6 @@ def compute_amplitudes(myadc, eris):
             t2_2_a[:,:,ab_ind_a[1],ab_ind_a[0]] = -t2_1_vvvv_a[:]
         else:
             t2_2_a = t2_1_vvvv_a
-#        t2_2_a = np.zeros((nocc_a,nocc_a,nvir_a,nvir_a))
-#        t2_2_a[:,:,ab_ind_a[0],ab_ind_a[1]] = t2_1_vvvv_a[:]
-#        t2_2_a[:,:,ab_ind_a[1],ab_ind_a[0]] = -t2_1_vvvv_a[:]
 
         t2_2_a += 0.5*lib.einsum('kilj,klab->ijab', eris_oooo, t2_1_a[:],optimize=True)
         t2_2_a -= 0.5*lib.einsum('kjli,klab->ijab', eris_oooo, t2_1_a[:],optimize=True)
@@ -917,13 +914,13 @@ def compute_energy(myadc, t1, t2, eris):
 
 def contract_ladder(myadc,t_amp,vvvv_p, prefactor = 1.0, pack = False):
 
-    tril_idx = np.tril_indices(nvir_a, k=-1)
 
     nocc_a = t_amp.shape[0]
     nocc_b = t_amp.shape[1]
     nvir_a = t_amp.shape[2]
     nvir_b = t_amp.shape[3]
 
+    tril_idx = np.tril_indices(nvir_a, k=-1)
     t_amp_t = np.ascontiguousarray(t_amp.reshape(nocc_a*nocc_b,-1).T)
     t = np.zeros((nvir_a,nvir_b, nocc_a*nocc_b))
     chnk_size = uadc_ao2mo.calculate_chunk_size(myadc)
