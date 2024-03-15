@@ -967,9 +967,9 @@ def make_rdm1_eigenvectors(adc, L, R):
     einsum = lib.einsum 
     einsum_type = True
 
-    #### IJ #####
+############# block- ij
     ### 000 ###
-    rdm1[:nocc, :nocc] += 2 * np.einsum('a,a,IJ->IJ', L1, R1, np.identity(nocc), optimize = einsum_type)
+    rdm1[:nocc, :nocc] += 2 * np.einsum('a,a,IJ->IJ', L1, R1, kd_oc, optimize = einsum_type)
 
     ### 020 ###
     rdm1[:nocc, :nocc] -= 2 * einsum('a,a,Iibc,Jibc->IJ', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
@@ -982,10 +982,22 @@ def make_rdm1_eigenvectors(adc, L, R):
     rdm1[:nocc, :nocc] += einsum('a,a,Iibc,Jicb->IJ', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
     rdm1[:nocc, :nocc] += einsum('a,b,Iica,Jicb->IJ', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
 
-    #### AB ####
+############# block- ab
     ### 000 ###
     rdm1[nocc:, nocc:] += einsum('A,B->AB', L1, R1, optimize = einsum_type)
 
+    ### 020 ###
+    rdm1[nocc:, nocc:] -= einsum('A,a,ijab,ijBb->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+    rdm1[nocc:, nocc:] += 1/2 * einsum('A,a,ijab,jiBb->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+    rdm1[nocc:, nocc:] -= einsum('a,B,ijab,ijAb->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+    rdm1[nocc:, nocc:] += 1/2 * einsum('a,B,ijab,jiAb->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+    rdm1[nocc:, nocc:] += 2 * einsum('a,a,ijAb,ijBb->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+    rdm1[nocc:, nocc:] -= einsum('a,a,ijAb,jiBb->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+    rdm1[nocc:, nocc:] -= einsum('a,b,ijBa,ijAb->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+    rdm1[nocc:, nocc:] += einsum('a,b,ijBa,jiAb->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+    rdm1[nocc:, nocc:] += 2 * einsum('a,a,ijAb,ijBb->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+    rdm1[nocc:, nocc:] -= einsum('a,a,ijAb,jiBb->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+    rdm1[nocc:, nocc:] -= einsum('a,b,ijBa,ijAb->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
 
     return rdm1
 
