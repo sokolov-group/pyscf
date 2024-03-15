@@ -280,9 +280,9 @@ class RADC(lib.StreamObject):
 
         self.method_type = self.method_type.lower()
         if (self.method_type == "ea"):
-            e_exc, v_exc, spec_fac, x, adc_es = self.ea_adc(nroots=nroots, guess=guess, eris=eris)
+            e_exc, v_exc, spec_fac, x, OPDM, adc_es = self.ea_adc(nroots=nroots, guess=guess, eris=eris)
 
-        if (self.method_type == "ee"):
+        elif (self.method_type == "ee"):
             e_exc, v_exc, spec_fac, x, adc_es = self.ee_adc(nroots=nroots, guess=guess, eris=eris)
 
         elif(self.method_type == "ip"):
