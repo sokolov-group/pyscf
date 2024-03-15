@@ -280,9 +280,9 @@ class RADC(lib.StreamObject):
 
         self.method_type = self.method_type.lower()
         if (self.method_type == "ea"):
-            e_exc, v_exc, spec_fac, x, adc_es = self.ea_adc(nroots=nroots, guess=guess, eris=eris)
+            e_exc, v_exc, spec_fac, x, OPDM, adc_es = self.ea_adc(nroots=nroots, guess=guess, eris=eris)
 
-        if (self.method_type == "ee"):
+        elif (self.method_type == "ee"):
             e_exc, v_exc, spec_fac, x, adc_es = self.ee_adc(nroots=nroots, guess=guess, eris=eris)
 
         elif(self.method_type == "ip"):
@@ -306,8 +306,8 @@ class RADC(lib.StreamObject):
     def ea_adc(self, nroots=1, guess=None, eris=None):
         from pyscf.adc import radc_ea
         adc_es = radc_ea.RADCEA(self)
-        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
-        return e_exc, v_exc, spec_fac, x, adc_es
+        e_exc, v_exc, spec_fac, x, OPDM = adc_es.kernel(nroots, guess, eris)
+        return e_exc, v_exc, spec_fac, x, OPDM, adc_es
    
     def ee_adc(self, nroots=1, guess=None, eris=None):
          from pyscf.adc import radc_ee
