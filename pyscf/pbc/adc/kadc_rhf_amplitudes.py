@@ -45,48 +45,10 @@ import h5py
 import tempfile
 
 
-# Note : All interals are in Chemist's notation except for vvvv
+# Note : All integrals are in Chemist's notation except for vvvv
 #        Eg.of momentum conservation :
 #        Chemist's  oovv(ijab) : ki - kj + ka - kb
 #        Amplitudes t2(ijab)  : ki + kj - ka - kba
-#def gen_t2_1(myadc, eris):
-#@profile
-def get_verbose(myadc):
-    
-    #cput0 = (time.process_time(), time.time())
-    cput0 = (time.process_time(), time.perf_counter())
-    log = logger.Logger(myadc.stdout, myadc.verbose)
-
-    if myadc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
-        raise NotImplementedError(myadc.method)
-
-    nmo = myadc.nmo
-    nocc = myadc.nocc
-    nvir = nmo - nocc
-    nkpts = myadc.nkpts
-    cell = myadc.cell
-    kpts = myadc.kpts
-    #ncvs = myadc.ncvs
-    #madelung = tools.madelung(cell, kpts)
-
-    mo_energy =  myadc.mo_energy
-    mo_coeff =  myadc.mo_coeff
-    #mo_coeff, mo_energy = _add_padding(myadc, mo_coeff, mo_energy)
-
-    #mo_e_o = [mo_energy[k][:nocc] for k in range(nkpts)]
-    #mo_e_v = [mo_energy[k][nocc:] for k in range(nkpts)]
-   
-    ki = kj = ka = kb = 0
-    # Get location of non-zero/padded elements in occupied and virtual space
-    #nonzero_opadding, nonzero_vpadding = padding_k_idx(myadc, kind="split")
-
-    #eia = _get_epq([0,nocc,ki,mo_e_o,nonzero_opadding],
-    #               [0,nvir,ka,mo_e_v,nonzero_vpadding],
-    #               fac=[1.0,-1.0])
-
-    #ejb = _get_epq([0,nocc,kj,mo_e_o,nonzero_opadding],
-    #               [0,nvir,kb,mo_e_v,nonzero_vpadding],
-    #               fac=[1.0,-1.0])
 
 def gen_t2_1(myadc,kijab,cvs_idx_slice=None,ncvs=None, eris=None):
     
@@ -107,8 +69,6 @@ def gen_t2_1(myadc,kijab,cvs_idx_slice=None,ncvs=None, eris=None):
     nkpts = myadc.nkpts
     cell = myadc.cell
     kpts = myadc.kpts
-    #ncvs = myadc.ncvs
-    #madelung = tools.madelung(cell, kpts)
     madelung = myadc.madelung
 
     mo_energy =  myadc.mo_energy
@@ -144,9 +104,6 @@ def gen_t2_1(myadc,kijab,cvs_idx_slice=None,ncvs=None, eris=None):
         t2_1_ij = 1./nkpts * lib.einsum('Lia,Ljb->ijab'
                     , eris.Lov[ki,ka], eris.Lov[kj,kb], optimize=True).conj() / eijab
 
-    #cput0 = log.timer_debug1("Completed t2_1 amplitude calculation", *cput0)
-    #t2_1 = t2_1_ij
-
     return t2_1_ij
 
 def compute_amplitudes_energy(myadc, eris, verbose=None):
@@ -161,11 +118,8 @@ def compute_amplitudes_energy(myadc, eris, verbose=None):
         #e_corr = myadc.compute_energy(t2, eris)
         return e_corr
 
-
-#@profile
 def compute_amplitudes(myadc, eris):
 
-    #cput0 = (time.process_time(), time.time())
     cput0 = (time.process_time(), time.perf_counter())
     log = logger.Logger(myadc.stdout, myadc.verbose)
 
@@ -401,7 +355,6 @@ def compute_energy(myadc, t2, eris):
     kconserv = myadc.khelper.kconserv
 
     emp2 = 0.0
-    print(f'inside compute_energy myadc.eris_direct = {myadc.eris_direct}')
     if not myadc.eris_direct:
         eris_ovov = eris.ovov
         t2_amp = t2[0]#[:]

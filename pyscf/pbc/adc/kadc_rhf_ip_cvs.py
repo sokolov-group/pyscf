@@ -62,7 +62,7 @@ def vector_size(adc):
     size = n_singles + n_doubles_ecc + 2*n_doubles_ecv
 
     return size
-def get_imds(adc, eris=None):
+def get_imds_off(adc, eris=None):
 
     cput0 = (time.process_time(), time.time())
     log = logger.Logger(adc.stdout, adc.verbose)
@@ -375,7 +375,7 @@ def get_imds(adc, eris=None):
     cput0 = log.timer_debug1("Completed M_ij third-order terms ADC(3) calculation", *cput0)
     return M_ij
 
-def get_imds_off(adc, eris=None):
+def get_imds(adc, eris=None):
 
     tracemalloc.start()
     #cput0 = (time.process_time(), time.time())
