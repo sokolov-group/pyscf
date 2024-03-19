@@ -61,100 +61,7 @@ def vector_size(adc):
     return size
 
 
-tracemalloc.start()
-print(f'[memalloc current+max ERI-DF-post-pqrs [GB] = {np.array(tracemalloc.get_traced_memory())/1024**3}')
-tracemalloc.stop()
-def analyze_eigenvector(adc):
-
-    nocc = adc.nocc
-    nvir = adc.nmo - nocc
-    nkpts = adc.nkpts
-
-    n_singles = nocc
-    evec_print_tol = adc.evec_print_tol
-    U = adc.U
-
-    logger.info(adc, "Number of occupied orbitals = %d", nocc)
-    logger.info(adc, "Number of virtual orbitals =  %d", nvir)
-    logger.info(adc, "Number of k-points =  %d", nkpts)
-    logger.info(adc, "Print eigenvector elements > %f\n", evec_print_tol)
-
-    #for I in range(U.shape[1]):
-    #    U1 = U[:n_singles,I]
-    #    U2 = U[n_singles:,I].reshape(nvir,nocc,nocc)
-    #    U1dotU1 = np.dot(U1, U1)
-    #    U2dotU2 =  2.*np.dot(U2.ravel(), U2.ravel()) - \
-    #                         np.dot(U2.ravel(), U2.transpose(0,2,1).ravel())
-    for I in range(U.shape[1]):
-        U1 = U[:n_singles,I]
-        U2 = U[n_singles:,I].reshape(nkpts,nkpts,nvir,nocc,nocc)
-        UdotU = np.dot(U1.conj().ravel(),U1.ravel())
-        for kj in range(nkpts):
-            for kk in range(nkpts):
-                ka = adc.khelper.kconserv[kj, kshift, kk]
-                UdotU +=  2.*np.dot(U2[ka,kj].conj().ravel(), U2[ka,kj].ravel()) - \
-                                    np.dot(U2[ka,kj].conj().ravel(),
-                                           U2[ka,kk].transpose(0,2,1).ravel())
-
-        U[:,I] /= np.sqrt(UdotU)
-
-        U_sq = U[:,I].copy()**2
-        ind_idx = np.argsort(-U_sq)
-        U_sq = U_sq[ind_idx]
-        U_sorted = U[ind_idx,I].copy()
-
-        U_sorted = U_sorted[U_sq > evec_print_tol**2]
-        ind_idx = ind_idx[U_sq > evec_print_tol**2]
-
-        singles_idx = []
-        doubles_idx = []
-        singles_val = []
-        doubles_val = []
-        iter_num = 0
-
-        for orb_idx in ind_idx:
-
-            if orb_idx < n_singles:
-                i_idx = orb_idx + 1
-                singles_idx.append(i_idx)
-                singles_val.append(U_sorted[iter_num])
-
-            if orb_idx >= n_singles:
-                ka_ki_aij_idx = orb_idx - n_singles
-                ki_aij_rem = ki_aij_idx % (nkpts*nvir*nocc*nocc)
-                ka_idx = ka_ki_aij_idx//(nkpts*nvir*nocc*nocc)
-
-                ij_rem = aij_idx % (nocc*nocc)
-                a_idx = aij_idx//(nocc*nocc)
-                i_idx = ij_rem//nocc
-                j_idx = ij_rem % nocc
-                doubles_idx.append((a_idx + 1 + n_singles, i_idx + 1, j_idx + 1))
-                doubles_val.append(U_sorted[iter_num])
-
-            iter_num += 1
-
-        logger.info(adc, '%s | root %d | norm(1h)  = %6.4f | norm(2h1p) = %6.4f ',
-                    adc.method ,I, U1dotU1, U2dotU2)
-
-        if singles_val:
-            logger.info(adc, "\n1h block: ")
-            logger.info(adc, "     i     U(i)")
-            logger.info(adc, "------------------")
-            for idx, print_singles in enumerate(singles_idx):
-                logger.info(adc, '  %4d   %7.4f', print_singles, singles_val[idx])
-
-        if doubles_val:
-            logger.info(adc, "\n2h1p block: ")
-            logger.info(adc, "     i     j     a     U(i,j,a)")
-            logger.info(adc, "-------------------------------")
-            for idx, print_doubles in enumerate(doubles_idx):
-                logger.info(adc, '  %4d  %4d  %4d     %7.4f',
-                            print_doubles[1], print_doubles[2], print_doubles[0], doubles_val[idx])
-
-        logger.info(adc, "\n*************************************************************\n")
-
-#@profile
-def get_imds_direct_off(adc, eris=None):
+def get_imds(adc, eris=None):
 
     #print(f'before calling t2_1')
     #get_verbose(adc)
@@ -269,7 +176,7 @@ def get_imds_direct_off(adc, eris=None):
     tracemalloc.stop()
     return M_ij
 
-def get_imds(adc, eris=None):
+def get_imds_off2(adc, eris=None):
 
     #cput0 = (time.process_time(), time.time())
     cput0 = (time.process_time(), time.perf_counter())
@@ -1732,7 +1639,7 @@ def matvec(adc, kshift, M_ij=None, eris=None):
         return s
     return sigma_
 
-def matvec_off(adc, kshift, M_ij=None, eris=None):
+def matvec_off2(adc, kshift, M_ij=None, eris=None):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
@@ -2448,6 +2355,7 @@ def get_trans_moments_orbital_off(adc, orb, kshift):
 
 def renormalize_eigenvectors(adc, kshift, U, nroots=1):
 
+    print('inside renormalize eigenvectors function')
     nkpts = adc.nkpts
     if not adc.eris_direct:
         nocc = adc.t2[0].shape[3]
@@ -2456,7 +2364,6 @@ def renormalize_eigenvectors(adc, kshift, U, nroots=1):
     n_singles = nocc
     nvir = adc.nmo - adc.nocc
 
-    print(f'printing shape of U inside renormalize function = {U.shape}')
     for I in range(U.shape[1]):
         U1 = U[:n_singles,I]
         U2 = U[n_singles:,I].reshape(nkpts,nkpts,nvir,nocc,nocc)
@@ -2489,6 +2396,139 @@ def get_properties(adc, kshift, U, nroots=1):
 
     return P,X
 
+def analyze_eigenvector(adc, kshift, U):
+
+    U = np.array(U).T
+ 
+    if not adc.eris_direct:
+        nocc = adc.t2[0].shape[3]
+    else:
+        nocc = adc.eris.Lov.shape[3]
+    nvir = adc.nmo - adc.nocc
+    nkpts = adc.nkpts
+    n_singles = nocc
+    
+    evec_print_tol = 0.05
+    #evec_print_tol = adc.evec_print_tol
+
+    logger.info(adc, "Number of k-points = %d", nkpts)
+    logger.info(adc, "Number of occupied orbitals = %d", nocc)
+    logger.info(adc, "Number of virtual orbitals =  %d", nvir)
+    logger.info(adc, "Print eigenvector elements > %f\n", evec_print_tol)
+
+    import itertools
+
+    for I in range(U.shape[1]):
+
+        U_kfree = np.zeros(n_singles + (nvir * nocc * nocc), dtype=U.dtype)
+
+        U1 = U[:n_singles,I]
+        U2 = U[n_singles:,I].reshape(nkpts,nkpts,nvir,nocc,nocc)
+        U1dotU1 = np.dot(U1.conj().ravel(),U1.ravel())
+        U2dotU2 = 0
+        U_kfree[:n_singles] = np.multiply(U1.conj().ravel(),U1.ravel())
+        for kj, kk in itertools.product(range(nkpts),repeat=2):
+            ka = adc.khelper.kconserv[kj, kshift, kk]
+            U2dotU2 +=  2.*np.dot(U2[ka,kj].conj().ravel(), U2[ka,kj].ravel()) - \
+                                np.dot(U2[ka,kj].conj().ravel(),
+                                       U2[ka,kk].transpose(0,2,1).ravel())
+            U_kfree[n_singles:] +=  2.*np.multiply(U2[ka,kj].conj().ravel(), U2[ka,kj].ravel()) - \
+                                np.multiply(U2[ka,kj].conj().ravel(),
+                                       U2[ka,kk].transpose(0,2,1).ravel())
+        UdotU = U1dotU1 + U2dotU2
+        U[:,I] /= np.sqrt(UdotU)
+        U_kfree /= (UdotU * nkpts * nkpts)
+
+        singles_idx = []
+        doubles_idx = []
+        doubles_idx_kfree = []
+        singles_val = []
+        doubles_val = []
+        doubles_val_kfree = []
+
+        U_sq_kfree = U_kfree.copy()**2
+        ind_idx_kfree = np.argsort(-U_sq_kfree)
+        U_sq_kfree = U_sq_kfree[ind_idx_kfree]
+        U_sorted_kfree = U_kfree[ind_idx_kfree].copy()
+
+        U_sorted_kfree = U_sorted_kfree[U_sq_kfree > evec_print_tol**4]
+        ind_idx_kfree = ind_idx_kfree[U_sq_kfree > evec_print_tol**4]
+
+        iter_num = 0
+        print(f'ind_idx_kfree = {ind_idx_kfree}')
+        for orb_idx in ind_idx_kfree:
+
+            if orb_idx >= n_singles:
+                aij_idx = orb_idx - n_singles
+                ij_rem = aij_idx % (nocc*nocc)
+                a_idx = aij_idx//(nocc*nocc)
+                i_idx = ij_rem//nocc
+                j_idx = ij_rem % nocc
+                doubles_idx_kfree.append((a_idx + 1 + n_singles, i_idx + 1, j_idx + 1))
+                doubles_val_kfree.append(U_sorted_kfree[iter_num])
+            iter_num += 1
+
+        for kj, kk in itertools.product(range(nkpts),repeat=2):
+            ka = adc.khelper.kconserv[kj, kshift, kk]
+            U_jk = np.zeros(n_singles + nvir*nocc*nocc)
+            U_jk[:n_singles] = U[:n_singles,I]
+            U2_jk = U[n_singles:,I].reshape(nkpts,nkpts,nvir,nocc,nocc)
+            U_jk[n_singles:] = U2_jk[ka,kj].ravel() 
+            #U_sq = U[:,I].copy()**2
+            U_sq = np.multiply(U_jk.conj().ravel(),U_jk.ravel())
+            ind_idx = np.argsort(-U_sq)
+            U_sq = U_sq[ind_idx]
+            U_sorted = U_jk[ind_idx].copy()
+
+            U_sorted = U_sorted[U_sq > evec_print_tol**2]
+            ind_idx = ind_idx[U_sq > evec_print_tol**2]
+
+            iter_num = 0
+            for orb_idx in ind_idx:
+
+                if (orb_idx < n_singles) and kj == kk == 0:
+                    i_idx = orb_idx + 1
+                    singles_idx.append(i_idx)
+                    singles_val.append(U_sorted[iter_num])
+
+                if orb_idx >= n_singles:
+                    aij_idx = orb_idx - n_singles
+                    ij_rem = aij_idx % (nocc*nocc)
+                    a_idx = aij_idx//(nocc*nocc)
+                    i_idx = ij_rem//nocc
+                    j_idx = ij_rem % nocc
+                    doubles_idx.append((ka, kj, kk, a_idx + 1 + n_singles, i_idx + 1, j_idx + 1))
+                    doubles_val.append(U_sorted[iter_num])
+                iter_num += 1
+
+        logger.info(adc, '%s | root %d | norm(1h)  = %6.4f | norm(2h1p) = %6.4f ',
+                    adc.method ,I, U1dotU1, U2dotU2)
+
+        if singles_val:
+            logger.info(adc, "\n1h block: ")
+            logger.info(adc, "     i     U(i)")
+            logger.info(adc, "------------------")
+            for idx, print_singles in enumerate(singles_idx):
+                logger.info(adc, '  %4d   %7.4f', print_singles, singles_val[idx])
+
+        if doubles_val:
+            logger.info(adc, "\n2h1p block: ")
+            logger.info(adc, "     ki    kj    ka    i     j     a     U(i,j,a)")
+            logger.info(adc, "-------------------------------")
+            for idx, print_doubles in enumerate(doubles_idx):
+                logger.info(adc, '  %4d  %4d  %4d  %4d  %4d  %4d     %7.4f',
+                            print_doubles[1], print_doubles[2], print_doubles[0], 
+                            print_doubles[4], print_doubles[5], print_doubles[3], doubles_val[idx])
+
+        if doubles_val_kfree:
+            logger.info(adc, "\n2h1p block [k-free]: ")
+            logger.info(adc, "     i     j     a     U(i,j,a)")
+            logger.info(adc, "-------------------------------")
+            for idx, print_doubles in enumerate(doubles_idx_kfree):
+                logger.info(adc, '  %4d  %4d  %4d     %7.4f',
+                            print_doubles[1], print_doubles[2], print_doubles[0], doubles_val_kfree[idx])
+
+        logger.info(adc, "\n*************************************************************\n")
 
 class RADCIP(kadc_rhf.RADC):
     '''restricted ADC for IP energies and spectroscopic amplitudes
@@ -2590,6 +2630,7 @@ class RADCIP(kadc_rhf.RADC):
     get_trans_moments = get_trans_moments
     renormalize_eigenvectors = renormalize_eigenvectors
     get_properties = get_properties
+    analyze_eigenvector = analyze_eigenvector
 
     def get_init_guess(self, nroots=1, diag=None, ascending=True):
         if diag is None :

@@ -419,7 +419,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None, imd
 
         E_P_size = (E, P, M_size)
         return E_P_size 
- 
+
+    
     #def kernel_micro(k):
 
     #    matvec, diag = adc.gen_matvec(k, imds, eris)
@@ -522,6 +523,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None, imd
                 nroots=nroots, verbose=log, tol=adc.conv_tol,
                 max_cycle=adc.max_cycle, max_space=adc.max_space,
                 tol_residual=adc.tol_residual)#, follow_state=True)
+
+        adc.analyze_eigenvector(k, evecs_k)
 
         print(f'dtype = {dtype}')
         print(f'diag.dtype = {diag.dtype}')
