@@ -209,26 +209,26 @@ class RADC(lib.StreamObject):
         mem_incore = (max(nao_pair**2, nmo**4) + nmo_pair**2) * 8/1e6
         mem_now = lib.current_memory()[0]
 
-       # if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
-       #     if getattr(self, 'with_df', None):
-       #         self.with_df = self.with_df
-       #     else:
-       #         self.with_df = self._scf.with_df
+        if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
+            if getattr(self, 'with_df', None):
+                self.with_df = self.with_df
+            else:
+                self.with_df = self._scf.with_df
 
-       #     def df_transform():
-       #         return radc_ao2mo.transform_integrals_df(self)
-       #     self.transform_integrals = df_transform
-       # elif (self._scf._eri is None or
-       #       (mem_incore+mem_now >= self.max_memory and not self.incore_complete)):
-       #     def outcore_transform():
-       #         return radc_ao2mo.transform_integrals_outcore(self)
-       #     self.transform_integrals = outcore_transform
+            def df_transform():
+                return radc_ao2mo.transform_integrals_df(self)
+            self.transform_integrals = df_transform
+        elif (self._scf._eri is None or
+              (mem_incore+mem_now >= self.max_memory and not self.incore_complete)):
+            def outcore_transform():
+                return radc_ao2mo.transform_integrals_outcore(self)
+            self.transform_integrals = outcore_transform
 
        # eris = self.transform_integrals()
-        def transform_incore():
-            return radc_ao2mo.transform_integrals_incore(self)
+       # def transform_incore():
+       #     return radc_ao2mo.transform_integrals_incore(self)
 
-        self.transform_integrals = transform_incore
+        #self.transform_integrals = transform_incore
 
         eris = self.transform_integrals()
 
@@ -257,27 +257,27 @@ class RADC(lib.StreamObject):
         mem_incore = (max(nao_pair**2, nmo**4) + nmo_pair**2) * 8/1e6
         mem_now = lib.current_memory()[0]
 
-     #   if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
-     #       if getattr(self, 'with_df', None):
-     #           self.with_df = self.with_df
-     #       else:
-     #           self.with_df = self._scf.with_df
+        if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
+            if getattr(self, 'with_df', None):
+                self.with_df = self.with_df
+            else:
+                self.with_df = self._scf.with_df
 
-     #       def df_transform():
-     #           return radc_ao2mo.transform_integrals_df(self)
-     #       self.transform_integrals = df_transform
-     #   elif (self._scf._eri is None or
-     #         (mem_incore+mem_now >= self.max_memory and not self.incore_complete)):
-     #       def outcore_transform():
-     #           return radc_ao2mo.transform_integrals_outcore(self)
-     #       self.transform_integrals = outcore_transform
+            def df_transform():
+                return radc_ao2mo.transform_integrals_df(self)
+            self.transform_integrals = df_transform
+        elif (self._scf._eri is None or
+              (mem_incore+mem_now >= self.max_memory and not self.incore_complete)):
+            def outcore_transform():
+                return radc_ao2mo.transform_integrals_outcore(self)
+            self.transform_integrals = outcore_transform
 
      #   eris = self.transform_integrals()
 
-        def transform_incore():
-            return radc_ao2mo.transform_integrals_incore(self)
+       # def transform_incore():
+       #     return radc_ao2mo.transform_integrals_incore(self)
 
-        self.transform_integrals = transform_incore
+       # self.transform_integrals = transform_incore
 
         eris = self.transform_integrals()
 
