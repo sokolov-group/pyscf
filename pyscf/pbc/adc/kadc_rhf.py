@@ -232,27 +232,18 @@ class RADC(pyscf.adc.radc.RADC):
         mem_incore *= 16 /1e6
         mem_now = lib.current_memory()[0]
 
-      #  if isinstance(self._scf.with_df, df.GDF):
-      #      self.chnk_size = self.get_chnk_size()
-      #      self.with_df = self._scf.with_df
-      #      def df_transform():
-      #          return kadc_ao2mo.transform_integrals_df(self)
-      #      self.transform_integrals = df_transform
-      #  elif (mem_incore+mem_now >= self.max_memory and not self.incore_complete):
-      #      def outcore_transform():
-      #          return kadc_ao2mo.transform_integrals_outcore(self)
-      #      self.transform_integrals = outcore_transform
-
-      #  eris = self.transform_integrals()
-
-        def transform_incore():
-            return kadc_ao2mo.transform_integrals_incore(self)
-
-        self.transform_integrals = transform_incore
+        if isinstance(self._scf.with_df, df.GDF):
+            self.chnk_size = self.get_chnk_size()
+            self.with_df = self._scf.with_df
+            def df_transform():
+                return kadc_ao2mo.transform_integrals_df(self)
+            self.transform_integrals = df_transform
+        elif (mem_incore+mem_now >= self.max_memory and not self.incore_complete):
+            def outcore_transform():
+                return kadc_ao2mo.transform_integrals_outcore(self)
+            self.transform_integrals = outcore_transform
 
         eris = self.transform_integrals()
-
-
 
 
         self.e_corr,self.t1,self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
@@ -282,23 +273,17 @@ class RADC(pyscf.adc.radc.RADC):
         mem_incore *= 16 /1e6
         mem_now = lib.current_memory()[0]
 
-#        if isinstance(self._scf.with_df, df.GDF):
-#            self.chnk_size = self.get_chnk_size()
-#            self.with_df = self._scf.with_df
-#            def df_transform():
-#                return kadc_ao2mo.transform_integrals_df(self)
-#            self.transform_integrals = df_transform
-#        elif (mem_incore+mem_now >= self.max_memory and not self.incore_complete):
-#            def outcore_transform():
-#                return kadc_ao2mo.transform_integrals_outcore(self)
-#            self.transform_integrals = outcore_transform
-#
-#        eris = self.transform_integrals()
+        if isinstance(self._scf.with_df, df.GDF):
+            self.chnk_size = self.get_chnk_size()
+            self.with_df = self._scf.with_df
+            def df_transform():
+                return kadc_ao2mo.transform_integrals_df(self)
+            self.transform_integrals = df_transform
+        elif (mem_incore+mem_now >= self.max_memory and not self.incore_complete):
+            def outcore_transform():
+                return kadc_ao2mo.transform_integrals_outcore(self)
+            self.transform_integrals = outcore_transform
 
-        def transform_incore():
-            return kadc_ao2mo.transform_integrals_incore(self)
-
-        self.transform_integrals = transform_incore
 
         eris = self.transform_integrals()
 
