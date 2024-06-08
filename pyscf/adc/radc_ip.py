@@ -968,11 +968,10 @@ def make_rdm1_eigenvectors(adc, L, R):
         t2_ce = adc.t1[0][:]
         t1_ccee = t2_1.copy()
         einsum = lib.einsum
-
         ###################################################
+        
 ############# block- ij
         ### 030 ###
-        # a-a #
         rdm1[:nocc, :nocc] += einsum('J,i,Ijab,ijab->IJ', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
         rdm1[:nocc, :nocc] -= 1/2 * einsum('J,i,Ijab,ijba->IJ', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
         rdm1[:nocc, :nocc] += einsum('J,i,ijab,Ijab->IJ', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
@@ -990,7 +989,6 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1[:nocc, :nocc] += einsum('i,j,Jjab,Iiab->IJ', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
         rdm1[:nocc, :nocc] -= einsum('i,j,Jjab,Iiba->IJ', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
 
-        # b-b #
         rdm1[:nocc, :nocc] -= 2 * einsum('i,i,Ijab,Jjab->IJ', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
         rdm1[:nocc, :nocc] += einsum('i,i,Ijab,Jjba->IJ', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
         rdm1[:nocc, :nocc] -= 2 * einsum('i,i,Jjab,Ijab->IJ', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
@@ -999,12 +997,10 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1[:nocc, :nocc] += einsum('i,j,Jjab,Iiab->IJ', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
 
         ### 021 ###
-        # a-aaa, b-aab #
         rdm1[:nocc, :nocc] -= 2 * einsum('i,aIi,Ja->IJ', L1, R2, t2_ce, optimize = einsum_type)
         rdm1[:nocc, :nocc] += einsum('i,aiI,Ja->IJ', L1, R2, t2_ce, optimize = einsum_type)
 
         ### 120 ###
-        # aaa-a, aab-b #
         rdm1[:nocc, :nocc] -= 2 * einsum('aJi,i,Ia->IJ', L2, R1, t2_ce, optimize = einsum_type)
         rdm1[:nocc, :nocc] += einsum('aiJ,i,Ia->IJ', L2, R1, t2_ce, optimize = einsum_type)
         
@@ -1012,7 +1008,6 @@ def make_rdm1_eigenvectors(adc, L, R):
 
 ############# block- ab
         ### 030 ###
-        # a-a #
         rdm1[nocc:, nocc:] += 2 * einsum('i,i,jkAa,jkBa->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
         rdm1[nocc:, nocc:] -= einsum('i,i,jkAa,kjBa->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
         rdm1[nocc:, nocc:] += 2 * einsum('i,i,jkBa,jkAa->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
@@ -1025,7 +1020,7 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1[nocc:, nocc:] -= einsum('i,j,kiBa,kjAa->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
         rdm1[nocc:, nocc:] += einsum('i,j,kjAa,ikBa->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
         rdm1[nocc:, nocc:] -= einsum('i,j,kjAa,kiBa->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
-        # b-b #
+
         rdm1[nocc:, nocc:] += 2 * einsum('i,i,jkAa,jkBa->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
         rdm1[nocc:, nocc:] -= einsum('i,i,jkAa,kjBa->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
         rdm1[nocc:, nocc:] += 2 * einsum('i,i,jkBa,jkAa->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
@@ -1034,19 +1029,16 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1[nocc:, nocc:] -= einsum('i,j,kjAa,kiBa->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
 
         ### 021 ###
-        # a-aaa, b-aab #
         rdm1[nocc:, nocc:] -= einsum('i,Bij,jA->AB', L1, R2, t2_ce, optimize = einsum_type)
         rdm1[nocc:, nocc:] += 2 * einsum('i,Bji,jA->AB', L1, R2, t2_ce, optimize = einsum_type)
 
         ### 120 ###
-        # aaa-a, aab-b #
         rdm1[nocc:, nocc:] -= einsum('Aij,i,jB->AB', L2, R1, t2_ce, optimize = einsum_type)
         rdm1[nocc:, nocc:] += 2 * einsum('Aij,j,iB->AB', L2, R1, t2_ce, optimize = einsum_type)
 
         #----------------------------------------------------------------------------------------------------------#
 ############# block- ia
         ### 030 ###
-        # a-a #
         rdm1[:nocc, nocc:] -= einsum('i,I,iA->IA', L1, R1, t3, optimize = einsum_type)
         rdm1[:nocc, nocc:] += einsum('i,i,IA->IA', L1, R1, t3, optimize = einsum_type)
         rdm1[:nocc, nocc:] -= einsum('i,I,ijAa,ja->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
@@ -1056,14 +1048,12 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1[:nocc, nocc:] -= 1/2 * einsum('i,j,IiAa,ja->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
         rdm1[:nocc, nocc:] += 1/2 * einsum('i,j,iIAa,ja->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
 
-        # b-b #
         rdm1[:nocc, nocc:] += einsum('i,i,IA->IA', L1, R1, t3, optimize = einsum_type)
         rdm1[:nocc, nocc:] += einsum('i,i,IjAa,ja->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
         rdm1[:nocc, nocc:] -= 1/2 * einsum('i,i,jIAa,ja->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
         rdm1[:nocc, nocc:] -= 1/2 * einsum('i,j,IiAa,ja->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
 
         ### 021 ###
-        # a-bba #
         rdm1[:nocc, nocc:] -= einsum('i,ajI,ikAb,jkab->IA', L1, R2, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[:nocc, nocc:] += 1/2 * einsum('i,ajI,ikAb,kjab->IA', L1, R2, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[:nocc, nocc:] += 1/2 * einsum('i,ajI,kiAb,jkab->IA', L1, R2, t1_ccee, t1_ccee, optimize = einsum_type)
@@ -1073,7 +1063,6 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1[:nocc, nocc:] -= 1/2 * einsum('i,ajk,IiAb,jkab->IA', L1, R2, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[:nocc, nocc:] += 1/2 * einsum('i,ajk,iIAb,jkab->IA', L1, R2, t1_ccee, t1_ccee, optimize = einsum_type)
 
-        # a-aaa #
         rdm1[:nocc, nocc:] += einsum('i,Aij,jkab,Ikab->IA', L1, R2, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[:nocc, nocc:] -= 1/2 * einsum('i,Aij,jkab,Ikba->IA', L1, R2, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[:nocc, nocc:] -= einsum('i,Aji,jkab,Ikab->IA', L1, R2, t1_ccee, t1_ccee, optimize = einsum_type)
@@ -1105,7 +1094,6 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1[:nocc, nocc:] += 1/2 * einsum('i,ajk,iIAb,jkab->IA', L1, R2, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[:nocc, nocc:] -= 1/2 * einsum('i,ajk,iIAb,kjab->IA', L1, R2, t1_ccee, t1_ccee, optimize = einsum_type)
 
-        # b-aab #
         rdm1[:nocc, nocc:] -= einsum('i,Aji,jkab,Ikab->IA', L1, R2, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[:nocc, nocc:] += 1/2 * einsum('i,Aji,jkab,Ikba->IA', L1, R2, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[:nocc, nocc:] += 1/2 * einsum('i,Ajk,Iiab,jkab->IA', L1, R2, t1_ccee, t1_ccee, optimize = einsum_type)
@@ -1118,7 +1106,6 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1[:nocc, nocc:] += 1/2 * einsum('i,aji,kjab,kIAb->IA', L1, R2, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[:nocc, nocc:] -= 1/2 * einsum('i,ajk,IiAb,jkab->IA', L1, R2, t1_ccee, t1_ccee, optimize = einsum_type)
 
-        # b-bbb #
         rdm1[:nocc, nocc:] -= einsum('i,aij,jkab,IkAb->IA', L1, R2, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[:nocc, nocc:] += 1/2 * einsum('i,aij,jkab,kIAb->IA', L1, R2, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[:nocc, nocc:] += 1/2 * einsum('i,aij,kjab,IkAb->IA', L1, R2, t1_ccee, t1_ccee, optimize = einsum_type)
@@ -1129,11 +1116,9 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1[:nocc, nocc:] += 1/2 * einsum('i,ajk,IiAb,kjab->IA', L1, R2, t1_ccee, t1_ccee, optimize = einsum_type)
 
         ### 120 ###
-        # bba-a #
         rdm1[:nocc, nocc:] -= einsum('aij,I,jiAa->IA', L2, R1, t2_ccee, optimize = einsum_type)
         rdm1[:nocc, nocc:] += einsum('aij,j,IiAa->IA', L2, R1, t2_ccee, optimize = einsum_type)
 
-        # a-aaa #
         rdm1[:nocc, nocc:] += einsum('aij,I,ijAa->IA', L2, R1, t2_ccee, optimize = einsum_type)
         rdm1[:nocc, nocc:] -= einsum('aij,I,jiAa->IA', L2, R1, t2_ccee, optimize = einsum_type)
         rdm1[:nocc, nocc:] -= einsum('aij,i,IjAa->IA', L2, R1, t2_ccee, optimize = einsum_type)
@@ -1141,18 +1126,15 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1[:nocc, nocc:] += einsum('aij,j,IiAa->IA', L2, R1, t2_ccee, optimize = einsum_type)
         rdm1[:nocc, nocc:] -= einsum('aij,j,iIAa->IA', L2, R1, t2_ccee, optimize = einsum_type)
 
-        # aab-b #
         rdm1[:nocc, nocc:] += einsum('aij,j,IiAa->IA', L2, R1, t2_ccee, optimize = einsum_type)
         rdm1[:nocc, nocc:] -= einsum('aij,j,iIAa->IA', L2, R1, t2_ccee, optimize = einsum_type)
 
-        # bbb-b #
         rdm1[:nocc, nocc:] -= einsum('aij,i,IjAa->IA', L2, R1, t2_ccee, optimize = einsum_type)
         rdm1[:nocc, nocc:] += einsum('aij,j,IiAa->IA', L2, R1, t2_ccee, optimize = einsum_type)
 
         #----------------------------------------------------------------------------------------------------------# 
 ############# block- ai
         ### 030 ###
-        # a-a #
         rdm1[nocc:, :nocc] -= einsum('I,i,iA->AI', L1, R1, t3, optimize = einsum_type)
         rdm1[nocc:, :nocc] += einsum('i,i,IA->AI', L1, R1, t3, optimize = einsum_type)
         rdm1[nocc:, :nocc] -= einsum('I,i,ijAa,ja->AI', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
@@ -1162,18 +1144,15 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1[nocc:, :nocc] -= 1/2 * einsum('i,j,IjAa,ia->AI', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
         rdm1[nocc:, :nocc] += 1/2 * einsum('i,j,jIAa,ia->AI', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
 
-        # b-b #
         rdm1[nocc:, :nocc] += einsum('i,i,IA->AI', L1, R1, t3, optimize = einsum_type)
         rdm1[nocc:, :nocc] += einsum('i,i,IjAa,ja->AI', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
         rdm1[nocc:, :nocc] -= 1/2 * einsum('i,i,jIAa,ja->AI', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
         rdm1[nocc:, :nocc] -= 1/2 * einsum('i,j,IjAa,ia->AI', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
 
         ### 021 ###
-        # a-bba #
         rdm1[nocc:, :nocc] -= einsum('I,aij,jiAa->AI', L1, R2, t2_ccee, optimize = einsum_type)
         rdm1[nocc:, :nocc] += einsum('i,aji,IjAa->AI', L1, R2, t2_ccee, optimize = einsum_type)
 
-        # a-aaa #
         rdm1[nocc:, :nocc] += einsum('I,aij,ijAa->AI', L1, R2, t2_ccee, optimize = einsum_type)
         rdm1[nocc:, :nocc] -= einsum('I,aij,jiAa->AI', L1, R2, t2_ccee, optimize = einsum_type)
         rdm1[nocc:, :nocc] -= einsum('i,aij,IjAa->AI', L1, R2, t2_ccee, optimize = einsum_type)
@@ -1181,16 +1160,13 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1[nocc:, :nocc] += einsum('i,aji,IjAa->AI', L1, R2, t2_ccee, optimize = einsum_type)
         rdm1[nocc:, :nocc] -= einsum('i,aji,jIAa->AI', L1, R2, t2_ccee, optimize = einsum_type)
 
-        # b-aab #
         rdm1[nocc:, :nocc] += einsum('i,aji,IjAa->AI', L1, R2, t2_ccee, optimize = einsum_type)
         rdm1[nocc:, :nocc] -= einsum('i,aji,jIAa->AI', L1, R2, t2_ccee, optimize = einsum_type)
 
-        # b-bbb #
         rdm1[nocc:, :nocc] -= einsum('i,aij,IjAa->AI', L1, R2, t2_ccee, optimize = einsum_type)
         rdm1[nocc:, :nocc] += einsum('i,aji,IjAa->AI', L1, R2, t2_ccee, optimize = einsum_type)
         
         ### 120 ###
-        # bba-a #
         rdm1[nocc:, :nocc] -= einsum('aiI,j,ikab,jkAb->AI', L2, R1, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[nocc:, :nocc] += 1/2 * einsum('aiI,j,ikab,kjAb->AI', L2, R1, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[nocc:, :nocc] += 1/2 * einsum('aiI,j,kiab,jkAb->AI', L2, R1, t1_ccee, t1_ccee, optimize = einsum_type)
@@ -1200,7 +1176,6 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1[nocc:, :nocc] -= 1/2 * einsum('aij,k,ijab,IkAb->AI', L2, R1, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[nocc:, :nocc] += 1/2 * einsum('aij,k,ijab,kIAb->AI', L2, R1, t1_ccee, t1_ccee, optimize = einsum_type)
 
-        # aaa-a #
         rdm1[nocc:, :nocc] += einsum('Aij,i,jkab,Ikab->AI', L2, R1, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[nocc:, :nocc] -= 1/2 * einsum('Aij,i,jkab,Ikba->AI', L2, R1, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[nocc:, :nocc] -= einsum('Aij,j,ikab,Ikab->AI', L2, R1, t1_ccee, t1_ccee, optimize = einsum_type)
@@ -1232,7 +1207,6 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1[nocc:, :nocc] += 1/2 * einsum('aij,k,jiab,IkAb->AI', L2, R1, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[nocc:, :nocc] -= 1/2 * einsum('aij,k,jiab,kIAb->AI', L2, R1, t1_ccee, t1_ccee, optimize = einsum_type)
 
-        # b-aab #
         rdm1[nocc:, :nocc] -= einsum('Aij,j,ikab,Ikab->AI', L2, R1, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[nocc:, :nocc] += 1/2 * einsum('Aij,j,ikab,Ikba->AI', L2, R1, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[nocc:, :nocc] += 1/2 * einsum('Aij,k,ijab,Ikab->AI', L2, R1, t1_ccee, t1_ccee, optimize = einsum_type)
@@ -1245,7 +1219,6 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1[nocc:, :nocc] += 1/2 * einsum('aij,j,kiab,kIAb->AI', L2, R1, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[nocc:, :nocc] -= 1/2 * einsum('aij,k,ijab,IkAb->AI', L2, R1, t1_ccee, t1_ccee, optimize = einsum_type)
 
-        # b-bbb #
         rdm1[nocc:, :nocc] -= einsum('aij,i,jkab,IkAb->AI', L2, R1, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[nocc:, :nocc] += 1/2 * einsum('aij,i,jkab,kIAb->AI', L2, R1, t1_ccee, t1_ccee, optimize = einsum_type)
         rdm1[nocc:, :nocc] += 1/2 * einsum('aij,i,kjab,IkAb->AI', L2, R1, t1_ccee, t1_ccee, optimize = einsum_type)
