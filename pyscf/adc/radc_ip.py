@@ -811,7 +811,7 @@ def get_properties(adc, nroots=1):
     #opdm1 = get_ref_opdm(adc)
     #opdm2 = get_ref_opdm_off_2(adc)
 
-    #print(np.linalg.norm(opdm1 - opdm2))
+    print('NORM 1RDM: ', np.linalg.norm(opdm[0]))
     #exit()
     pdm = (ref_opdm, opdm)
     #Spectroscopic factors

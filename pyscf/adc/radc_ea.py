@@ -1081,6 +1081,34 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1[nocc:, nocc:] += einsum('a,b,ijAa,jiBb->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
         rdm1[nocc:, nocc:] -= 2 * einsum('a,b,ijBb,ijAa->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
         rdm1[nocc:, nocc:] += einsum('a,b,ijBb,jiAa->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
+
+############# block- ia
+        # 120 #
+        # 021 #
+
+        # 030 #
+        rdm1[:nocc, nocc:] -= einsum('A,a,Ia->IA', L1, R1, t3, optimize = einsum_type)
+        rdm1[:nocc, nocc:] += 2 * einsum('a,a,IA->IA', L1, R1, t3, optimize = einsum_type)
+        rdm1[:nocc, nocc:] -= einsum('A,a,Iiab,ib->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
+        rdm1[:nocc, nocc:] += 1/2 * einsum('A,a,Iiba,ib->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
+        rdm1[:nocc, nocc:] += 2 * einsum('a,a,IiAb,ib->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
+        rdm1[:nocc, nocc:] -= einsum('a,a,iIAb,ib->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
+        rdm1[:nocc, nocc:] -= einsum('a,b,IiAb,ia->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
+        rdm1[:nocc, nocc:] += 1/2 * einsum('a,b,iIAb,ia->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
+
+############# block- ai
+        # 120 #
+        # 021 #
+
+        # 030 #
+        rdm1[nocc:, :nocc] -= einsum('a,A,Ia->AI', L1, R1, t3, optimize = einsum_type)
+        rdm1[nocc:, :nocc] += 2 * einsum('a,a,IA->AI', L1, R1, t3, optimize = einsum_type)
+        rdm1[nocc:, :nocc] -= einsum('a,A,Iiab,ib->AI', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
+        rdm1[nocc:, :nocc] += 1/2 * einsum('a,A,Iiba,ib->AI', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
+        rdm1[nocc:, :nocc] += 2 * einsum('a,a,IiAb,ib->AI', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
+        rdm1[nocc:, :nocc] -= einsum('a,a,iIAb,ib->AI', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
+        rdm1[nocc:, :nocc] -= einsum('a,b,IiAa,ib->AI', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
+        rdm1[nocc:, :nocc] += 1/2 * einsum('a,b,iIAa,ib->AI', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
     return rdm1
 
 
