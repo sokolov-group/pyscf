@@ -888,10 +888,7 @@ def get_properties(adc, nroots=1):
     U = adc.renormalize_eigenvectors(nroots)
     X = np.dot(T, U).reshape(-1, nroots)
     opdm = adc.make_rdm1()
-
-    test_opdm = np.array(opdm)[0]
-    print('NORM:', np.linalg.norm(test_opdm))
-    print('TRACE:', np.einsum('pp', test_opdm))
+    print('NORM OPDM root 0: ', np.linalg.norm(opdm[0]))
 
     #Spectroscopic factors
     P = 2.0*lib.einsum("pi,pi->i", X, X)
