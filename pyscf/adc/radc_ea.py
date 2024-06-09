@@ -1006,30 +1006,32 @@ def make_rdm1_eigenvectors(adc, L, R):
     rdm1[nocc:, nocc:] -= einsum('a,b,ijBa,ijAb->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
 
     ### 101 ###
-    # Left off here...
-    #rdm1[nocc:, nocc:] += 4 * einsum('iAa,iBa->AB', L2, R2, optimize = einsum_type)
-    #rdm1[nocc:, nocc:] -= 2 * einsum('iaA,iaB->AB', L2, R2, optimize = einsum_type)
-    #rdm1[nocc:, nocc:] += 2 * einsum('iAa,iaB->AB', L2, R2, optimize = einsum_type)
-    #rdm1[nocc:, nocc:] -= 1 * einsum('iAa,iBa->AB', L2, R2, optimize = einsum_type)
-
-
-############# block- ia
-    # 020 #
-    rdm1[:nocc, nocc:] -= einsum('A,a,Ia->IA', L1, R1, t2_ce, optimize = einsum_type)
-    rdm1[:nocc, nocc:] += einsum('a,a,IA->IA', L1, R1, t2_ce, optimize = einsum_type)
-    rdm1[:nocc, nocc:] += einsum('a,a,IA->IA', L1, R1, t2_ce, optimize = einsum_type)
-
-    # 110 #
-    rdm1[:nocc, nocc:] -= einsum('IAa,a->IA',L2, R1, optimize=True)
-    rdm1[:nocc, nocc:] += 2 * einsum('IaA,a->IA',L2, R1, optimize=True)
-
-    # 011 #
-    # Can't Get These Yet #
-    #rdm1[:nocc, nocc:] += einsum('a,IAa->IA',L1, R2, optimize=True)
-    #rdm1[:nocc, nocc:] -= 2 * einsum('a,IaA->IA',L1, R2, optimize=True)
+    rdm1[nocc:, nocc:] += 2 * einsum('iAa,iBa->AB', R2, R2, optimize = einsum_type)
+    rdm1[nocc:, nocc:] -= einsum('iAa,iaB->AB', R2, R2, optimize = einsum_type)
+    rdm1[nocc:, nocc:] -= einsum('iaA,iBa->AB', L2, R2, optimize = einsum_type)
+    rdm1[nocc:, nocc:] += 2 * einsum('iaA,iaB->AB', L2, R2, optimize = einsum_type)
 
 ############# block- ai
-    rdm1[nocc:, :nocc] = rdm1[:nocc, nocc:].T
+    # 020 #
+    rdm1[nocc:, :nocc] -= einsum('a,A,Ia->AI', L1, R1, t2_ce, optimize = einsum_type)
+    rdm1[nocc:, :nocc] += 2 * einsum('a,a,IA->AI', L1, R1, t2_ce, optimize = einsum_type)
+
+    # 011 #
+    rdm1[nocc:, :nocc] -= 2 * einsum('A,iab,Iiab->AI', L1, R2, t1_ccee, optimize = einsum_type)
+    rdm1[nocc:, :nocc] += einsum('A,iab,Iiba->AI', L1, R2, t1_ccee, optimize = einsum_type)
+    rdm1[nocc:, :nocc] += 2 * einsum('a,iab,IiAb->AI', L1, R2, t1_ccee, optimize = einsum_type)
+    rdm1[nocc:, :nocc] -= einsum('a,iab,iIAb->AI', L1, R2, t1_ccee, optimize = einsum_type)
+    rdm1[nocc:, :nocc] -= 2 * einsum('a,iba,IiAb->AI', L1, R2, t1_ccee, optimize = einsum_type)
+    rdm1[nocc:, :nocc] += einsum('a,iba,iIAb->AI', L1, R2, t1_ccee, optimize = einsum_type)
+    rdm1[nocc:, :nocc] += 2 * einsum('a,iab,IiAb->AI', L1, R2, t1_ccee, optimize = einsum_type)
+    rdm1[nocc:, :nocc] -= einsum('a,iab,iIAb->AI', L1, R2, t1_ccee, optimize = einsum_type)
+
+    # 110 #
+    rdm1[nocc:, :nocc] -= einsum('IAa,a->AI',L2, R1, optimize=True)
+    rdm1[nocc:, :nocc] += 2 * einsum('IaA,a->AI',L2, R1, optimize=True)
+
+############# block- ia
+    rdm1[:nocc, nocc:] = rdm1[nocc:, :nocc].T
 
     ####### ADC(3) SPIN ADAPTED EXCITED STATE OPDM WITH SQA ################
     if adc.method == "adc(3)":
