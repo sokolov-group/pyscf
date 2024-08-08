@@ -5473,7 +5473,21 @@ def get_properties(adc, nroots=1):
     dX =  lib.einsum("xqp,nqp->xn", adc.dip_mom[0], X[0], optimize = True)
     dX += lib.einsum("xqp,nqp->xn", adc.dip_mom[1], X[1], optimize = True)
 
-    spec_intensity = np.sum(np.conj(dX) * dX, axis=0)
+####    test_dX = np.array([])
+####    for root in range(X[0].shape[0]):
+####        test_dX = np.append(test_dX, lib.einsum("xqp,qp->x", adc.dip_mom[0], X[0][root], optimize = True) + lib.einsum("xqp,qp->x", adc.dip_mom[1], X[1][root], optimize = True))
+####
+####    test_dX = np.array(test_dX)
+####    test_dX = test_dX.reshape(nroots, 3)
+####
+####    P_test = np.square(test_dX.T)*adc.E*(2/3)
+####    P_test = P_test[0] + P_test[1] + P_test[2]
+####
+####    print(P_test.reshape(-1, 1))
+
+    spec_intensity =  np.conj(dX[0]) * dX[0]
+    spec_intensity += np.conj(dX[1]) * dX[1]
+    spec_intensity += np.conj(dX[2]) * dX[2]
 
     # Oscillator strengths
     P = (2.0/3.0) * adc.E * spec_intensity
