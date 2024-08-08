@@ -69,14 +69,6 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     if adc.compute_properties:
         adc.P,adc.X = adc.get_properties(nroots)
 
-    if adc.method_type == "ee":
-        TY, props = adc.X
-        spin, opdm  = props
-        if adc.spin_c is True:
-            spin, trace = spin
-            spin_c = spin
-            na = trace[0]
-            nb = trace[1]
     nfalse = np.shape(conv)[0] - np.sum(conv)
 
     header = ("\n*************************************************************"
@@ -89,7 +81,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
                         (adc.method, n, adc.E[n], adc.E[n]*27.2114))
         if adc.compute_properties:
             if (adc.method_type == "ee"):
-                print_string += ("|  Osc. Str. = %10.8f  " % adc.P[n])
+                print_string += ("|  Osc. strength = %10.8f  " % adc.P[n])
                 if (adc.spin_c is True):
                     print_string += ("|  S^2 = %10.8f  " % spin_c[n])
                 if (adc.spin_c is True):

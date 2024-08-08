@@ -291,7 +291,9 @@ def compute_amplitudes(myadc, eris):
     t1_3 = (None,)
     t2_1_vvvv = (None,)
 
-    if (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False) or (myadc.method == "adc(3)"):
+    if ((myadc.method == "adc(2)" and myadc.method_type == "ee" and myadc.approx_trans_moments is False) \
+        or (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False) \
+        or (myadc.method == "adc(3)")):
 
         # Compute second-order doubles t2 (tijab)
 
@@ -860,7 +862,9 @@ def compute_amplitudes(myadc, eris):
 
     t2_1 = (t2_1_a , t2_1_ab, t2_1_b)
 
-    if (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False) or (myadc.method == "adc(3)"):
+    if ((myadc.method == "adc(2)" and myadc.method_type == "ee" and myadc.approx_trans_moments is False) \
+        or (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False) \
+        or (myadc.method == "adc(3)")):
         t2_2 = (t2_2_a , t2_2_ab, t2_2_b)
         t2_1_vvvv = (t2_1_vvvv_a, t2_1_vvvv_ab, t2_1_vvvv_b)
 

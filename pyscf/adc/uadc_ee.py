@@ -3645,8 +3645,6 @@ def get_opdm(adc):
         raise NotImplementedError(adc.method)
 
     method = adc.method
-    dm_a = adc.dm_a.copy()
-    dm_b = adc.dm_b.copy()
 
     t1 = adc.t1
     t2 = adc.t2
@@ -4021,22 +4019,6 @@ def get_opdm(adc):
         
         opdm_a = np.append(opdm_a,temp_a)
         opdm_b = np.append(opdm_b,temp_b)
-
-        
-       # na = np.einsum('pp',temp_a)
-       # nb = np.einsum('pp',temp_b)
-       # spin = (temp_a,temp_b)
-        
-       # dip = lib.einsum("rqp,qp->r", dm_a, temp_a, optimize = True)
-       # dip += lib.einsum("rqp,qp->r", dm_b, temp_b, optimize = True)
-       # 
-       # dipole_x = (adc.nucl_dip[0] + dip)*nist.AU2DEBYE
-       # dipole_y = (adc.nucl_dip[1] + dip)*nist.AU2DEBYE
-       # dipole_z = (adc.nucl_dip[2] + dip)*nist.AU2DEBYE
-       # 
-       # mag_dipole = np.sqrt((dipole_x[0])**2 + (dipole_y[1])**2 + (dipole_z[2])**2)
-       # print("mag_dipole", mag_dipole)
-       # print("opdm trace dipole na nb ",mag_dipole, np.einsum('pp',temp_a), np.einsum('pp',temp_b))
 
     opdm_a = opdm_a.reshape(nroots,nmo_a,nmo_a)
     opdm_b = opdm_b.reshape(nroots,nmo_b,nmo_b)
@@ -4798,7 +4780,7 @@ def get_spin_contamination(adc):
     return spin, (trace_a, trace_b)
 
 
-def get_X(adc):
+def get_trans_moments(adc):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
@@ -4807,11 +4789,11 @@ def get_X(adc):
 
     t1 = adc.t1
     t2 = adc.t2
+
     nocc_a = adc.nocc_a
     nocc_b = adc.nocc_b
     nvir_a = adc.nvir_a
     nvir_b = adc.nvir_b
-
 
     if adc.f_ov is None:
         f_ov_a = np.zeros((nocc_a, nvir_a))
@@ -4826,14 +4808,8 @@ def get_X(adc):
     nmo_a = nocc_a + nvir_a
     nmo_b = nocc_b + nvir_b
 
-
     TY_a = np.zeros((nmo_a,nmo_a))
     TY_b = np.zeros((nmo_b,nmo_b))
-
-    dm_a = adc.dm_a.copy()
-    dm_b = adc.dm_b.copy()
-
-
 
     n_singles_a = nocc_a * nvir_a
     n_singles_b = nocc_b * nvir_b
@@ -4843,7 +4819,6 @@ def get_X(adc):
 
     dim = n_singles_a + n_singles_b + n_doubles_aaaa + n_doubles_ab + n_doubles_bbbb
 
-    
     e_occ_a = adc.mo_energy_a[:nocc_a]
     e_occ_b = adc.mo_energy_b[:nocc_b]
     e_vir_a = adc.mo_energy_a[nocc_a:]
@@ -4868,14 +4843,13 @@ def get_X(adc):
     U = adc.U.T
     nroots = U.shape[0]
 
-    x = np.array([])
     TY_aa = []
     TY_bb = []
+
     for r in range(U.shape[0]):
-        
+
         Y_a = U[r][:f_a].reshape(nocc_a, nvir_a)
         Y_b = U[r][f_a:f_b].reshape(nocc_b, nvir_b)
-
 
         Y1_abab = U[r][s_abab:f_ab].reshape(nocc_a, nocc_b, nvir_a, nvir_b)
 
@@ -4897,18 +4871,14 @@ def get_X(adc):
 
         del Y_vv_u_b
 
-
         # T_U2_Y0 qp block
         t1_2_a = t1[0][0][:]
         TY_a[:nocc_a,:nocc_a] = -lib.einsum('pg,qg->pq',Y_a,t1_2_a,optimize=True)
         TY_a[nocc_a:,nocc_a:] = lib.einsum('xr,xv->vr',Y_a,t1_2_a,optimize=True)
         del t1_2_a
 
-
         TY_a[:nocc_a,nocc_a:] = Y_a
         TY_b[:nocc_b,nocc_b:] = Y_b
-
-
 
         t1_2_b = t1[0][1][:]
         TY_b[:nocc_b,:nocc_b] = -lib.einsum('pg,qg->pq',Y_b,t1_2_b,optimize=True)
@@ -4931,7 +4901,6 @@ def get_X(adc):
         TY_a[:nocc_a,nocc_a:] -= 0.25*lib.einsum('xv,xygh,pygh->pv',Y_a,t2_1_a,t2_1_a,optimize=True)
         del t2_1_a
         del t2_1_ab
-
 
         t2_1_b = t2[0][2][:]
         t2_1_ab = t2[0][1][:]
@@ -4973,16 +4942,12 @@ def get_X(adc):
         TY_b[nocc_b:,:nocc_b] += lib.einsum('xg,xpgv->vp',Y_a,t2_1_ab,optimize=True)
         del t2_1_ab 
        
-       
-       
        # T_U1_Y0 qp block
         TY_a[:nocc_a,:nocc_a] -= lib.einsum('pg,qg->pq',Y_a,t1_1_a,optimize=True)
         TY_b[:nocc_b,:nocc_b] -= lib.einsum('pg,qg->pq',Y_b,t1_1_b,optimize=True)
 
         TY_a[nocc_a:,nocc_a:] += lib.einsum('xr,xv->vr',Y_a,t1_1_a,optimize=True)
         TY_b[nocc_b:,nocc_b:] += lib.einsum('xr,xv->vr',Y_b,t1_1_b,optimize=True)
-
-
 
         TY_a[:nocc_a,nocc_a:] -= 0.5*np.einsum('pg,xg,xv->pv',Y_a,t1_1_a,t1_1_a,optimize=True)
         TY_b[:nocc_b,nocc_b:] -= 0.5*np.einsum('pg,xg,xv->pv',Y_b,t1_1_b,t1_1_b,optimize=True)
@@ -4993,11 +4958,9 @@ def get_X(adc):
         TY_a[nocc_a:,:nocc_a] -= lib.einsum('xg,pg,xv->vp',Y_a,t1_1_a,t1_1_a,optimize=True)
         TY_b[nocc_b:,:nocc_b] -= lib.einsum('xg,pg,xv->vp',Y_b,t1_1_b,t1_1_b,optimize=True)
 
-
         t2_2_a = t2[1][0][:]
         TY_a[nocc_a:,:nocc_a] += lib.einsum('xg,pxvg->vp',Y_a,t2_2_a,optimize=True)
         del t2_2_a                                     
-                                                       
                                                        
         t2_2_b = t2[1][2][:]                           
         TY_b[nocc_b:,:nocc_b] += lib.einsum('xg,pxvg->vp',Y_b,t2_2_b,optimize=True)
@@ -5012,8 +4975,6 @@ def get_X(adc):
             del Y1_abab
             del Y1_oovv_u_a
             del Y1_oovv_u_b
-
-
 
         if (method == "adc(2)-x") or (method == "adc(3)"):
             # T_U2_Y1 qp block
@@ -5054,7 +5015,6 @@ def get_X(adc):
             TY_a[nocc_a:,:nocc_a] -= np.einsum('yxgh,yv,pxgh->vp',Y1_abab,t1_1_a,t2_1_ab,optimize=True)
             TY_b[nocc_b:,:nocc_b] -= np.einsum('xyhg,yv,xphg->vp',Y1_abab,t1_1_b,t2_1_ab,optimize=True)
             del t2_1_ab
-
 
             t2_1_b = t2[0][2][:]
             TY_b[:nocc_b,nocc_b:] += 0.25*lib.einsum('pxgh,yv,xygh->pv',Y1_oovv_u_b,t1_1_b,t2_1_b,optimize=True)
@@ -5413,19 +5373,12 @@ def get_X(adc):
             TY_b[nocc_b:,:nocc_b] += 0.166666667 * lib.einsum('ib,jicb,jkcd,klda->al', Y_b, t1_ccee_abab, t1_ccee_aaaa, t1_ccee_abab, optimize = einsum_type)
             TY_b[nocc_b:,:nocc_b] -= 0.166666667 * lib.einsum('ib,jicd,lkab,jkcd->al', Y_b, t1_ccee_abab, t1_ccee_bbbb, t1_ccee_abab, optimize = einsum_type)
 
+        TY_aa.append(TY_a)
+        TY_bb.append(TY_b)
 
+    TY = (np.array(TY_aa), np.array(TY_bb))
 
-        dx = lib.einsum("rqp,qp->r", dm_a, TY_a, optimize = True)
-        dx += lib.einsum("rqp,qp->r", dm_b, TY_b, optimize = True)
-
-        TY_aa = np.append(TY_aa,TY_a)
-        TY_bb = np.append(TY_bb,TY_b)
-        TY = (TY_aa, TY_bb)
-
-        x = np.append(x,dx)
-    x = x.reshape(nroots, 3)
-
-    return TY, x
+    return TY
 
 
 def analyze_spec_factor(adc):
@@ -5515,29 +5468,17 @@ def analyze_spec_factor(adc):
 def get_properties(adc, nroots=1):
 
     #Transition moments
-    TY, dx  = adc.get_X()
+    X  = adc.get_trans_moments()
 
-    X_a = TY[0].reshape(nroots,-1)
-    X_b = TY[1].reshape(nroots,-1)
+    dX =  lib.einsum("xqp,nqp->xn", adc.dip_mom[0], X[0], optimize = True)
+    dX += lib.einsum("xqp,nqp->xn", adc.dip_mom[1], X[1], optimize = True)
 
-    X = (X_a,X_b)
+    spec_intensity = np.sum(np.conj(dX) * dX, axis=0)
 
-    if adc.opdm is True:
-        opdm = adc.get_opdm()
-    else:
-        opdm = None
-    
-    if adc.spin_c is True:
-        spin = adc.get_spin_contamination()
-    else:
-        spin = None
-   
-    density_matrix = (spin, opdm)
+    # Oscillator strengths
+    P = (2.0/3.0) * adc.E * spec_intensity
 
-    P = np.square(dx.T)*adc.E*(2/3)
-    P = P[0] + P[1] + P[2]
-    
-    return P, (X,density_matrix)
+    return P, X
 
 
 def analyze(myadc):
@@ -5590,12 +5531,19 @@ class UADCEE(uadc.UADC):
             Spectroscopic amplitudes for each EE transition.
     '''
 
-    _keys = {'tol_residual','conv_tol', 'e_corr', 'method',
-                'method_type', 'mo_coeff', 'mo_energy_b', 'max_memory',
-                't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle'}
+    _keys = {
+        'tol_residual','conv_tol', 'e_corr', 'method',
+        'method_type', 'mo_coeff', 'mo_energy_b', 'max_memory',
+        't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle',
+        'nocc_a', 'nocc_b', 'nvir_a', 'nvir_b', 'mo_coeff', 'mo_energy_a',
+        'mo_energy_b', 'nmo_a', 'nmo_b', 'mol', 'transform_integrals',
+        'with_df', 'spec_factor_print_tol', 'evec_print_tol',
+        'compute_properties', 'approx_trans_moments', 'E', 'U', 'P', 'X',
+    }
 
 
     def __init__(self, adc):
+        self.mol = adc.mol
         self.verbose = adc.verbose
         self.stdout = adc.stdout
         self.max_memory = adc.max_memory
@@ -5605,12 +5553,6 @@ class UADCEE(uadc.UADC):
         self.tol_residual  = adc.tol_residual
         self.t1 = adc.t1
         self.t2 = adc.t2
-        self.f_ov = adc.f_ov
-        self.dm_a = adc.dm_a
-        self.dm_b = adc.dm_b
-        self.opdm = adc.opdm
-        self.spin_c = adc.spin_c
-        self.nucl_dip = adc.nucl_dip
         self.imds = adc.imds
         self.e_corr = adc.e_corr
         self.method = adc.method
@@ -5627,24 +5569,29 @@ class UADCEE(uadc.UADC):
         self.mo_energy_b = adc.mo_energy_b
         self.nmo_a = adc._nmo[0]
         self.nmo_b = adc._nmo[1]
-        self.mol = adc.mol
         self.transform_integrals = adc.transform_integrals
         self.with_df = adc.with_df
+        self.compute_properties = adc.compute_properties
+        self.approx_trans_moments = adc.approx_trans_moments
+
         self.spec_factor_print_tol = adc.spec_factor_print_tol
         self.evec_print_tol = adc.evec_print_tol
 
-        self.compute_properties = adc.compute_properties
-        self.approx_trans_moments = adc.approx_trans_moments
         self.E = adc.E
         self.U = adc.U
         self.P = adc.P
         self.X = adc.X
 
+        self.f_ov = adc.f_ov
+        self.spin_c = adc.spin_c
+        self.dip_mom = adc.dip_mom
+        self.dip_mom_nuc = adc.dip_mom_nuc
+
     kernel = uadc.kernel
     get_imds = get_imds
     get_diag = get_diag
     matvec = matvec
-    get_X = get_X
+    get_trans_moments = get_trans_moments
     get_spin_contamination = get_spin_contamination
     get_opdm = get_opdm
     get_properties = get_properties
