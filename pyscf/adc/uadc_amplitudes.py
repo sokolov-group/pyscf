@@ -871,6 +871,25 @@ def compute_amplitudes(myadc, eris):
     t1 = (t1_2, t1_3, t1_1)
     t2 = (t2_1, t2_2)
 
+####    if t1_2[0] is not None:
+####        print("t1_2[0]", np.linalg.norm(t1_2[0]))
+####        print("t1_2[1]", np.linalg.norm(t1_2[1]))
+####    if t1_3[0] is not None:
+####        print("t1_3[0]", np.linalg.norm(t1_3[0]))
+####        print("t1_3[1]", np.linalg.norm(t1_3[1]))
+####    if t1_1[0] is not None:
+####        print("t1_1[0]", np.linalg.norm(t1_1[0]))
+####        print("t1_1[1]", np.linalg.norm(t1_1[1]))
+####    if t2_1[0] is not None:
+####        print("t2_1[0]", np.linalg.norm(t2_1[0]))
+####        print("t2_1[1]", np.linalg.norm(t2_1[1]))
+####        print("t2_1[2]", np.linalg.norm(t2_1[2]))
+####    if t2_2[0] is not None:
+####        print("t2_2[0]", np.linalg.norm(t2_2[0]))
+####        print("t2_2[1]", np.linalg.norm(t2_2[1]))
+####        print("t2_2[2]", np.linalg.norm(t2_2[2]))
+####    exit()
+
     cput0 = log.timer_debug1("Completed amplitude calculation", *cput0)
 
     return t1, t2, t2_1_vvvv

@@ -5473,6 +5473,9 @@ def get_properties(adc, nroots=1):
     dX =  lib.einsum("xqp,nqp->xn", adc.dip_mom[0], X[0], optimize = True)
     dX += lib.einsum("xqp,nqp->xn", adc.dip_mom[1], X[1], optimize = True)
 
+####    #for root in range(X[0].shape[0]):
+####        print(root, np.linalg.norm(dX[:, root]))
+
 ####    test_dX = np.array([])
 ####    for root in range(X[0].shape[0]):
 ####        test_dX = np.append(test_dX, lib.einsum("xqp,qp->x", adc.dip_mom[0], X[0][root], optimize = True) + lib.einsum("xqp,qp->x", adc.dip_mom[1], X[1][root], optimize = True))
