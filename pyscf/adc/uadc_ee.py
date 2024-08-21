@@ -4842,9 +4842,8 @@ def get_trans_moments(adc):
 
     U = adc.U.T
     nroots = U.shape[0]
-
-    TY_aa = []
-    TY_bb = []
+    TY_aa = np.zeros((nroots, nmo_a, nmo_a))
+    TY_bb = np.zeros((nroots, nmo_b, nmo_b))
 
     for r in range(U.shape[0]):
 
@@ -5373,24 +5372,30 @@ def get_trans_moments(adc):
             TY_b[nocc_b:,:nocc_b] += 0.166666667 * lib.einsum('ib,jicb,jkcd,klda->al', Y_b, t1_ccee_abab, t1_ccee_aaaa, t1_ccee_abab, optimize = einsum_type)
             TY_b[nocc_b:,:nocc_b] -= 0.166666667 * lib.einsum('ib,jicd,lkab,jkcd->al', Y_b, t1_ccee_abab, t1_ccee_bbbb, t1_ccee_abab, optimize = einsum_type)
 
-        TY_aa.append(TY_a)
-        TY_bb.append(TY_b)
+        TY_aa[r,:,:] = TY_a
+        TY_bb[r,:,:] = TY_b
 
-    TY = (np.array(TY_aa), np.array(TY_bb))
-
+    TY = (TY_aa, TY_bb)
+    
     return TY
 
 
 def analyze_spec_factor(adc):
-    X_ab, props = adc.X
-    
+    X_aa, X_bb = adc.X
+
+    nroots = X_aa.shape[0]
+
+    X_aa = X_aa.reshape(nroots, -1)
+    X_bb = X_bb.reshape(nroots, -1)
+
     energy = adc.E*27.2114
 
-    X_a = (X_ab[0].copy())**2
-    X_b = (X_ab[1].copy())**2
+    X_a = (X_aa.copy())**2
+    X_b = (X_bb.copy())**2
 
     nmo_a = adc.nocc_a + adc.nvir_a
     nmo_b = adc.nocc_b + adc.nvir_b
+
     
     logger.info(adc, "Print spectroscopic factors > %E\n", adc.spec_factor_print_tol)
     
@@ -5468,11 +5473,11 @@ def analyze_spec_factor(adc):
 def get_properties(adc, nroots=1):
 
     #Transition moments
-    X  = adc.get_trans_moments()
+    X = adc.get_trans_moments()
 
     dX =  lib.einsum("xqp,nqp->xn", adc.dip_mom[0], X[0], optimize = True)
     dX += lib.einsum("xqp,nqp->xn", adc.dip_mom[1], X[1], optimize = True)
-
+ 
 ####    #for root in range(X[0].shape[0]):
 ####        print(root, np.linalg.norm(dX[:, root]))
 
@@ -5494,6 +5499,7 @@ def get_properties(adc, nroots=1):
 
     # Oscillator strengths
     P = (2.0/3.0) * adc.E * spec_intensity
+
 
     return P, X
 
