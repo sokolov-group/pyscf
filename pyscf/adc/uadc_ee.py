@@ -2144,12 +2144,6 @@ def get_imds(adc, eris=None):
     M_ia_jb_b = M_ia_jb_b.reshape(n_singles_b, n_singles_b)
     M_aabb = M_aabb.reshape(n_singles_a, n_singles_b)
 
-
-    if not isinstance(eris.oovv, np.ndarray):
-        M_ia_jb_a = radc_ao2mo.write_dataset(M_ia_jb_a)
-        M_ia_jb_b = radc_ao2mo.write_dataset(M_ia_jb_b)
-        M_aabb = radc_ao2mo.write_dataset(M_aabb)
-
     M_ia_jb = (M_ia_jb_a, M_ia_jb_b, M_aabb)
     cput0 = log.timer_debug1("Completed M_ia_jb  ADC calculation", *cput0)
 
@@ -2229,9 +2223,6 @@ def get_diag(adc,M_ia_jb=None,eris=None):
     # Compute precond
     diag[s_a:f_a] = np.diagonal(M_ia_jb_a)
     diag[s_b:f_b] = np.diagonal(M_ia_jb_b)
-
-    if not isinstance(eris.oovv, np.ndarray):
-        diag = radc_ao2mo.write_dataset(diag)
 
     return diag
 
@@ -3639,7 +3630,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
     return sigma_
 
 ##@profile
-def get_opdm(adc):
+def make_rdm1(adc):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
@@ -4033,8 +4024,7 @@ def get_spin_contamination(adc):
         raise NotImplementedError(adc.method)
 
     method = adc.method
-    dm_a = adc.dm_a.copy()
-    dm_b = adc.dm_b.copy()
+    dm_a, dm_b = adc.make_rdm1()
 
     t1 = adc.t1
     t2 = adc.t2
@@ -5606,7 +5596,7 @@ class UADCEE(uadc.UADC):
         self.X = adc.X
 
         self.f_ov = adc.f_ov
-        self.spin_c = adc.spin_c
+        self.spin_cont = adc.spin_cont
         self.dip_mom = adc.dip_mom
         self.dip_mom_nuc = adc.dip_mom_nuc
 
@@ -5616,7 +5606,7 @@ class UADCEE(uadc.UADC):
     matvec = matvec
     get_trans_moments = get_trans_moments
     get_spin_contamination = get_spin_contamination
-    get_opdm = get_opdm
+    make_rdm1 = make_rdm1
     get_properties = get_properties
 
     analyze_spec_factor = analyze_spec_factor
