@@ -195,13 +195,13 @@ class UADC(lib.StreamObject):
             fock_b = np.dot(mo_a.T,np.dot(fock_b, mo_a))
 
             # Semicanonicalize Ca using fock_a, nocc_a -> Ca, mo_energy_a, U_a, f_ov_a
-            mo_a, mo_energy_a, f_ov_a, f_aa = self.semi_canonicalize_orbitals(
+            mo_a_coeff, mo_energy_a, f_ov_a, f_aa = self.semi_canonicalize_orbitals(
                 fock_a, ndocc + nsocc, mo_a)
 
             # Semicanonicalize Cb using fock_b, nocc_b -> Cb, mo_energy_b, U_b, f_ov_b
-            mo_b, mo_energy_b, f_ov_b, f_bb = self.semi_canonicalize_orbitals(fock_b, ndocc, mo_a)
+            mo_b_coeff, mo_energy_b, f_ov_b, f_bb = self.semi_canonicalize_orbitals(fock_b, ndocc, mo_a)
 
-            mo_coeff = [mo_a, mo_b]
+            mo_coeff = [mo_a_coeff, mo_b_coeff]
 
             f_ov = [f_ov_a, f_ov_b]
 
