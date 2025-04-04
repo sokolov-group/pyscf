@@ -71,7 +71,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     nfalse = np.shape(conv)[0] - np.sum(conv)
 
-    if adc.spin_cont:
+    if adc.spin_c:
         spin_c, evec_ne = adc.get_spin_contamination()
         evec_ne_na, evec_ne_nb = evec_ne
 
@@ -86,7 +86,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         if adc.compute_properties:
             if (adc.method_type == "ee"):
                 print_string += ("|  Osc. strength = %10.8f  " % adc.P[n])
-                if (adc.spin_cont is True):
+                if (adc.spin_c is True):
                     print_string += ("|  S^2 = %10.8f  " % spin_c[n])
                     print_string += ("|  na = %5.3f  " % evec_ne_na[n])
                     print_string += ("|  nb = %5.3f  " % evec_ne_nb[n])
@@ -138,7 +138,7 @@ class UADC(lib.StreamObject):
         'max_space', 'mo_occ', 'max_cycle', 'imds', 'with_df', 'compute_properties',
         'approx_trans_moments', 'evec_print_tol', 'spec_factor_print_tol',
         'E', 'U', 'P', 'X', 'ncvs', 'dip_mom', 'dip_mom_nuc',
-        'spin_cont', 'f_ov'
+        'spin_c', 'f_ov'
     }
 
     def __init__(self, mf, frozen=None, mo_coeff=None, mo_occ=None):
@@ -158,7 +158,7 @@ class UADC(lib.StreamObject):
         self.stdout = self.mol.stdout
         self.max_memory = mf.max_memory
 
-        self.max_space = getattr(__config__, 'adc_uadc_UADC_max_space', 12)
+        self.max_space = getattr(__config__, 'adc_uadc_UADC_max_space', 200)
         self.max_cycle = getattr(__config__, 'adc_uadc_UADC_max_cycle', 50)
         self.conv_tol = getattr(__config__, 'adc_uadc_UADC_conv_tol', 1e-12)
         self.tol_residual = getattr(__config__, 'adc_uadc_UADC_tol_residual', 1e-6)
@@ -237,7 +237,7 @@ class UADC(lib.StreamObject):
         self.P = None
         self.X = (None,)
 
-        self.spin_cont = False
+        self.spin_c = False
 
         dip_ints = -self.mol.intor('int1e_r',comp=3)
         dip_mom_a = np.zeros((dip_ints.shape[0], self._nmo[0], self._nmo[0]))
