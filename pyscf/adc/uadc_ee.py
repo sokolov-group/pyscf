@@ -307,7 +307,6 @@ def get_imds(adc, eris=None):
             v_cccc_aaaa = eris.oooo
             v_cccc_bbbb = eris.OOOO
             v_cccc_aabb = eris.ooOO
-            
 
             v_ceec_aaaa = eris.ovvo
             v_ceec_bbbb = eris.OVVO
@@ -2283,7 +2282,6 @@ def get_imds(adc, eris=None):
     M_ia_jb_b = M_ia_jb_b.reshape(n_singles_b, n_singles_b)
     M_aabb = M_aabb.reshape(n_singles_a, n_singles_b)
 
-
     if not isinstance(eris.oovv, np.ndarray):
         M_ia_jb_a = radc_ao2mo.write_dataset(M_ia_jb_a)
         M_ia_jb_b = radc_ao2mo.write_dataset(M_ia_jb_b)
@@ -2606,7 +2604,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
         s[s_b:f_b] += 0.5*lib.einsum('mnae,mein->ia',r2_b, eris.OVOO, optimize = True).reshape(-1)
         s[s_b:f_b] -= lib.einsum('mnea,mein->ia',r1_ab, eris.ovOO, optimize = True).reshape(-1)
 
-##        # # M^(1)_h1_h0
+##     #   # # M^(1)_h1_h0
 #
         temp_a = lib.einsum('ma,ibjm->ijab',r1_a_ov, eris.ovoo, optimize = True)
         temp_a -= lib.einsum('ma,jbim->ijab',r1_a_ov, eris.ovoo, optimize = True)
@@ -2736,6 +2734,8 @@ def matvec(adc, M_ia_jb=None, eris=None):
         #   exit()
 
         if (method == "adc(3)"):
+#            print("Hey")
+#            exit()
             #M_Y120_aa
             t1 = adc.t1
             t2 = adc.t2
@@ -2965,7 +2965,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
             del int_1
             del int_2
 
-################################################################################################################################
+###############################################################################################################################
 
             if isinstance(adc._scf, scf.rohf.ROHF):
 
@@ -3070,27 +3070,27 @@ def matvec(adc, M_ia_jb=None, eris=None):
                     M_02Y1_aa += temp_2
 
 
-#                if isinstance(eris.vvvv_p, type(None)):
-#                    a = 0
-#                    temp_1 = np.zeros((nocc_a,nocc_a, nvir_a, nvir_a))
-#                    temp_2 = np.zeros((nocc_a,nvir_a))
-#                    chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-#                    for p in range(0,nvir_a,chnk_size):
-#                        vvvv = dfadc.get_vvvv_antisym_df(adc, eris.Lvv, p, chnk_size)
-#                        k = vvvv.shape[0]
-#                        v_eeee_aaaa = np.zeros((k,nvir_a,nvir_a,nvir_a))
-#                        v_eeee_aaaa[:,:,ab_ind_a[0],ab_ind_a[1]] = vvvv
-#                        v_eeee_aaaa[:,:,ab_ind_a[1],ab_ind_a[0]] = -vvvv
-#
-#                        temp_1[:,:,a:a+k,:] += lib.einsum('Ia,Jb,CDab->IJCD', Y_aa, t1_ce_aa, v_eeee_aaaa, optimize = einsum_type)
-#                        temp_1[:,:,a:a+k,:] -= lib.einsum('Ja,Ib,CDab->IJCD', Y_aa, t1_ce_aa, v_eeee_aaaa, optimize = einsum_type)
-#
-#                        temp_2[:,a:a+k] += 1/2 * lib.einsum('Iiab,ic,Dcab->ID', Y_aaaa, t1_ce_aa, v_eeee_aaaa, optimize = einsum_type)
-#
-#                        del v_eeee_aaaa
-#                        a += k
-#                    M_12Y0_aa  = temp_1
-#                    M_02Y1_aa += temp_2
+                if isinstance(eris.vvvv_p, type(None)):
+                    a = 0
+                    temp_1 = np.zeros((nocc_a,nocc_a, nvir_a, nvir_a))
+                    temp_2 = np.zeros((nocc_a,nvir_a))
+                    chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
+                    for p in range(0,nvir_a,chnk_size):
+                        vvvv = dfadc.get_vvvv_antisym_df(adc, eris.Lvv, p, chnk_size)
+                        k = vvvv.shape[0]
+                        v_eeee_aaaa = np.zeros((k,nvir_a,nvir_a,nvir_a))
+                        v_eeee_aaaa[:,:,ab_ind_a[0],ab_ind_a[1]] = vvvv
+                        v_eeee_aaaa[:,:,ab_ind_a[1],ab_ind_a[0]] = -vvvv
+
+                        temp_1[:,:,a:a+k,:] += lib.einsum('Ia,Jb,CDab->IJCD', Y_aa, t1_ce_aa, v_eeee_aaaa, optimize = einsum_type)
+                        temp_1[:,:,a:a+k,:] -= lib.einsum('Ja,Ib,CDab->IJCD', Y_aa, t1_ce_aa, v_eeee_aaaa, optimize = einsum_type)
+
+                        temp_2[:,a:a+k] += 1/2 * lib.einsum('Iiab,ic,Dcab->ID', Y_aaaa, t1_ce_aa, v_eeee_aaaa, optimize = einsum_type)
+
+                        del v_eeee_aaaa
+                        a += k
+                    M_12Y0_aa  = temp_1
+                    M_02Y1_aa += temp_2
 
 
 
@@ -3815,7 +3815,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
 
             M_12Y0_aa = M_12Y0_aa[:,:,ab_ind_a[0],ab_ind_a[1]]
             s[s_aaaa:f_aaaa] += M_12Y0_aa[ij_ind_a[0],ij_ind_a[1]].reshape(n_doubles_aaaa)
-           
+          
             M_12Y0_bb = M_12Y0_bb[:,:,ab_ind_b[0],ab_ind_b[1]]
             s[s_bbbb:f_bbbb] += M_12Y0_bb[ij_ind_b[0],ij_ind_b[1]].reshape(n_doubles_bbbb)
             del r1_ab
