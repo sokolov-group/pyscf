@@ -4112,12 +4112,6 @@ def get_spin_contamination(adc):
     S_vv_ab = delta[nocc_a:,nocc_b:].copy()
     S_ov_ab = delta[:nocc_a,nocc_b:].copy()
     S_vo_ab = delta[nocc_a:,:nocc_b].copy()
-#        S_oc_ab = delta[:nocc_a,:nocc_b].copy()
-#        S_oo_ab = delta[:nocc_a,:nocc_b].copy()
-#        S_vir_ab = delta[nocc_a:,nocc_b:].copy()
-#        S_vv_ab = delta[nocc_a:,nocc_b:].copy()
-#        S_ov_ab = delta[:nocc_a,nocc_b:].copy()
-#        S_vo_ab = delta[nocc_a:,:nocc_b].copy()
 
 
     for r in range(U.shape[0]):
@@ -5971,20 +5965,6 @@ def get_properties(adc, nroots=1):
     dX =  lib.einsum("xqp,nqp->xn", adc.dip_mom[0], X[0], optimize = True)
     dX += lib.einsum("xqp,nqp->xn", adc.dip_mom[1], X[1], optimize = True)
  
-####    #for root in range(X[0].shape[0]):
-####        print(root, np.linalg.norm(dX[:, root]))
-
-####    test_dX = np.array([])
-####    for root in range(X[0].shape[0]):
-####        test_dX = np.append(test_dX, lib.einsum("xqp,qp->x", adc.dip_mom[0], X[0][root], optimize = True) + lib.einsum("xqp,qp->x", adc.dip_mom[1], X[1][root], optimize = True))
-####
-####    test_dX = np.array(test_dX)
-####    test_dX = test_dX.reshape(nroots, 3)
-####
-####    P_test = np.square(test_dX.T)*adc.E*(2/3)
-####    P_test = P_test[0] + P_test[1] + P_test[2]
-####
-####    print(P_test.reshape(-1, 1))
 
     spec_intensity =  np.conj(dX[0]) * dX[0]
     spec_intensity += np.conj(dX[1]) * dX[1]
