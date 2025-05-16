@@ -67,8 +67,8 @@ class KnownValues(unittest.TestCase):
         mf.kernel()
 
         popa, popb = mf.mulliken_meta()[0]
-        self.assertAlmostEqual(lib.fp(popa), 1.5403023058, 7)
-        self.assertAlmostEqual(lib.fp(popb), 1.5403023058, 7)
+        self.assertAlmostEqual(lib.fp(popa), 1.2700920989, 7)
+        self.assertAlmostEqual(lib.fp(popb), 1.2700920989, 7)
 
         popa, popb = k2gamma.k2gamma(mf).mulliken_meta()[0]
         self.assertAlmostEqual(lib.fp(popa), 0.8007278745, 7)
@@ -143,6 +143,11 @@ class KnownValues(unittest.TestCase):
         kpts = cell.get_abs_kpts(scaled_kpts)
         kmesh = k2gamma.kpts_to_kmesh(cell, kpts)
         self.assertEqual(kmesh.tolist(), [2, 4, 11])
+
+        cell = gto.M(atom='He 0 0 0', basis=[[0, (2.3, 1)]], a=np.eye(3)*3, verbose=0)
+        kpts = cell.make_kpts([6,1,1])
+        kmesh = k2gamma.kpts_to_kmesh(cell, kpts)
+        self.assertEqual(kmesh.tolist(), [3, 1, 1])
 
 
 if __name__ == '__main__':

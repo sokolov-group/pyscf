@@ -1,4 +1,4 @@
-Copyright 2014-2021 The PySCF Developers.
+Copyright 2014-2024 The PySCF Developers.
 PySCF (www.pyscf.org) was developed by:
 
 Qiming Sun
@@ -110,7 +110,23 @@ Christopher Hillenbrand
 scohenjanes5
 Michal Krompiec
 Victor Yu
-
+James Serna (The Ohio State University)
+Brian Zhao
+Juan Jose Aucar
+Ivan Chernyshov
+kvkarandashev
+Jonas Greiner
+Steffen Thomas
+Ethan Vo
+Raehyun Kim
+Sebastian Ehlert
+Thijs Vogels
+Andrew Jenkins
+Al Nejati
+Oskar Weser
+Henry Wang (ByteDance Ltd.)
+Weitang Li
+Sander Cohen-Janes
 
 ---
 * This list is not the contribution order. The order is roughly based on the

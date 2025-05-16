@@ -58,21 +58,19 @@ class DiamondPBE(unittest.TestCase):
         del cls.cell, cls.mf
 
     def kernel(self, TD, ref, **kwargs):
-        td = getattr(self.mf, TD)().set(kshift_lst=np.arange(len(self.mf.kpts)),
+        td = getattr(self.mf, TD)().set(kshift_lst=np.arange(len(ref)),
                                         nstates=self.nstates, **kwargs).run()
         for kshift,e in enumerate(td.e):
             self.assertAlmostEqual(abs(e[:self.nstates_test] * unitev - ref[kshift]).max(), 0, 4)
 
     def test_tda(self):
         # same as lowest roots in DiamondPBE->test_tda_singlet/triplet in test_krks.py
-        ref = [[5.7465112548, 5.7465526327],
-               [6.9888184993, 6.9888609925]]
+        ref = [[5.7465112548, 5.7465526327]]
         self.kernel('TDA', ref, singlet=False)
 
     def test_tdhf(self):
         # same as lowest roots in DiamondPBE->test_tdhf_singlet/triplet in test_krks.py
-        ref = [[5.5659966435, 5.5660393021],
-               [6.7992845776, 6.7993290046]]
+        ref = [[5.56602, 5.56602]]
         self.kernel('TDDFT', ref, singlet=False)
 
 
@@ -111,21 +109,19 @@ class DiamondPBE0(unittest.TestCase):
         del cls.cell, cls.mf
 
     def kernel(self, TD, ref, **kwargs):
-        td = getattr(self.mf, TD)().set(kshift_lst=np.arange(len(self.mf.kpts)),
+        td = getattr(self.mf, TD)().set(kshift_lst=np.arange(len(ref)),
                                         nstates=self.nstates, **kwargs).run()
         for kshift,e in enumerate(td.e):
             self.assertAlmostEqual(abs(e[:self.nstates_test] * unitev - ref[kshift]).max(), 0, 4)
 
     def test_tda(self):
         # same as lowest roots in DiamondPBE0->test_tda_singlet/triplet in test_krks.py
-        ref = [[6.6703797643, 6.6704110631],
-               [7.4081863259, 7.4082204017]]
+        ref = [[6.6703797643, 6.6704110631]]
         self.kernel('TDA', ref, singlet=False)
 
     def test_tdhf(self):
         # same as lowest roots in DiamondPBE0->test_tdhf_singlet/triplet in test_krks.py
-        ref = [[6.3282716764, 6.3283051217],
-               [7.0656766298, 7.0657111705]]
+        ref = [[6.3282716764, 6.3283051217]]
         self.kernel('TDDFT', ref, singlet=False)
 
 

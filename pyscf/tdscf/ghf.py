@@ -25,14 +25,13 @@
 from functools import reduce
 import numpy
 from pyscf import lib
-from pyscf import dft
-from pyscf.dft import numint
+from pyscf import scf
 from pyscf import ao2mo
 from pyscf import symm
 from pyscf.lib import logger
 from pyscf.tdscf import rhf
+from pyscf.tdscf._lr_eig import eigh as lr_eigh, eig as lr_eig
 from pyscf.scf import ghf_symm
-from pyscf.data import nist
 from pyscf import __config__
 
 OUTPUT_THRESHOLD = getattr(__config__, 'tdscf_rhf_get_nto_threshold', 0.3)
@@ -46,6 +45,7 @@ def gen_tda_operation(mf, fock_ao=None, wfnsym=None):
         wfnsym : int or str
             Point group symmetry irrep symbol or ID for excited CIS wavefunction.
     '''
+    assert fock_ao is None
     mol = mf.mol
     mo_coeff = mf.mo_coeff
     mo_energy = mf.mo_energy
@@ -62,21 +62,9 @@ def gen_tda_operation(mf, fock_ao=None, wfnsym=None):
         if isinstance(wfnsym, str):
             wfnsym = symm.irrep_name2id(mol.groupname, wfnsym)
         wfnsym = wfnsym % 10  # convert to D2h subgroup
-        orbsym = ghf_symm.get_orbsym(mol, mo_coeff)
-        orbsym_in_d2h = numpy.asarray(orbsym) % 10  # convert to D2h irreps
-        sym_forbid = (orbsym_in_d2h[occidx,None] ^ orbsym_in_d2h[viridx]) != wfnsym
+        sym_forbid = _get_x_sym_table(mf) != wfnsym
 
-    if fock_ao is None:
-        #dm0 = mf.make_rdm1(mo_coeff, mo_occ)
-        #fock_ao = mf.get_hcore() + mf.get_veff(mol, dm0)
-        foo = numpy.diag(mo_energy[occidx])
-        fvv = numpy.diag(mo_energy[viridx])
-    else:
-        fock = reduce(numpy.dot, (mo_coeff.conj().T, fock_ao, mo_coeff))
-        foo = fock[occidx[:,None],occidx]
-        fvv = fock[viridx[:,None],viridx]
-
-    hdiag = fvv.diagonal() - foo.diagonal()[:,None]
+    e_ia = hdiag = mo_energy[viridx] - mo_energy[occidx,None]
     if wfnsym is not None and mol.symmetry:
         hdiag[sym_forbid] = 0
     hdiag = hdiag.ravel().real
@@ -90,23 +78,30 @@ def gen_tda_operation(mf, fock_ao=None, wfnsym=None):
             zs = numpy.copy(zs)
             zs[:,sym_forbid] = 0
 
-        dmov = lib.einsum('xov,qv,po->xpq', zs, orbv.conj(), orbo)
-        v1ao = vresp(dmov)
-        v1ov = lib.einsum('xpq,po,qv->xov', v1ao, orbo.conj(), orbv)
-        v1ov += lib.einsum('xqs,sp->xqp', zs, fvv)
-        v1ov -= lib.einsum('xpr,sp->xsr', zs, foo)
+        dms = lib.einsum('xov,pv,qo->xpq', zs, orbv, orbo.conj())
+        v1ao = vresp(dms)
+        v1mo = lib.einsum('xpq,qo,pv->xov', v1ao, orbo, orbv.conj())
+        v1mo += numpy.einsum('xia,ia->xia', zs, e_ia)
         if wfnsym is not None and mol.symmetry:
-            v1ov[:,sym_forbid] = 0
-        return v1ov.reshape(v1ov.shape[0],-1)
+            v1mo[:,sym_forbid] = 0
+        return v1mo.reshape(v1mo.shape[0],-1)
 
     return vind, hdiag
 gen_tda_hop = gen_tda_operation
 
+def _get_x_sym_table(mf):
+    '''Irrep (up to D2h symmetry) of each coefficient in X[nocc,nvir]'''
+    mol = mf.mol
+    mo_occ = mf.mo_occ
+    orbsym = ghf_symm.get_orbsym(mol, mf.mo_coeff)
+    orbsym = numpy.asarray(orbsym) % 10  # convert to D2h irreps
+    return orbsym[mo_occ==1,None] ^ orbsym[mo_occ==0]
+
 def get_ab(mf, mo_energy=None, mo_coeff=None, mo_occ=None):
     r'''A and B matrices for TDDFT response function.
 
-    A[i,a,j,b] = \delta_{ab}\delta_{ij}(E_a - E_i) + (ia||bj)
-    B[i,a,j,b] = (ia||jb)
+    A[i,a,j,b] = \delta_{ab}\delta_{ij}(E_a - E_i) + (ai||jb)
+    B[i,a,j,b] = (ai||bj)
     '''
     if mo_energy is None: mo_energy = mf.mo_energy
     if mo_coeff is None: mo_coeff = mf.mo_coeff
@@ -128,7 +123,7 @@ def get_ab(mf, mo_energy=None, mo_coeff=None, mo_occ=None):
     orbob = orbo[nao:]
     nmo = nocc + nvir
 
-    e_ia = lib.direct_sum('a-i->ia', mo_energy[viridx], mo_energy[occidx])
+    e_ia = mo_energy[viridx] - mo_energy[occidx,None]
     a = numpy.diag(e_ia.ravel()).reshape(nocc,nvir,nocc,nvir).astype(mo_coeff.dtype)
     b = numpy.zeros_like(a)
 
@@ -145,13 +140,13 @@ def get_ab(mf, mo_energy=None, mo_coeff=None, mo_occ=None):
             eri_mo_a+= lib.einsum('pqrs,pi,qj->ijrs', eri_ao, orbob.conj(), mob)
             eri_mo = lib.einsum('ijrs,rk,sl->ijkl', eri_mo_a, moa.conj(), moa)
             eri_mo+= lib.einsum('ijrs,rk,sl->ijkl', eri_mo_a, mob.conj(), mob)
-        a += numpy.einsum('iabj->iajb', eri_mo[:nocc,nocc:,nocc:,:nocc])
-        a -= numpy.einsum('ijba->iajb', eri_mo[:nocc,:nocc,nocc:,nocc:]) * hyb
-        b += numpy.einsum('iajb->iajb', eri_mo[:nocc,nocc:,:nocc,nocc:])
-        b -= numpy.einsum('jaib->iajb', eri_mo[:nocc,nocc:,:nocc,nocc:]) * hyb
+        a += numpy.einsum('iabj->iajb', eri_mo[:nocc,nocc:,nocc:,:nocc].conj())
+        a -= numpy.einsum('ijba->iajb', eri_mo[:nocc,:nocc,nocc:,nocc:].conj()) * hyb
+        b += numpy.einsum('iajb->iajb', eri_mo[:nocc,nocc:,:nocc,nocc:].conj())
+        b -= numpy.einsum('jaib->iajb', eri_mo[:nocc,nocc:,:nocc,nocc:].conj()) * hyb
         return a, b
 
-    if isinstance(mf, dft.KohnShamDFT):
+    if isinstance(mf, scf.hf.KohnShamDFT):
         from pyscf.dft import xc_deriv
         ni = mf._numint
         ni.libxc.test_deriv_order(mf.xc, 2, raise_error=True)
@@ -208,9 +203,9 @@ def get_ab(mf, mo_energy=None, mo_coeff=None, mo_occ=None):
                     rho_ov_bb = numpy.einsum('ri,ra->ria', mo_ob.conj(), mo_vb)
                     rho_ov = ud2tm(rho_ov_aa, rho_ov_ab, rho_ov_ba, rho_ov_bb)
                     rho_vo = rho_ov.conj()
-                    w_ov = numpy.einsum('tsr,tria->sria', wfxc, rho_ov)
-                    a += lib.einsum('sria,srjb->iajb', w_ov, rho_vo)
-                    b += lib.einsum('sria,srjb->iajb', w_ov, rho_ov)
+                    w_vo = numpy.einsum('tsr,tria->sria', wfxc, rho_vo)
+                    a += lib.einsum('sria,srjb->iajb', w_vo, rho_ov)
+                    b += lib.einsum('sria,srjb->iajb', w_vo, rho_vo)
                 elif ni.collinear[0] == 'c':
                     rho = ni.eval_rho(mol, ao, dm0, mask, xctype, hermi=1, with_lapl=False)
                     fxc = ni.eval_xc_eff(mf.xc, rho, deriv=2)[2]
@@ -220,13 +215,13 @@ def get_ab(mf, mo_energy=None, mo_coeff=None, mo_occ=None):
                     rho_ov_b = numpy.einsum('ri,ra->ria', mo_ob.conj(), mo_vb)
                     rho_vo_a = rho_ov_a.conj()
                     rho_vo_b = rho_ov_b.conj()
-                    w_ov  = wv_a[:,:,None,None] * rho_ov_a
-                    w_ov += wv_b[:,:,None,None] * rho_ov_b
-                    wa_ov, wb_ov = w_ov
-                    a += lib.einsum('ria,rjb->iajb', wa_ov, rho_vo_a)
-                    a += lib.einsum('ria,rjb->iajb', wb_ov, rho_vo_b)
-                    b += lib.einsum('ria,rjb->iajb', wa_ov, rho_ov_a)
-                    b += lib.einsum('ria,rjb->iajb', wb_ov, rho_ov_b)
+                    w_vo  = wv_a[:,:,None,None] * rho_vo_a
+                    w_vo += wv_b[:,:,None,None] * rho_vo_b
+                    wa_vo, wb_vo = w_vo
+                    a += lib.einsum('ria,rjb->iajb', wa_vo, rho_ov_a)
+                    a += lib.einsum('ria,rjb->iajb', wb_vo, rho_ov_b)
+                    b += lib.einsum('ria,rjb->iajb', wa_vo, rho_vo_a)
+                    b += lib.einsum('ria,rjb->iajb', wb_vo, rho_vo_b)
                 else:
                     raise NotImplementedError(ni.collinear)
 
@@ -251,9 +246,9 @@ def get_ab(mf, mo_energy=None, mo_coeff=None, mo_occ=None):
                     rho_ov_bb[1:4] += numpy.einsum('xri,ra->xria', mo_ob[1:4].conj(), mo_vb[0])
                     rho_ov = ud2tm(rho_ov_aa, rho_ov_ab, rho_ov_ba, rho_ov_bb)
                     rho_vo = rho_ov.conj()
-                    w_ov = numpy.einsum('txsyr,txria->syria', wfxc, rho_ov)
-                    a += lib.einsum('syria,syrjb->iajb', w_ov, rho_vo)
-                    b += lib.einsum('syria,syrjb->iajb', w_ov, rho_ov)
+                    w_vo = numpy.einsum('txsyr,txria->syria', wfxc, rho_vo)
+                    a += lib.einsum('syria,syrjb->iajb', w_vo, rho_ov)
+                    b += lib.einsum('syria,syrjb->iajb', w_vo, rho_vo)
                 elif ni.collinear[0] == 'c':
                     rho = ni.eval_rho(mol, ao, dm0, mask, xctype, hermi=1, with_lapl=False)
                     fxc = ni.eval_xc_eff(mf.xc, rho, deriv=2)[2]
@@ -265,13 +260,13 @@ def get_ab(mf, mo_energy=None, mo_coeff=None, mo_occ=None):
                     rho_ov_b[1:4] += numpy.einsum('ri,xra->xria', mo_ob[0].conj(), mo_vb[1:4])
                     rho_vo_a = rho_ov_a.conj()
                     rho_vo_b = rho_ov_b.conj()
-                    w_ov  = numpy.einsum('xsyr,xria->syria', wv_a, rho_ov_a)
-                    w_ov += numpy.einsum('xsyr,xria->syria', wv_b, rho_ov_b)
-                    wa_ov, wb_ov = w_ov
-                    a += lib.einsum('xria,xrjb->iajb', wa_ov, rho_vo_a)
-                    a += lib.einsum('xria,xrjb->iajb', wb_ov, rho_vo_b)
-                    b += lib.einsum('xria,xrjb->iajb', wa_ov, rho_ov_a)
-                    b += lib.einsum('xria,xrjb->iajb', wb_ov, rho_ov_b)
+                    w_vo  = numpy.einsum('xsyr,xria->syria', wv_a, rho_vo_a)
+                    w_vo += numpy.einsum('xsyr,xria->syria', wv_b, rho_vo_b)
+                    wa_vo, wb_vo = w_vo
+                    a += lib.einsum('xria,xrjb->iajb', wa_vo, rho_ov_a)
+                    a += lib.einsum('xria,xrjb->iajb', wb_vo, rho_ov_b)
+                    b += lib.einsum('xria,xrjb->iajb', wa_vo, rho_vo_a)
+                    b += lib.einsum('xria,xrjb->iajb', wb_vo, rho_vo_b)
                 else:
                     raise NotImplementedError(ni.collinear)
 
@@ -310,9 +305,9 @@ def get_ab(mf, mo_energy=None, mo_coeff=None, mo_occ=None):
                     rho_ov_bb = numpy.vstack([rho_ov_bb, tau_ov_bb[numpy.newaxis]])
                     rho_ov = ud2tm(rho_ov_aa, rho_ov_ab, rho_ov_ba, rho_ov_bb)
                     rho_vo = rho_ov.conj()
-                    w_ov = numpy.einsum('txsyr,txria->syria', wfxc, rho_ov)
-                    a += lib.einsum('syria,syrjb->iajb', w_ov, rho_vo)
-                    b += lib.einsum('syria,syrjb->iajb', w_ov, rho_ov)
+                    w_vo = numpy.einsum('txsyr,txria->syria', wfxc, rho_vo)
+                    a += lib.einsum('syria,syrjb->iajb', w_vo, rho_ov)
+                    b += lib.einsum('syria,syrjb->iajb', w_vo, rho_vo)
                 elif ni.collinear[0] == 'c':
                     rho = ni.eval_rho(mol, ao, dm0, mask, xctype, hermi=1, with_lapl=False)
                     fxc = ni.eval_xc_eff(mf.xc, rho, deriv=2)[2]
@@ -328,13 +323,13 @@ def get_ab(mf, mo_energy=None, mo_coeff=None, mo_occ=None):
                     rho_ov_b = numpy.vstack([rho_ov_b, tau_ov_b[numpy.newaxis]])
                     rho_vo_a = rho_ov_a.conj()
                     rho_vo_b = rho_ov_b.conj()
-                    w_ov  = numpy.einsum('xsyr,xria->syria', wv_a, rho_ov_a)
-                    w_ov += numpy.einsum('xsyr,xria->syria', wv_b, rho_ov_b)
-                    wa_ov, wb_ov = w_ov
-                    a += lib.einsum('xria,xrjb->iajb', wa_ov, rho_vo_a)
-                    a += lib.einsum('xria,xrjb->iajb', wb_ov, rho_vo_b)
-                    b += lib.einsum('xria,xrjb->iajb', wa_ov, rho_ov_a)
-                    b += lib.einsum('xria,xrjb->iajb', wb_ov, rho_ov_b)
+                    w_vo  = numpy.einsum('xsyr,xria->syria', wv_a, rho_vo_a)
+                    w_vo += numpy.einsum('xsyr,xria->syria', wv_b, rho_vo_b)
+                    wa_vo, wb_vo = w_vo
+                    a += lib.einsum('xria,xrjb->iajb', wa_vo, rho_ov_a)
+                    a += lib.einsum('xria,xrjb->iajb', wb_vo, rho_ov_b)
+                    b += lib.einsum('xria,xrjb->iajb', wa_vo, rho_vo_a)
+                    b += lib.einsum('xria,xrjb->iajb', wb_vo, rho_vo_b)
                 else:
                     raise NotImplementedError(ni.collinear)
 
@@ -379,7 +374,7 @@ class TDA(TDBase):
             mf = self._scf
         return gen_tda_hop(mf, wfnsym=self.wfnsym)
 
-    def init_guess(self, mf, nstates=None, wfnsym=None):
+    def init_guess(self, mf, nstates=None, wfnsym=None, return_symmetry=False):
         if nstates is None: nstates = self.nstates
         if wfnsym is None: wfnsym = self.wfnsym
 
@@ -387,27 +382,36 @@ class TDA(TDBase):
         mo_occ = mf.mo_occ
         occidx = numpy.where(mo_occ==1)[0]
         viridx = numpy.where(mo_occ==0)[0]
-        e_ia = mo_energy[viridx] - mo_energy[occidx,None]
-
-        if wfnsym is not None and mf.mol.symmetry:
-            if isinstance(wfnsym, str):
-                wfnsym = symm.irrep_name2id(mf.mol.groupname, wfnsym)
-            wfnsym = wfnsym % 10  # convert to D2h subgroup
-            orbsym = ghf_symm.get_orbsym(mf.mol, mf.mo_coeff)
-            orbsym_in_d2h = numpy.asarray(orbsym) % 10  # convert to D2h irreps
-            e_ia[(orbsym_in_d2h[occidx,None] ^ orbsym_in_d2h[viridx]) != wfnsym] = 1e99
-
+        e_ia = (mo_energy[viridx] - mo_energy[occidx,None]).ravel()
         nov = e_ia.size
         nstates = min(nstates, nov)
-        e_ia = e_ia.ravel()
-        e_threshold = numpy.sort(e_ia)[nstates-1]
+
+        if (wfnsym is not None or return_symmetry) and mf.mol.symmetry:
+            x_sym = _get_x_sym_table(mf).ravel()
+            if wfnsym is not None:
+                if isinstance(wfnsym, str):
+                    wfnsym = symm.irrep_name2id(mf.mol.groupname, wfnsym)
+                wfnsym = wfnsym % 10  # convert to D2h subgroup
+                e_ia[x_sym != wfnsym] = 1e99
+                nov_allowed = numpy.count_nonzero(x_sym == wfnsym)
+                nstates = min(nstates, nov_allowed)
+
+        e_threshold = numpy.partition(e_ia, nstates-1)[nstates-1]
         e_threshold += self.deg_eia_thresh
 
         idx = numpy.where(e_ia <= e_threshold)[0]
         x0 = numpy.zeros((idx.size, nov))
         for i, j in enumerate(idx):
             x0[i, j] = 1  # Koopmans' excitations
-        return x0
+
+        if return_symmetry:
+            if mf.mol.symmetry:
+                x0sym = x_sym[idx]
+            else:
+                x0sym = None
+            return x0, x0sym
+        else:
+            return x0
 
     def kernel(self, x0=None, nstates=None):
         '''TDA diagonalization solver
@@ -419,6 +423,7 @@ class TDA(TDBase):
             nstates = self.nstates
         else:
             self.nstates = nstates
+        mol = self.mol
 
         log = logger.Logger(self.stdout, self.verbose)
 
@@ -429,17 +434,18 @@ class TDA(TDBase):
             idx = numpy.where(w > self.positive_eig_threshold)[0]
             return w[idx], v[:,idx], idx
 
+        x0sym = None
         if x0 is None:
-            x0 = self.init_guess(self._scf, self.nstates)
+            x0, x0sym = self.init_guess(
+                self._scf, self.nstates, return_symmetry=True)
+        elif mol.symmetry:
+            x_sym = _get_x_sym_table(self._scf).ravel()
+            x0sym = [rhf._guess_wfnsym_id(self, x_sym, x) for x in x0]
 
-        # FIXME: Is it correct to call davidson1 for complex integrals
-        self.converged, self.e, x1 = \
-                lib.davidson1(vind, x0, precond,
-                              tol=self.conv_tol,
-                              nroots=nstates, lindep=self.lindep,
-                              max_cycle=self.max_cycle,
-                              max_space=self.max_space, pick=pickeig,
-                              verbose=log)
+        self.converged, self.e, x1 = lr_eigh(
+            vind, x0, precond, tol_residual=self.conv_tol, lindep=self.lindep,
+            nroots=nstates, x0sym=x0sym, pick=pickeig, max_cycle=self.max_cycle,
+            max_memory=self.max_memory, verbose=log)
 
         nocc = (self._scf.mo_occ>0).sum()
         nmo = self._scf.mo_occ.size
@@ -479,19 +485,11 @@ def gen_tdhf_operation(mf, fock_ao=None, wfnsym=None):
         if isinstance(wfnsym, str):
             wfnsym = symm.irrep_name2id(mol.groupname, wfnsym)
         wfnsym = wfnsym % 10  # convert to D2h subgroup
-        orbsym = ghf_symm.get_orbsym(mol, mo_coeff)
-        orbsym_in_d2h = numpy.asarray(orbsym) % 10  # convert to D2h irreps
-        sym_forbid = (orbsym_in_d2h[occidx,None] ^ orbsym_in_d2h[viridx]) != wfnsym
+        sym_forbid = _get_x_sym_table(mf) != wfnsym
 
-    #dm0 = mf.make_rdm1(mo_coeff, mo_occ)
-    #fock_ao = mf.get_hcore() + mf.get_veff(mol, dm0)
-    #fock = reduce(numpy.dot, (mo_coeff.T, fock_ao, mo_coeff))
-    #foo = fock[occidx[:,None],occidx]
-    #fvv = fock[viridx[:,None],viridx]
-    foo = numpy.diag(mo_energy[occidx])
-    fvv = numpy.diag(mo_energy[viridx])
+    assert fock_ao is None
 
-    hdiag = fvv.diagonal() - foo.diagonal()[:,None]
+    e_ia = hdiag = mo_energy[viridx] - mo_energy[occidx,None]
     if wfnsym is not None and mol.symmetry:
         hdiag[sym_forbid] = 0
     hdiag = numpy.hstack((hdiag.ravel(), -hdiag.ravel())).real
@@ -507,25 +505,28 @@ def gen_tdhf_operation(mf, fock_ao=None, wfnsym=None):
             xys[:,:,sym_forbid] = 0
 
         xs, ys = xys.transpose(1,0,2,3)
-        # dms = AX + BY
-        dms  = lib.einsum('xov,qv,po->xpq', xs, orbv.conj(), orbo)
-        dms += lib.einsum('xov,pv,qo->xpq', ys, orbv, orbo.conj())
-
-        v1ao = vresp(dms)
-        v1ov = lib.einsum('xpq,po,qv->xov', v1ao, orbo.conj(), orbv)
-        v1vo = lib.einsum('xpq,qo,pv->xov', v1ao, orbo, orbv.conj())
-        v1ov += lib.einsum('xqs,sp->xqp', xs, fvv)  # AX
-        v1ov -= lib.einsum('xpr,sp->xsr', xs, foo)  # AX
-        v1vo += lib.einsum('xqs,sp->xqp', ys, fvv.conj())  # (A*)Y
-        v1vo -= lib.einsum('xpr,sp->xsr', ys, foo.conj())  # (A*)Y
+        dms  = lib.einsum('xov,pv,qo->xpq', xs, orbv, orbo.conj())
+        dms += lib.einsum('xov,qv,po->xpq', ys, orbv.conj(), orbo)
+        v1ao = vresp(dms) # = <mj||nb> Xjb + <mb||nj> Yjb
+        # A ~= <aj||ib>, B = <ab||ij>
+        # AX + BY
+        # = <aj||ib> Xjb + <ab||ij> Yjb
+        # = (<mj||nb> Xjb + <mb||nj> Yjb) Cma* Cni
+        v1_top = lib.einsum('xpq,qo,pv->xov', v1ao, orbo, orbv.conj())
+        # (B*)X + (A*)Y
+        # = <ij||ab> Xjb + <ib||aj> Yjb
+        # = (<mj||nb> Xjb + <mb||nj> Yjb) Cmi* Cna
+        v1_bot = lib.einsum('xpq,po,qv->xov', v1ao, orbo.conj(), orbv)
+        v1_top += numpy.einsum('xia,ia->xia', xs, e_ia)  # AX
+        v1_bot += numpy.einsum('xia,ia->xia', ys, e_ia)  # (A*)Y
 
         if wfnsym is not None and mol.symmetry:
-            v1ov[:,sym_forbid] = 0
-            v1vo[:,sym_forbid] = 0
+            v1_top[:,sym_forbid] = 0
+            v1_bot[:,sym_forbid] = 0
 
         # (AX, (-A*)Y)
         nz = xys.shape[0]
-        hx = numpy.hstack((v1ov.reshape(nz,-1), -v1vo.reshape(nz,-1)))
+        hx = numpy.hstack((v1_top.reshape(nz,-1), -v1_bot.reshape(nz,-1)))
         return hx
 
     return vind, hdiag
@@ -541,10 +542,15 @@ class TDHF(TDBase):
             mf = self._scf
         return gen_tdhf_operation(mf, wfnsym=self.wfnsym)
 
-    def init_guess(self, mf, nstates=None, wfnsym=None):
-        x0 = TDA.init_guess(self, mf, nstates, wfnsym)
-        y0 = numpy.zeros_like(x0)
-        return numpy.asarray(numpy.block([[x0, y0], [y0, x0.conj()]]))
+    def init_guess(self, mf, nstates=None, wfnsym=None, return_symmetry=False):
+        if return_symmetry:
+            x0, x0sym = TDA.init_guess(self, mf, nstates, wfnsym, return_symmetry)
+            y0 = numpy.zeros_like(x0)
+            return numpy.hstack([x0, y0]), x0sym
+        else:
+            x0 = TDA.init_guess(self, mf, nstates, wfnsym, return_symmetry)
+            y0 = numpy.zeros_like(x0)
+            return numpy.hstack([x0, y0])
 
     def kernel(self, x0=None, nstates=None):
         '''TDHF diagonalization with non-Hermitian eigenvalue solver
@@ -556,6 +562,7 @@ class TDHF(TDBase):
             nstates = self.nstates
         else:
             self.nstates = nstates
+        mol = self.mol
 
         log = logger.Logger(self.stdout, self.verbose)
 
@@ -569,16 +576,19 @@ class TDHF(TDBase):
             # FIXME: Should the amplitudes be real? It also affects x2c-tdscf
             return lib.linalg_helper._eigs_cmplx2real(w, v, realidx, ensure_real)
 
+        x0sym = None
         if x0 is None:
-            x0 = self.init_guess(self._scf, self.nstates)
+            x0, x0sym = self.init_guess(
+                self._scf, self.nstates, return_symmetry=True)
+        elif mol.symmetry:
+            x_sym = y_sym = _get_x_sym_table(self._scf).ravel()
+            x_sym = numpy.append(x_sym, y_sym)
+            x0sym = [rhf._guess_wfnsym_id(self, x_sym, x) for x in x0]
 
-        self.converged, w, x1 = \
-                lib.davidson_nosym1(vind, x0, precond,
-                                    tol=self.conv_tol,
-                                    nroots=nstates, lindep=self.lindep,
-                                    max_cycle=self.max_cycle,
-                                    max_space=self.max_space, pick=pickeig,
-                                    verbose=log)
+        self.converged, w, x1 = lr_eig(
+            vind, x0, precond, tol_residual=self.conv_tol, lindep=self.lindep,
+            nroots=nstates, x0sym=x0sym, pick=pickeig, max_cycle=self.max_cycle,
+            max_memory=self.max_memory, verbose=log)
 
         nocc = (self._scf.mo_occ>0).sum()
         nmo = self._scf.mo_occ.size
@@ -587,7 +597,9 @@ class TDHF(TDBase):
         def norm_xy(z):
             x, y = z.reshape(2,nocc,nvir)
             norm = lib.norm(x)**2 - lib.norm(y)**2
-            norm = numpy.sqrt(1./norm)
+            if norm < 0:
+                log.warn('TDDFT amplitudes |X| smaller than |Y|')
+            norm = abs(norm)**-.5
             return x*norm, y*norm
         self.xy = [norm_xy(z) for z in x1]
 
@@ -601,6 +613,5 @@ class TDHF(TDBase):
 
 RPA = TDGHF = TDHF
 
-from pyscf import scf
 scf.ghf.GHF.TDA = lib.class_as_method(TDA)
 scf.ghf.GHF.TDHF = lib.class_as_method(TDHF)

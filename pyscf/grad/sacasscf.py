@@ -444,6 +444,8 @@ class Gradients (lagrange.Gradients):
             self.e_states = np.asarray (mc.e_tot)
         if isinstance (mc, StateAverageMCSCFSolver):
             self.weights = np.asarray (mc.weights)
+        if np.amax (self.weights) - np.amin (self.weights) > 1e-8:
+            raise NotImplementedError ("Unequal weights in SA-CASSCF gradients")
         assert (len (self.weights) == self.nroots), '{} {} {}'.format (
             mc.fcisolver.__class__, self.weights, self.nroots)
         lagrange.Gradients.__init__(self, mc, self.ngorb+self.nci)
@@ -876,7 +878,7 @@ class SACASLagPrec (lagrange.LagPrec):
                 except Exception as e:
                     print (i, j, desort_spin)
                     raise (e)
-        assert (all ([i is not None for i in Mxci]))
+        assert (all (i is not None for i in Mxci))
         return Mxci
 
 mcscf.addons.StateAverageMCSCFSolver.Gradients = lib.class_as_method(Gradients)

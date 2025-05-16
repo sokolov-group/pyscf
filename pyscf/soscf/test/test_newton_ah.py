@@ -103,6 +103,15 @@ def tearDownModule():
     del h2o_z0, h2o_z1, h2o_z0_s, h2o_z1_s, h4_z0_s, h4_z1_s
 
 class KnownValues(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.original_grids = dft.radi.ATOM_SPECIFIC_TREUTLER_GRIDS
+        dft.radi.ATOM_SPECIFIC_TREUTLER_GRIDS = False
+
+    @classmethod
+    def tearDownClass(cls):
+        dft.radi.ATOM_SPECIFIC_TREUTLER_GRIDS = cls.original_grids
+
     def test_nr_rhf(self):
         mf = scf.RHF(h2o_z0)
         mf.max_cycle = 1
@@ -133,6 +142,15 @@ class KnownValues(unittest.TestCase):
         nr.max_cycle = 2
         nr.conv_tol_grad = 1e-5
         self.assertAlmostEqual(nr.kernel(), -75.58051984397145, 9)
+
+        nr1 = scf.newton(mf)
+        nr1.max_cycle = 0 # Should reproduce energy of the initial guess
+        nr1.kernel()
+        self.assertAlmostEqual(nr1.e_tot, mf.e_tot, 10)
+
+        nr1.max_cycle = 2
+        nr1.kernel()
+        self.assertAlmostEqual(nr1.e_tot, nr.e_tot, 10)
 
     def test_nr_uhf_cart(self):
         mol = h2o_z1.copy()

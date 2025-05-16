@@ -93,6 +93,8 @@ class SCFWithSolvent(_Solvation):
     def get_fock(self, h1e=None, s1e=None, vhf=None, dm=None, cycle=-1,
                  diis=None, diis_start_cycle=None,
                  level_shift_factor=None, damp_factor=None, fock_last=None):
+        if dm is None: dm = self.make_rdm1()
+
         # DIIS was called inside super().get_fock. v_solvent, as a function of
         # dm, should be extrapolated as well. To enable it, v_solvent has to be
         # added to the fock matrix before DIIS was called.
@@ -142,7 +144,13 @@ class SCFWithSolvent(_Solvation):
     def gen_response(self, *args, **kwargs):
         vind = super().gen_response(*args, **kwargs)
         is_uhf = isinstance(self, scf.uhf.UHF)
-        # singlet=None is orbital hessian or CPHF type response function
+        # * singlet=None is orbital hessian or CPHF type response function.
+        # Except TDDFT, this is the default case for all response calculations
+        # (such as stability analysis, SOSCF, polarizability and Hessian).
+        # * In TDDFT, this setting only affect RHF wfn. The UHF wfn does not
+        # depend on the setting of "singlet".
+        # * For RHF reference, the triplet excitation does not change the total
+        # electron density, thus does not lead to solvent response.
         singlet = kwargs.get('singlet', True)
         singlet = singlet or singlet is None
         def vind_with_solvent(dm1):
@@ -153,6 +161,10 @@ class SCFWithSolvent(_Solvation):
                     v += v_solvent[0] + v_solvent[1]
                 elif singlet:
                     v += self.with_solvent._B_dot_x(dm1)
+                else:
+                    # The response of electron density should be strictly zero
+                    # for TDDFT triplet
+                    pass
             return v
         return vind_with_solvent
 

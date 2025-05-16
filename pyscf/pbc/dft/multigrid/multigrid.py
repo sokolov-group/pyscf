@@ -32,13 +32,14 @@ from pyscf.pbc import gto
 from pyscf.pbc.gto import pseudo
 from pyscf.pbc.gto.pseudo import pp_int
 from pyscf.pbc.dft import numint, gen_grid
+from pyscf.pbc.scf.khf import KSCF
 from pyscf.pbc.df.df_jk import (
     _format_dms,
     _format_kpts_band,
     _format_jks,
 )
 from pyscf.pbc.lib.kpts_helper import gamma_point
-from pyscf.pbc.df import fft, ft_ao
+from pyscf.pbc.df import fft, ft_ao, aft
 from pyscf.pbc.dft.multigrid.utils import (
     _take_4d,
     _take_5d,
@@ -508,7 +509,7 @@ def get_j_kpts(mydf, dm_kpts, hermi=1, kpts=numpy.zeros((1,3)), kpts_band=None):
         kpts : (nkpts, 3) ndarray
 
     Kwargs:
-        kpts_band : (3,) ndarray or (*,3) ndarray
+        kpts_band : ``(3,)`` ndarray or ``(*,3)`` ndarray
             A list of arbitrary "band" k-points at which to evalute the matrix.
 
     Returns:
@@ -601,16 +602,16 @@ def _eval_rhoG(mydf, dm_kpts, hermi=1, kpts=numpy.zeros((1,3)), deriv=0,
             dms_ht = numpy.asarray(dms[:,:,idx_h[:,None],idx_t], order='C')
             dms_lh = numpy.asarray(dms[:,:,idx_l[:,None],idx_h], order='C')
 
-            t_cell = h_cell + grids_sparse.cell
+            l_cell = grids_sparse.cell
+            h_pcell, h_coeff = h_cell.decontract_basis(to_cart=True, aggregate=True)
+            l_pcell, l_coeff = l_cell.decontract_basis(to_cart=True, aggregate=True)
+            t_cell = h_pcell + l_pcell
+            t_coeff = scipy.linalg.block_diag(h_coeff, l_coeff)
+
             nshells_h = _pgto_shells(h_cell)
             nshells_t = _pgto_shells(t_cell)
-            t_cell, t_coeff = t_cell.to_uncontracted_cartesian_basis()
 
             if deriv == 0:
-                h_coeff = scipy.linalg.block_diag(*t_coeff[:h_cell.nbas])
-                l_coeff = scipy.linalg.block_diag(*t_coeff[h_cell.nbas:])
-                t_coeff = scipy.linalg.block_diag(*t_coeff)
-
                 if hermi == 1:
                     naol, naoh = dms_lh.shape[2:]
                     dms_ht[:,:,:,naoh:] += dms_lh.transpose(0,1,3,2)
@@ -635,10 +636,6 @@ def _eval_rhoG(mydf, dm_kpts, hermi=1, kpts=numpy.zeros((1,3)), deriv=0,
                                          'LDA', kpts, grids_dense, ignore_imag, log)
 
             elif deriv == 1:
-                h_coeff = scipy.linalg.block_diag(*t_coeff[:h_cell.nbas])
-                l_coeff = scipy.linalg.block_diag(*t_coeff[h_cell.nbas:])
-                t_coeff = scipy.linalg.block_diag(*t_coeff)
-
                 pgto_dms = lib.einsum('nkij,pi,qj->nkpq', dms_ht, h_coeff, t_coeff)
                 shls_slice = (0, nshells_h, 0, nshells_t)
                 #:rho = eval_rho(t_cell, pgto_dms, shls_slice, 0, 'GGA', kpts,
@@ -895,13 +892,13 @@ def _get_j_pass2(mydf, vG, hermi=1, kpts=numpy.zeros((1,3)), verbose=None):
 
             h_cell = grids_dense.cell
             l_cell = grids_sparse.cell
-            t_cell = h_cell + l_cell
-            t_cell, coeff = t_cell.to_uncontracted_cartesian_basis()
+            h_pcell, h_coeff = h_cell.decontract_basis(to_cart=True, aggregate=True)
+            l_pcell, l_coeff = l_cell.decontract_basis(to_cart=True, aggregate=True)
+            t_cell = h_pcell + l_pcell
+            t_coeff = scipy.linalg.block_diag(h_coeff, l_coeff)
+
             nshells_h = _pgto_shells(h_cell)
             nshells_t = _pgto_shells(t_cell)
-
-            h_coeff = scipy.linalg.block_diag(*coeff[:h_cell.nbas])
-            t_coeff = scipy.linalg.block_diag(*coeff)
             shls_slice = (0, nshells_h, 0, nshells_t)
             vp = eval_mat(t_cell, vR, shls_slice, 1, 0, 'LDA', kpts)
             # Imaginary part may contribute
@@ -919,7 +916,6 @@ def _get_j_pass2(mydf, vG, hermi=1, kpts=numpy.zeros((1,3)), verbose=None):
                 vj_kpts[:,:,idx_l[:,None],idx_h] += \
                         vp[:,:,:,naoh:].transpose(0,1,3,2).conj()
             else:
-                l_coeff = scipy.linalg.block_diag(*coeff[h_cell.nbas:])
                 shls_slice = (nshells_h, nshells_t, 0, nshells_h)
                 vp = eval_mat(t_cell, vR, shls_slice, 1, 0, 'LDA', kpts)
                 # Imaginary part may contribute
@@ -996,15 +992,13 @@ def _get_gga_pass2(mydf, vG, hermi=1, kpts=numpy.zeros((1,3)), verbose=None):
 
             h_cell = grids_dense.cell
             l_cell = grids_sparse.cell
-            t_cell = h_cell + l_cell
-            t_cell, coeff = t_cell.to_uncontracted_cartesian_basis()
+            h_pcell, h_coeff = h_cell.decontract_basis(to_cart=True, aggregate=True)
+            l_pcell, l_coeff = l_cell.decontract_basis(to_cart=True, aggregate=True)
+            t_cell = h_pcell + l_pcell
+            t_coeff = scipy.linalg.block_diag(h_coeff, l_coeff)
+
             nshells_h = _pgto_shells(h_cell)
             nshells_t = _pgto_shells(t_cell)
-
-            h_coeff = scipy.linalg.block_diag(*coeff[:h_cell.nbas])
-            l_coeff = scipy.linalg.block_diag(*coeff[h_cell.nbas:])
-            t_coeff = scipy.linalg.block_diag(*coeff)
-
             shls_slice = (0, nshells_h, 0, nshells_t)
             vpR = eval_mat(t_cell, vR, shls_slice, 1, 0, 'GGA', kpts)
             vp = vpR = lib.einsum('nkpq,pi,qj->nkij', vpR, h_coeff, t_coeff)
@@ -1054,7 +1048,7 @@ def nr_rks(mydf, xc_code, dm_kpts, hermi=1, kpts=None,
         kpts : (nkpts, 3) ndarray
 
     Kwargs:
-        kpts_band : (3,) ndarray or (*,3) ndarray
+        kpts_band : ``(3,)`` ndarray or ``(*,3)`` ndarray
             A list of arbitrary "band" k-points at which to evalute the matrix.
 
     Returns:
@@ -1160,7 +1154,7 @@ def nr_uks(mydf, xc_code, dm_kpts, hermi=1, kpts=None,
         kpts : (nkpts, 3) ndarray
 
     Kwargs:
-        kpts_band : (3,) ndarray or (*,3) ndarray
+        kpts_band : ``(3,)`` ndarray or ``(*,3)`` ndarray
             A list of arbitrary "band" k-points at which to evalute the matrix.
 
     Returns:
@@ -1504,7 +1498,7 @@ def _gen_rhf_response(mf, dm0, singlet=None, hermi=0):
     '''multigrid version of function pbc.scf.newton_ah._gen_rhf_response
     '''
     #assert (isinstance(mf, dft.krks.KRKS))
-    if getattr(mf, 'kpts', None) is not None:
+    if isinstance(mf, KSCF):
         kpts = mf.kpts
     else:
         kpts = mf.kpt.reshape(1,3)
@@ -1535,7 +1529,7 @@ def _gen_uhf_response(mf, dm0, with_j=True, hermi=0):
     '''multigrid version of function pbc.scf.newton_ah._gen_uhf_response
     '''
     #assert (isinstance(mf, dft.kuks.KUKS))
-    if getattr(mf, 'kpts', None) is not None:
+    if isinstance(mf, KSCF):
         kpts = mf.kpts
     else:
         kpts = mf.kpt.reshape(1,3)
@@ -1869,7 +1863,12 @@ class MultiGridFFTDF(fft.FFTDF):
     get_nuc = get_nuc
 
     def get_jk(self, dm, hermi=1, kpts=None, kpts_band=None,
-               with_j=True, with_k=True, exxdiv='ewald', **kwargs):
+               with_j=True, with_k=True, omega=None, exxdiv='ewald'):
+        if omega is not None:  # J/K for RSH functionals
+            with self.range_coulomb(omega) as rsh_df:
+                return rsh_df.get_jk(dm, hermi, kpts, kpts_band, with_j, with_k,
+                                     omega=None, exxdiv=exxdiv)
+
         from pyscf.pbc.df import fft_jk
         if with_k:
             logger.warn(self, 'MultiGridFFTDF does not support HFX. '
@@ -1899,6 +1898,10 @@ class MultiGridFFTDF(fft.FFTDF):
         return vj, vk
 
     get_rho = get_rho
+
+    range_coulomb = aft.AFTDF.range_coulomb
+
+    to_gpu = lib.to_gpu
 
 
 def multigrid_fftdf(mf):

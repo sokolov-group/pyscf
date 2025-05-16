@@ -81,12 +81,14 @@ def parse(string, symb=None, optimize=True):
     '''
     if symb is not None:
         symb = _std_symbol(symb)
-        string = _search_basis_block(re.split(BASIS_SET_DELIMITER, string), symb)
-        if not string:
-            raise BasisNotFoundError('Basis not found for %s' % symb)
+        line_data = _search_basis_block(re.split(BASIS_SET_DELIMITER, string), symb)
+        if not line_data:
+            raise BasisNotFoundError('Basis set not found for %s' % symb)
+    else:
+        line_data = string.splitlines()
 
     raw_basis = []
-    for dat in string.splitlines():
+    for dat in line_data:
         dat = dat.split('#')[0].strip()  # Use # to start comments
         dat_upper = dat.upper()
         if (dat and not dat_upper.startswith('END') and not dat_upper.startswith('BASIS')):
@@ -96,6 +98,8 @@ def parse(string, symb=None, optimize=True):
 def load(basisfile, symb, optimize=True):
     '''Load basis for atom of symb from file'''
     raw_basis = search_seg(basisfile, symb)
+    if not raw_basis:
+        raise BasisNotFoundError('Basis set not found for %s' % symb)
     return _parse(raw_basis, optimize)
 
 def _parse(raw_basis, optimize=True):
@@ -153,17 +157,30 @@ def search_seg(basisfile, symb):
     symb = _std_symbol(symb)
     with open(basisfile, 'r') as fin:
         fdata = re.split(BASIS_SET_DELIMITER, fin.read())
-    raw_basis = _search_basis_block(fdata, symb)
-    return [x for x in raw_basis.splitlines() if x and 'END' not in x]
+    line_data = _search_basis_block(fdata, symb)
+    return [x for x in line_data if x and 'END' not in x]
 
 def _search_basis_block(raw_data, symb):
-    raw_basis = ''
+    line_data = []
     for dat in raw_data:
         dat0 = dat.split(None, 1)
-        if dat0 and dat0[0] == symb:
-            raw_basis = dat
-            break
-    return raw_basis
+        if not dat0:
+            continue
+
+        if dat0[0] == symb:
+            return dat.splitlines()
+
+        elif dat0[0][0] == '#':
+            basis_lines = dat.splitlines()
+            for i, line in enumerate(basis_lines):
+                # Skip all leading '# xxx' lines and empty lines
+                if not line or line.lstrip()[0] == '#':
+                    continue
+                elif line.split(None, 1)[0] == symb:
+                    return basis_lines[i:]
+                else:
+                    break
+    return line_data
 
 def convert_basis_to_nwchem(symb, basis):
     '''Convert the internal basis format to NWChem format string'''
@@ -212,7 +229,7 @@ def optimize_contraction(basis):
             key = tuple(b[:1])
             ec = numpy.array(b[1:]).T
         es = ec[0]
-        cs = [c for c in ec[1:]]
+        cs = list(ec[1:])
 
         if key not in basdic:
             basdic[key] = []

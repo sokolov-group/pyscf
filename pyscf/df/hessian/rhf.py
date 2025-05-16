@@ -39,6 +39,7 @@ import scipy.linalg
 from pyscf import lib
 from pyscf.lib import logger
 from pyscf import ao2mo
+from pyscf import df
 from pyscf.hessian import rhf as rhf_hess
 from pyscf.df.grad.rhf import (_int3c_wrapper, _gen_metric_solver,
                                LINEAR_DEP_THRESHOLD)
@@ -78,7 +79,10 @@ def _partial_hess_ejk(hessobj, mo_energy=None, mo_coeff=None, mo_occ=None,
     # Energy weighted density matrix
     dme0 = numpy.einsum('pi,qi,i->pq', mocc, mocc, mo_energy[mo_occ>0]) * 2
 
-    auxmol = hessobj.base.with_df.auxmol
+    with_df = hessobj.base.with_df
+    auxmol = with_df.auxmol
+    if auxmol is None:
+        auxmol = df.addons.make_auxmol(with_df.mol, with_df.auxbasis)
     naux = auxmol.nao
     nbas = mol.nbas
     auxslices = auxmol.aoslice_by_atom()
@@ -368,16 +372,8 @@ def make_h1(hessobj, mo_coeff, mo_occ, chkfile=None, atmlst=None, verbose=None):
     for ia, h1, vj1, vk1 in _gen_jk(hessobj, mo_coeff, mo_occ, chkfile,
                                     atmlst, verbose, True):
         h1 += vj1 - vk1 * .5
-
-        if chkfile is None:
-            h1ao[ia] = h1
-        else:
-            key = 'scf_f1ao/%d' % ia
-            lib.chkfile.save(chkfile, key, h1)
-    if chkfile is None:
-        return h1ao
-    else:
-        return chkfile
+        h1ao[ia] = h1
+    return h1ao
 
 def _gen_jk(hessobj, mo_coeff, mo_occ, chkfile=None, atmlst=None,
             verbose=None, with_k=True):
@@ -385,7 +381,10 @@ def _gen_jk(hessobj, mo_coeff, mo_occ, chkfile=None, atmlst=None,
     if atmlst is None:
         atmlst = range(mol.natm)
 
-    auxmol = hessobj.base.with_df.auxmol
+    with_df = hessobj.base.with_df
+    auxmol = with_df.auxmol
+    if auxmol is None:
+        auxmol = df.addons.make_auxmol(with_df.mol, with_df.auxbasis)
     nbas = mol.nbas
     auxslices = auxmol.aoslice_by_atom()
     aux_loc = auxmol.ao_loc

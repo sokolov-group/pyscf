@@ -21,9 +21,8 @@ import numpy
 from pyscf import symm
 from pyscf import lib
 from pyscf.lib import logger
-from pyscf.tdscf import uhf
-from pyscf.scf import uhf_symm
-from pyscf.data import nist
+from pyscf.tdscf import uhf, rhf
+from pyscf.tdscf._lr_eig import eigh as lr_eigh
 from pyscf.dft.rks import KohnShamDFT
 from pyscf import __config__
 
@@ -46,6 +45,7 @@ class CasidaTDDFT(TDDFT, TDA):
     '''
 
     init_guess = TDA.init_guess
+    get_precond = TDA.get_precond
 
     def gen_vind(self, mf=None):
         if mf is None:
@@ -74,13 +74,9 @@ class CasidaTDDFT(TDDFT, TDA):
         if wfnsym is not None and mol.symmetry:
             if isinstance(wfnsym, str):
                 wfnsym = symm.irrep_name2id(mol.groupname, wfnsym)
-            orbsyma, orbsymb = uhf_symm.get_orbsym(mol, mo_coeff)
             wfnsym = wfnsym % 10  # convert to D2h subgroup
-            orbsyma_in_d2h = numpy.asarray(orbsyma) % 10
-            orbsymb_in_d2h = numpy.asarray(orbsymb) % 10
-            sym_forbida = (orbsyma_in_d2h[occidxa,None] ^ orbsyma_in_d2h[viridxa]) != wfnsym
-            sym_forbidb = (orbsymb_in_d2h[occidxb,None] ^ orbsymb_in_d2h[viridxb]) != wfnsym
-            sym_forbid = numpy.hstack((sym_forbida.ravel(), sym_forbidb.ravel()))
+            x_sym_a, x_sym_b = uhf._get_x_sym_table(mf)
+            sym_forbid = numpy.append(x_sym_a.ravel(), x_sym_b.ravel()) != wfnsym
 
         e_ia_a = (mo_energy[0][viridxa,None] - mo_energy[0][occidxa]).T
         e_ia_b = (mo_energy[1][viridxb,None] - mo_energy[1][occidxb]).T
@@ -102,15 +98,15 @@ class CasidaTDDFT(TDDFT, TDA):
 
             dmsa = (zs[:,:nocca*nvira] * d_ia[:nocca*nvira]).reshape(nz,nocca,nvira)
             dmsb = (zs[:,nocca*nvira:] * d_ia[nocca*nvira:]).reshape(nz,noccb,nvirb)
-            dmsa = lib.einsum('xov,po,qv->xpq', dmsa, orboa, orbva.conj())
-            dmsb = lib.einsum('xov,po,qv->xpq', dmsb, orbob, orbvb.conj())
-            dmsa = dmsa + dmsa.conj().transpose(0,2,1)
-            dmsb = dmsb + dmsb.conj().transpose(0,2,1)
+            dmsa = lib.einsum('xov,pv,qo->xpq', dmsa, orbva, orboa)
+            dmsb = lib.einsum('xov,pv,qo->xpq', dmsb, orbvb, orbob)
+            dmsa = dmsa + dmsa.transpose(0,2,1)
+            dmsb = dmsb + dmsb.transpose(0,2,1)
 
             v1ao = vresp(numpy.asarray((dmsa,dmsb)))
 
-            v1a = lib.einsum('xpq,po,qv->xov', v1ao[0], orboa.conj(), orbva)
-            v1b = lib.einsum('xpq,po,qv->xov', v1ao[1], orbob.conj(), orbvb)
+            v1a = lib.einsum('xpq,qo,pv->xov', v1ao[0], orboa, orbva)
+            v1b = lib.einsum('xpq,qo,pv->xov', v1ao[1], orbob, orbvb)
 
             hx = numpy.hstack((v1a.reshape(nz,-1), v1b.reshape(nz,-1)))
             hx += ed_ia * zs
@@ -123,6 +119,7 @@ class CasidaTDDFT(TDDFT, TDA):
         '''TDDFT diagonalization solver
         '''
         cpu0 = (logger.process_clock(), logger.perf_counter())
+        mol = self.mol
         mf = self._scf
         if mf._numint.libxc.is_hybrid_xc(mf.xc):
             raise RuntimeError('%s cannot be used with hybrid functional'
@@ -142,16 +139,19 @@ class CasidaTDDFT(TDDFT, TDA):
             idx = numpy.where(w > self.positive_eig_threshold)[0]
             return w[idx], v[:,idx], idx
 
+        x0sym = None
         if x0 is None:
-            x0 = self.init_guess(self._scf, self.nstates)
+            x0, x0sym = self.init_guess(
+                self._scf, self.nstates, return_symmetry=True)
+        elif mol.symmetry:
+            x_sym_a, x_sym_b = uhf._get_x_sym_table(self._scf)
+            x_sym = numpy.append(x_sym_a.ravel(), x_sym_b.ravel())
+            x0sym = [rhf._guess_wfnsym_id(self, x_sym, x) for x in x0]
 
-        self.converged, w2, x1 = \
-                lib.davidson1(vind, x0, precond,
-                              tol=self.conv_tol,
-                              nroots=nstates, lindep=self.lindep,
-                              max_cycle=self.max_cycle,
-                              max_space=self.max_space, pick=pickeig,
-                              verbose=log)
+        self.converged, w2, x1 = lr_eigh(
+            vind, x0, precond, tol_residual=self.conv_tol, lindep=self.lindep,
+            nroots=nstates, x0sym=x0sym, pick=pickeig, max_cycle=self.max_cycle,
+            max_memory=self.max_memory, verbose=log)
 
         mo_energy = self._scf.mo_energy
         mo_occ = self._scf.mo_occ
@@ -179,13 +179,14 @@ class CasidaTDDFT(TDDFT, TDA):
             x = (zp + zm) * .5
             y = (zp - zm) * .5
             norm = lib.norm(x)**2 - lib.norm(y)**2
-            if norm > 0:
-                norm = 1/numpy.sqrt(norm)
-                e.append(w)
-                xy.append(((x[:nocca*nvira].reshape(nocca,nvira) * norm,  # X_alpha
-                            x[nocca*nvira:].reshape(noccb,nvirb) * norm), # X_beta
-                           (y[:nocca*nvira].reshape(nocca,nvira) * norm,  # Y_alpha
-                            y[nocca*nvira:].reshape(noccb,nvirb) * norm)))# Y_beta
+            if norm < 0:
+                log.warn('TDDFT amplitudes |X| smaller than |Y|')
+            norm = abs(norm)**-.5
+            e.append(w)
+            xy.append(((x[:nocca*nvira].reshape(nocca,nvira) * norm,  # X_alpha
+                        x[nocca*nvira:].reshape(noccb,nvirb) * norm), # X_beta
+                       (y[:nocca*nvira].reshape(nocca,nvira) * norm,  # Y_alpha
+                        y[nocca*nvira:].reshape(noccb,nvirb) * norm)))# Y_beta
         self.e = numpy.array(e)
         self.xy = xy
 

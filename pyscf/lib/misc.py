@@ -417,8 +417,8 @@ def tril_product(*iterables, **kwds):
     .. math:: i[tril_idx[0]] >= i[tril_idx[1]] >= ... >= i[tril_idx[len(tril_idx)-1]]
 
     Args:
-        *iterables: Variable length argument list of indices for the cartesian product
-        **kwds: Arbitrary keyword arguments.  Acceptable keywords include:
+        ``*iterables``: Variable length argument list of indices for the cartesian product
+        ``**kwds``: Arbitrary keyword arguments.  Acceptable keywords include:
             repeat (int): Number of times to repeat the iterables
             tril_idx (array_like): Indices to put into lower-triangular form.
 
@@ -456,7 +456,7 @@ def tril_product(*iterables, **kwds):
             yield tup
             continue
 
-        if all([tup[tril_idx[i]] >= tup[tril_idx[i+1]] for i in range(ntril_idx-1)]):
+        if all(tup[tril_idx[i]] >= tup[tril_idx[i+1]] for i in range(ntril_idx-1)):
             yield tup
         else:
             pass
@@ -664,7 +664,7 @@ class StreamObject:
 
     def apply(self, fn, *args, **kwargs):
         '''
-        Apply the fn to rest arguments:  return fn(*args, **kwargs).  The
+        Apply the fn to rest arguments:  return ``fn(*args, **kwargs)``.  The
         return value of method set is the object itself.  This allows a series
         of functions/methods to be executed in pipe.
         '''
@@ -870,25 +870,27 @@ def invalid_method(name):
     fn.__name__ = name
     return fn
 
-@functools.lru_cache(None)
-def _define_class(name, bases):
-    return type(name, bases, {})
-
+_registered_classes = {}
 def make_class(bases, name=None, attrs=None):
     '''
     Construct a class
 
-    class {name}(*bases):
-        __dict__ = attrs
+    .. code-block:: python
+
+        class {name}(*bases):
+            __dict__ = attrs
     '''
+    _registered_classes
     if name is None:
         name = ''.join(getattr(x, '__name_mixin__', x.__name__) for x in bases)
 
-    cls = _define_class(name, bases)
-    cls.__name_mixin__ = name
-    if attrs is not None:
-        for key, val in attrs.items():
-            setattr(cls, key, val)
+    cls = _registered_classes.get((name, bases))
+    if cls is None:
+        if attrs is None:
+            attrs = {}
+        cls = type(name, bases, attrs)
+        cls.__name_mixin__ = name
+        _registered_classes[name, bases] = cls
     return cls
 
 def set_class(obj, bases, name=None, attrs=None):
@@ -927,7 +929,8 @@ def drop_class(cls, base_cls, name_mixin=None):
 
     # rebuild the dynamic_mixin class
     attrs = {**cls.__dict__, '__name_mixin__': cls_name}
-    cls_undressed = type(cls_name, tuple(filter_bases), attrs)
+    cls_undressed = make_class(tuple(filter_bases), cls_name, attrs)
+    cls_undressed.__module__ = cls.__module__
     return cls_undressed
 
 def replace_class(cls, old_cls, new_cls):
@@ -949,7 +952,9 @@ def replace_class(cls, old_cls, new_cls):
 
     name = cls.__name__.replace(old_cls.__name__, new_cls.__name__)
     attrs = {**cls.__dict__, '__name_mixin__': name}
-    return type(name, tuple(bases), attrs)
+    _cls = make_class(tuple(bases), name, attrs)
+    _cls.__module__ = cls.__module__
+    return _cls
 
 def overwrite_mro(obj, mro):
     '''A hacky function to overwrite the __mro__ attribute'''
@@ -1478,7 +1483,7 @@ class _OmniObject:
     '''
     verbose = 0
     max_memory = param.MAX_MEMORY
-    stdout = sys.stdout
+    stdout = StreamObject.stdout
 
     def __init__(self, default_factory=None):
         self._default = default_factory
@@ -1495,6 +1500,10 @@ omniobj._built = True
 omniobj.mol = omniobj
 omniobj._scf = omniobj
 omniobj.base = omniobj
+omniobj.precision = 1e-8 # utilized by several pbc modules
+
+# Attributes that are kept in np.ndarray during the to_gpu conversion
+_ATTRIBUTES_IN_NPARRAY = {'kpt', 'kpts', 'kpts_band', 'mesh', 'frozen'}
 
 def to_gpu(method, out=None):
     '''Convert a method to its corresponding GPU variant, and recursively
@@ -1537,9 +1546,11 @@ def to_gpu(method, out=None):
     for key in keys:
         val = getattr(method, key)
         if isinstance(val, numpy.ndarray):
-            val = cupy.asarray(val)
+            if key not in _ATTRIBUTES_IN_NPARRAY:
+                val = cupy.asarray(val)
         elif hasattr(val, 'to_gpu'):
             val = val.to_gpu()
         setattr(out, key, val)
-    out.reset()
+    if hasattr(out, 'reset'):
+        out.reset()
     return out

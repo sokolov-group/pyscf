@@ -35,7 +35,6 @@ from pyscf.pbc.scf import hf as pbchf
 from pyscf import lib
 from pyscf.scf import hf as mol_hf
 from pyscf.lib import logger
-from pyscf.pbc.gto import ecp
 from pyscf.pbc.scf import addons
 from pyscf.pbc.scf import chkfile  # noqa
 from pyscf.pbc import tools
@@ -79,6 +78,7 @@ def get_hcore(mf, cell=None, kpts=None):
     else:
         nuc = lib.asarray(mf.with_df.get_nuc(kpts))
     if len(cell._ecpbas) > 0:
+        from pyscf.pbc.gto import ecp
         nuc += lib.asarray(ecp.ecp_int(cell, kpts))
     t = lib.asarray(cell.pbc_intor('int1e_kin', 1, 1, kpts))
     return nuc + t
@@ -249,7 +249,7 @@ def energy_elec(mf, dm_kpts=None, h1e_kpts=None, vhf_kpts=None):
     mf.scf_summary['e1'] = e1.real
     mf.scf_summary['e2'] = e_coul.real
     logger.debug(mf, 'E1 = %s  E_coul = %s', e1, e_coul)
-    if CHECK_COULOMB_IMAG and abs(e_coul.imag > mf.cell.precision*10):
+    if CHECK_COULOMB_IMAG and abs(e_coul.imag) > mf.cell.precision*10:
         logger.warn(mf, "Coulomb energy has imaginary part %s. "
                     "Coulomb integrals (e-e, e-N) may not converge !",
                     e_coul.imag)
@@ -278,31 +278,36 @@ def analyze(mf, verbose=None, with_meta_lowdin=WITH_META_LOWDIN,
         #return mf.mulliken_pop(mf.cell, dm, s=ovlp_ao, verbose=verbose)
 
 
-def mulliken_meta(cell, dm_ao_kpts, verbose=logger.DEBUG,
+def _make_rdm1_meta(cell, dm_ao_kpts, kpts, pre_orth_method, s):
+    from pyscf.lo import orth
+    from pyscf.pbc.tools import k2gamma
+
+    kmesh = k2gamma.kpts_to_kmesh(cell, kpts-kpts[0])
+    nkpts, nao = dm_ao_kpts.shape[:2]
+    scell, phase = k2gamma.get_phase(cell, kpts, kmesh)
+    s_sc = k2gamma.to_supercell_ao_integrals(cell, kpts, s, kmesh=kmesh, force_real=False)
+    orth_coeff = orth.orth_ao(scell, 'meta_lowdin', pre_orth_method, s=s_sc)[:,:nao] # cell 0 only
+    c_inv = np.dot(orth_coeff.T.conj(), s_sc)
+    c_inv = lib.einsum('aRp,Rk->kap', c_inv.reshape(nao,nkpts,nao), phase)
+    dm = lib.einsum('kap,kpq,kbq->ab', c_inv, dm_ao_kpts, c_inv.conj())
+
+    return dm
+
+
+def mulliken_meta(cell, dm_ao_kpts, kpts, verbose=logger.DEBUG,
                   pre_orth_method=PRE_ORTH_METHOD, s=None):
     '''A modified Mulliken population analysis, based on meta-Lowdin AOs.
-
-    Note this function only computes the Mulliken population for the gamma
-    point density matrix.
+    The results are equivalent to the corresponding supercell calculation.
     '''
-    from pyscf.lo import orth
-    if s is None:
-        s = get_ovlp(cell)
     log = logger.new_logger(cell, verbose)
-    log.note('Analyze output for *gamma point*')
-    log.info('    To include the contributions from k-points, transform to a '
-             'supercell then run the population analysis on the supercell\n'
-             '        from pyscf.pbc.tools import k2gamma\n'
-             '        k2gamma.k2gamma(mf).mulliken_meta()')
-    log.note("KRHF mulliken_meta")
-    dm_ao_gamma = dm_ao_kpts[0,:,:].real
-    s_gamma = s[0,:,:].real
-    orth_coeff = orth.orth_ao(cell, 'meta_lowdin', pre_orth_method, s=s_gamma)
-    c_inv = np.dot(orth_coeff.T, s_gamma)
-    dm = reduce(np.dot, (c_inv, dm_ao_gamma, c_inv.T.conj()))
+
+    if s is None:
+        s = get_ovlp(None, cell=cell, kpts=kpts)
+
+    dm = _make_rdm1_meta(cell, dm_ao_kpts, kpts, pre_orth_method, s)
 
     log.note(' ** Mulliken pop on meta-lowdin orthogonal AOs **')
-    return mol_hf.mulliken_pop(cell, dm, np.eye(orth_coeff.shape[0]), log)
+    return mol_hf.mulliken_pop(cell, dm, np.eye(dm.shape[0]), log)
 
 
 def canonicalize(mf, mo_coeff_kpts, mo_occ_kpts, fock=None):
@@ -469,6 +474,61 @@ class KSCF(pbchf.SCF):
     def mo_occ_kpts(self):
         return self.mo_occ
 
+    @property
+    def kpts(self):
+        if 'kpts' in self.__dict__:
+            # To handle the attribute kpt loaded from chkfile
+            self.kpts = self.__dict__.pop('kpts')
+        return self.with_df.kpts
+
+    @kpts.setter
+    def kpts(self, x):
+        self.with_df.kpts = np.reshape(x, (-1,3))
+        if self.rsjk:
+            self.rsjk.kpts = self.with_df.kpts
+
+    @property
+    def kmesh(self):
+        '''The number of k-points along each axis in the first Brillouin zone'''
+        from pyscf.pbc.tools.k2gamma import kpts_to_kmesh
+        kpts = self.kpts
+        kmesh = kpts_to_kmesh(kpts)
+        if len(kpts) != np.prod(kmesh):
+            logger.WARN(self, 'K-points specified in %s are not Monkhorst-Pack %s grids',
+                        self, kmesh)
+        return kmesh
+
+    @kmesh.setter
+    def kmesh(self, x):
+        self.kpts = self.cell.make_kpts(x)
+
+    def build(self, cell=None):
+        # To handle the attribute kpt or kpts loaded from chkfile
+        if 'kpts' in self.__dict__:
+            self.kpts = self.__dict__.pop('kpts')
+
+        # "vcut_ws" precomputing is triggered by pbc.tools.pbc.get_coulG
+        #if self.exxdiv == 'vcut_ws':
+        #    if self.exx_built is False:
+        #        self.precompute_exx()
+        #    logger.info(self, 'WS alpha = %s', self.exx_alpha)
+
+        kpts = self.kpts
+        if self.rsjk:
+            if not np.all(self.rsjk.kpts == kpts):
+                self.rsjk = self.rsjk.__class__(cell, kpts)
+
+        # for GDF and MDF
+        with_df = self.with_df
+        if len(kpts) > 1 and getattr(with_df, '_j_only', False):
+            logger.warn(self, 'df.j_only cannot be used with k-point HF')
+            with_df._j_only = False
+            with_df.reset()
+
+        if self.verbose >= logger.WARN:
+            self.check_sanity()
+        return self
+
     def dump_flags(self, verbose=None):
         mol_hf.SCF.dump_flags(self, verbose)
         logger.info(self, '\n')
@@ -633,7 +693,7 @@ class KSCF(pbchf.SCF):
     def analyze(mf, verbose=None, with_meta_lowdin=WITH_META_LOWDIN, **kwargs):
         raise NotImplementedError
 
-    def mulliken_meta(self, cell=None, dm=None, verbose=logger.DEBUG,
+    def mulliken_meta(self, cell=None, dm=None, kpts=None, verbose=logger.DEBUG,
                       pre_orth_method=PRE_ORTH_METHOD, s=None):
         raise NotImplementedError
 
@@ -738,12 +798,13 @@ class KRHF(KSCF):
         return dm_kpts
 
     @lib.with_doc(mulliken_meta.__doc__)
-    def mulliken_meta(self, cell=None, dm=None, verbose=logger.DEBUG,
+    def mulliken_meta(self, cell=None, dm=None, kpts=None, verbose=logger.DEBUG,
                       pre_orth_method=PRE_ORTH_METHOD, s=None):
         if cell is None: cell = self.cell
         if dm is None: dm = self.make_rdm1()
+        if kpts is None: kpts = self.kpts
         if s is None: s = self.get_ovlp(cell)
-        return mulliken_meta(cell, dm, s=s, verbose=verbose,
+        return mulliken_meta(cell, dm, kpts, s=s, verbose=verbose,
                              pre_orth_method=pre_orth_method)
 
     def nuc_grad_method(self):
@@ -753,9 +814,10 @@ class KRHF(KSCF):
     def stability(self,
                   internal=getattr(__config__, 'pbc_scf_KSCF_stability_internal', True),
                   external=getattr(__config__, 'pbc_scf_KSCF_stability_external', False),
-                  verbose=None):
+                  verbose=None,
+                  return_status=False):
         from pyscf.pbc.scf.stability import rhf_stability
-        return rhf_stability(self, internal, external, verbose)
+        return rhf_stability(self, internal, external, verbose, return_status)
 
     def to_ks(self, xc='HF'):
         '''Convert to RKS object.

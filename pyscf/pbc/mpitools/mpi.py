@@ -67,7 +67,7 @@ INQUIRY = 50050
 TASK = 50051
 def work_share_partition(tasks, interval=.02, loadmin=1):
     loadmin = max(loadmin, len(tasks)//50//pool.size)
-    rest_tasks = [x for x in tasks[loadmin*pool.size:]]
+    rest_tasks = list(tasks[loadmin*pool.size:])
     tasks = tasks[loadmin*rank:loadmin*rank+loadmin]
     def distribute_task():
         while True:
@@ -290,7 +290,6 @@ def _assert(condition):
         comm.Abort()
 
 def register_for(obj):
-    global _registry
     key = id(obj)
     # Keep track of the object in a global registry.  On slave nodes, the
     # object can be accessed from global registry.

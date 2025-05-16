@@ -302,14 +302,14 @@ class KnownValues(unittest.TestCase):
         mf1.max_cycle = 4
         eref = mf1.kernel()
 
+        mf1 = scf.RHF(mol)
         mf1.diis = adiis
         mf1.max_cycle = 1
         e1 = mf1.kernel()
         self.assertAlmostEqual(e1, -75.987815719969291, 9)
 
-        dm = mf1.make_rdm1()
         mf1.max_cycle = 3
-        e2 = mf1.kernel(dm)
+        e2 = mf1.kernel()
         self.assertAlmostEqual(e2, eref, 9)
 
     def test_energy_tot(self):
@@ -371,7 +371,7 @@ class KnownValues(unittest.TestCase):
     def test_scf(self):
         self.assertAlmostEqual(mf.e_tot, -76.026765673119627, 9)
 
-    @unittest.skipIf('dftd3' not in sys.modules, "requires the dftd3 library")
+    @unittest.skipIf('dispersion' not in sys.modules, "requires the dftd3 library")
     def test_scf_d3(self):
         mf = scf.RHF(mol)
         mf.disp = 'd3bj'
@@ -380,7 +380,7 @@ class KnownValues(unittest.TestCase):
         e_tot = mf.kernel()
         self.assertAlmostEqual(e_tot, -76.03127458778653, 9)
 
-    @unittest.skipIf('dftd4' not in sys.modules, "requires the dftd4 library")
+    @unittest.skipIf('dispersion' not in sys.modules, "requires the dftd4 library")
     def test_scf_d4(self):
         mf = scf.RHF(mol)
         mf.disp = 'd4'
@@ -685,10 +685,25 @@ H     0    0.757    0.587'''
         dip = mf.dip_moment(unit='au')
         self.assertTrue(numpy.allclose(dip, [0.00000, 0.00000, 0.80985]))
 
+    def test_rhf_quad_moment(self):
+        quad = n2mf.quad_moment(unit='au')
+        answer = numpy.array([[ 0.65040837,  0.        ,  0.        ],
+                              [ 0.        ,  0.65040837,  0.        ],
+                              [ 0.        ,  0.        , -1.30081674]])
+        self.assertTrue(numpy.allclose(quad, answer))
+
     def test_rohf_dip_moment(self):
         mf = scf.ROHF(mol).run()
         dip = mf.dip_moment(unit='au')
         self.assertTrue(numpy.allclose(dip, [0.00000, 0.00000, 0.80985]))
+
+    def test_rohf_quad_moment(self):
+        mf = scf.ROHF(n2sym).run()
+        quad = mf.quad_moment(unit='au')
+        answer = numpy.array([[ 0.65040837,  0.        ,  0.        ],
+                              [ 0.        ,  0.65040837,  0.        ],
+                              [ 0.        ,  0.        , -1.30081674]])
+        self.assertTrue(numpy.allclose(quad, answer))
 
     def test_get_wfnsym(self):
         self.assertEqual(n2mf.wfnsym, 0)
@@ -794,7 +809,7 @@ H     0    0.757    0.587'''
         self.assertAlmostEqual(abs(f1 + f1.T).max(), 0, 12)
 
     def test_check_convergence(self):
-        mf1 = n2mf.copy()
+        mf1 = scf.RHF(n2sym)
         mf1.diis = False
         count = [0]
         def check_convergence(envs):

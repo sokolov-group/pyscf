@@ -41,6 +41,8 @@ def get_nuc(mydf, kpts=None):
     from pyscf.pbc.dft import gen_grid
     kpts, is_single_kpt = _check_kpts(mydf, kpts)
     cell = mydf.cell
+    assert cell.low_dim_ft_type != 'inf_vacuum'
+    assert cell.dimension > 1
     mesh = mydf.mesh
     charge = -cell.atom_charges()
     Gv = cell.get_Gv(mesh)
@@ -68,6 +70,8 @@ def get_pp(mydf, kpts=None):
     from pyscf.pbc.dft import gen_grid
     kpts, is_single_kpt = _check_kpts(mydf, kpts)
     cell = mydf.cell
+    assert cell.low_dim_ft_type != 'inf_vacuum'
+    assert cell.dimension > 1
     mesh = mydf.mesh
     Gv = cell.get_Gv(mesh)
     SI = cell.get_SI(mesh=mesh)
@@ -157,6 +161,9 @@ class FFTDF(lib.StreamObject):
     '''Density expansion on plane waves
     '''
 
+    # to mimic molecular DF object
+    blockdim = getattr(__config__, 'pbc_df_df_DF_blockdim', 240)
+
     _keys = {
         'cell', 'kpts', 'grids', 'mesh', 'blockdim', 'exxdiv',
     }
@@ -180,9 +187,6 @@ class FFTDF(lib.StreamObject):
         # This is a first order error, same to the error estimation for nuclear
         # attraction.
         self.mesh = cell.mesh
-
-        # to mimic molecular DF object
-        self.blockdim = getattr(__config__, 'pbc_df_df_DF_blockdim', 240)
 
         # The following attributes are not input options.
         # self.exxdiv has no effects. It was set in the get_k_kpts function to

@@ -17,6 +17,7 @@
 #         Timothy Berkelbach <tim.berkelbach@gmail.com>
 #
 
+import os
 import sys
 import json
 import ctypes
@@ -66,6 +67,7 @@ def pack(cell):
     '''
     cldic = mole.pack(cell)
     cldic['a'] = cell.a
+    cldic['fractional'] = cell.fractional
     cldic['precision'] = cell.precision
     cldic['ke_cutoff'] = cell.ke_cutoff
     cldic['exp_to_discard'] = cell.exp_to_discard
@@ -87,23 +89,20 @@ def unpack(celldic):
 def dumps(cell):
     '''Serialize Cell object to a JSON formatted str.
     '''
-    exclude_keys = {'output', 'stdout', '_keys', 'symm_orb', 'irrep_id',
-                        'irrep_name', 'lattice_symmetry'}
+    exclude_keys = {'output', 'stdout', '_keys', '_ctx_lock',
+                    'symm_orb', 'irrep_id', 'irrep_name', 'lattice_symmetry'}
 
     celldic = dict(cell.__dict__)
     for k in exclude_keys:
         if k in celldic:
             del (celldic[k])
     for k in celldic:
-        if isinstance(celldic[k], np.ndarray):
+        if isinstance(celldic[k], (np.ndarray, np.generic)):
             celldic[k] = celldic[k].tolist()
     celldic['atom'] = repr(cell.atom)
     celldic['basis']= repr(cell.basis)
     celldic['pseudo'] = repr(cell.pseudo)
     celldic['ecp'] = repr(cell.ecp)
-    # Explicitly convert mesh because it is often created as numpy array
-    if isinstance(cell.mesh, np.ndarray):
-        celldic['mesh'] = cell.mesh.tolist()
 
     try:
         return json.dumps(celldic)
@@ -120,6 +119,8 @@ def dumps(cell):
                     dic1[k] = list(v)
                 elif isinstance(v, dict):
                     dic1[k] = skip_value(v)
+                elif isinstance(v, np.generic):
+                    dic1[k] = v.tolist()
                 else:
                     msg =('Function cell.dumps drops attribute %s because '
                           'it is not JSON-serializable' % k)
@@ -517,7 +518,7 @@ def get_bounding_sphere(cell, rcut):
     nimgs = np.ceil(rcut*heights_inv).astype(int)
 
     for i in range(cell.dimension, 3):
-        nimgs[i] = 1
+        nimgs[i] = 0
     return nimgs
 
 def get_Gv(cell, mesh=None, **kwargs):
@@ -1012,6 +1013,143 @@ def rcut_by_shells(cell, precision=None, rcut=0,
         return shell_radius, pgf_radius
     return shell_radius
 
+def tostring(cell, format='poscar'):
+    '''Convert cell geometry to a string of the required format.
+
+    Supported output formats:
+        | poscar: VASP POSCAR
+        | xyz: Extended XYZ with Lattice information
+    '''
+    format = format.lower()
+    output = []
+    atmfmt = '%17.8f %17.8f %17.8f'
+    if format == 'poscar' or format == 'vasp' or format == 'xyz':
+        lattice_vectors = cell.lattice_vectors() * param.BOHR
+        coords = cell.atom_coords() * param.BOHR
+        if format == 'poscar' or format == 'vasp':
+            output.append('Written by PySCF, units are A')
+            output.append('1.0')
+            for lattice_vector in lattice_vectors:
+                ax, ay, az = lattice_vector
+                output.append(atmfmt % (ax, ay, az))
+            unique_atoms = dict()
+            for atom in cell.elements:
+                if atom not in unique_atoms:
+                    unique_atoms[atom] = 1
+                else:
+                    unique_atoms[atom] += 1
+            output.append(' '.join(unique_atoms))
+            output.append(' '.join(str(count) for count in unique_atoms.values()))
+            output.append('Cartesian')
+            for atom_type in unique_atoms:
+                for atom, coord in zip(cell.elements, coords):
+                    if atom == atom_type:
+                        x, y, z = coord
+                        output.append(atmfmt % (x, y, z))
+            return '\n'.join(output)
+        elif format == 'xyz':
+            output.append('%d' % cell.natm)
+            output.append('Lattice="'+' '.join(f'{ax:17.8f}' for ax in lattice_vectors.ravel())
+                +'" Properties=species:S:1:pos:R:3')
+            for i in range(cell.natm):
+                symb = cell.atom_pure_symbol(i)
+                x, y, z = coords[i]
+                output.append(('%-4s ' + atmfmt) %
+                              (symb, x, y, z))
+            return '\n'.join(output)
+    else:
+        raise NotImplementedError(f'format={format}')
+
+def tofile(cell, filename, format=None):
+    if format is None:  # Guess format based on filename
+        if filename.lower() == 'poscar':
+            format = 'poscar'
+        else:
+            format = os.path.splitext(filename)[1][1:]
+    string = tostring(cell, format)
+    with open(filename,  'w', encoding='utf-8') as f:
+        f.write(string)
+        f.write('\n')
+    return string
+
+def fromfile(filename, format=None):
+    '''Read cell geometry from a file
+    (in testing)
+
+    Supported formats:
+        | poscar: VASP POSCAR file format
+        | xyz: Extended XYZ with Lattice information
+    '''
+    if format is None:  # Guess format based on filename
+        if filename.lower() == 'poscar':
+            format = 'poscar'
+        else:
+            format = os.path.splitext(filename)[1][1:].lower()
+        if format not in ('poscar', 'vasp', 'xyz'):
+            format = 'raw'
+    with open(filename, 'r') as f:
+        return fromstring(f.read(), format)
+
+def fromstring(string, format='poscar'):
+    '''Convert the string of the specified format to internal format
+    (in testing)
+
+    Supported formats:
+        | poscar: VASP POSCAR file format
+        | xyz: Extended XYZ with Lattice information
+
+    Returns:
+        a: Lattice vectors
+        atom: Atomic elements and xyz coordinates
+    '''
+    format = format.lower()
+    if format == 'poscar' or format == 'vasp':
+        lines = string.splitlines()
+        scale = float(lines[1])
+        a = lines[2:5]
+        lattice_vectors = np.array([np.fromstring(ax, sep=' ') for ax in a])
+        lattice_vectors *= scale
+        a = []
+        for i in range(3):
+            a.append(' '.join(str(ax) for ax in lattice_vectors[i]))
+        atom_position_type = lines[7].strip()
+        unique_atoms = dict()
+        natm = 0
+        for atom, count in zip(lines[5].split(), lines[6].split()):
+            unique_atoms[atom] = int(count)
+            natm += int(count)
+        atoms = []
+        start = 8
+        for atom_type in unique_atoms:
+            end = start + unique_atoms[atom_type]
+            for line in lines[start:end]:
+                coords = np.fromstring(line, sep=' ')
+                if atom_position_type.lower() == 'cartesian':
+                    x, y, z = coords * scale
+                elif atom_position_type.lower() == 'direct':
+                    x, y, z = np.dot(coords, lattice_vectors)
+                else:
+                    raise RuntimeError('Error reading VASP geometry due to '
+                        f'atom position type "{atom_position_type}". Atom '
+                        'positions must be Direct or Cartesian.')
+                atoms.append('%s %17.8f %17.8f %17.8f'
+                    % (atom_type, x, y, z))
+            start = end
+        return '\n'.join(a), '\n'.join(atoms)
+    elif format == 'xyz':
+        lines = string.splitlines()
+        natm = int(lines[0])
+        lattice_vectors = lines[1].split('Lattice=')[1].split('"')[1].split()
+        a = []
+        for i in range(3):
+            a.append(" ".join(lattice_vectors[3*i:3*i+3]))
+        return '\n'.join(a), '\n'.join(lines[2:natm+2])
+    elif format == 'raw':
+        lines = string.splitlines()
+        return '\n'.join(lines[:3]), '\n'.join(lines[4:])
+    else:
+        raise NotImplementedError
+
 
 class Cell(mole.MoleBase):
     '''A Cell object holds the basic information of a crystal.
@@ -1075,10 +1213,13 @@ class Cell(mole.MoleBase):
 
     _keys = {
         'precision', 'exp_to_discard',
-        'a', 'ke_cutoff', 'pseudo', 'dimension', 'low_dim_ft_type',
+        'a', 'ke_cutoff', 'pseudo', 'fractional', 'dimension', 'low_dim_ft_type',
         'space_group_symmetry', 'symmorphic', 'lattice_symmetry', 'mesh', 'rcut',
         'use_loose_rcut', 'use_particle_mesh_ewald',
     }
+
+    tostring = tostring
+    tofile = tofile
 
     def __init__(self, **kwargs):
         mole.MoleBase.__init__(self)
@@ -1087,6 +1228,7 @@ class Cell(mole.MoleBase):
         # of fourier components, with .5 * G**2 < ke_cutoff
         self.ke_cutoff = None
 
+        self.fractional = False
         self.dimension = 3
         # TODO: Simple hack for now; the implementation of ewald depends on the
         #       density-fitting class.  This determines how the ewald produces
@@ -1104,6 +1246,20 @@ class Cell(mole.MoleBase):
         self.rcut = None
         for key, val in kwargs.items():
             setattr(self, key, val)
+
+    def fromstring(self, string, format='poscar'):
+        '''Update the Cell object based on the input geometry string'''
+        a, atom = fromstring(string, format)
+        self.a = a
+        self.set_geom_(atom, unit='Angstrom', inplace=True)
+        return self
+
+    def fromfile(self, filename, format=None):
+        '''Update the Cell object based on the input geometry file'''
+        a, atom = fromfile(filename, format)
+        self.a = a
+        self.set_geom_(atom, unit='Angstrom', inplace=True)
+        return self
 
     @property
     def mesh(self):
@@ -1237,6 +1393,17 @@ class Cell(mole.MoleBase):
                                                              return_mesh=True)
         if np.prod(mesh1) != np.prod(mesh):
             logger.debug(self, 'mesh %s is symmetrized as %s', mesh, mesh1)
+        m1size = np.prod(mesh1)
+        msize = np.prod(mesh)
+        if m1size > 8 * msize and m1size > 1000 + msize:
+            wstr = ('''WARNING!
+  Symmetrization significantly increased the mesh size,
+  from {} to {}. This might indicate a nearly symmetric input
+  structure, and it might cause memory issues. Consider symmetrizing your
+  structure, increasing the symmetry tolerance `pbc_symm_space_group_symprec`,
+  or turning off symmetry.\n\n''')
+            wstr = wstr.format(mesh, mesh1)
+            sys.stderr.write(wstr)
         return mesh1
 
     def build_lattice_symmetry(self, check_mesh_symmetry=True):
@@ -1265,13 +1432,23 @@ class Cell(mole.MoleBase):
             self._mesh_from_build = _mesh_from_build
         return self
 
+    @lib.with_doc(mole.format_atom.__doc__)
+    def format_atom(self, atoms, origin=0, axes=None,
+                    unit=getattr(__config__, 'UNIT', 'Ang')):
+        if not self.fractional:
+            return mole.format_atom(atoms, origin, axes, unit)
+        _atoms = mole.format_atom(atoms, origin, axes, unit=1.)
+        _a = self.lattice_vectors()
+        c = np.array([a[1] for a in _atoms]).dot(_a)
+        return [(a[0], r) for a, r in zip(_atoms, c.tolist())]
+
 #Note: Exculde dump_input, parse_arg, basis from kwargs to avoid parsing twice
     def build(self, dump_input=True, parse_arg=mole.ARGPARSE,
               a=None, mesh=None, ke_cutoff=None, precision=None, nimgs=None,
               h=None, dimension=None, rcut= None, low_dim_ft_type=None,
               space_group_symmetry=None, symmorphic=None,
               use_loose_rcut=None, use_particle_mesh_ewald=None,
-              *args, **kwargs):
+              fractional=None, *args, **kwargs):
         '''Setup Mole molecule and Cell and initialize some control parameters.
         Whenever you change the value of the attributes of :class:`Cell`,
         you need call this function to refresh the internal data of Cell.
@@ -1280,6 +1457,10 @@ class Cell(mole.MoleBase):
             a : (3,3) ndarray
                 The real-space cell lattice vectors. Each row represents
                 a lattice vector.
+            fractional : bool
+                Whether the atom postions are specified in fractional coordinates.
+                The default value is False, which means the coordinates are
+                interpreted as Cartesian coordinate.
             mesh : (3,) ndarray of ints
                 The number of *positive* G-vectors along each direction.
             ke_cutoff : float
@@ -1318,6 +1499,7 @@ class Cell(mole.MoleBase):
         if mesh is not None: self.mesh = mesh
         if nimgs is not None: self.nimgs = nimgs
         if dimension is not None: self.dimension = dimension
+        if fractional is not None: self.fractional = fractional
         if precision is not None: self.precision = precision
         if rcut is not None: self.rcut = rcut
         if ke_cutoff is not None: self.ke_cutoff = ke_cutoff
@@ -1331,8 +1513,11 @@ class Cell(mole.MoleBase):
         if symmorphic is not None:
             self.symmorphic = symmorphic
 
-        dump_input = dump_input and not self._built and self.verbose > logger.NOTE
-        mole.MoleBase.build(self, dump_input, parse_arg, *args, **kwargs)
+        if self.a is None:
+            raise RuntimeError('Lattice parameters not specified')
+
+        _built = self._built
+        mole.MoleBase.build(self, False, parse_arg, *args, **kwargs)
 
         exp_min = np.array([self.bas_exp(ib).min() for ib in range(self.nbas)])
         if self.exp_to_discard is None:
@@ -1409,11 +1594,6 @@ class Cell(mole.MoleBase):
                         '%d contracted functions', nprim_drop, nctr_drop)
             #logger.debug1(self, 'Old shells %s', steep_shls)
 
-        # The rest initialization requires lattice parameters.  If .a is not
-        # set, pass the rest initialization.
-        if self.a is None:
-            return self
-
         if self.rcut is None or self._rcut_from_build:
             self._rcut = estimate_rcut(self, self.precision)
             self._rcut_from_build = True
@@ -1449,7 +1629,8 @@ class Cell(mole.MoleBase):
             _check_mesh_symm = not self._mesh_from_build
             self.build_lattice_symmetry(check_mesh_symmetry=_check_mesh_symm)
 
-        if dump_input:
+        if dump_input and not _built and self.verbose > logger.NOTE:
+            self.dump_input()
             logger.info(self, 'lattice vectors  a1 [%.9f, %.9f, %.9f]', *_a[0])
             logger.info(self, '                 a2 [%.9f, %.9f, %.9f]', *_a[1])
             logger.info(self, '                 a3 [%.9f, %.9f, %.9f]', *_a[2])
@@ -1742,12 +1923,14 @@ class Cell(mole.MoleBase):
         '''Return a Mole object using the same atoms and basis functions as
         the Cell object.
         '''
-        #FIXME: should cell be converted to mole object?  If cell is converted
-        # and a mole object is returned, many attributes (e.g. the GTH basis,
-        # gth-PP) will not be recognized by mole.build function.
         mol = self.view(mole.Mole)
-        delattr(mol, 'a')
-        delattr(mol, '_mesh')
+        del mol.a
+        mol.__dict__.pop('fractional', None)
+        mol.__dict__.pop('ke_cutoff', None)
+        mol.__dict__.pop('_mesh', None)
+        mol.__dict__.pop('_rcut', None)
+        mol.__dict__.pop('dimension', None)
+        mol.__dict__.pop('low_dim_ft_type', None)
         mol.enuc = None #reset nuclear energy
         if mol.symmetry:
             mol._build_symmetry()

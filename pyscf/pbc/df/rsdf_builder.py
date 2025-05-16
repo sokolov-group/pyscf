@@ -51,7 +51,7 @@ from pyscf import __config__
 
 OMEGA_MIN = 0.08
 INDEX_MIN = -10000
-LINEAR_DEP_THR = getattr(__config__, 'pbc_df_df_DF_lindep', 1e-9)
+LINEAR_DEP_THR = getattr(__config__, 'pbc_df_df_DF_lindep', 1e-10)
 # Threshold of steep bases and local bases
 RCUT_THRESHOLD = getattr(__config__, 'pbc_scf_rsjk_rcut_threshold', 1.0)
 
@@ -416,8 +416,8 @@ class _RSGDFBuilder(Int3cBuilder):
         ao_loc = cell.ao_loc
         aux_loc = auxcell.ao_loc_nr(auxcell.cart or 'ssc' in intor)
         ish0, ish1, jsh0, jsh1, ksh0, ksh1 = shls_slice
-        i0, i1, j0, j1 = ao_loc[list(shls_slice[:4])]
-        k0, k1 = aux_loc[[ksh0, ksh1]]
+        i0, i1, j0, j1 = ao_loc[list(shls_slice[:4])].astype(np.int64)
+        k0, k1 = aux_loc[[ksh0, ksh1]].astype(np.int64)
         if aosym == 's1':
             nao_pair = (i1 - i0) * (j1 - j0)
         else:
@@ -554,6 +554,9 @@ class _RSGDFBuilder(Int3cBuilder):
         log = logger.new_logger(self)
         cell = self.cell
         cell_d = self.rs_cell.smooth_basis_cell()
+        assert cell_d.low_dim_ft_type != 'inf_vacuum'
+        assert cell_d.dimension > 1
+
         auxcell = self.auxcell
         nao = cell_d.nao
         naux = auxcell.nao
@@ -1042,6 +1045,9 @@ def _int_dd_block(dfbuilder, fakenuc, intor='int3c2e', comp=None):
     t0 = (logger.process_clock(), logger.perf_counter())
     cell = dfbuilder.cell
     cell_d = dfbuilder.rs_cell.smooth_basis_cell()
+    assert cell_d.low_dim_ft_type != 'inf_vacuum'
+    assert cell_d.dimension > 1
+
     nao = cell_d.nao
     kpts = dfbuilder.kpts
     nkpts = kpts.shape[0]
@@ -1089,7 +1095,6 @@ def _int_dd_block(dfbuilder, fakenuc, intor='int3c2e', comp=None):
 
 class _RSNucBuilder(_RSGDFBuilder):
 
-    exclude_dd_block = True
     exclude_d_aux = False
 
     def __init__(self, cell, kpts=np.zeros((1,3))):
