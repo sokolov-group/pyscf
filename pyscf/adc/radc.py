@@ -59,8 +59,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     adc.U = np.array(U).T.copy()
 
-    if adc.compute_properties:
-        adc.P,adc.X = adc.get_properties(nroots)
+#    if adc.compute_properties:
+#        adc.P,adc.X = adc.get_properties(nroots)
 
     nfalse = np.shape(conv)[0] - np.sum(conv)
 
@@ -72,8 +72,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     for n in range(nroots):
         print_string = ('%s root %d  |  Energy (Eh) = %14.10f  |  Energy (eV) = %12.8f  ' %
                         (adc.method, n, adc.E[n], adc.E[n]*27.2114))
-        if adc.compute_properties:
-            print_string += ("|  Spec factors = %10.8f  " % adc.P[n])
+#        if adc.compute_properties:
+#            print_string += ("|  Spec factors = %10.8f  " % adc.P[n])
         print_string += ("|  conv = %s" % conv[n])
         logger.info(adc, print_string)
 
