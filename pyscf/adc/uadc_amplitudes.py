@@ -291,7 +291,9 @@ def compute_amplitudes(myadc, eris):
     t1_3 = (None,)
     t2_1_vvvv = (None,)
 
-    if (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False) or (myadc.method == "adc(3)"):
+    if ((myadc.method == "adc(2)" and myadc.method_type == "ee" and myadc.approx_trans_moments is False) \
+        or (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False) \
+        or (myadc.method == "adc(3)")):
 
         # Compute second-order doubles t2 (tijab)
 
@@ -860,12 +862,33 @@ def compute_amplitudes(myadc, eris):
 
     t2_1 = (t2_1_a , t2_1_ab, t2_1_b)
 
-    if (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False) or (myadc.method == "adc(3)"):
+    if ((myadc.method == "adc(2)" and myadc.method_type == "ee" and myadc.approx_trans_moments is False) \
+        or (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False) \
+        or (myadc.method == "adc(3)")):
         t2_2 = (t2_2_a , t2_2_ab, t2_2_b)
         t2_1_vvvv = (t2_1_vvvv_a, t2_1_vvvv_ab, t2_1_vvvv_b)
 
     t1 = (t1_2, t1_3, t1_1)
     t2 = (t2_1, t2_2)
+
+####    if t1_2[0] is not None:
+####        print("t1_2[0]", np.linalg.norm(t1_2[0]))
+####        print("t1_2[1]", np.linalg.norm(t1_2[1]))
+####    if t1_3[0] is not None:
+####        print("t1_3[0]", np.linalg.norm(t1_3[0]))
+####        print("t1_3[1]", np.linalg.norm(t1_3[1]))
+####    if t1_1[0] is not None:
+####        print("t1_1[0]", np.linalg.norm(t1_1[0]))
+####        print("t1_1[1]", np.linalg.norm(t1_1[1]))
+####    if t2_1[0] is not None:
+####        print("t2_1[0]", np.linalg.norm(t2_1[0]))
+####        print("t2_1[1]", np.linalg.norm(t2_1[1]))
+####        print("t2_1[2]", np.linalg.norm(t2_1[2]))
+####    if t2_2[0] is not None:
+####        print("t2_2[0]", np.linalg.norm(t2_2[0]))
+####        print("t2_2[1]", np.linalg.norm(t2_2[1]))
+####        print("t2_2[2]", np.linalg.norm(t2_2[2]))
+####    exit()
 
     cput0 = log.timer_debug1("Completed amplitude calculation", *cput0)
 

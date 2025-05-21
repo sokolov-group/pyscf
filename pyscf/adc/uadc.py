@@ -68,7 +68,12 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     if adc.compute_properties:
         adc.P,adc.X = adc.get_properties(nroots)
+
     nfalse = np.shape(conv)[0] - np.sum(conv)
+
+    if adc.spin_c:
+        spin_c, evec_ne = adc.get_spin_contamination()
+        evec_ne_na, evec_ne_nb = evec_ne
 
     header = ("\n*************************************************************"
               "\n            ADC calculation summary"
@@ -79,7 +84,14 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         print_string = ('%s root %d  |  Energy (Eh) = %14.10f  |  Energy (eV) = %12.8f  ' %
                         (adc.method, n, adc.E[n], adc.E[n]*27.2114))
         if adc.compute_properties:
-            print_string += ("|  Spec. factor = %10.8f  " % adc.P[n])
+            if (adc.method_type == "ee"):
+                print_string += ("|  Osc. strength = %10.8f  " % adc.P[n])
+                if (adc.spin_c is True):
+                    print_string += ("|  S^2 = %10.8f  " % spin_c[n])
+                    print_string += ("|  na = %5.3f  " % evec_ne_na[n])
+                    print_string += ("|  nb = %5.3f  " % evec_ne_nb[n])
+            else:
+                print_string += ("|  Spec. factor = %10.8f  " % adc.P[n])
         print_string += ("|  conv = %s" % conv[n])
         logger.info(adc, print_string)
 
@@ -146,7 +158,7 @@ class UADC(lib.StreamObject):
         self.stdout = self.mol.stdout
         self.max_memory = mf.max_memory
 
-        self.max_space = getattr(__config__, 'adc_uadc_UADC_max_space', 12)
+        self.max_space = getattr(__config__, 'adc_uadc_UADC_max_space', 200)
         self.max_cycle = getattr(__config__, 'adc_uadc_UADC_max_cycle', 50)
         self.conv_tol = getattr(__config__, 'adc_uadc_UADC_conv_tol', 1e-12)
         self.tol_residual = getattr(__config__, 'adc_uadc_UADC_tol_residual', 1e-6)
@@ -183,18 +195,17 @@ class UADC(lib.StreamObject):
             fock_b = np.dot(mo_a.T,np.dot(fock_b, mo_a))
 
             # Semicanonicalize Ca using fock_a, nocc_a -> Ca, mo_energy_a, U_a, f_ov_a
-            mo_a, mo_energy_a, f_ov_a, f_aa = self.semi_canonicalize_orbitals(
+            mo_a_coeff, mo_energy_a, f_ov_a, f_aa = self.semi_canonicalize_orbitals(
                 fock_a, ndocc + nsocc, mo_a)
 
             # Semicanonicalize Cb using fock_b, nocc_b -> Cb, mo_energy_b, U_b, f_ov_b
-            mo_b, mo_energy_b, f_ov_b, f_bb = self.semi_canonicalize_orbitals(fock_b, ndocc, mo_a)
+            mo_b_coeff, mo_energy_b, f_ov_b, f_bb = self.semi_canonicalize_orbitals(fock_b, ndocc, mo_a)
 
-            mo_coeff = [mo_a, mo_b]
+            mo_coeff = [mo_a_coeff, mo_b_coeff]
 
             f_ov = [f_ov_a, f_ov_b]
 
             self.f_ov = f_ov
-            self.spin_c = True
             self.mo_energy_a = mo_energy_a.copy()
             self.mo_energy_b = mo_energy_b.copy()
 
@@ -375,6 +386,9 @@ class UADC(lib.StreamObject):
         if (self.method_type == "ea"):
             e_exc, v_exc, spec_fac, X, adc_es = self.ea_adc(nroots=nroots, guess=guess, eris=eris)
 
+        elif (self.method_type == "ee"):
+            e_exc, v_exc, spec_fac, X, adc_es = self.ee_adc(nroots=nroots, guess=guess, eris=eris)
+
         elif(self.method_type == "ip"):
 
             if not isinstance(self.ncvs, type(None)) and self.ncvs > 0:
@@ -398,6 +412,12 @@ class UADC(lib.StreamObject):
     def ea_adc(self, nroots=1, guess=None, eris=None):
         from pyscf.adc import uadc_ea
         adc_es = uadc_ea.UADCEA(self)
+        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
+        return e_exc, v_exc, spec_fac, x, adc_es
+
+    def ee_adc(self, nroots=1, guess=None, eris=None):
+        from pyscf.adc import uadc_ee
+        adc_es = uadc_ee.UADCEE(self)
         e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
         return e_exc, v_exc, spec_fac, x, adc_es
 
