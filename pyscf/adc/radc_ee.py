@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Author: Terrenc Stahl <terrencestahl4@gmail.com>
+# Author: Terrence Stahl <terrencestahl@gmail.com>
 #         Alexander Sokolov <alexander.y.sokolov@gmail.com>
 #
 
@@ -31,6 +31,10 @@ from pyscf import df
 from pyscf import symm
 import sys
 
+
+from line_profiler import profile
+
+@profile
 def get_imds(adc, eris=None):
 
     cput0 = (logger.process_clock(), logger.perf_counter())
@@ -48,7 +52,6 @@ def get_imds(adc, eris=None):
 
     t2_ce = t1[0]
 
-    t2_ccee = t2[1][:]
 
     einsum = lib.einsum
     einsum_type = True
@@ -147,9 +150,9 @@ def get_imds(adc, eris=None):
     M_ab += 1/2 * einsum('iLAa,IDai->IDLA', t1_ccee, v_ceec, optimize = einsum_type)#
 
 
-    #print("M_ab", np.linalg.norm(M_ab))
 
     if (adc.method == "adc(3)"):
+        t2_ccee = t2[1][:]
 
         if isinstance(eris.ovvv, type(None)):
             chnk_size = radc_ao2mo.calculate_chunk_size(adc)
@@ -346,14 +349,10 @@ def get_imds(adc, eris=None):
         M_ab += 1/2 * einsum('IDai,ijba,jLAb->IDLA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab += einsum('ILAa,ijab,ijDb->IDLA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab -= 1/2 * einsum('ILAa,ijab,jiDb->IDLA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab += 2 * einsum('ILab,ijDa,ijAb->IDLA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab -= einsum('ILab,ijDa,jiAb->IDLA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab -= 2 * einsum('ILij,ikAa,jkDa->IDLA', v_cccc, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab += einsum('ILij,ikAa,kjDa->IDLA', v_cccc, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab += einsum('ILij,kiAa,jkDa->IDLA', v_cccc, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab -= 2 * einsum('ILij,kiAa,kjDa->IDLA', v_cccc, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab -= einsum('IabL,ijDb,ijAa->IDLA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab += einsum('IabL,ijDb,jiAa->IDLA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab += einsum('Iabi,ijDb,LjAa->IDLA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab -= einsum('Iabi,ijDb,jLAa->IDLA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab -= 2 * einsum('Iabi,jiDb,LjAa->IDLA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
@@ -613,7 +612,6 @@ def get_imds(adc, eris=None):
         M_ab -= einsum('IDai,ijab,jLAb->IDLA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab -= einsum('IDai,ijba,LjAb->IDLA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab += 1/2 * einsum('IDai,ijba,jLAb->IDLA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab += einsum('IabL,ijDb,jiAa->IDLA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab += einsum('Iabi,ijDb,LjAa->IDLA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab -= 2 * einsum('Iabi,jiDb,LjAa->IDLA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab -= 2 * einsum('IiAa,Ljab,ijDb->IDLA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
@@ -682,6 +680,7 @@ def get_imds(adc, eris=None):
     return M_ab
 
 
+@profile
 def get_diag(adc,M_ab=None,eris=None):
 
     log = logger.Logger(adc.stdout, adc.verbose)
@@ -722,6 +721,7 @@ def get_diag(adc,M_ab=None,eris=None):
     return diag
 
 
+@profile
 def matvec(adc, M_ab=None, eris=None):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -740,6 +740,11 @@ def matvec(adc, M_ab=None, eris=None):
 
     einsum = lib.einsum
     einsum_type = True
+    t1 = adc.t1
+    t2 = adc.t2
+    t1_ccee = t2[0][:]
+    t2_ce = t1[0]
+    v_ccce = eris.ovoo
 
     v_ccee = eris.oovv
     v_ceec = eris.ovvo
@@ -761,23 +766,22 @@ def matvec(adc, M_ab=None, eris=None):
 
     e_occ = adc.mo_energy[:nocc]
     e_vir = adc.mo_energy[nocc:]
+    
+    d_ij = e_occ[:,None]+e_occ
+    d_ab = e_vir[:,None]+e_vir
 
     s1 = 0
     f1 = n_singles
     s2 = f1
     f2 = s2 + n_doubles
 
-    d_ij = e_occ[:,None]+e_occ
-    d_ab = e_vir[:,None]+e_vir
-
-    d_ia = e_occ[:,None]+e_vir
     e_core = adc.mo_energy[:nocc].copy()
     e_extern = adc.mo_energy[nocc:].copy()
 
 
     #Calculate sigma vector
     #@profile
-    #@profile
+    @profile
     def sigma_(r):
         cput0 = (logger.process_clock(), logger.perf_counter())
         log = logger.Logger(adc.stdout, adc.verbose)
@@ -791,6 +795,7 @@ def matvec(adc, M_ab=None, eris=None):
         s = np.zeros(dim)
 
         s[s1:f1] = lib.einsum('ab,b->a',M_,r1, optimize = True)
+
 
         D_ijab = (-d_ij.reshape(-1,1) + d_ab.reshape(-1)).reshape((nocc,nocc,nvir,nvir))
         s[s2:f2] = (D_ijab.reshape(-1))*r[s2:f2]
@@ -827,13 +832,11 @@ def matvec(adc, M_ab=None, eris=None):
             del M_11Y0
             del M_01Y1
 
-        M_11Y0 = -einsum('iC,JDIi->IJCD', Y, v_cecc, optimize = einsum_type)
-        M_11Y0 -= einsum('iD,ICJi->IJCD', Y, v_cecc, optimize = einsum_type)
-        s[s2:f2] += M_11Y0.reshape(-1)
+        s[s2:f2] -= einsum('iC,JDIi->IJCD', Y, v_cecc, optimize = einsum_type).reshape(-1)
+        s[s2:f2] -= einsum('iD,ICJi->IJCD', Y, v_cecc, optimize = einsum_type).reshape(-1)
 
-        M_01Y1 = -2*einsum('ijDa,jaiI->ID', r2, v_cecc, optimize = einsum_type)
-        M_01Y1 += einsum('ijDa,iajI->ID', r2, v_cecc, optimize = einsum_type)
-        s[s1:f1] += M_01Y1.reshape(-1)
+        s[s1:f1] -= 2*einsum('ijDa,jaiI->ID', r2, v_cecc, optimize = einsum_type).reshape(-1)
+        s[s1:f1] += einsum('ijDa,iajI->ID', r2, v_cecc, optimize = einsum_type).reshape(-1)
 
         if (adc.method == "adc(2)-x") or (adc.method == "adc(3)"):
             del Y
@@ -843,62 +846,46 @@ def matvec(adc, M_ab=None, eris=None):
                 s[s2:f2] += radc_amplitudes.contract_ladder(adc,Y,eris.Lvv).reshape(-1)
             else:
                 v_eeee = eris.vvvv.reshape(nvir, nvir, nvir,nvir)
-                M_1Y1_aa  = einsum('IJab,CDab->IJCD', Y, v_eeee, optimize = einsum_type)
-                s[s2:f2] += M_1Y1_aa.reshape(-1)
-                del M_1Y1_aa
+                s[s2:f2] += einsum('IJab,CDab->IJCD', Y, v_eeee, optimize = einsum_type).reshape(-1)
             
-                
-            M_1Y1_aa = 2 * einsum('IiCa,JDai->IJCD', Y, v_ceec, optimize = einsum_type)
-            M_1Y1_aa -= einsum('IiCa,iJDa->IJCD', Y, v_ccee, optimize = einsum_type)
-            M_1Y1_aa -= einsum('IiaC,JDai->IJCD', Y, v_ceec, optimize = einsum_type)
-            M_1Y1_aa -= einsum('IiaD,iJCa->IJCD', Y, v_ccee, optimize = einsum_type)
-            M_1Y1_aa += 2 * einsum('JiDa,ICai->IJCD', Y, v_ceec, optimize = einsum_type)
-            M_1Y1_aa -= einsum('JiDa,iICa->IJCD', Y, v_ccee, optimize = einsum_type)
-            M_1Y1_aa -= einsum('JiaC,iIDa->IJCD', Y, v_ccee, optimize = einsum_type)
-            M_1Y1_aa -= einsum('JiaD,ICai->IJCD', Y, v_ceec, optimize = einsum_type)
-            M_1Y1_aa += einsum('ijCD,IiJj->IJCD', Y, v_cccc, optimize = einsum_type)
-
-
-
-
-
-
-            s[s2:f2] += M_1Y1_aa.reshape(-1)
+            s[s2:f2] += 2 * einsum('IiCa,JDai->IJCD', Y, v_ceec, optimize = einsum_type).reshape(-1)
+            s[s2:f2] -= einsum('IiCa,iJDa->IJCD', Y, v_ccee, optimize = einsum_type).reshape(-1)
+            s[s2:f2] -= einsum('IiaC,JDai->IJCD', Y, v_ceec, optimize = einsum_type).reshape(-1)
+            s[s2:f2] -= einsum('IiaD,iJCa->IJCD', Y, v_ccee, optimize = einsum_type).reshape(-1)
+            s[s2:f2] += 2 * einsum('JiDa,ICai->IJCD', Y, v_ceec, optimize = einsum_type).reshape(-1)
+            s[s2:f2] -= einsum('JiDa,iICa->IJCD', Y, v_ccee, optimize = einsum_type).reshape(-1)
+            s[s2:f2] -= einsum('JiaC,iIDa->IJCD', Y, v_ccee, optimize = einsum_type).reshape(-1)
+            s[s2:f2] -= einsum('JiaD,ICai->IJCD', Y, v_ceec, optimize = einsum_type).reshape(-1)
+            s[s2:f2] += einsum('ijCD,IiJj->IJCD', Y, v_cccc, optimize = einsum_type).reshape(-1)
 
 
         if (adc.method == "adc(3)"):
-            t1 = adc.t1
-            t2 = adc.t2
-            t1_ccee = t2[0][:]
-            t2_ce = t1[0]
-            t2_ccee = t2[1][:]
-            v_ccce = eris.ovoo
 
-            M_02Y1_aa = 2 * einsum('IiDa,a,ia->ID', Y, e_extern, t2_ce, optimize = einsum_type)
-            M_02Y1_aa -= 2 * einsum('IiDa,i,ia->ID', Y, e_core, t2_ce, optimize = einsum_type)
-            M_02Y1_aa -= einsum('IiaD,a,ia->ID', Y, e_extern, t2_ce, optimize = einsum_type)
-            M_02Y1_aa += einsum('IiaD,i,ia->ID', Y, e_core, t2_ce, optimize = einsum_type)
-            M_02Y1_aa -= 4 * einsum('IiDa,jkab,kbji->ID', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_02Y1_aa += 2 * einsum('IiDa,jkab,jbki->ID', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_02Y1_aa += 2 * einsum('IiaD,jkab,kbji->ID', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_02Y1_aa -= einsum('IiaD,jkab,jbki->ID', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_02Y1_aa -= einsum('Iiab,jkab,kDji->ID', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_02Y1_aa += 2 * einsum('Iiab,jkab,jDki->ID', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_02Y1_aa += 2 * einsum('ijDa,ikab,kbIj->ID', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_02Y1_aa -= einsum('ijDa,ikab,Ibkj->ID', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_02Y1_aa -= einsum('ijDa,ikba,kbIj->ID', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_02Y1_aa += 2 * einsum('ijDa,ikba,Ibkj->ID', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_02Y1_aa -= 4 * einsum('ijDa,jkab,kbIi->ID', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_02Y1_aa += 2 * einsum('ijDa,jkab,Ibki->ID', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_02Y1_aa += 2 * einsum('ijDa,jkba,kbIi->ID', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_02Y1_aa -= einsum('ijDa,jkba,Ibki->ID', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_02Y1_aa += 2 * einsum('ijab,ikab,kDIj->ID', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_02Y1_aa -= 3 * einsum('ijab,ikab,IDkj->ID', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_02Y1_aa -= einsum('ijab,ikba,kDIj->ID', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_02Y1_aa += einsum('ijab,ikba,IDkj->ID', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_02Y1_aa -= einsum('ijab,ikab,IDkj->ID', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_02Y1_aa += einsum('ijab,ikba,IDkj->ID', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            s[s1:f1] += M_02Y1_aa.reshape(-1)
+
+            s[s1:f1] += 2 * einsum('IiDa,a,ia->ID', Y, e_extern, t2_ce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] -= 2 * einsum('IiDa,i,ia->ID', Y, e_core, t2_ce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] -= einsum('IiaD,a,ia->ID', Y, e_extern, t2_ce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] += einsum('IiaD,i,ia->ID', Y, e_core, t2_ce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] -= 4 * einsum('IiDa,jkab,kbji->ID', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] += 2 * einsum('IiDa,jkab,jbki->ID', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] += 2 * einsum('IiaD,jkab,kbji->ID', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] -= einsum('IiaD,jkab,jbki->ID', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] -= einsum('Iiab,jkab,kDji->ID', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] += 2 * einsum('Iiab,jkab,jDki->ID', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] += 2 * einsum('ijDa,ikab,kbIj->ID', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] -= einsum('ijDa,ikab,Ibkj->ID', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] -= einsum('ijDa,ikba,kbIj->ID', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] += 2 * einsum('ijDa,ikba,Ibkj->ID', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] -= 4 * einsum('ijDa,jkab,kbIi->ID', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] += 2 * einsum('ijDa,jkab,Ibki->ID', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] += 2 * einsum('ijDa,jkba,kbIi->ID', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] -= einsum('ijDa,jkba,Ibki->ID', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] += 2 * einsum('ijab,ikab,kDIj->ID', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] -= 3 * einsum('ijab,ikab,IDkj->ID', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] -= einsum('ijab,ikba,kDIj->ID', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] += einsum('ijab,ikba,IDkj->ID', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] -= einsum('ijab,ikab,IDkj->ID', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s1:f1] += einsum('ijab,ikba,IDkj->ID', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
 
             if isinstance(eris.ovvv, type(None)):
                 chnk_size = radc_ao2mo.calculate_chunk_size(adc)
@@ -932,44 +919,77 @@ def matvec(adc, M_ab=None, eris=None):
                 del temp
                 del v_ceee
             else:
-                M_02Y1_aa += -2 * einsum('IiDa,ijbc,jbac->ID', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                M_02Y1_aa += 4 * einsum('IiDa,ijbc,jcab->ID', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                M_02Y1_aa += einsum('IiaD,ijbc,jbac->ID', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                M_02Y1_aa -= 2 * einsum('IiaD,ijbc,jcab->ID', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                M_02Y1_aa += einsum('Iiab,ijac,jDbc->ID', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                M_02Y1_aa -= 2 * einsum('Iiab,ijac,jcbD->ID', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                M_02Y1_aa -= 2 * einsum('Iiab,ijbc,jDac->ID', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                M_02Y1_aa += 4 * einsum('Iiab,ijbc,jcaD->ID', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                M_02Y1_aa -= 2 * einsum('Iiab,ijca,jDbc->ID', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                M_02Y1_aa += einsum('Iiab,ijca,jcbD->ID', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                M_02Y1_aa += einsum('Iiab,ijcb,jDac->ID', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                M_02Y1_aa -= 2 * einsum('Iiab,ijcb,jcaD->ID', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                M_02Y1_aa -= 2 * einsum('ijDa,ijbc,Ibac->ID', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                M_02Y1_aa += einsum('ijDa,ijbc,Icab->ID', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                M_02Y1_aa += 3 * einsum('ijab,ijac,IDbc->ID', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                M_02Y1_aa -= 2 * einsum('ijab,ijac,IcbD->ID', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                M_02Y1_aa -= einsum('ijab,ijbc,IDac->ID', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                M_02Y1_aa += einsum('ijab,ijbc,IcaD->ID', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                M_02Y1_aa += einsum('ijab,ijac,IDbc->ID', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                M_02Y1_aa -= einsum('ijab,ijbc,IDac->ID', Y, t1_ccee, v_ceee, optimize = einsum_type)
+                s[s1:f1] -= 2 * einsum('IiDa,ijbc,jbac->ID', Y, t1_ccee, v_ceee, optimize = einsum_type).reshape(-1)
+                s[s1:f1] += 4 * einsum('IiDa,ijbc,jcab->ID', Y, t1_ccee, v_ceee, optimize = einsum_type).reshape(-1)
+                s[s1:f1] += einsum('IiaD,ijbc,jbac->ID', Y, t1_ccee, v_ceee, optimize = einsum_type).reshape(-1)
+                s[s1:f1] -= 2 * einsum('IiaD,ijbc,jcab->ID', Y, t1_ccee, v_ceee, optimize = einsum_type).reshape(-1)
+                s[s1:f1] += einsum('Iiab,ijac,jDbc->ID', Y, t1_ccee, v_ceee, optimize = einsum_type).reshape(-1)
+                s[s1:f1] -= 2 * einsum('Iiab,ijac,jcbD->ID', Y, t1_ccee, v_ceee, optimize = einsum_type).reshape(-1)
+                s[s1:f1] -= 2 * einsum('Iiab,ijbc,jDac->ID', Y, t1_ccee, v_ceee, optimize = einsum_type).reshape(-1)
+                s[s1:f1] += 4 * einsum('Iiab,ijbc,jcaD->ID', Y, t1_ccee, v_ceee, optimize = einsum_type).reshape(-1)
+                s[s1:f1] -= 2 * einsum('Iiab,ijca,jDbc->ID', Y, t1_ccee, v_ceee, optimize = einsum_type).reshape(-1)
+                s[s1:f1] += einsum('Iiab,ijca,jcbD->ID', Y, t1_ccee, v_ceee, optimize = einsum_type).reshape(-1)
+                s[s1:f1] += einsum('Iiab,ijcb,jDac->ID', Y, t1_ccee, v_ceee, optimize = einsum_type).reshape(-1)
+                s[s1:f1] -= 2 * einsum('Iiab,ijcb,jcaD->ID', Y, t1_ccee, v_ceee, optimize = einsum_type).reshape(-1)
+                s[s1:f1] -= 2 * einsum('ijDa,ijbc,Ibac->ID', Y, t1_ccee, v_ceee, optimize = einsum_type).reshape(-1)
+                s[s1:f1] += einsum('ijDa,ijbc,Icab->ID', Y, t1_ccee, v_ceee, optimize = einsum_type).reshape(-1)
+                s[s1:f1] += 3 * einsum('ijab,ijac,IDbc->ID', Y, t1_ccee, v_ceee, optimize = einsum_type).reshape(-1)
+                s[s1:f1] -= 2 * einsum('ijab,ijac,IcbD->ID', Y, t1_ccee, v_ceee, optimize = einsum_type).reshape(-1)
+                s[s1:f1] -= einsum('ijab,ijbc,IDac->ID', Y, t1_ccee, v_ceee, optimize = einsum_type).reshape(-1)
+                s[s1:f1] += einsum('ijab,ijbc,IcaD->ID', Y, t1_ccee, v_ceee, optimize = einsum_type).reshape(-1)
+                s[s1:f1] += einsum('ijab,ijac,IDbc->ID', Y, t1_ccee, v_ceee, optimize = einsum_type).reshape(-1)
+                s[s1:f1] -= einsum('ijab,ijbc,IDac->ID', Y, t1_ccee, v_ceee, optimize = einsum_type).reshape(-1)
 
             del Y
             Y = r1.reshape(nocc, nvir).copy()
 
-            M_12Y0_ab  = einsum('Ia,ijCD,iajJ->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_12Y0_ab += einsum('Ja,ijCD,jaiI->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_12Y0_ab -= 2 * einsum('iC,JjDa,jaiI->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_12Y0_ab += einsum('iC,JjDa,iajI->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_12Y0_ab += einsum('iC,jIDa,iajJ->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_12Y0_ab += einsum('iC,jJDa,jaiI->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_12Y0_ab -= 2 * einsum('iD,IjCa,jaiJ->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_12Y0_ab += einsum('iD,IjCa,iajJ->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_12Y0_ab += einsum('iD,jICa,jaiJ->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_12Y0_ab += einsum('iD,jJCa,iajI->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_12Y0_ab += einsum('ia,IjCD,jaiJ->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_12Y0_ab -= 2 * einsum('ia,IjCD,iajJ->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_12Y0_ab += einsum('ia,jJCD,jaiI->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type)
-            M_12Y0_ab -= 2 * einsum('ia,jJCD,iajI->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type)
+            int_1 = einsum('ijAb,LA->ijLb', t1_ccee, Y, optimize = einsum_type)
+            int_2 = einsum('ijDa,ijLb->LbDa', t1_ccee, int_1, optimize = einsum_type)
+            s[s1:f1] += 2 * einsum('ILab,LbDa->ID', v_ccee, int_2, optimize = einsum_type).reshape(-1)
+            del int_1
+            del int_2
+
+            int_1 = einsum('jiAb,LA->jiLb', t1_ccee, Y, optimize = einsum_type)
+            int_2 = einsum('ijDa,jiLb->LbDa',t1_ccee, int_1, optimize = einsum_type)
+            s[s1:f1] -= einsum('ILab,LbDa->ID', v_ccee, int_2, optimize = einsum_type).reshape(-1)
+            del int_1
+            del int_2
+
+
+
+            int_1 = einsum('ijAa,LA->ijLa', t1_ccee, Y, optimize = einsum_type)
+            int_2 = einsum('ijDb,ijLa->LaDb', t1_ccee, int_1, optimize = einsum_type)
+            s[s1:f1] -= einsum('IabL,LaDb->ID', v_ceec, int_2, optimize = einsum_type).reshape(-1)
+            del int_1
+            del int_2
+
+            int_1 = einsum('jiAa,LA->jiLa', t1_ccee, Y, optimize = einsum_type)
+            int_2 = einsum('ijDb,jiLa->LaDb',t1_ccee, int_1, optimize = einsum_type)
+            s[s1:f1] += einsum('IabL,LaDb->ID', v_ceec, int_2, optimize = einsum_type).reshape(-1)
+            del int_1
+            del int_2
+
+            int_1 = einsum('jiAa,LA->jiLa', t1_ccee, Y, optimize = einsum_type)
+            int_2 = einsum('ijDb,jiLa->LaDb', t1_ccee, int_1, optimize = einsum_type)
+            s[s1:f1] += einsum('IabL,LaDb->ID', v_ceec, int_2, optimize = einsum_type).reshape(-1)
+            del int_1
+            del int_2
+
+
+            s[s2:f2] += einsum('Ia,ijCD,iajJ->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s2:f2] += einsum('Ja,ijCD,jaiI->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s2:f2] -= 2 * einsum('iC,JjDa,jaiI->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s2:f2] += einsum('iC,JjDa,iajI->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s2:f2] += einsum('iC,jIDa,iajJ->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s2:f2] += einsum('iC,jJDa,jaiI->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s2:f2] -= 2 * einsum('iD,IjCa,jaiJ->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s2:f2] += einsum('iD,IjCa,iajJ->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s2:f2] += einsum('iD,jICa,jaiJ->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s2:f2] += einsum('iD,jJCa,iajI->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s2:f2] += einsum('ia,IjCD,jaiJ->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s2:f2] -= 2 * einsum('ia,IjCD,iajJ->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s2:f2] += einsum('ia,jJCD,jaiI->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
+            s[s2:f2] -= 2 * einsum('ia,jJCD,iajI->IJCD', Y, t1_ccee, v_ccce, optimize = einsum_type).reshape(-1)
 
             if isinstance(eris.ovvv, type(None)):
                 chnk_size = radc_ao2mo.calculate_chunk_size(adc)
@@ -1011,186 +1031,14 @@ def matvec(adc, M_ab=None, eris=None):
                    M_12Y0_ab -= einsum('ia,IJCb,ibDa->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
                    M_12Y0_ab += 2 * einsum('ia,JIDb,iaCb->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
                    M_12Y0_ab -= einsum('ia,JIDb,ibCa->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
+                   s[s2:f2] += M_12Y0_ab.reshape(-1)
 
-
-            s[s2:f2] += M_12Y0_ab.reshape(-1)
-
+            del Y
         return s
 
 
 
     return sigma_
-
-
-
-
-
-def renormalize_eigenvectors(adc, nroots=1):
-
-    nocc = adc._nocc
-    nvir = adc._nvir
-
-    n_singles = nocc * nvir
-
-    U = adc.U
-    for I in range(U.shape[1]):
-        U1 = U[:n_singles,I]
-        U2 = U[n_singles:,I].reshape(nocc,nocc,nvir,nvir)
-        UdotU = np.dot(U1, U1) + 2.*np.dot(U2.ravel(), U2.ravel()) - 4.*np.dot(U2.ravel(), U2.transpose(0,1,3,2).ravel())
-        U[:,I] /= np.sqrt(UdotU)
-
-    return U
-
-
-
-
-def get_X(adc):
-    U = renormalize_eigenvectors(adc)
-
-    #U = adc.U
-    U = U.T.copy()
-
-    nroots = U.shape[0]
-
-    dip_ints = -adc.mol.intor('int1e_r',comp=3)
-    dm = np.zeros_like((dip_ints))
-    for i in range(dip_ints.shape[0]):
-        dip = dip_ints[i,:,:]
-        dm[i,:,:] = np.dot(adc.mo_coeff.T,np.dot(dip,adc.mo_coeff))
-
-   
-
-    x = np.array([])
-    
-    nocc = adc._nocc
-    nvir = adc._nvir
-
-    nmo = nocc + nvir
-
-
-    n_singles = nocc * nvir
-    n_doubles = nocc * nocc * nvir * nvir
-
-
-    s1 = 0
-    f1 = n_singles
-    s2 = f1
-    f2 = s2 + n_doubles
-
-    t1 = adc.t1
-    t2 = adc.t2
-
-    t1_ccee = t2[0][:]
-    t2_ccee = t2[1][:]
-
-    t2_ce = t1[0]
-
-
-    einsum = lib.einsum
-    einsum_type = True
-
-    TY = np.zeros((nmo, nmo))
-
-    TY_ = []
-    x = np.array([])
-
-    for r in range(U.shape[0]):
-
-
-        r1 = U[r][s1:f1]
-
-        Y = r1.reshape(nocc, nvir).copy()
-        #print(np.linalg.norm(Y))
-        #exit()
-        
-       # print(np.linalg.norm(Y))
-       # exit()
-        r2 = U[r][s2:f2].reshape(nocc,nocc,nvir,nvir).copy()
-
-        TY[:nocc,nocc:] = Y.copy()
-
-        TY[nocc:,:nocc]  = einsum('ia,LiAa->AL', Y, t1_ccee, optimize = einsum_type)
-        TY[nocc:,:nocc] -= einsum('ia,iLAa->AL', Y, t1_ccee, optimize = einsum_type)
-
-        TY[:nocc,:nocc] =- einsum('Iiab,Liab->IL', r2, t1_ccee, optimize = einsum_type)
-        TY[:nocc,:nocc] += einsum('Iiab,Liba->IL', r2, t1_ccee, optimize = einsum_type)
-
-
-        TY[nocc:,nocc:]  = 2 * einsum('ijCa,ijAa->AC', r2, t1_ccee, optimize = einsum_type)
-        TY[nocc:,nocc:] -= 2 * einsum('ijCa,jiAa->AC', r2, t1_ccee, optimize = einsum_type)
-
-
-        TY[:nocc,:nocc] -= einsum('Iiab,Liab->IL', r2, t1_ccee, optimize = einsum_type)
-        TY[nocc:,nocc:] += einsum('ijCa,ijAa->AC', r2, t1_ccee, optimize = einsum_type)
-
-
-        TY[:nocc,:nocc] -= einsum('Ia,La->IL', Y, t2_ce, optimize = einsum_type)
-        TY[nocc:,nocc:] += einsum('iC,iA->AC', Y, t2_ce, optimize = einsum_type)
-
-        TY[:nocc,nocc:] -= einsum('Ia,ijab,ijCb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
-        TY[:nocc,nocc:] += 1/2 * einsum('Ia,ijab,jiCb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
-        TY[:nocc,nocc:] -= einsum('iC,ijab,Ijab->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
-        TY[:nocc,nocc:] += 1/2 * einsum('iC,ijab,Ijba->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
-        TY[:nocc,nocc:] += einsum('ia,ijab,IjCb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
-        TY[:nocc,nocc:] -= 1/2 * einsum('ia,ijab,jICb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
-        TY[:nocc,nocc:] -= 1/2 * einsum('ia,ijba,IjCb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
-        TY[:nocc,nocc:] += 1/2 * einsum('ia,ijba,jICb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
-
-        TY[nocc:,:nocc] += einsum('ia,LiAa->AL', Y, t2_ccee, optimize = einsum_type)
-        TY[nocc:,:nocc] -= einsum('ia,iLAa->AL', Y, t2_ccee, optimize = einsum_type)
-
-
-        dx = lib.einsum("rqp,qp->r", dm, TY, optimize = True)
-
-        TY_ = np.append(TY_,TY)
-
-        x = np.append(x,dx)
-    x = x.reshape(nroots, 3)
-
-    return TY_, x
-
-#def analyze_spec_factor(adc):
-
-
-
-
-def get_properties(adc,nroots):
-
-    TY, dx  = adc.get_X()
-
-
-    X = TY.reshape(nroots,-1)
-
-    P = np.square(dx.T)*adc.E*(2/3)
-    P = P[0] + P[1] + P[2]
-
-    return P, X
-
-
-def analyze(myadc):
-
-    if myadc.compute_properties:
-
-        header = ("\n*************************************************************"
-                  "\n            Spectroscopic factors analysis summary"
-                  "\n*************************************************************")
-        logger.info(myadc, header)
-
-        myadc.analyze_spec_factor()
-
-def compute_dyson_mo(myadc):
-
-    X = myadc.X
-
-    if X is None:
-        nroots = myadc.U.shape[1]
-        P,X = myadc.get_properties(nroots)
-
-    nroots = X.shape[1]
-    dyson_mo = np.dot(myadc.mo_coeff,X)
-
-    return dyson_mo
-
 
 class RADCEE(radc.RADC):
     '''restricted ADC for EA energies and spectroscopic amplitudes
@@ -1273,15 +1121,6 @@ class RADCEE(radc.RADC):
     get_imds = get_imds
     matvec = matvec
     get_diag = get_diag
-    #get_trans_moments = get_trans_moments
-    renormalize_eigenvectors = renormalize_eigenvectors
-    get_X = get_X
-    get_properties = get_properties
-#    analyze_spec_factor = analyze_spec_factor
- #   analyze_eigenvector = analyze_eigenvector
- #   analyze = analyze
- #   compute_dyson_mo = compute_dyson_mo
-
     def get_init_guess(self, nroots=1, diag=None, ascending = True):
         if diag is None :
             diag = self.get_diag()
@@ -1306,36 +1145,3 @@ class RADCEE(radc.RADC):
         diag = self.get_diag(imds, eris)
         matvec = self.matvec(imds, eris)
         return matvec, diag
-
-
-def contract_r_vvvv(myadc,r2,vvvv):
-
-    nocc = myadc._nocc
-    nvir = myadc._nvir
-
-    r2_vvvv = np.zeros((nocc,nocc,nvir,nvir))
-    r2 = np.ascontiguousarray(r2.reshape(nocc*nocc,-1))
-    chnk_size = radc_ao2mo.calculate_chunk_size(myadc)
-
-    a = 0
-    if isinstance(vvvv, list):
-        for dataset in vvvv:
-            k = dataset.shape[0]
-            dataset = dataset[:].reshape(-1,nvir*nvir)
-            r2_vvvv[:,a:a+k] = np.dot(r2,dataset.T).reshape(nocc,-1,nvir)
-            del dataset
-            a += k
-    elif getattr(myadc, 'with_df', None):
-        for p in range(0,nvir,chnk_size):
-            vvvv_p = dfadc.get_vvvv_df(myadc, vvvv, p, chnk_size)
-            k = vvvv_p.shape[0]
-            vvvv_p = vvvv_p.reshape(-1,nvir*nvir)
-            r2_vvvv[:,a:a+k] = np.dot(r2,vvvv_p.T).reshape(nocc*nocc,-1)
-            del vvvv_p
-            a += k
-    else:
-        raise Exception("Unknown vvvv type")
-
-    r2_vvvv = r2_vvvv.reshape(-1)
-
-    return r2_vvvv

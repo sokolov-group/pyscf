@@ -15,7 +15,7 @@
 # Author: Abdelrahman Ahmed <>
 #         Samragni Banerjee <samragnibanerjee4@gmail.com>
 #         James Serna <jamcar456@gmail.com>
-#         Terrence Stahl <>
+#         Terrence Stahl <terrencestahl1@gmail.com>
 #         Alexander Sokolov <alexander.y.sokolov@gmail.com>
 
 '''

@@ -15,7 +15,7 @@
 # Author: Abdelrahman Ahmed <>
 #         Samragni Banerjee <samragnibanerjee4@gmail.com>
 #         James Serna <jamcar456@gmail.com>
-#         Terrence Stahl <>
+#         Terrence Stahl <terrencestahl1@gmail.com>
 #         Alexander Sokolov <alexander.y.sokolov@gmail.com>
 #
 
@@ -57,7 +57,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     conv, adc.E, U = lib.linalg_helper.davidson_nosym1(
         lambda xs : [matvec(x) for x in xs],
-        guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol,
+        guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_memory=adc.max_memory,
         max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual=adc.tol_residual)
 
     adc.U = np.array(U).T.copy()
@@ -216,8 +216,8 @@ class RADC(lib.StreamObject):
 
         self.max_space = getattr(__config__, 'adc_radc_RADC_max_space', 12)
         self.max_cycle = getattr(__config__, 'adc_radc_RADC_max_cycle', 50)
-        self.conv_tol = getattr(__config__, 'adc_radc_RADC_conv_tol', 1e-12)
-        self.tol_residual = getattr(__config__, 'adc_radc_RADC_tol_residual', 1e-6)
+        self.conv_tol = getattr(__config__, 'adc_radc_RADC_conv_tol', 1e-8)
+        self.tol_residual = getattr(__config__, 'adc_radc_RADC_tol_residual', 1e-5)
         self.scf_energy = mf.e_tot
 
         self.frozen = frozen
@@ -237,7 +237,7 @@ class RADC(lib.StreamObject):
         self.method = "adc(2)"
         self.method_type = "ip"
         self.with_df = None
-        self.compute_properties = True
+        self.compute_properties = False
         self.approx_trans_moments = False
         self.evec_print_tol = 0.1
         self.spec_factor_print_tol = 0.1
