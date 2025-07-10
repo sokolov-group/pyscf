@@ -34,16 +34,12 @@ import sys
 
 from line_profiler import profile
 
-@profile
 def get_imds(adc, eris=None):
 
-    cput0 = (logger.process_clock(), logger.perf_counter())
-    log = logger.Logger(adc.stdout, adc.verbose)
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
 
-    method = adc.method
 
     t1 = adc.t1
     t2 = adc.t2
@@ -56,7 +52,6 @@ def get_imds(adc, eris=None):
     einsum = lib.einsum
     einsum_type = True
 
-    eris_ovvo = eris.ovvo
     ncore = adc._nocc
     nextern = adc._nvir
 
@@ -86,13 +81,13 @@ def get_imds(adc, eris=None):
     d_ai_a = adc.mo_energy[ncore:][:,None] - adc.mo_energy[:ncore]
     np.fill_diagonal(M_ab, d_ai_a.transpose().reshape(-1))
     M_ab = M_ab.reshape(ncore,nextern,ncore,nextern).copy()
-    
-    
+
+
     ####010#####################
 
     M_ab -= einsum('ILAD->IDLA', v_ccee, optimize = einsum_type).copy()
     M_ab += einsum('LADI->IDLA', v_ceec, optimize = einsum_type).copy()
-    
+
     M_ab += einsum('LADI->IDLA', v_ceec, optimize = einsum_type).copy()
 
     ####020#####################
@@ -136,8 +131,8 @@ def get_imds(adc, eris=None):
     M_ab[:,vir_list,:,vir_list] -= 1/2 * einsum('Iabi,Liba->IL', v_ceec, t1_ccee, optimize = einsum_type)##
     M_ab[:,vir_list,:,vir_list] += einsum('Iiab,Labi->IL', t1_ccee, v_ceec, optimize = einsum_type) ##
     M_ab[:,vir_list,:,vir_list] -= 1/2 * einsum('Iiab,Lbai->IL', t1_ccee, v_ceec, optimize = einsum_type) ##
-    
-    
+
+
     M_ab += 2 * einsum('IiDa,LAai->IDLA', t1_ccee, v_cece, optimize = einsum_type)
     M_ab -= einsum('IiDa,iAaL->IDLA', t1_ccee, v_cece, optimize = einsum_type)
     M_ab += 2 * einsum('LiAa,IDai->IDLA', t1_ccee, v_cece, optimize = einsum_type)
@@ -193,39 +188,57 @@ def get_imds(adc, eris=None):
             for p in range(0,nvir,chnk_size):
                 v_eeee = dfadc.get_vvvv_df(adc, eris.Lvv, p, chnk_size).reshape(-1,nvir,nvir,nvir)
                 k = v_eeee.shape[0]
-                M_ab[:,:,:,a:a+k] -= 2 * einsum('AaDb,Iiac,Libc->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
+                M_ab[:,:,:,a:a+k] -= 2 * einsum('AaDb,Iiac,Libc->IDLA', v_eeee, t1_ccee, t1_ccee, optimize =
+                einsum_type)
                 M_ab[:,:,:,a:a+k] += einsum('AaDb,Iiac,Licb->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
                 M_ab[:,:,:,a:a+k] += einsum('AaDb,Iica,Libc->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[:,:,:,a:a+k] -= 2 * einsum('AaDb,Iica,Licb->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[:,:,:,a:a+k] += 2 * einsum('AbaD,Iibc,Liac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
+                M_ab[:,:,:,a:a+k] -= 2 * einsum('AaDb,Iica,Licb->IDLA', v_eeee, t1_ccee, t1_ccee, optimize =
+                einsum_type)
+                M_ab[:,:,:,a:a+k] += 2 * einsum('AbaD,Iibc,Liac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize =
+                einsum_type)
                 M_ab[:,:,:,a:a+k] -= einsum('AbaD,Iibc,Lica->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
                 M_ab[:,:,:,a:a+k] -= einsum('AbaD,Iicb,Liac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
                 M_ab[:,:,:,a:a+k] += einsum('AbaD,Iicb,Lica->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[:,:,:,a:a+k] += 2 * einsum('Abac,IiDb,Liac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
+                M_ab[:,:,:,a:a+k] += 2 * einsum('Abac,IiDb,Liac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize =
+                einsum_type)
                 M_ab[:,:,:,a:a+k] -= einsum('Abac,IiDb,Lica->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
                 M_ab[:,:,:,a:a+k] -= einsum('Abac,iIDb,Liac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
                 M_ab[:,:,:,a:a+k] += einsum('Abac,iIDb,Lica->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[:,a:a+k,:,:] += 2 * einsum('Dbac,LiAb,Iiac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
+                M_ab[:,a:a+k,:,:] += 2 * einsum('Dbac,LiAb,Iiac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize =
+                einsum_type)
                 M_ab[:,a:a+k,:,:] -= einsum('Dbac,LiAb,Iica->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
                 M_ab[:,a:a+k,:,:] -= einsum('Dbac,iLAb,Iiac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
                 M_ab[:,a:a+k,:,:] += einsum('Dbac,iLAb,Iica->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[:,vir_list,:,vir_list] -= 2 * einsum('acbd,Iiac,Libd->IL', v_eeee, t1_ccee[:,:,a:a+k,:], t1_ccee, optimize = einsum_type)
-                M_ab[:,vir_list,:,vir_list] += einsum('acbd,Iiac,Lidb->IL', v_eeee, t1_ccee[:,:,a:a+k,:], t1_ccee, optimize = einsum_type)
-                M_ab[occ_list,:,occ_list,a:a+k] += 4 * einsum('AaDb,ijac,ijbc->DA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[occ_list,:,occ_list,a:a+k] -= 2 * einsum('AaDb,ijac,jibc->DA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[occ_list,:,occ_list,a:a+k] -= 2 * einsum('AbaD,ijbc,ijac->DA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[occ_list,:,occ_list,a:a+k] += einsum('AbaD,ijbc,jiac->DA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[occ_list,:,occ_list,a:a+k] -= 2 * einsum('Abac,ijDb,ijac->DA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[occ_list,:,occ_list,a:a+k] += einsum('Abac,ijDb,jiac->DA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[occ_list,a:a+k,occ_list,:] -= 2 * einsum('Dbac,ijAb,ijac->DA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[occ_list,a:a+k,occ_list,:] += einsum('Dbac,ijAb,jiac->DA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[:,:,:,a:a+k] += 2 * einsum('AbaD,Iibc,Liac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
+                M_ab[:,vir_list,:,vir_list] -= 2 * einsum('acbd,Iiac,Libd->IL', v_eeee, t1_ccee[:,:,a:a+k,:], t1_ccee,
+                optimize = einsum_type)
+                M_ab[:,vir_list,:,vir_list] += einsum('acbd,Iiac,Lidb->IL', v_eeee, t1_ccee[:,:,a:a+k,:], t1_ccee,
+                optimize = einsum_type)
+                M_ab[occ_list,:,occ_list,a:a+k] += 4 * einsum('AaDb,ijac,ijbc->DA', v_eeee, t1_ccee, t1_ccee, optimize =
+                einsum_type)
+                M_ab[occ_list,:,occ_list,a:a+k] -= 2 * einsum('AaDb,ijac,jibc->DA', v_eeee, t1_ccee, t1_ccee, optimize =
+                einsum_type)
+                M_ab[occ_list,:,occ_list,a:a+k] -= 2 * einsum('AbaD,ijbc,ijac->DA', v_eeee, t1_ccee, t1_ccee, optimize =
+                einsum_type)
+                M_ab[occ_list,:,occ_list,a:a+k] += einsum('AbaD,ijbc,jiac->DA', v_eeee, t1_ccee, t1_ccee, optimize =
+                einsum_type)
+                M_ab[occ_list,:,occ_list,a:a+k] -= 2 * einsum('Abac,ijDb,ijac->DA', v_eeee, t1_ccee, t1_ccee, optimize =
+                einsum_type)
+                M_ab[occ_list,:,occ_list,a:a+k] += einsum('Abac,ijDb,jiac->DA', v_eeee, t1_ccee, t1_ccee, optimize =
+                einsum_type)
+                M_ab[occ_list,a:a+k,occ_list,:] -= 2 * einsum('Dbac,ijAb,ijac->DA', v_eeee, t1_ccee, t1_ccee, optimize =
+                einsum_type)
+                M_ab[occ_list,a:a+k,occ_list,:] += einsum('Dbac,ijAb,jiac->DA', v_eeee, t1_ccee, t1_ccee, optimize =
+                einsum_type)
+                M_ab[:,:,:,a:a+k] += 2 * einsum('AbaD,Iibc,Liac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize =
+                einsum_type)
                 M_ab[:,:,:,a:a+k] -= einsum('AbaD,Iibc,Lica->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
                 M_ab[:,:,:,a:a+k] -= einsum('AbaD,Iicb,Liac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[:,:,:,a:a+k] += 2 * einsum('Abac,IiDb,Liac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
+                M_ab[:,:,:,a:a+k] += 2 * einsum('Abac,IiDb,Liac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize =
+                einsum_type)
                 M_ab[:,:,:,a:a+k] -= einsum('Abac,IiDb,Lica->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
                 M_ab[:,:,:,a:a+k] -= einsum('Abac,iIDb,Liac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[:,a:a+k,:,:] += 2 * einsum('Dbac,LiAb,Iiac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
+                M_ab[:,a:a+k,:,:] += 2 * einsum('Dbac,LiAb,Iiac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize =
+                einsum_type)
                 M_ab[:,a:a+k,:,:] -= einsum('Dbac,LiAb,Iica->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
                 M_ab[:,a:a+k,:,:] -= einsum('Dbac,iLAb,Iiac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
                 del v_eeee
@@ -250,16 +263,26 @@ def get_imds(adc, eris=None):
             M_ab -= einsum('Dbac,LiAb,Iica->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
             M_ab -= einsum('Dbac,iLAb,Iiac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
             M_ab += einsum('Dbac,iLAb,Iica->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-            M_ab[:,vir_list,:,vir_list] -= 2 * einsum('acbd,Iiac,Libd->IL', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-            M_ab[:,vir_list,:,vir_list] += einsum('acbd,Iiac,Lidb->IL', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-            M_ab[occ_list,:,occ_list,:] += 4 * einsum('AaDb,ijac,ijbc->DA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-            M_ab[occ_list,:,occ_list,:] -= 2 * einsum('AaDb,ijac,jibc->DA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-            M_ab[occ_list,:,occ_list,:] -= 2 * einsum('AbaD,ijbc,ijac->DA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-            M_ab[occ_list,:,occ_list,:] += einsum('AbaD,ijbc,jiac->DA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-            M_ab[occ_list,:,occ_list,:] -= 2 * einsum('Abac,ijDb,ijac->DA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-            M_ab[occ_list,:,occ_list,:] += einsum('Abac,ijDb,jiac->DA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-            M_ab[occ_list,:,occ_list,:] -= 2 * einsum('Dbac,ijAb,ijac->DA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-            M_ab[occ_list,:,occ_list,:] += einsum('Dbac,ijAb,jiac->DA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
+            M_ab[:,vir_list,:,vir_list] -= 2 * einsum('acbd,Iiac,Libd->IL', v_eeee, t1_ccee, t1_ccee, optimize =
+            einsum_type)
+            M_ab[:,vir_list,:,vir_list] += einsum('acbd,Iiac,Lidb->IL', v_eeee, t1_ccee, t1_ccee, optimize =
+            einsum_type)
+            M_ab[occ_list,:,occ_list,:] += 4 * einsum('AaDb,ijac,ijbc->DA', v_eeee, t1_ccee, t1_ccee, optimize =
+            einsum_type)
+            M_ab[occ_list,:,occ_list,:] -= 2 * einsum('AaDb,ijac,jibc->DA', v_eeee, t1_ccee, t1_ccee, optimize =
+            einsum_type)
+            M_ab[occ_list,:,occ_list,:] -= 2 * einsum('AbaD,ijbc,ijac->DA', v_eeee, t1_ccee, t1_ccee, optimize =
+            einsum_type)
+            M_ab[occ_list,:,occ_list,:] += einsum('AbaD,ijbc,jiac->DA', v_eeee, t1_ccee, t1_ccee, optimize =
+            einsum_type)
+            M_ab[occ_list,:,occ_list,:] -= 2 * einsum('Abac,ijDb,ijac->DA', v_eeee, t1_ccee, t1_ccee, optimize =
+            einsum_type)
+            M_ab[occ_list,:,occ_list,:] += einsum('Abac,ijDb,jiac->DA', v_eeee, t1_ccee, t1_ccee, optimize =
+            einsum_type)
+            M_ab[occ_list,:,occ_list,:] -= 2 * einsum('Dbac,ijAb,ijac->DA', v_eeee, t1_ccee, t1_ccee, optimize =
+            einsum_type)
+            M_ab[occ_list,:,occ_list,:] += einsum('Dbac,ijAb,jiac->DA', v_eeee, t1_ccee, t1_ccee, optimize =
+            einsum_type)
             M_ab += 2 * einsum('AbaD,Iibc,Liac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
             M_ab -= einsum('AbaD,Iibc,Lica->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
             M_ab -= einsum('AbaD,Iicb,Liac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
@@ -277,11 +300,11 @@ def get_imds(adc, eris=None):
 
 
 
-        
+
         M_ab += 2 * einsum('IiDa,LAai->IDLA', t2_ccee, v_cece, optimize = einsum_type)
-        
+
         M_ab -= einsum('IiDa,iAaL->IDLA', t2_ccee, v_cece, optimize = einsum_type)
-        
+
         M_ab += 2 * einsum('LiAa,IDai->IDLA', t2_ccee, v_cece, optimize = einsum_type)
         M_ab -= einsum('LiAa,iDaI->IDLA', t2_ccee, v_cece, optimize = einsum_type)
         M_ab += einsum('iA,iDIL->IDLA', t2_ce, v_cecc, optimize = einsum_type)
@@ -324,7 +347,7 @@ def get_imds(adc, eris=None):
         M_ab += 1/2*einsum('iAaL,IiDa->IDLA', v_ceec, t2_ccee, optimize = einsum_type)
         M_ab -= 1/2*einsum('i,iLAa,iIDa->IDLA', e_core, t1_ccee, t2_ccee, optimize = einsum_type)
         M_ab -= 1/2*einsum('iAaL,iIDa->IDLA', v_ceec, t2_ccee, optimize = einsum_type)
-        
+
         M_ab[:,vir_list,:,vir_list] -= 2 * einsum('Iiab,Labi->IL', t2_ccee, v_cece, optimize = einsum_type)
         M_ab[:,vir_list,:,vir_list] += einsum('Iiab,Lbai->IL', t2_ccee, v_cece, optimize = einsum_type)
         M_ab[:,vir_list,:,vir_list] -= 2 * einsum('Liab,Iabi->IL', t2_ccee, v_cece, optimize = einsum_type)
@@ -333,13 +356,13 @@ def get_imds(adc, eris=None):
         M_ab[:,vir_list,:,vir_list] -= 2 * einsum('ia,iaLI->IL', t2_ce, v_cecc, optimize = einsum_type)
         M_ab[:,vir_list,:,vir_list] += einsum('ia,LaiI->IL', t2_ce, v_cecc, optimize = einsum_type)
         M_ab[:,vir_list,:,vir_list] += einsum('ia,IaiL->IL', t2_ce, v_cecc, optimize = einsum_type)
-        
-        
+
+
         M_ab[occ_list,:,occ_list,:] -= 2 * einsum('ijAa,iDaj->DA', t2_ccee, v_cece, optimize = einsum_type)
         M_ab[occ_list,:,occ_list,:] += einsum('ijAa,jDai->DA', t2_ccee, v_cece, optimize = einsum_type)
         M_ab[occ_list,:,occ_list,:] -= 2 * einsum('ijDa,iAaj->DA', t2_ccee, v_cece, optimize = einsum_type)
         M_ab[occ_list,:,occ_list,:] += einsum('ijDa,jAai->DA',t2_ccee, v_cece, optimize = einsum_type)
-        
+
 
         M_ab -= einsum('IDaL,ijab,ijAb->IDLA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab += 1/2 * einsum('IDaL,ijab,jiAb->IDLA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
@@ -449,15 +472,19 @@ def get_imds(adc, eris=None):
         M_ab += einsum('ijab,LjAa,iIDb->IDLA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab += einsum('ijab,jLAa,IiDb->IDLA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab -= einsum('ijab,jLAa,iIDb->IDLA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
-        
+
         M_ab[occ_list,:,occ_list,:] -= einsum('A,ijAa,ijDa->DA', e_extern, t1_ccee, t2_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] += 1/2 * einsum('A,ijAa,jiDa->DA', e_extern, t1_ccee, t2_ccee, optimize = einsum_type)
+        M_ab[occ_list,:,occ_list,:] += 1/2 * einsum('A,ijAa,jiDa->DA', e_extern, t1_ccee, t2_ccee, optimize =
+        einsum_type)
         M_ab[occ_list,:,occ_list,:] -= einsum('A,ijDa,ijAa->DA', e_extern, t1_ccee, t2_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] += 1/2 * einsum('A,ijDa,jiAa->DA', e_extern, t1_ccee, t2_ccee, optimize = einsum_type)
+        M_ab[occ_list,:,occ_list,:] += 1/2 * einsum('A,ijDa,jiAa->DA', e_extern, t1_ccee, t2_ccee, optimize =
+        einsum_type)
         M_ab[occ_list,:,occ_list,:] -= einsum('D,ijAa,ijDa->DA', e_extern, t1_ccee, t2_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] += 1/2 * einsum('D,ijAa,jiDa->DA', e_extern, t1_ccee, t2_ccee, optimize = einsum_type)
+        M_ab[occ_list,:,occ_list,:] += 1/2 * einsum('D,ijAa,jiDa->DA', e_extern, t1_ccee, t2_ccee, optimize =
+        einsum_type)
         M_ab[occ_list,:,occ_list,:] -= einsum('D,ijDa,ijAa->DA', e_extern, t1_ccee, t2_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] += 1/2 * einsum('D,ijDa,jiAa->DA', e_extern, t1_ccee, t2_ccee, optimize = einsum_type)
+        M_ab[occ_list,:,occ_list,:] += 1/2 * einsum('D,ijDa,jiAa->DA', e_extern, t1_ccee, t2_ccee, optimize =
+        einsum_type)
         M_ab[:,vir_list,:,vir_list] += einsum('I,Iiab,Liab->IL', e_core, t1_ccee, t2_ccee, optimize = einsum_type)
         M_ab[:,vir_list,:,vir_list] -= 1/2 * einsum('I,Iiab,Liba->IL', e_core, t1_ccee, t2_ccee, optimize = einsum_type)
         M_ab[:,vir_list,:,vir_list] += einsum('I,Liab,Iiab->IL', e_core, t1_ccee, t2_ccee, optimize = einsum_type)
@@ -490,84 +517,126 @@ def get_imds(adc, eris=None):
         M_ab[occ_list,:,occ_list,:] += 2 * einsum('i,jiAa,jiDa->DA', e_core, t1_ccee, t2_ccee, optimize = einsum_type)
         M_ab[occ_list,:,occ_list,:] -= einsum('i,jiDa,ijAa->DA', e_core, t1_ccee, t2_ccee, optimize = einsum_type)
         M_ab[occ_list,:,occ_list,:] += 2 * einsum('i,jiDa,jiAa->DA', e_core, t1_ccee, t2_ccee, optimize = einsum_type)
-        
-        
-        
-        M_ab[:,vir_list,:,vir_list] -= 4 * einsum('ILab,ijac,ijbc->IL', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] += 2 * einsum('ILab,ijac,jibc->IL', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] += 4 * einsum('ILij,ikab,jkab->IL', v_cccc, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] -= 2 * einsum('ILij,ikab,jkba->IL', v_cccc, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] += 2 * einsum('IabL,ijbc,ijac->IL', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
+
+
+
+        M_ab[:,vir_list,:,vir_list] -= 4 * einsum('ILab,ijac,ijbc->IL', v_ccee, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[:,vir_list,:,vir_list] += 2 * einsum('ILab,ijac,jibc->IL', v_ccee, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[:,vir_list,:,vir_list] += 4 * einsum('ILij,ikab,jkab->IL', v_cccc, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[:,vir_list,:,vir_list] -= 2 * einsum('ILij,ikab,jkba->IL', v_cccc, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[:,vir_list,:,vir_list] += 2 * einsum('IabL,ijbc,ijac->IL', v_ceec, t1_ccee, t1_ccee, optimize =
+        einsum_type)
         M_ab[:,vir_list,:,vir_list] -= einsum('IabL,ijbc,jiac->IL', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] -= 4 * einsum('Iabi,ijbc,Ljac->IL', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] += 2 * einsum('Iabi,ijbc,Ljca->IL', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] += 2 * einsum('Iabi,jibc,Ljac->IL', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
+        M_ab[:,vir_list,:,vir_list] -= 4 * einsum('Iabi,ijbc,Ljac->IL', v_ceec, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[:,vir_list,:,vir_list] += 2 * einsum('Iabi,ijbc,Ljca->IL', v_ceec, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[:,vir_list,:,vir_list] += 2 * einsum('Iabi,jibc,Ljac->IL', v_ceec, t1_ccee, t1_ccee, optimize =
+        einsum_type)
         M_ab[:,vir_list,:,vir_list] -= einsum('Iabi,jibc,Ljca->IL', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] += 2 * einsum('Iiab,ijac,Ljbc->IL', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+        M_ab[:,vir_list,:,vir_list] += 2 * einsum('Iiab,ijac,Ljbc->IL', v_ccee, t1_ccee, t1_ccee, optimize =
+        einsum_type)
         M_ab[:,vir_list,:,vir_list] -= einsum('Iiab,ijac,Ljcb->IL', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab[:,vir_list,:,vir_list] -= einsum('Iiab,jiac,Ljbc->IL', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] += 2 * einsum('Iiab,jiac,Ljcb->IL', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] -= 2 * einsum('IijL,jkab,ikab->IL', v_cccc, t1_ccee, t1_ccee, optimize = einsum_type)
+        M_ab[:,vir_list,:,vir_list] += 2 * einsum('Iiab,jiac,Ljcb->IL', v_ccee, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[:,vir_list,:,vir_list] -= 2 * einsum('IijL,jkab,ikab->IL', v_cccc, t1_ccee, t1_ccee, optimize =
+        einsum_type)
         M_ab[:,vir_list,:,vir_list] += einsum('IijL,jkab,ikba->IL', v_cccc, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] -= 2 * einsum('Iijk,Ljab,ikab->IL', v_cccc, t1_ccee, t1_ccee, optimize = einsum_type)
+        M_ab[:,vir_list,:,vir_list] -= 2 * einsum('Iijk,Ljab,ikab->IL', v_cccc, t1_ccee, t1_ccee, optimize =
+        einsum_type)
         M_ab[:,vir_list,:,vir_list] += einsum('Iijk,Ljab,ikba->IL', v_cccc, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] -= 4 * einsum('Labi,ijbc,Ijac->IL', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] += 2 * einsum('Labi,ijbc,Ijca->IL', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] += 2 * einsum('Labi,jibc,Ijac->IL', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
+        M_ab[:,vir_list,:,vir_list] -= 4 * einsum('Labi,ijbc,Ijac->IL', v_ceec, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[:,vir_list,:,vir_list] += 2 * einsum('Labi,ijbc,Ijca->IL', v_ceec, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[:,vir_list,:,vir_list] += 2 * einsum('Labi,jibc,Ijac->IL', v_ceec, t1_ccee, t1_ccee, optimize =
+        einsum_type)
         M_ab[:,vir_list,:,vir_list] -= einsum('Labi,jibc,Ijca->IL', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] += 2 * einsum('Liab,ijac,Ijbc->IL', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+        M_ab[:,vir_list,:,vir_list] += 2 * einsum('Liab,ijac,Ijbc->IL', v_ccee, t1_ccee, t1_ccee, optimize =
+        einsum_type)
         M_ab[:,vir_list,:,vir_list] -= einsum('Liab,ijac,Ijcb->IL', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab[:,vir_list,:,vir_list] -= einsum('Liab,jiac,Ijbc->IL', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] += 2 * einsum('Liab,jiac,Ijcb->IL', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] -= 2 * einsum('Lijk,Ijab,ikab->IL', v_cccc, t1_ccee, t1_ccee, optimize = einsum_type)
+        M_ab[:,vir_list,:,vir_list] += 2 * einsum('Liab,jiac,Ijcb->IL', v_ccee, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[:,vir_list,:,vir_list] -= 2 * einsum('Lijk,Ijab,ikab->IL', v_cccc, t1_ccee, t1_ccee, optimize =
+        einsum_type)
         M_ab[:,vir_list,:,vir_list] += einsum('Lijk,Ijab,ikba->IL', v_cccc, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab[:,vir_list,:,vir_list] -= einsum('iabj,Iiac,Ljbc->IL', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] += 2 * einsum('iabj,Iiac,Ljcb->IL', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] += 2 * einsum('iabj,Iica,Ljbc->IL', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] -= 4 * einsum('iabj,Iica,Ljcb->IL', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] += 2 * einsum('ijab,Iibc,Ljac->IL', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+        M_ab[:,vir_list,:,vir_list] += 2 * einsum('iabj,Iiac,Ljcb->IL', v_ceec, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[:,vir_list,:,vir_list] += 2 * einsum('iabj,Iica,Ljbc->IL', v_ceec, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[:,vir_list,:,vir_list] -= 4 * einsum('iabj,Iica,Ljcb->IL', v_ceec, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[:,vir_list,:,vir_list] += 2 * einsum('ijab,Iibc,Ljac->IL', v_ccee, t1_ccee, t1_ccee, optimize =
+        einsum_type)
         M_ab[:,vir_list,:,vir_list] -= einsum('ijab,Iibc,Ljca->IL', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab[:,vir_list,:,vir_list] -= einsum('ijab,Iicb,Ljac->IL', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[:,vir_list,:,vir_list] += 2 * einsum('ijab,Iicb,Ljca->IL', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
-        
-        M_ab[occ_list,:,occ_list,:] += 2 * einsum('iADj,jkab,ikab->DA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
+        M_ab[:,vir_list,:,vir_list] += 2 * einsum('ijab,Iicb,Ljca->IL', v_ccee, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+
+        M_ab[occ_list,:,occ_list,:] += 2 * einsum('iADj,jkab,ikab->DA', v_ceec, t1_ccee, t1_ccee, optimize =
+        einsum_type)
         M_ab[occ_list,:,occ_list,:] -= einsum('iADj,jkab,ikba->DA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] -= 4 * einsum('iAaj,jkab,ikDb->DA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] += 2 * einsum('iAaj,jkab,kiDb->DA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] += 2 * einsum('iAaj,jkba,ikDb->DA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
+        M_ab[occ_list,:,occ_list,:] -= 4 * einsum('iAaj,jkab,ikDb->DA', v_ceec, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[occ_list,:,occ_list,:] += 2 * einsum('iAaj,jkab,kiDb->DA', v_ceec, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[occ_list,:,occ_list,:] += 2 * einsum('iAaj,jkba,ikDb->DA', v_ceec, t1_ccee, t1_ccee, optimize =
+        einsum_type)
         M_ab[occ_list,:,occ_list,:] -= einsum('iAaj,jkba,kiDb->DA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] -= 4 * einsum('iDaj,jkab,ikAb->DA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] += 2 * einsum('iDaj,jkab,kiAb->DA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] += 2 * einsum('iDaj,jkba,ikAb->DA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
+        M_ab[occ_list,:,occ_list,:] -= 4 * einsum('iDaj,jkab,ikAb->DA', v_ceec, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[occ_list,:,occ_list,:] += 2 * einsum('iDaj,jkab,kiAb->DA', v_ceec, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[occ_list,:,occ_list,:] += 2 * einsum('iDaj,jkba,ikAb->DA', v_ceec, t1_ccee, t1_ccee, optimize =
+        einsum_type)
         M_ab[occ_list,:,occ_list,:] -= einsum('iDaj,jkba,kiAb->DA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab[occ_list,:,occ_list,:] -= einsum('iabj,ikAa,jkDb->DA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] += 2 * einsum('iabj,ikAa,kjDb->DA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] += 2 * einsum('iabj,kiAa,jkDb->DA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] -= 4 * einsum('iabj,kiAa,kjDb->DA', v_ceec, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] -= 4 * einsum('ijAD,ikab,jkab->DA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] += 2 * einsum('ijAD,ikab,jkba->DA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] += 2 * einsum('ijAa,ikab,jkDb->DA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+        M_ab[occ_list,:,occ_list,:] += 2 * einsum('iabj,ikAa,kjDb->DA', v_ceec, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[occ_list,:,occ_list,:] += 2 * einsum('iabj,kiAa,jkDb->DA', v_ceec, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[occ_list,:,occ_list,:] -= 4 * einsum('iabj,kiAa,kjDb->DA', v_ceec, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[occ_list,:,occ_list,:] -= 4 * einsum('ijAD,ikab,jkab->DA', v_ccee, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[occ_list,:,occ_list,:] += 2 * einsum('ijAD,ikab,jkba->DA', v_ccee, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[occ_list,:,occ_list,:] += 2 * einsum('ijAa,ikab,jkDb->DA', v_ccee, t1_ccee, t1_ccee, optimize =
+        einsum_type)
         M_ab[occ_list,:,occ_list,:] -= einsum('ijAa,ikab,kjDb->DA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab[occ_list,:,occ_list,:] -= einsum('ijAa,ikba,jkDb->DA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] += 2 * einsum('ijAa,ikba,kjDb->DA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] += 2 * einsum('ijDa,ikab,jkAb->DA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+        M_ab[occ_list,:,occ_list,:] += 2 * einsum('ijAa,ikba,kjDb->DA', v_ccee, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[occ_list,:,occ_list,:] += 2 * einsum('ijDa,ikab,jkAb->DA', v_ccee, t1_ccee, t1_ccee, optimize =
+        einsum_type)
         M_ab[occ_list,:,occ_list,:] -= einsum('ijDa,ikab,kjAb->DA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab[occ_list,:,occ_list,:] -= einsum('ijDa,ikba,jkAb->DA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] += 2 * einsum('ijDa,ikba,kjAb->DA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] += 2 * einsum('ijab,jkAa,ikDb->DA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+        M_ab[occ_list,:,occ_list,:] += 2 * einsum('ijDa,ikba,kjAb->DA', v_ccee, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[occ_list,:,occ_list,:] += 2 * einsum('ijab,jkAa,ikDb->DA', v_ccee, t1_ccee, t1_ccee, optimize =
+        einsum_type)
         M_ab[occ_list,:,occ_list,:] -= einsum('ijab,jkAa,kiDb->DA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
         M_ab[occ_list,:,occ_list,:] -= einsum('ijab,kjAa,ikDb->DA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] += 2 * einsum('ijab,kjAa,kiDb->DA', v_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
-        M_ab[occ_list,:,occ_list,:] -= 2 * einsum('ijkl,ikAa,jlDa->DA', v_cccc, t1_ccee, t1_ccee, optimize = einsum_type)
+        M_ab[occ_list,:,occ_list,:] += 2 * einsum('ijab,kjAa,kiDb->DA', v_ccee, t1_ccee, t1_ccee, optimize =
+        einsum_type)
+        M_ab[occ_list,:,occ_list,:] -= 2 * einsum('ijkl,ikAa,jlDa->DA', v_cccc, t1_ccee, t1_ccee, optimize =
+        einsum_type)
         M_ab[occ_list,:,occ_list,:] += einsum('ijkl,ikAa,ljDa->DA', v_cccc, t1_ccee, t1_ccee, optimize = einsum_type)
 
-        
+
         M_ab += 2 * einsum('IiDa,LAai->IDLA', t2_ccee, v_cece, optimize = einsum_type)
         M_ab -= einsum('IiDa,iAaL->IDLA', t2_ccee, v_cece, optimize = einsum_type)
-        
-        
+
+
         M_ab += 2 * einsum('LiAa,IDai->IDLA', t2_ccee, v_cece, optimize = einsum_type)
-        
+
         M_ab -= einsum('LiAa,iDaI->IDLA', t2_ccee, v_cece, optimize = einsum_type)
         M_ab -= einsum('iA,IDiL->IDLA', t2_ce, v_cecc, optimize = einsum_type)
         M_ab -= einsum('iD,LAiI->IDLA', t2_ce, v_cecc, optimize = einsum_type)
@@ -680,10 +749,8 @@ def get_imds(adc, eris=None):
     return M_ab
 
 
-@profile
 def get_diag(adc,M_ab=None,eris=None):
 
-    log = logger.Logger(adc.stdout, adc.verbose)
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
@@ -721,20 +788,18 @@ def get_diag(adc,M_ab=None,eris=None):
     return diag
 
 
-@profile
 def matvec(adc, M_ab=None, eris=None):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
 
-    method = adc.method
 
-    
+
     if M_ab is None:
         M_  = adc.get_imds()
 
     M_ = M_ab
-    
+
     if eris is None:
         eris = adc.transform_integrals()
 
@@ -750,23 +815,19 @@ def matvec(adc, M_ab=None, eris=None):
     v_ceec = eris.ovvo
     v_cccc = eris.oooo
     v_cecc = eris.ovoo
-    v_ceee = eris.ovvv
 
     nocc = adc._nocc
     nvir = adc._nvir
 
-    ij_ind_a = np.tril_indices(nocc, k=-1)
-    ab_ind_a = np.tril_indices(nvir, k=-1)
 
     n_singles = nocc * nvir
     n_doubles = nocc * nocc * nvir * nvir
 
     dim = n_singles + n_doubles
-    diag = np.zeros(dim)
 
     e_occ = adc.mo_energy[:nocc]
     e_vir = adc.mo_energy[nocc:]
-    
+
     d_ij = e_occ[:,None]+e_occ
     d_ab = e_vir[:,None]+e_vir
 
@@ -780,16 +841,12 @@ def matvec(adc, M_ab=None, eris=None):
 
 
     #Calculate sigma vector
-    #@profile
-    @profile
     def sigma_(r):
-        cput0 = (logger.process_clock(), logger.perf_counter())
-        log = logger.Logger(adc.stdout, adc.verbose)
-       
+
         r1 = r[s1:f1]
 
         Y = r1.reshape(nocc, nvir).copy()
-        
+
         r2 = r[s2:f2].reshape(nocc,nocc,nvir,nvir).copy()
 
         s = np.zeros(dim)
@@ -847,7 +904,7 @@ def matvec(adc, M_ab=None, eris=None):
             else:
                 v_eeee = eris.vvvv.reshape(nvir, nvir, nvir,nvir)
                 s[s2:f2] += einsum('IJab,CDab->IJCD', Y, v_eeee, optimize = einsum_type).reshape(-1)
-            
+
             s[s2:f2] += 2 * einsum('IiCa,JDai->IJCD', Y, v_ceec, optimize = einsum_type).reshape(-1)
             s[s2:f2] -= einsum('IiCa,iJDa->IJCD', Y, v_ccee, optimize = einsum_type).reshape(-1)
             s[s2:f2] -= einsum('IiaC,JDai->IJCD', Y, v_ceec, optimize = einsum_type).reshape(-1)
@@ -1017,21 +1074,21 @@ def matvec(adc, M_ab=None, eris=None):
                 del temp
                 del v_ceee
             else:
-                   M_12Y0_ab  = -einsum('Ia,JiDb,iaCb->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                   M_12Y0_ab += 2 * einsum('Ia,JiDb,ibCa->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                   M_12Y0_ab -= einsum('Ia,iJCb,iaDb->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                   M_12Y0_ab -= einsum('Ia,iJDb,ibCa->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                   M_12Y0_ab -= einsum('Ja,IiCb,iaDb->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                   M_12Y0_ab += 2 * einsum('Ja,IiCb,ibDa->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                   M_12Y0_ab -= einsum('Ja,iICb,ibDa->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                   M_12Y0_ab -= einsum('Ja,iIDb,iaCb->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                   M_12Y0_ab -= einsum('iC,IJab,iaDb->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                   M_12Y0_ab -= einsum('iD,IJab,ibCa->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                   M_12Y0_ab += 2 * einsum('ia,IJCb,iaDb->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                   M_12Y0_ab -= einsum('ia,IJCb,ibDa->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                   M_12Y0_ab += 2 * einsum('ia,JIDb,iaCb->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                   M_12Y0_ab -= einsum('ia,JIDb,ibCa->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
-                   s[s2:f2] += M_12Y0_ab.reshape(-1)
+                M_12Y0_ab  = -einsum('Ia,JiDb,iaCb->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
+                M_12Y0_ab += 2 * einsum('Ia,JiDb,ibCa->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
+                M_12Y0_ab -= einsum('Ia,iJCb,iaDb->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
+                M_12Y0_ab -= einsum('Ia,iJDb,ibCa->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
+                M_12Y0_ab -= einsum('Ja,IiCb,iaDb->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
+                M_12Y0_ab += 2 * einsum('Ja,IiCb,ibDa->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
+                M_12Y0_ab -= einsum('Ja,iICb,ibDa->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
+                M_12Y0_ab -= einsum('Ja,iIDb,iaCb->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
+                M_12Y0_ab -= einsum('iC,IJab,iaDb->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
+                M_12Y0_ab -= einsum('iD,IJab,ibCa->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
+                M_12Y0_ab += 2 * einsum('ia,IJCb,iaDb->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
+                M_12Y0_ab -= einsum('ia,IJCb,ibDa->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
+                M_12Y0_ab += 2 * einsum('ia,JIDb,iaCb->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
+                M_12Y0_ab -= einsum('ia,JIDb,ibCa->IJCD', Y, t1_ccee, v_ceee, optimize = einsum_type)
+                s[s2:f2] += M_12Y0_ab.reshape(-1)
 
             del Y
         return s
