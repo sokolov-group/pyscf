@@ -16186,7 +16186,7 @@ def make_rdm1(adc):
     return opdm
 
 
-def get_spin_contamination(adc):
+def get_spin_square(adc):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
@@ -21631,9 +21631,9 @@ def get_spin_contamination(adc):
         na = lib.einsum('pp', temp_a)
         nb = lib.einsum('pp', temp_b)
 
-        spin_c = 0.25 * ((na - nb)**2) + 0.5 * (na + nb) + IjKl + AbCd + 2 * IjCd + \
+        spin_square = 0.25 * ((na - nb)**2) + 0.5 * (na + nb) + IjKl + AbCd + 2 * IjCd + \
             IaKd + 2 * IaDk + AiDk + IjdL + IjlD + AbcL + AjdC + AblC + AjlK + IbdC + IblK
-        spin = np.append(spin, spin_c)
+        spin = np.append(spin, spin_square)
         trace_a = np.append(trace_a, na)
         trace_b = np.append(trace_b, nb)
     return spin, (trace_a, trace_b)
@@ -24368,7 +24368,7 @@ class UADCEE(uadc.UADC):
         self.X = adc.X
 
         self.f_ov = adc.f_ov
-        self.spin_c = adc.spin_c
+        self.compute_spin_square = adc.compute_spin_square
         self.dip_mom = adc.dip_mom
         self.dip_mom_nuc = adc.dip_mom_nuc
 
@@ -24377,7 +24377,7 @@ class UADCEE(uadc.UADC):
     get_diag = get_diag
     matvec = matvec
     get_trans_moments = get_trans_moments
-    get_spin_contamination = get_spin_contamination
+    get_spin_square = get_spin_square
     make_rdm1 = make_rdm1
     get_properties = get_properties
 
