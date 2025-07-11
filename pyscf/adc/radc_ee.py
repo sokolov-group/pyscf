@@ -1135,6 +1135,16 @@ class RADCEE(radc.RADC):
         p_ea : float
             Spectroscopic amplitudes for each EA transition.
     '''
+
+    _keys = {
+        'tol_residual', 'conv_tol', 'e_corr', 'method',
+        'method_type', 'mo_coeff', 'mo_energy', 'max_memory',
+        't1', 't2', 'max_space', 'max_cycle',
+        'nocc', 'nvir', 'nmo', 'mol', 'transform_integrals',
+        'with_df', 'spec_factor_print_tol', 'evec_print_tol',
+        'compute_properties', 'approx_trans_moments', 'E', 'U', 'P', 'X',
+    }
+
     def __init__(self, adc):
         self.mol = adc.mol
         self.verbose = adc.verbose
@@ -1167,12 +1177,6 @@ class RADCEE(radc.RADC):
         self.X = None
         self.evec_print_tol = adc.evec_print_tol
         self.spec_factor_print_tol = adc.spec_factor_print_tol
-
-        keys = set(('tol_residual','conv_tol', 'e_corr', 'method', 'mo_coeff',
-                    'mo_energy', 'max_memory', 't1', 'max_space', 't2',
-                    'max_cycle'))
-
-        self._keys = set(self.__dict__.keys()).union(keys)
 
     kernel = radc.kernel
     get_imds = get_imds

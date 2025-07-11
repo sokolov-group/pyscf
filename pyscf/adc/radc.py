@@ -62,8 +62,9 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     adc.U = np.array(U).T.copy()
 
-    if adc.compute_properties:
+    if adc.compute_properties and adc.method_type != "ee":
         adc.P,adc.X = adc.get_properties(nroots)
+
     nfalse = np.shape(conv)[0] - np.sum(conv)
 
     header = ("\n*************************************************************"
@@ -74,7 +75,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     for n in range(nroots):
         print_string = ('%s root %d  |  Energy (Eh) = %14.10f  |  Energy (eV) = %12.8f  ' %
                         (adc.method, n, adc.E[n], adc.E[n]*27.2114))
-        if adc.compute_properties:
+        if adc.compute_properties and adc.method_type != "ee":
             print_string += ("|  Spec. factor = %10.8f  " % adc.P[n])
         print_string += ("|  conv = %s" % conv[n])
         logger.info(adc, print_string)
@@ -237,7 +238,7 @@ class RADC(lib.StreamObject):
         self.method = "adc(2)"
         self.method_type = "ip"
         self.with_df = None
-        self.compute_properties = False
+        self.compute_properties = True
         self.approx_trans_moments = False
         self.evec_print_tol = 0.1
         self.spec_factor_print_tol = 0.1
