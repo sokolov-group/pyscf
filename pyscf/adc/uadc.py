@@ -23,12 +23,10 @@ Unrestricted algebraic diagrammatic construction
 '''
 
 import numpy as np
-from pyscf import lib, symm
+import pyscf.lib as lib
 from pyscf.lib import logger
 from pyscf.adc import uadc_ao2mo
 from pyscf.adc import uadc_amplitudes
-from pyscf.adc import radc_ao2mo
-from pyscf.adc import dfadc
 from pyscf import __config__
 from pyscf import df
 from pyscf import scf

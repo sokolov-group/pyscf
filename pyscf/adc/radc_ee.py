@@ -20,19 +20,10 @@
 Restricted algebraic diagrammatic construction
 '''
 import numpy as np
-import pyscf.ao2mo as ao2mo
 from pyscf import lib
-from pyscf.lib import logger
 from pyscf.adc import radc
 from pyscf.adc import radc_ao2mo, radc_amplitudes
 from pyscf.adc import dfadc
-from pyscf import __config__
-from pyscf import df
-from pyscf import symm
-import sys
-
-
-from line_profiler import profile
 
 def get_imds(adc, eris=None):
 

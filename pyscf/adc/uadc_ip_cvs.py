@@ -30,8 +30,6 @@ from pyscf.adc import uadc
 from pyscf.adc import uadc_ao2mo
 from pyscf.adc import radc_ao2mo
 from pyscf.adc import dfadc
-from pyscf import __config__
-from pyscf import df
 
 def get_imds(adc, eris=None):
 
