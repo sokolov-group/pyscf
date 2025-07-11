@@ -38,10 +38,10 @@ def setUpModule():
     mol.verbose = 0
     mol.build()
 
-    mf = scf.RHF(mol)
+    mf = scf.UHF(mol)
     mf.conv_tol = 1e-12
     mf.kernel()
-    myadc = adc.ADC(mf).density_fit('cc-pvdz-ri')
+    myadc = adc.ADC(mf)
 
 def tearDownModule():
     global mol, mf, myadc
@@ -57,55 +57,51 @@ class KnownValues(unittest.TestCase):
 
     def test_ee_adc2(self):
         myadc.method = "adc(2)"
-        e, t_amp1, t_amp2 = myadc.kernel_gs()
-        self.assertAlmostEqual(e,-0.20397003815111225, 6)
-        dm1_gs = myadc.make_ref_rdm1()
-        r2_gs = rdms_test(dm1_gs)
-        self.assertAlmostEqual(r2_gs, 19.073709731899555, 6)
+
         myadc.method_type = "ee"
         e,v,p,x = myadc.kernel(nroots=4)
-        
-        self.assertAlmostEqual(e[0],0.2964652641, 6)
-        self.assertAlmostEqual(e[1],0.3721878388, 6)
-        self.assertAlmostEqual(e[2],0.3931892768, 6)
-        self.assertAlmostEqual(e[3],0.4706609107, 6)
 
+        self.assertAlmostEqual(e[0],0.2720830076, 6)
+        self.assertAlmostEqual(e[1],0.2971167018, 6)
+        self.assertAlmostEqual(e[2],0.3576717579, 6)
+        self.assertAlmostEqual(e[3],0.3724791304, 6)
+
+        self.assertAlmostEqual(p[0],0.00000000, 6)
+        self.assertAlmostEqual(p[1],0.02774679, 6)
+        self.assertAlmostEqual(p[2],0.00000000, 6)
+        self.assertAlmostEqual(p[3],0.00000000, 6)
 
     def test_ee_adc2x(self):
         myadc.method = "adc(2)-x"
-        e, t_amp1, t_amp2 = myadc.kernel_gs()
-        self.assertAlmostEqual(e, -0.20397003815111225, 6)
 
-        dm1_gs = myadc.make_ref_rdm1()
-        r2_gs = rdms_test(dm1_gs)
-        self.assertAlmostEqual(r2_gs, 19.073709731899555, 6)
-
-        myadcee = adc.radc_ee.RADCEE(myadc)
+        myadcee = adc.uadc_ee.UADCEE(myadc)
         e,v,p,x = myadcee.kernel(nroots=4)
 
-        self.assertAlmostEqual(e[0],0.2787834258, 6)
-        self.assertAlmostEqual(e[1],0.3560598951, 6)
-        self.assertAlmostEqual(e[2],0.3753963772, 6)
-        self.assertAlmostEqual(e[3],0.4548887980, 6)
+        self.assertAlmostEqual(e[0],0.2560782475, 6)
+        self.assertAlmostEqual(e[1],0.2794713422, 6)
+        self.assertAlmostEqual(e[2],0.3429814832, 6)
+        self.assertAlmostEqual(e[3],0.3563942331, 6)
 
+        self.assertAlmostEqual(p[0],0.00000000, 6)
+        self.assertAlmostEqual(p[1],0.02546196, 6)
+        self.assertAlmostEqual(p[2],0.00000000, 6)
+        self.assertAlmostEqual(p[3],0.00000000, 6)
 
     def test_ee_adc3(self):
         myadc.method = "adc(3)"
-        e, t_amp1, t_amp2 = myadc.kernel_gs()
-        self.assertAlmostEqual(e, -0.21087156082147254, 6)
 
-        dm1_gs = myadc.make_ref_rdm1()
-        r2_gs = rdms_test(dm1_gs)
-        self.assertAlmostEqual(r2_gs,19.043616749195607, 6)
-
-        myadcee = adc.radc_ee.RADCEE(myadc)
+        myadcee = adc.uadc_ee.UADCEE(myadc)
         e,v,p,x = myadcee.kernel(nroots=4)
 
-        self.assertAlmostEqual(e[0],0.3046898037, 6)
-        self.assertAlmostEqual(e[1],0.3787870164, 6)
-        self.assertAlmostEqual(e[2],0.4017031629, 6)
-        self.assertAlmostEqual(e[3],0.4769618372, 6)
+        self.assertAlmostEqual(e[0],0.2801187917, 6)
+        self.assertAlmostEqual(e[1],0.3053163948, 6)
+        self.assertAlmostEqual(e[2],0.3635551473, 6)
+        self.assertAlmostEqual(e[3],0.3790532775, 6)
 
+        self.assertAlmostEqual(p[0],0.00000000, 6)
+        self.assertAlmostEqual(p[1],0.02714686, 6)
+        self.assertAlmostEqual(p[2],0.00000000, 6)
+        self.assertAlmostEqual(p[3],0.00000000, 6)
 if __name__ == "__main__":
     print("EE calculations for different ADC methods for water molecule")
     unittest.main()

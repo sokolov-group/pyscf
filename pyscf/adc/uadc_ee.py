@@ -33,10 +33,8 @@ from pyscf import df
 from pyscf import scf
 from pyscf.data import nist
 
-from line_profiler import profile
 
 
-@profile
 def get_imds(adc, eris=None):
 
     cput0 = (logger.process_clock(), logger.perf_counter())
@@ -10446,7 +10444,6 @@ def get_imds(adc, eris=None):
     return M_ia_jb
 
 
-@profile
 def get_diag(adc, M_ia_jb=None, eris=None):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -10526,7 +10523,6 @@ def get_diag(adc, M_ia_jb=None, eris=None):
     return diag
 
 
-@profile
 def matvec(adc, M_ia_jb=None, eris=None):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
@@ -10578,7 +10574,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
 
     d_ij_abab = e_occ_a[:, None] + e_occ_b
     d_ab_abab = e_vir_a[:, None] + e_vir_b
-    @profile
+
     def sigma_(r):
 
         r1_a = r[s_a:f_a]
@@ -14872,7 +14868,6 @@ def matvec(adc, M_ia_jb=None, eris=None):
 
     return sigma_
 
-# @profile
 
 
 def make_rdm1(adc):
@@ -24247,7 +24242,6 @@ def analyze_spec_factor(adc):
             "*************************************************************\n")
 
 
-# @profile
 def get_properties(adc, nroots=1):
 
     # Transition moments

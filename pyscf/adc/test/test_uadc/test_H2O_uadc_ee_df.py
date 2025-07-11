@@ -57,7 +57,7 @@ class KnownValues(unittest.TestCase):
 
     def test_ee_adc2(self):
         myadc.method = "adc(2)"
-        
+
         myadc.method_type = "ee"
         e,v,p,x = myadc.kernel(nroots=4)
 

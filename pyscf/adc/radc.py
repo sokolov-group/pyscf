@@ -395,12 +395,12 @@ class RADC(lib.StreamObject):
         adc_es = radc_ea.RADCEA(self)
         e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
         return e_exc, v_exc, spec_fac, x, adc_es
-   
+
     def ee_adc(self, nroots=1, guess=None, eris=None):
-         from pyscf.adc import radc_ee
-         adc_es = radc_ee.RADCEE(self)
-         e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
-         return e_exc, v_exc, spec_fac, x, adc_es
+        from pyscf.adc import radc_ee
+        adc_es = radc_ee.RADCEE(self)
+        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
+        return e_exc, v_exc, spec_fac, x, adc_es
 
     def ip_adc(self, nroots=1, guess=None, eris=None):
         from pyscf.adc import radc_ip
