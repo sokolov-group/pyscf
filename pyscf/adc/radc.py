@@ -47,6 +47,9 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     if eris is None:
         eris = adc.transform_integrals()
 
+    if isinstance(eris.vvvv, list) and adc.method_type == "ee":
+        raise NotImplementedError("Out-of-core algorithm for " + adc.method + ". Please use density fitting.")
+
     imds = adc.get_imds(eris)
     matvec, diag = adc.gen_matvec(imds, eris)
 

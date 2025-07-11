@@ -83,6 +83,8 @@ def transform_integrals_outcore(myadc):
         'ovvo', (nocc,nvir,nvir,nocc), 'f8', chunks=(nocc,1,nvir,nocc))
     eris.ovvv = eris.feri1.create_dataset('ovvv', (nocc,nvir,nvpair), 'f8')
 
+    eris.vvvv = []
+
     def save_occ_frac(p0, p1, eri):
         eri = eri.reshape(p1-p0,nocc,nmo,nmo)
         eris.oooo[p0:p1] = eri[:,:,:nocc,:nocc]
@@ -149,9 +151,9 @@ def transform_integrals_outcore(myadc):
 
     ############### forming eris_vvvv ########################################
 
-    if (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False) or (myadc.method == "adc(3)"):
-        eris.vvvv = []
-
+    if ((myadc.method == "adc(2)" and myadc.method_type == "ee" and myadc.approx_trans_moments is False)
+        or (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False)
+        or (myadc.method == "adc(3)")):
         cput3 = logger.process_clock(), logger.perf_counter()
         avail_mem = (myadc.max_memory - lib.current_memory()[0]) * 0.5
         chnk_size = calculate_chunk_size(myadc)
