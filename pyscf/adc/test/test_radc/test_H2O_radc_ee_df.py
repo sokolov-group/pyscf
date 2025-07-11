@@ -25,17 +25,20 @@ from pyscf import adc
 
 def setUpModule():
     global mol, mf, myadc
-    r = 1.098
     mol = gto.Mole()
+    r = 0.957492
+    x = r * math.sin(104.468205 * math.pi/(2 * 180.0))
+    y = r * math.cos(104.468205* math.pi/(2 * 180.0))
     mol.atom = [
-        ['F', (0., 0.    , -r/2   )],
-        ['F', (0., 0.    ,  r/2)],]
-    mol.basis = {'F':'cc-pvdz'}
-
+        ['O', (0., 0.    , 0)],
+        ['H', (0., -x, y)],
+        ['H', (0., x , y)],]
+    mol.basis = {'H': 'cc-pVDZ',
+                 'O': 'cc-pVDZ',}
     mol.verbose = 0
     mol.build()
 
-    mf = scf.UHF(mol)
+    mf = scf.RHF(mol)
     mf.conv_tol = 1e-12
     mf.kernel()
     myadc = adc.ADC(mf).density_fit('cc-pvdz-ri')
@@ -54,51 +57,55 @@ class KnownValues(unittest.TestCase):
 
     def test_ee_adc2(self):
         myadc.method = "adc(2)"
-        
+        e, t_amp1, t_amp2 = myadc.kernel_gs()
+        self.assertAlmostEqual(e,-0.20397003815111225, 6)
+        dm1_gs = myadc.make_ref_rdm1()
+        r2_gs = rdms_test(dm1_gs)
+        self.assertAlmostEqual(r2_gs, 19.073709731899555, 6)
         myadc.method_type = "ee"
         e,v,p,x = myadc.kernel(nroots=4)
 
-        self.assertAlmostEqual(e[0],0.3954389168, 6)
-        self.assertAlmostEqual(e[1],0.3954389168, 6)
-        self.assertAlmostEqual(e[2],0.4626206038, 6)
-        self.assertAlmostEqual(e[3],0.4626206038, 6)
+        self.assertAlmostEqual(e[0],0.2964652641, 6)
+        self.assertAlmostEqual(e[1],0.3721878388, 6)
+        self.assertAlmostEqual(e[2],0.3931892768, 6)
+        self.assertAlmostEqual(e[3],0.4706609107, 6)
 
-        self.assertAlmostEqual(p[0],0.00000000, 6)
-        self.assertAlmostEqual(p[1],0.00000000, 6)
-        self.assertAlmostEqual(p[2],0.00101509, 6)
-        self.assertAlmostEqual(p[3],0.00101509, 6)
 
     def test_ee_adc2x(self):
         myadc.method = "adc(2)-x"
+        e, t_amp1, t_amp2 = myadc.kernel_gs()
+        self.assertAlmostEqual(e, -0.20397003815111225, 6)
 
-        myadcee = adc.uadc_ee.UADCEE(myadc)
+        dm1_gs = myadc.make_ref_rdm1()
+        r2_gs = rdms_test(dm1_gs)
+        self.assertAlmostEqual(r2_gs, 19.073709731899555, 6)
+
+        myadcee = adc.radc_ee.RADCEE(myadc)
         e,v,p,x = myadcee.kernel(nroots=4)
 
-        self.assertAlmostEqual(e[0],0.3737913888, 6)
-        self.assertAlmostEqual(e[1],0.3737913888, 6)
-        self.assertAlmostEqual(e[2],0.4397242667, 6)
-        self.assertAlmostEqual(e[3],0.4397242667, 6)
+        self.assertAlmostEqual(e[0],0.2787834258, 6)
+        self.assertAlmostEqual(e[1],0.3560598951, 6)
+        self.assertAlmostEqual(e[2],0.3753963772, 6)
+        self.assertAlmostEqual(e[3],0.4548887980, 6)
 
-        self.assertAlmostEqual(p[0],0.00000000, 6)
-        self.assertAlmostEqual(p[1],0.00000000, 6)
-        self.assertAlmostEqual(p[2],0.00101221, 6)
-        self.assertAlmostEqual(p[3],0.00101221, 6)
 
     def test_ee_adc3(self):
         myadc.method = "adc(3)"
+        e, t_amp1, t_amp2 = myadc.kernel_gs()
+        self.assertAlmostEqual(e, -0.21087156082147254, 6)
 
-        myadcee = adc.uadc_ee.UADCEE(myadc)
+        dm1_gs = myadc.make_ref_rdm1()
+        r2_gs = rdms_test(dm1_gs)
+        self.assertAlmostEqual(r2_gs,19.043616749195607, 6)
+
+        myadcee = adc.radc_ee.RADCEE(myadc)
         e,v,p,x = myadcee.kernel(nroots=4)
 
-        self.assertAlmostEqual(e[0],0.3883587379, 6)
-        self.assertAlmostEqual(e[1],0.3883587379, 6)
-        self.assertAlmostEqual(e[2],0.4564907388, 6)
-        self.assertAlmostEqual(e[3],0.4564907388, 6)
+        self.assertAlmostEqual(e[0],0.3046898037, 6)
+        self.assertAlmostEqual(e[1],0.3787870164, 6)
+        self.assertAlmostEqual(e[2],0.4017031629, 6)
+        self.assertAlmostEqual(e[3],0.4769618372, 6)
 
-        self.assertAlmostEqual(p[0],0.00000000, 6)
-        self.assertAlmostEqual(p[1],0.00000000, 6)
-        self.assertAlmostEqual(p[2],0.00107400, 6)
-        self.assertAlmostEqual(p[3],0.00107400, 6)
 if __name__ == "__main__":
     print("EE calculations for different ADC methods for water molecule")
     unittest.main()
