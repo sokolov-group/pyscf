@@ -30,7 +30,7 @@ def setUpModule():
     mol.verbose = 0
     mol.atom = '''
         C 0.00000000 0.00000000 -1.18953886
-        N 0.00000000 0.00000000 1.01938091 
+        N 0.00000000 0.00000000 1.01938091
          '''
     mol.basis = {'C': basis,
                  'N': basis,}
@@ -38,7 +38,7 @@ def setUpModule():
     mol.symmetry = "c2v"
     mol.spin = 1
     mol.build()
-    
+
     mf = scf.ROHF(mol)
     mf.conv_tol = 1e-12
     mf.scf()

@@ -27,18 +27,18 @@ def setUpModule():
     global mol, mf, myadc
     basis = 'cc-pVDZ'
     r = 1.215774
-    
+
     mol = gto.Mole()
     mol.verbose = 0
     mol.atom = [
         ['O', ( 0., 0.    , -r/2)],
         ['O', ( 0., 0., r/2)],]
     mol.basis = {'O': basis,}
-    
+
     mol.spin = 2
     mol.symmetry = True
     mol.build()
-    
+
     mf = scf.ROHF(mol)
     mf.conv_tol = 1e-12
     mf.scf()
