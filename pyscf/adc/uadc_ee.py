@@ -24261,7 +24261,7 @@ class UADCEE(uadc.UADC):
             Number of roots (eigenvalues) requested. Default value is 1.
 
             >>> myadc = adc.UADC(mf).run()
-            >>> myadcee = adc.UADC(myadc).run()
+            >>> myadcee = adc.UADCEE(myadc).run()
 
     Saved results
 
@@ -24271,7 +24271,9 @@ class UADCEE(uadc.UADC):
             nroots eigenvalues.
         v_ee : array
             Eigenvectors for each EE transition.
-        p_ee : float
+        p_ee : array
+            Oscillator strength for each EE transition.
+        x_ee : array
             Spectroscopic amplitudes for each EE transition.
     '''
 

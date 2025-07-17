@@ -1449,7 +1449,7 @@ class RADCEA(radc.RADC):
             Number of roots (eigenvalues) requested. Default value is 1.
 
             >>> myadc = adc.RADC(mf).run()
-            >>> myadcea = adc.RADC(myadc).run()
+            >>> myadcea = adc.RADCEA(myadc).run()
 
     Saved results
 
@@ -1457,9 +1457,11 @@ class RADCEA(radc.RADC):
             EA energy (eigenvalue). For nroots = 1, it is a single float
             number. If nroots > 1, it is a list of floats for the lowest
             nroots eigenvalues.
-        v_ip : array
+        v_ea : array
             Eigenvectors for each EA transition.
         p_ea : float
+            Spectroscopic factor for each EA transition.
+        x_ea : float
             Spectroscopic amplitudes for each EA transition.
     '''
 

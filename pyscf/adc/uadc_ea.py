@@ -1883,7 +1883,7 @@ class UADCEA(uadc.UADC):
             Number of roots (eigenvalues) requested. Default value is 1.
 
             >>> myadc = adc.UADC(mf).run()
-            >>> myadcea = adc.UADC(myadc).run()
+            >>> myadcea = adc.UADCEA(myadc).run()
 
     Saved results
 
@@ -1891,9 +1891,11 @@ class UADCEA(uadc.UADC):
             EA energy (eigenvalue). For nroots = 1, it is a single float
             number. If nroots > 1, it is a list of floats for the lowest
             nroots eigenvalues.
-        v_ip : array
+        v_ea : array
             Eigenvectors for each EA transition.
         p_ea : float
+            Spectroscopic factors for each EA transition.
+        x_ea : float
             Spectroscopic amplitudes for each EA transition.
     '''
 

@@ -1330,7 +1330,7 @@ class RADCIP(radc.RADC):
             Number of roots (eigenvalues) requested. Default value is 1.
 
             >>> myadc = adc.RADC(mf).run()
-            >>> myadcip = adc.RADC(myadc).run()
+            >>> myadcip = adc.RADCIP(myadc).run()
 
     Saved results
 
@@ -1341,6 +1341,8 @@ class RADCIP(radc.RADC):
         v_ip : array
             Eigenvectors for each IP transition.
         p_ip : float
+            Spectroscopic factor for each IP transition.
+        x_ip : float
             Spectroscopic amplitudes for each IP transition.
     '''
 

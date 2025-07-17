@@ -1116,7 +1116,7 @@ class RADCEE(radc.RADC):
             Number of roots (eigenvalues) requested. Default value is 1.
 
             >>> myadc = adc.RADC(mf).run()
-            >>> myadcea = adc.RADC(myadc).run()
+            >>> myadcee = adc.RADCEE(myadc).run()
 
     Saved results
 
@@ -1126,8 +1126,10 @@ class RADCEE(radc.RADC):
             nroots eigenvalues.
         v_ee : array
             Eigenvectors for each EE transition.
-        p_ee : float
-            Spectroscopic amplitudes for each EE transition.
+        p_ee : array
+            Oscillator strength for each EE transition (currently not implemented, returns None).
+        x_ee : array
+            Spectroscopic amplitudes for each EE transition (currently not implemented, returns None).
     '''
 
     _keys = {
