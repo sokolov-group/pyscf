@@ -31,7 +31,6 @@ from pyscf.adc import dfadc
 from pyscf import scf
 
 
-
 def get_imds(adc, eris=None):
 
     cput0 = (logger.process_clock(), logger.perf_counter())
@@ -263,50 +262,47 @@ def get_imds(adc, eris=None):
         t1_1_a = t1[2][0][:]
         if isinstance(eris.ovvv, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-            a = 0
-            for p in range(0, nocc_a, chnk_size):
+            for a,b in lib.prange(0,nocc_a,chnk_size):
                 eris_ovvv = dfadc.get_ovvv_spin_df(
-                    adc, eris.Lov, eris.Lvv, p, chnk_size).reshape(-1, nvir_a, nvir_a, nvir_a)
-                k = eris_ovvv.shape[0]
+                    adc, eris.Lov, eris.Lvv, a, chnk_size).reshape(-1, nvir_a, nvir_a, nvir_a)
                 M_ia_jb_a[occ_list_a,
                           :,
                           occ_list_a,
                           :] += 2 * lib.einsum('me,meba->ab',
-                                               t1_1_a[a:a + k],
+                                               t1_1_a[a:b],
                                                eris_ovvv,
                                                optimize=True)
                 M_ia_jb_a[occ_list_a,
                           :,
                           occ_list_a,
                           :] -= lib.einsum('me,mabe->ab',
-                                           t1_1_a[a:a + k],
+                                           t1_1_a[a:b],
                                            eris_ovvv,
                                            optimize=True)
                 M_ia_jb_a[occ_list_a,
                           :,
                           occ_list_a,
                           :] -= lib.einsum('me,mbea->ab',
-                                           t1_1_a[a:a + k],
+                                           t1_1_a[a:b],
                                            eris_ovvv,
                                            optimize=True)
-                M_ia_jb_a[a:a + k] -= lib.einsum('je,ieab->iajb',
+                M_ia_jb_a[a:b] -= lib.einsum('je,ieab->iajb',
                                                  t1_1_a, eris_ovvv, optimize=True)
-                M_ia_jb_a[a:a + k] += lib.einsum('je,iaeb->iajb',
+                M_ia_jb_a[a:b] += lib.einsum('je,iaeb->iajb',
                                                  t1_1_a, eris_ovvv, optimize=True)
                 M_ia_jb_a[:,
                           :,
-                          a:a + k] -= lib.einsum('ie,jeba->iajb',
+                          a:b] -= lib.einsum('ie,jeba->iajb',
                                                  t1_1_a,
                                                  eris_ovvv,
                                                  optimize=True)
                 M_ia_jb_a[:,
                           :,
-                          a:a + k] += lib.einsum('ie,jbea->iajb',
+                          a:b] += lib.einsum('ie,jbea->iajb',
                                                  t1_1_a,
                                                  eris_ovvv,
                                                  optimize=True)
                 del eris_ovvv
-                a += k
         else:
             eris_ovvv = uadc_ao2mo.unpack_eri_1(eris.ovvv, nvir_a)
             M_ia_jb_a[occ_list_a, :, occ_list_a, :] += 2 * \
@@ -340,49 +336,47 @@ def get_imds(adc, eris=None):
         if isinstance(eris.OVVV, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
             a = 0
-            for p in range(0, nocc_b, chnk_size):
+            for a,b in lib.prange(0,nocc_b,chnk_size):
                 eris_OVVV = dfadc.get_ovvv_spin_df(
-                    adc, eris.LOV, eris.LVV, p, chnk_size).reshape(-1, nvir_b, nvir_b, nvir_b)
-                k = eris_OVVV.shape[0]
+                    adc, eris.LOV, eris.LVV, a, chnk_size).reshape(-1, nvir_b, nvir_b, nvir_b)
                 M_ia_jb_b[occ_list_b,
                           :,
                           occ_list_b,
                           :] += 2 * lib.einsum('me,meba->ab',
-                                               t1_1_b[a:a + k],
+                                               t1_1_b[a:b],
                                                eris_OVVV,
                                                optimize=True)
                 M_ia_jb_b[occ_list_b,
                           :,
                           occ_list_b,
                           :] -= lib.einsum('me,mabe->ab',
-                                           t1_1_b[a:a + k],
+                                           t1_1_b[a:b],
                                            eris_OVVV,
                                            optimize=True)
                 M_ia_jb_b[occ_list_b,
                           :,
                           occ_list_b,
                           :] -= lib.einsum('me,mbea->ab',
-                                           t1_1_b[a:a + k],
+                                           t1_1_b[a:b],
                                            eris_OVVV,
                                            optimize=True)
-                M_ia_jb_b[a:a + k] -= lib.einsum('je,ieab->iajb',
+                M_ia_jb_b[a:b] -= lib.einsum('je,ieab->iajb',
                                                  t1_1_b, eris_OVVV, optimize=True)
-                M_ia_jb_b[a:a + k] += lib.einsum('je,iaeb->iajb',
+                M_ia_jb_b[a:b] += lib.einsum('je,iaeb->iajb',
                                                  t1_1_b, eris_OVVV, optimize=True)
                 M_ia_jb_b[:,
                           :,
-                          a:a + k] -= lib.einsum('ie,jeba->iajb',
+                          a:b] -= lib.einsum('ie,jeba->iajb',
                                                  t1_1_b,
                                                  eris_OVVV,
                                                  optimize=True)
                 M_ia_jb_b[:,
                           :,
-                          a:a + k] += lib.einsum('ie,jbea->iajb',
+                          a:b] += lib.einsum('ie,jbea->iajb',
                                                  t1_1_b,
                                                  eris_OVVV,
                                                  optimize=True)
                 del eris_OVVV
-                a += k
         else:
             eris_OVVV = uadc_ao2mo.unpack_eri_1(eris.OVVV, nvir_b)
             M_ia_jb_b[occ_list_b, :, occ_list_b, :] += 2 * \
@@ -416,26 +410,23 @@ def get_imds(adc, eris=None):
         t1_1_b = t1[2][1][:]
         if isinstance(eris.OVvv, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-            a = 0
-            for p in range(0, nocc_b, chnk_size):
+            for a,b in lib.prange(0,nocc_b,chnk_size):
                 eris_OVvv = dfadc.get_ovvv_spin_df(
-                    adc, eris.LOV, eris.Lvv, p, chnk_size).reshape(-1, nvir_b, nvir_a, nvir_a)
-                k = eris_OVvv.shape[0]
+                    adc, eris.LOV, eris.Lvv, a, chnk_size).reshape(-1, nvir_b, nvir_a, nvir_a)
                 M_ia_jb_a[occ_list_a,
                           :,
                           occ_list_a,
                           :] += 2 * lib.einsum('me,meba->ab',
-                                               t1_1_b[a:a + k],
+                                               t1_1_b[a:b],
                                                eris_OVvv,
                                                optimize=True)
                 M_aabb[:,
                        :,
-                       a:a + k] += lib.einsum('ie,jbea->iajb',
+                       a:b] += lib.einsum('ie,jbea->iajb',
                                               t1_1_a,
                                               eris_OVvv,
                                               optimize=True)
                 del eris_OVvv
-                a += k
         else:
             eris_OVvv = uadc_ao2mo.unpack_eri_1(eris.OVvv, nvir_a)
             M_ia_jb_a[occ_list_a, :, occ_list_a, :] += 2 * \
@@ -450,22 +441,19 @@ def get_imds(adc, eris=None):
         t1_1_b = t1[2][1][:]
         if isinstance(eris.ovVV, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-            a = 0
-            for p in range(0, nocc_a, chnk_size):
+            for a,b in lib.prange(0,nocc_a,chnk_size):
                 eris_ovVV = dfadc.get_ovvv_spin_df(
-                    adc, eris.Lov, eris.LVV, p, chnk_size).reshape(-1, nvir_a, nvir_b, nvir_b)
-                k = eris_ovVV.shape[0]
+                    adc, eris.Lov, eris.LVV, a, chnk_size).reshape(-1, nvir_a, nvir_b, nvir_b)
                 M_ia_jb_b[occ_list_b,
                           :,
                           occ_list_b,
                           :] += 2 * lib.einsum('me,meba->ab',
-                                               t1_1_a[a:a + k],
+                                               t1_1_a[a:b],
                                                eris_ovVV,
                                                optimize=True)
-                M_aabb[a:a + k] += lib.einsum('je,iaeb->iajb',
+                M_aabb[a:b] += lib.einsum('je,iaeb->iajb',
                                               t1_1_b, eris_ovVV, optimize=True)
                 del eris_ovVV
-                a += k
         else:
             eris_ovVV = uadc_ao2mo.unpack_eri_1(eris.ovVV, nvir_b)
             M_ia_jb_b[occ_list_b, :, occ_list_b, :] += 2 * \
@@ -512,21 +500,6 @@ def get_imds(adc, eris=None):
         v_cecc_aabb = eris.ovOO
         v_cecc_bbaa = eris.OVoo
 
-        if isinstance(
-                eris.vvvv_p,
-                np.ndarray) or isinstance(
-                eris.vvvv_p,
-                list):
-            eris_ovvv = uadc_ao2mo.unpack_eri_1(eris.ovvv, nvir_a)
-            eris_OVVV = uadc_ao2mo.unpack_eri_1(eris.OVVV, nvir_b)
-            eris_ovVV = uadc_ao2mo.unpack_eri_1(eris.ovVV, nvir_b)
-            eris_OVvv = uadc_ao2mo.unpack_eri_1(eris.OVvv, nvir_a)
-
-            v_ceee_aaaa = eris_ovvv.copy()
-            v_ceee_bbbb = eris_OVVV.copy()
-            v_ceee_aabb = eris_ovVV.copy()
-            v_ceee_bbaa = eris_OVvv.copy()
-
         t2_ce_aa = t1[0][0][:]
         t2_ce_bb = t1[0][1][:]
 
@@ -546,6 +519,9 @@ def get_imds(adc, eris=None):
         e_core_b = adc.mo_energy_b[:nocc_b].copy()
         e_extern_b = adc.mo_energy_b[nocc_b:].copy()
 
+        M_030_aa, M_030_bb, M_030_aabb = 3 * (None,)
+
+        # In-core V^4 contribution
         if isinstance(eris.vvvv_p, np.ndarray):
 
             v_eeee_aaaa = radc_ao2mo.unpack_eri_2(eris.vvvv_p, nvir_a)
@@ -722,9 +698,10 @@ def get_imds(adc, eris=None):
 
             del v_eeee_bbbb
 
-        t_v_con = np.zeros((nocc_a, nvir_a, nocc_a, nvir_a))
+        # Out-of-core V^4 contribution
+        elif isinstance(eris.vvvv_p, list):
 
-        if isinstance(eris.vvvv_p, list):
+            t_v_con = np.zeros((nocc_a, nvir_a, nocc_a, nvir_a))
 
             a = 0
             temp_1 = np.zeros((nocc_a, nvir_a, nocc_a, nvir_a))
@@ -814,10 +791,10 @@ def get_imds(adc, eris=None):
             M_030_aa = temp_1
             M_030_aa += t_v_con
             del t_v_con
+            del temp_1
             del interm
 
-        t_v_con = np.zeros((nocc_b, nvir_b, nocc_b, nvir_b))
-        if isinstance(eris.VVVV_p, list):
+            t_v_con = np.zeros((nocc_b, nvir_b, nocc_b, nvir_b))
 
             a = 0
 
@@ -907,10 +884,29 @@ def get_imds(adc, eris=None):
             M_030_bb = temp_2
             M_030_bb += t_v_con
             del t_v_con
+            del temp_2
             del interm
 
-        t_v_con = np.zeros((nocc_a, nvir_a, nocc_a, nvir_a))
-        if isinstance(eris.vvvv_p, type(None)):
+            interm = 2.0 * adc.imds.t2_1_vvvv[0][:]
+
+            t_v_con = 1 / 2 * \
+                lib.einsum('ilba,IiDb->IDla', t1_ccee_abab, interm, optimize=einsum_type)
+
+            M_030_aabb = t_v_con
+            del t_v_con
+            del interm
+
+            interm = 2.0 * adc.imds.t2_1_vvvv[2][:]
+            t_v_con = 1 / 2 * \
+                lib.einsum('IiDb,liab->IDla', t1_ccee_abab, interm, optimize=einsum_type)
+
+            M_030_aabb += t_v_con
+            del t_v_con
+            del interm
+
+        # Density fitting V^4 contribution
+        else:
+            t_v_con = np.zeros((nocc_a, nvir_a, nocc_a, nvir_a))
 
             interm = 2.0 * adc.imds.t2_1_vvvv[0][:]
 
@@ -935,18 +931,16 @@ def get_imds(adc, eris=None):
             t_v_con[:, vir_list_a, :, vir_list_a] += -1 / 4 * \
                 lib.einsum('Iiab,Liab->IL', t1_ccee_aaaa, interm, optimize=einsum_type)
 
-            a = 0
             temp_1 = np.zeros((nocc_a, nvir_a, nocc_a, nvir_a))
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-            for p in range(0, nvir_a, chnk_size):
+            for a,b in lib.prange(0,nvir_a,chnk_size):
                 v_eeee_aaaa = dfadc.get_vvvv_antisym_df(
-                    adc, eris.Lvv, p, chnk_size, pack=False)
-                k = v_eeee_aaaa.shape[0]
+                    adc, eris.Lvv, a, chnk_size, pack=False)
 
                 temp_1[:,
                        :,
                        :,
-                       a:a + k] -= lib.einsum('AaDb,Iiac,Libc->IDLA',
+                       a:b] -= lib.einsum('AaDb,Iiac,Libc->IDLA',
                                               v_eeee_aaaa,
                                               t1_ccee_aaaa,
                                               t1_ccee_aaaa,
@@ -954,7 +948,7 @@ def get_imds(adc, eris=None):
                 temp_1[occ_list_a,
                        :,
                        occ_list_a,
-                       a:a + k] += 1 / 2 * lib.einsum('AaDb,ijac,ijbc->DA',
+                       a:b] += 1 / 2 * lib.einsum('AaDb,ijac,ijbc->DA',
                                                       v_eeee_aaaa,
                                                       t1_ccee_aaaa,
                                                       t1_ccee_aaaa,
@@ -962,7 +956,7 @@ def get_imds(adc, eris=None):
                 temp_1[occ_list_a,
                        :,
                        occ_list_a,
-                       a:a + k] += lib.einsum('AaDb,ijac,ijbc->DA',
+                       a:b] += lib.einsum('AaDb,ijac,ijbc->DA',
                                               v_eeee_aaaa,
                                               t1_ccee_abab,
                                               t1_ccee_abab,
@@ -972,7 +966,7 @@ def get_imds(adc, eris=None):
                     temp_1[:,
                            :,
                            :,
-                           a:a + k] += -lib.einsum('AaDb,Ia,Lb->IDLA',
+                           a:b] += -lib.einsum('AaDb,Ia,Lb->IDLA',
                                                    v_eeee_aaaa,
                                                    t1_ce_aa,
                                                    t1_ce_aa,
@@ -980,21 +974,20 @@ def get_imds(adc, eris=None):
                     temp_1[occ_list_a,
                            :,
                            occ_list_a,
-                           a:a + k] += lib.einsum('AaDb,ia,ib->DA',
+                           a:b] += lib.einsum('AaDb,ia,ib->DA',
                                                   v_eeee_aaaa,
                                                   t1_ce_aa,
                                                   t1_ce_aa,
                                                   optimize=einsum_type)
 
                 del v_eeee_aaaa
-                a += k
             M_030_aa = temp_1
             M_030_aa += t_v_con
             del t_v_con
+            del temp_1
             del interm
 
-        t_v_con = np.zeros((nocc_b, nvir_b, nocc_b, nvir_b))
-        if isinstance(eris.vvvv_p, type(None)):
+            t_v_con = np.zeros((nocc_b, nvir_b, nocc_b, nvir_b))
 
             interm = 2.0 * adc.imds.t2_1_vvvv[2][:]
 
@@ -1019,18 +1012,16 @@ def get_imds(adc, eris=None):
             t_v_con[:, vir_list_b, :, vir_list_b] += -1 / 4 * \
                 lib.einsum('ijbc,ljbc->il', t1_ccee_bbbb, interm, optimize=einsum_type)
 
-            a = 0
             temp_2 = np.zeros((nocc_b, nvir_b, nocc_b, nvir_b))
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-            for p in range(0, nvir_b, chnk_size):
+            for a,b in lib.prange(0,nvir_b,chnk_size):
                 v_eeee_bbbb = dfadc.get_vvvv_antisym_df(
-                    adc, eris.LVV, p, chnk_size, pack=False)
-                k = v_eeee_bbbb.shape[0]
+                    adc, eris.LVV, a, chnk_size, pack=False)
 
                 temp_2[:,
                        :,
                        :,
-                       a:a + k] -= lib.einsum('abdc,ijbe,ljce->idla',
+                       a:b] -= lib.einsum('abdc,ijbe,ljce->idla',
                                               v_eeee_bbbb,
                                               t1_ccee_bbbb,
                                               t1_ccee_bbbb,
@@ -1038,7 +1029,7 @@ def get_imds(adc, eris=None):
                 temp_2[:,
                        :,
                        :,
-                       a:a + k] -= lib.einsum('abdc,jieb,jlec->idla',
+                       a:b] -= lib.einsum('abdc,jieb,jlec->idla',
                                               v_eeee_bbbb,
                                               t1_ccee_abab,
                                               t1_ccee_abab,
@@ -1046,7 +1037,7 @@ def get_imds(adc, eris=None):
                 temp_2[occ_list_b,
                        :,
                        occ_list_b,
-                       a:a + k] += lib.einsum('abdc,jkeb,jkec->da',
+                       a:b] += lib.einsum('abdc,jkeb,jkec->da',
                                               v_eeee_bbbb,
                                               t1_ccee_abab,
                                               t1_ccee_abab,
@@ -1054,7 +1045,7 @@ def get_imds(adc, eris=None):
                 temp_2[occ_list_b,
                        :,
                        occ_list_b,
-                       a:a + k] += 1 / 2 * lib.einsum('abdc,jkbe,jkce->da',
+                       a:b] += 1 / 2 * lib.einsum('abdc,jkbe,jkce->da',
                                                       v_eeee_bbbb,
                                                       t1_ccee_bbbb,
                                                       t1_ccee_bbbb,
@@ -1064,7 +1055,7 @@ def get_imds(adc, eris=None):
                     temp_2[:,
                            :,
                            :,
-                           a:a + k] -= lib.einsum('abdc,ib,lc->idla',
+                           a:b] -= lib.einsum('abdc,ib,lc->idla',
                                                   v_eeee_bbbb,
                                                   t1_ce_bb,
                                                   t1_ce_bb,
@@ -1072,21 +1063,18 @@ def get_imds(adc, eris=None):
                     temp_2[occ_list_b,
                            :,
                            occ_list_b,
-                           a:a + k] += lib.einsum('abdc,jb,jc->da',
+                           a:b] += lib.einsum('abdc,jb,jc->da',
                                                   v_eeee_bbbb,
                                                   t1_ce_bb,
                                                   t1_ce_bb,
                                                   optimize=einsum_type)
 
                 del v_eeee_bbbb
-                a += k
             M_030_bb = temp_2
             M_030_bb += t_v_con
             del t_v_con
+            del temp_2
             del interm
-
-        t_v_con = np.zeros((nocc_a, nvir_a, nocc_b, nvir_b))
-        if isinstance(eris.vvvv_p, type(None)) or isinstance(eris.vvvv_p, list):
 
             interm = 2.0 * adc.imds.t2_1_vvvv[0][:]
 
@@ -1097,8 +1085,6 @@ def get_imds(adc, eris=None):
             del t_v_con
             del interm
 
-        t_v_con = np.zeros((nocc_a, nvir_a, nocc_b, nvir_b))
-        if isinstance(eris.VVVV_p, type(None)) or isinstance(eris.VVVV_p, list):
             interm = 2.0 * adc.imds.t2_1_vvvv[2][:]
             t_v_con = 1 / 2 * \
                 lib.einsum('IiDb,liab->IDla', t1_ccee_abab, interm, optimize=einsum_type)
@@ -1107,6 +1093,7 @@ def get_imds(adc, eris=None):
             del t_v_con
             del interm
 
+        # In-core V^4 contribution
         if isinstance(eris.vVvV_p, np.ndarray):
 
             v_eeee_abab = eris.vVvV_p
@@ -1267,11 +1254,12 @@ def get_imds(adc, eris=None):
                                      optimize=einsum_type)
             del v_eeee_abab
 
-        t_v_con_a = np.zeros((nocc_a, nvir_a, nocc_a, nvir_a))
-        t_v_con_b = np.zeros((nocc_b, nvir_b, nocc_b, nvir_b))
-        t_v_con_ab = np.zeros((nocc_a, nvir_a, nocc_b, nvir_b))
+        # Out-of-core V^4 contribution
+        elif isinstance(eris.vVvV_p, list):
 
-        if isinstance(eris.vVvV_p, list):
+            t_v_con_a = np.zeros((nocc_a, nvir_a, nocc_a, nvir_a))
+            t_v_con_b = np.zeros((nocc_b, nvir_b, nocc_b, nvir_b))
+            t_v_con_ab = np.zeros((nocc_a, nvir_a, nocc_b, nvir_b))
 
             interm = adc.imds.t2_1_vvvv[1][:]
             t_v_con_a[occ_list_a,
@@ -1457,11 +1445,15 @@ def get_imds(adc, eris=None):
             M_030_aa += temp_a
             M_030_bb += temp_b
             M_030_aabb += temp_aabb
+            del temp_a
+            del temp_b
+            del temp_aabb
 
-        t_v_con_a = np.zeros((nocc_a, nvir_a, nocc_a, nvir_a))
-        t_v_con_b = np.zeros((nocc_b, nvir_b, nocc_b, nvir_b))
-        t_v_con_ab = np.zeros((nocc_a, nvir_a, nocc_b, nvir_b))
-        if isinstance(eris.vvvv_p, type(None)):
+        # Density fitting V^4 contribution
+        else:
+            t_v_con_a = np.zeros((nocc_a, nvir_a, nocc_a, nvir_a))
+            t_v_con_b = np.zeros((nocc_b, nvir_b, nocc_b, nvir_b))
+            t_v_con_ab = np.zeros((nocc_a, nvir_a, nocc_b, nvir_b))
             interm = adc.imds.t2_1_vvvv[1][:]
             t_v_con_a[occ_list_a,
                       :,
@@ -1530,21 +1522,19 @@ def get_imds(adc, eris=None):
             del t_v_con_ab
             del interm
 
-            a = 0
             temp_a = np.zeros((nocc_a, nvir_a, nocc_a, nvir_a))
             temp_b = np.zeros((nocc_b, nvir_b, nocc_b, nvir_b))
             temp_aabb = np.zeros((nocc_a, nvir_a, nocc_b, nvir_b))
 
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-            for p in range(0, nvir_a, chnk_size):
-                vVvV = dfadc.get_vVvV_df(adc, eris.Lvv, eris.LVV, p, chnk_size)
-                k = vVvV.shape[0]
+            for a,b in lib.prange(0,nvir_a,chnk_size):
+                vVvV = dfadc.get_vVvV_df(adc, eris.Lvv, eris.LVV, a, chnk_size)
                 v_eeee_abab = vVvV
 
                 temp_a[occ_list_a,
                        :,
                        occ_list_a,
-                       a:a + k] += lib.einsum('AaDb,ijca,ijcb->DA',
+                       a:b] += lib.einsum('AaDb,ijca,ijcb->DA',
                                               v_eeee_abab,
                                               t1_ccee_abab,
                                               t1_ccee_abab,
@@ -1552,7 +1542,7 @@ def get_imds(adc, eris=None):
                 temp_a[occ_list_a,
                        :,
                        occ_list_a,
-                       a:a + k] += 1 / 2 * lib.einsum('AaDb,ijac,ijbc->DA',
+                       a:b] += 1 / 2 * lib.einsum('AaDb,ijac,ijbc->DA',
                                                       v_eeee_abab,
                                                       t1_ccee_bbbb,
                                                       t1_ccee_bbbb,
@@ -1562,7 +1552,7 @@ def get_imds(adc, eris=None):
                                       v_eeee_abab,
                                       t1_ccee_abab[:,
                                                    :,
-                                                   a:a + k,
+                                                   a:b,
                                                    :],
                                       t1_ccee_abab,
                                       optimize=einsum_type)
@@ -1573,7 +1563,7 @@ def get_imds(adc, eris=None):
                                                 v_eeee_abab,
                                                 t1_ccee_aaaa[:,
                                                              :,
-                                                             a:a + k,
+                                                             a:b,
                                                              :],
                                                 t1_ccee_aaaa,
                                                 optimize=einsum_type)
@@ -1584,13 +1574,13 @@ def get_imds(adc, eris=None):
                                         v_eeee_abab,
                                         t1_ccee_abab[:,
                                                      :,
-                                                     a:a + k,
+                                                     a:b,
                                                      :],
                                         t1_ccee_abab,
                                         optimize=einsum_type)
 
                 temp_aabb[:,
-                          a:a + k,
+                          a:b,
                           :,
                           :] += lib.einsum('Dbca,libd,Iicd->IDla',
                                            v_eeee_abab,
@@ -1598,7 +1588,7 @@ def get_imds(adc, eris=None):
                                            t1_ccee_abab,
                                            optimize=einsum_type)
                 temp_aabb[:,
-                          a:a + k,
+                          a:b,
                           :,
                           :] += lib.einsum('Dbca,ildb,Iicd->IDla',
                                            v_eeee_abab,
@@ -1610,7 +1600,7 @@ def get_imds(adc, eris=None):
                     temp_a[occ_list_a,
                            :,
                            occ_list_a,
-                           a:a + k] += lib.einsum('AaDb,ia,ib->DA',
+                           a:b] += lib.einsum('AaDb,ia,ib->DA',
                                                   v_eeee_abab,
                                                   t1_ce_bb,
                                                   t1_ce_bb,
@@ -1621,11 +1611,11 @@ def get_imds(adc, eris=None):
                            :] += lib.einsum('bacd,jb,jc->da',
                                             v_eeee_abab,
                                             t1_ce_aa[:,
-                                                     a:a + k],
+                                                     a:b],
                                             t1_ce_aa,
                                             optimize=einsum_type)
                     temp_aabb[:,
-                              a:a + k,
+                              a:b,
                               :,
                               :] += lib.einsum('Dbca,lb,Ic->IDla',
                                                v_eeee_abab,
@@ -1634,42 +1624,42 @@ def get_imds(adc, eris=None):
                                                optimize=einsum_type)
 
                 del v_eeee_abab
-                a += k
             M_030_aa += temp_a
             M_030_bb += temp_b
             M_030_aabb += temp_aabb
+            del temp_a
+            del temp_b
+            del temp_aabb
 
         if isinstance(eris.ovvv, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-            a = 0
-            for p in range(0, nocc_a, chnk_size):
+            for a,b in lib.prange(0,nocc_a,chnk_size):
 
                 v_ceee_aaaa = dfadc.get_ovvv_spin_df(
-                    adc, eris.Lov, eris.Lvv, p, chnk_size).reshape(-1, nvir_a, nvir_a, nvir_a)
-                k = v_ceee_aaaa.shape[0]
+                    adc, eris.Lov, eris.Lvv, a, chnk_size).reshape(-1, nvir_a, nvir_a, nvir_a)
 
                 M_030_aa[:,
                          :,
-                         a:a + k,
+                         a:b,
                          :] -= lib.einsum('Ia,LaDA->IDLA',
                                           t2_ce_aa,
                                           v_ceee_aaaa,
                                           optimize=einsum_type)
                 M_030_aa[:,
                          :,
-                         a:a + k,
+                         a:b,
                          :] += lib.einsum('Ia,LADa->IDLA',
                                           t2_ce_aa,
                                           v_ceee_aaaa,
                                           optimize=einsum_type)
-                M_030_aa[a:a + k,
+                M_030_aa[a:b,
                          :,
                          :,
                          :] -= lib.einsum('La,IaAD->IDLA',
                                           t2_ce_aa,
                                           v_ceee_aaaa,
                                           optimize=einsum_type)
-                M_030_aa[a:a + k,
+                M_030_aa[a:b,
                          :,
                          :,
                          :] += lib.einsum('La,IDAa->IDLA',
@@ -1680,7 +1670,7 @@ def get_imds(adc, eris=None):
                          :,
                          occ_list_a,
                          :] += lib.einsum('ia,iaAD->DA',
-                                          t2_ce_aa[a:a + k,
+                                          t2_ce_aa[a:b,
                                                    :],
                                           v_ceee_aaaa,
                                           optimize=einsum_type)
@@ -1688,7 +1678,7 @@ def get_imds(adc, eris=None):
                          :,
                          occ_list_a,
                          :] -= lib.einsum('ia,iADa->DA',
-                                          t2_ce_aa[a:a + k,
+                                          t2_ce_aa[a:b,
                                                    :],
                                           v_ceee_aaaa,
                                           optimize=einsum_type)
@@ -1696,7 +1686,7 @@ def get_imds(adc, eris=None):
                          :,
                          occ_list_a,
                          :] += lib.einsum('ia,iaDA->DA',
-                                          t2_ce_aa[a:a + k,
+                                          t2_ce_aa[a:b,
                                                    :],
                                           v_ceee_aaaa,
                                           optimize=einsum_type)
@@ -1704,13 +1694,13 @@ def get_imds(adc, eris=None):
                          :,
                          occ_list_a,
                          :] -= lib.einsum('ia,iDAa->DA',
-                                          t2_ce_aa[a:a + k,
+                                          t2_ce_aa[a:b,
                                                    :],
                                           v_ceee_aaaa,
                                           optimize=einsum_type)
 
                 if isinstance(adc._scf, scf.rohf.ROHF):
-                    M_030_aa[a:a + k,
+                    M_030_aa[a:b,
                              :,
                              :,
                              :] -= 1 / 2 * lib.einsum('IaAD,Liab,ib->IDLA',
@@ -1718,7 +1708,7 @@ def get_imds(adc, eris=None):
                                                       t1_ccee_aaaa,
                                                       t1_ce_aa,
                                                       optimize=einsum_type)
-                    M_030_aa[a:a + k,
+                    M_030_aa[a:b,
                              :,
                              :,
                              :] -= 1 / 2 * lib.einsum('IaAD,Liab,ib->IDLA',
@@ -1729,14 +1719,14 @@ def get_imds(adc, eris=None):
                     M_030_aa += 1 / 2 * lib.einsum('iaAD,Liab,Ib->IDLA',
                                                    v_ceee_aaaa,
                                                    t1_ccee_aaaa[:,
-                                                                a:a + k,
+                                                                a:b,
                                                                 :,
                                                                 :],
                                                    t1_ce_aa,
                                                    optimize=einsum_type)
                     M_030_aa[:,
                              :,
-                             a:a + k,
+                             a:b,
                              :] -= 1 / 2 * lib.einsum('LaDA,Iiab,ib->IDLA',
                                                       v_ceee_aaaa,
                                                       t1_ccee_aaaa,
@@ -1744,7 +1734,7 @@ def get_imds(adc, eris=None):
                                                       optimize=einsum_type)
                     M_030_aa[:,
                              :,
-                             a:a + k,
+                             a:b,
                              :] -= 1 / 2 * lib.einsum('LaDA,Iiab,ib->IDLA',
                                                       v_ceee_aaaa,
                                                       t1_ccee_abab,
@@ -1753,14 +1743,14 @@ def get_imds(adc, eris=None):
                     M_030_aa += 1 / 2 * lib.einsum('iaDA,Iiab,Lb->IDLA',
                                                    v_ceee_aaaa,
                                                    t1_ccee_aaaa[:,
-                                                                a:a + k,
+                                                                a:b,
                                                                 :,
                                                                 :],
                                                    t1_ce_aa,
                                                    optimize=einsum_type)
                     M_030_aa[:,
                              :,
-                             a:a + k,
+                             a:b,
                              :] += 1 / 2 * lib.einsum('LADa,Iiab,ib->IDLA',
                                                       v_ceee_aaaa,
                                                       t1_ccee_aaaa,
@@ -1768,7 +1758,7 @@ def get_imds(adc, eris=None):
                                                       optimize=einsum_type)
                     M_030_aa[:,
                              :,
-                             a:a + k,
+                             a:b,
                              :] += 1 / 2 * lib.einsum('LADa,Iiab,ib->IDLA',
                                                       v_ceee_aaaa,
                                                       t1_ccee_abab,
@@ -1776,7 +1766,7 @@ def get_imds(adc, eris=None):
                                                       optimize=einsum_type)
                     M_030_aa[:,
                              :,
-                             a:a + k,
+                             a:b,
                              :] += lib.einsum('LAab,IiDb,ia->IDLA',
                                               v_ceee_aaaa,
                                               t1_ccee_aaaa,
@@ -1785,7 +1775,7 @@ def get_imds(adc, eris=None):
                     M_030_aa -= 1 / 2 * lib.einsum('iADa,Iiab,Lb->IDLA',
                                                    v_ceee_aaaa,
                                                    t1_ccee_aaaa[:,
-                                                                a:a + k,
+                                                                a:b,
                                                                 :,
                                                                 :],
                                                    t1_ce_aa,
@@ -1793,12 +1783,12 @@ def get_imds(adc, eris=None):
                     M_030_aa -= lib.einsum('iAab,IiDb,La->IDLA',
                                            v_ceee_aaaa,
                                            t1_ccee_aaaa[:,
-                                                        a:a + k,
+                                                        a:b,
                                                         :,
                                                         :],
                                            t1_ce_aa,
                                            optimize=einsum_type)
-                    M_030_aa[a:a + k,
+                    M_030_aa[a:b,
                              :,
                              :,
                              :] += 1 / 2 * lib.einsum('IDAa,Liab,ib->IDLA',
@@ -1806,7 +1796,7 @@ def get_imds(adc, eris=None):
                                                       t1_ccee_aaaa,
                                                       t1_ce_aa,
                                                       optimize=einsum_type)
-                    M_030_aa[a:a + k,
+                    M_030_aa[a:b,
                              :,
                              :,
                              :] += 1 / 2 * lib.einsum('IDAa,Liab,ib->IDLA',
@@ -1814,7 +1804,7 @@ def get_imds(adc, eris=None):
                                                       t1_ccee_abab,
                                                       t1_ce_bb,
                                                       optimize=einsum_type)
-                    M_030_aa[a:a + k,
+                    M_030_aa[a:b,
                              :,
                              :,
                              :] -= 1 / 2 * lib.einsum('IaAb,Liba,iD->IDLA',
@@ -1825,14 +1815,14 @@ def get_imds(adc, eris=None):
                     M_030_aa -= 1 / 2 * lib.einsum('iDAa,Liab,Ib->IDLA',
                                                    v_ceee_aaaa,
                                                    t1_ccee_aaaa[:,
-                                                                a:a + k,
+                                                                a:b,
                                                                 :,
                                                                 :],
                                                    t1_ce_aa,
                                                    optimize=einsum_type)
                     M_030_aa[:,
                              :,
-                             a:a + k,
+                             a:b,
                              :] -= lib.einsum('LabA,ib,IiDa->IDLA',
                                               v_ceee_aaaa,
                                               t1_ce_aa,
@@ -1842,11 +1832,11 @@ def get_imds(adc, eris=None):
                                            v_ceee_aaaa,
                                            t1_ce_aa,
                                            t1_ccee_aaaa[:,
-                                                        a:a + k,
+                                                        a:b,
                                                         :,
                                                         :],
                                            optimize=einsum_type)
-                    M_030_aa[a:a + k,
+                    M_030_aa[a:b,
                              :,
                              :,
                              :] += lib.einsum('IDab,LiAb,ia->IDLA',
@@ -1857,20 +1847,20 @@ def get_imds(adc, eris=None):
                     M_030_aa -= lib.einsum('iDab,LiAb,Ia->IDLA',
                                            v_ceee_aaaa,
                                            t1_ccee_aaaa[:,
-                                                        a:a + k,
+                                                        a:b,
                                                         :,
                                                         :],
                                            t1_ce_aa,
                                            optimize=einsum_type)
                     M_030_aa[:,
                              :,
-                             a:a + k,
+                             a:b,
                              :] -= 1 / 2 * lib.einsum('LaDb,Iiba,iA->IDLA',
                                                       v_ceee_aaaa,
                                                       t1_ccee_aaaa,
                                                       t1_ce_aa,
                                                       optimize=einsum_type)
-                    M_030_aa[a:a + k,
+                    M_030_aa[a:b,
                              :,
                              :,
                              :] -= lib.einsum('IabD,ib,LiAa->IDLA',
@@ -1882,11 +1872,11 @@ def get_imds(adc, eris=None):
                                            v_ceee_aaaa,
                                            t1_ce_aa,
                                            t1_ccee_aaaa[:,
-                                                        a:a + k,
+                                                        a:b,
                                                         :,
                                                         :],
                                            optimize=einsum_type)
-                    M_030_aa[a:a + k,
+                    M_030_aa[a:b,
                              vir_list_a,
                              :,
                              vir_list_a] -= lib.einsum('Iabc,Liac,ib->IL',
@@ -1896,7 +1886,7 @@ def get_imds(adc, eris=None):
                                                        optimize=einsum_type)
                     M_030_aa[:,
                              vir_list_a,
-                             a:a + k,
+                             a:b,
                              vir_list_a] -= lib.einsum('Labc,Iiac,ib->IL',
                                                        v_ceee_aaaa,
                                                        t1_ccee_aaaa,
@@ -1908,7 +1898,7 @@ def get_imds(adc, eris=None):
                              vir_list_a] += lib.einsum('iabc,Iiac,Lb->IL',
                                                        v_ceee_aaaa,
                                                        t1_ccee_aaaa[:,
-                                                                    a:a + k,
+                                                                    a:b,
                                                                     :,
                                                                     :],
                                                        t1_ce_aa,
@@ -1920,7 +1910,7 @@ def get_imds(adc, eris=None):
                                                        v_ceee_aaaa,
                                                        t1_ce_aa,
                                                        t1_ccee_aaaa[:,
-                                                                    a:a + k,
+                                                                    a:b,
                                                                     :,
                                                                     :],
                                                        optimize=einsum_type)
@@ -1929,7 +1919,7 @@ def get_imds(adc, eris=None):
                              occ_list_a,
                              :] += 1 / 2 * lib.einsum('iaAD,ijab,jb->DA',
                                                       v_ceee_aaaa,
-                                                      t1_ccee_aaaa[a:a + k,
+                                                      t1_ccee_aaaa[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -1940,7 +1930,7 @@ def get_imds(adc, eris=None):
                              occ_list_a,
                              :] += 1 / 2 * lib.einsum('iaAD,ijab,jb->DA',
                                                       v_ceee_aaaa,
-                                                      t1_ccee_abab[a:a + k,
+                                                      t1_ccee_abab[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -1951,7 +1941,7 @@ def get_imds(adc, eris=None):
                              occ_list_a,
                              :] += 1 / 2 * lib.einsum('iaDA,ijab,jb->DA',
                                                       v_ceee_aaaa,
-                                                      t1_ccee_aaaa[a:a + k,
+                                                      t1_ccee_aaaa[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -1962,7 +1952,7 @@ def get_imds(adc, eris=None):
                              occ_list_a,
                              :] += 1 / 2 * lib.einsum('iaDA,ijab,jb->DA',
                                                       v_ceee_aaaa,
-                                                      t1_ccee_abab[a:a + k,
+                                                      t1_ccee_abab[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -1973,7 +1963,7 @@ def get_imds(adc, eris=None):
                              occ_list_a,
                              :] -= 1 / 2 * lib.einsum('iADa,ijab,jb->DA',
                                                       v_ceee_aaaa,
-                                                      t1_ccee_aaaa[a:a + k,
+                                                      t1_ccee_aaaa[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -1984,7 +1974,7 @@ def get_imds(adc, eris=None):
                              occ_list_a,
                              :] -= 1 / 2 * lib.einsum('iADa,ijab,jb->DA',
                                                       v_ceee_aaaa,
-                                                      t1_ccee_abab[a:a + k,
+                                                      t1_ccee_abab[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -1995,7 +1985,7 @@ def get_imds(adc, eris=None):
                              occ_list_a,
                              :] -= lib.einsum('iAab,ijDb,ja->DA',
                                               v_ceee_aaaa,
-                                              t1_ccee_aaaa[a:a + k,
+                                              t1_ccee_aaaa[a:b,
                                                            :,
                                                            :,
                                                            :],
@@ -2006,7 +1996,7 @@ def get_imds(adc, eris=None):
                              occ_list_a,
                              :] -= 1 / 2 * lib.einsum('iDAa,ijab,jb->DA',
                                                       v_ceee_aaaa,
-                                                      t1_ccee_aaaa[a:a + k,
+                                                      t1_ccee_aaaa[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -2017,7 +2007,7 @@ def get_imds(adc, eris=None):
                              occ_list_a,
                              :] -= 1 / 2 * lib.einsum('iDAa,ijab,jb->DA',
                                                       v_ceee_aaaa,
-                                                      t1_ccee_abab[a:a + k,
+                                                      t1_ccee_abab[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -2028,7 +2018,7 @@ def get_imds(adc, eris=None):
                              occ_list_a,
                              :] += 1 / 2 * lib.einsum('iaAb,ijba,jD->DA',
                                                       v_ceee_aaaa,
-                                                      t1_ccee_aaaa[a:a + k,
+                                                      t1_ccee_aaaa[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -2040,7 +2030,7 @@ def get_imds(adc, eris=None):
                              :] += lib.einsum('iabA,jb,ijDa->DA',
                                               v_ceee_aaaa,
                                               t1_ce_aa,
-                                              t1_ccee_aaaa[a:a + k,
+                                              t1_ccee_aaaa[a:b,
                                                            :,
                                                            :,
                                                            :],
@@ -2050,7 +2040,7 @@ def get_imds(adc, eris=None):
                              occ_list_a,
                              :] -= lib.einsum('iDab,ijAb,ja->DA',
                                               v_ceee_aaaa,
-                                              t1_ccee_aaaa[a:a + k,
+                                              t1_ccee_aaaa[a:b,
                                                            :,
                                                            :,
                                                            :],
@@ -2061,7 +2051,7 @@ def get_imds(adc, eris=None):
                              occ_list_a,
                              :] += 1 / 2 * lib.einsum('iaDb,ijba,jA->DA',
                                                       v_ceee_aaaa,
-                                                      t1_ccee_aaaa[a:a + k,
+                                                      t1_ccee_aaaa[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -2073,14 +2063,14 @@ def get_imds(adc, eris=None):
                              :] += lib.einsum('iabD,jb,ijAa->DA',
                                               v_ceee_aaaa,
                                               t1_ce_aa,
-                                              t1_ccee_aaaa[a:a + k,
+                                              t1_ccee_aaaa[a:b,
                                                            :,
                                                            :,
                                                            :],
                                               optimize=einsum_type)
                     M_030_aabb -= lib.einsum('iDbc,ilca,Ib->IDla',
                                              v_ceee_aaaa,
-                                             t1_ccee_abab[a:a + k,
+                                             t1_ccee_abab[a:b,
                                                           :,
                                                           :,
                                                           :],
@@ -2089,12 +2079,12 @@ def get_imds(adc, eris=None):
                     M_030_aabb += lib.einsum('ibcD,Ic,ilba->IDla',
                                              v_ceee_aaaa,
                                              t1_ce_aa,
-                                             t1_ccee_abab[a:a + k,
+                                             t1_ccee_abab[a:b,
                                                           :,
                                                           :,
                                                           :],
                                              optimize=einsum_type)
-                    M_030_aabb[a:a + k,
+                    M_030_aabb[a:b,
                                :,
                                :,
                                :] += lib.einsum('IDbc,ilca,ib->IDla',
@@ -2102,7 +2092,7 @@ def get_imds(adc, eris=None):
                                                 t1_ccee_abab,
                                                 t1_ce_aa,
                                                 optimize=einsum_type)
-                    M_030_aabb[a:a + k,
+                    M_030_aabb[a:b,
                                :,
                                :,
                                :] -= lib.einsum('IbcD,ic,ilba->IDla',
@@ -2111,8 +2101,8 @@ def get_imds(adc, eris=None):
                                                 t1_ccee_abab,
                                                 optimize=einsum_type)
                 del v_ceee_aaaa
-                a += k
         else:
+            v_ceee_aaaa = uadc_ao2mo.unpack_eri_1(eris.ovvv, nvir_a)
             M_030_aa -= lib.einsum('Ia,LaDA->IDLA',
                                    t2_ce_aa, v_ceee_aaaa, optimize=einsum_type)
             M_030_aa += lib.einsum('Ia,LADa->IDLA',
@@ -2381,38 +2371,37 @@ def get_imds(adc, eris=None):
                                      t1_ce_aa,
                                      t1_ccee_abab,
                                      optimize=einsum_type)
+            del v_ceee_aaaa
 
         if isinstance(eris.OVVV, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-            a = 0
-            for p in range(0, nocc_b, chnk_size):
+            for a,b in lib.prange(0,nocc_b,chnk_size):
 
                 v_ceee_bbbb = dfadc.get_ovvv_spin_df(
-                    adc, eris.LOV, eris.LVV, p, chnk_size).reshape(-1, nvir_b, nvir_b, nvir_b)
-                k = v_ceee_bbbb.shape[0]
+                    adc, eris.LOV, eris.LVV, a, chnk_size).reshape(-1, nvir_b, nvir_b, nvir_b)
 
                 M_030_bb[:,
                          :,
-                         a:a + k,
+                         a:b,
                          :] -= lib.einsum('ib,lbda->idla',
                                           t2_ce_bb,
                                           v_ceee_bbbb,
                                           optimize=einsum_type)
                 M_030_bb[:,
                          :,
-                         a:a + k,
+                         a:b,
                          :] += lib.einsum('ib,ladb->idla',
                                           t2_ce_bb,
                                           v_ceee_bbbb,
                                           optimize=einsum_type)
-                M_030_bb[a:a + k,
+                M_030_bb[a:b,
                          :,
                          :,
                          :] -= lib.einsum('lb,ibad->idla',
                                           t2_ce_bb,
                                           v_ceee_bbbb,
                                           optimize=einsum_type)
-                M_030_bb[a:a + k,
+                M_030_bb[a:b,
                          :,
                          :,
                          :] += lib.einsum('lb,idab->idla',
@@ -2423,7 +2412,7 @@ def get_imds(adc, eris=None):
                          :,
                          occ_list_b,
                          :] += lib.einsum('jb,jbad->da',
-                                          t2_ce_bb[a:a + k,
+                                          t2_ce_bb[a:b,
                                                    :],
                                           v_ceee_bbbb,
                                           optimize=einsum_type)
@@ -2431,7 +2420,7 @@ def get_imds(adc, eris=None):
                          :,
                          occ_list_b,
                          :] -= lib.einsum('jb,jadb->da',
-                                          t2_ce_bb[a:a + k,
+                                          t2_ce_bb[a:b,
                                                    :],
                                           v_ceee_bbbb,
                                           optimize=einsum_type)
@@ -2439,7 +2428,7 @@ def get_imds(adc, eris=None):
                          :,
                          occ_list_b,
                          :] += lib.einsum('jb,jbda->da',
-                                          t2_ce_bb[a:a + k,
+                                          t2_ce_bb[a:b,
                                                    :],
                                           v_ceee_bbbb,
                                           optimize=einsum_type)
@@ -2447,13 +2436,13 @@ def get_imds(adc, eris=None):
                          :,
                          occ_list_b,
                          :] -= lib.einsum('jb,jdab->da',
-                                          t2_ce_bb[a:a + k,
+                                          t2_ce_bb[a:b,
                                                    :],
                                           v_ceee_bbbb,
                                           optimize=einsum_type)
 
                 if isinstance(adc._scf, scf.rohf.ROHF):
-                    M_030_bb[a:a + k,
+                    M_030_bb[a:b,
                              :,
                              :,
                              :] -= 1 / 2 * lib.einsum('ibad,ljbc,jc->idla',
@@ -2461,7 +2450,7 @@ def get_imds(adc, eris=None):
                                                       t1_ccee_bbbb,
                                                       t1_ce_bb,
                                                       optimize=einsum_type)
-                    M_030_bb[a:a + k,
+                    M_030_bb[a:b,
                              :,
                              :,
                              :] -= 1 / 2 * lib.einsum('ibad,jlcb,jc->idla',
@@ -2472,14 +2461,14 @@ def get_imds(adc, eris=None):
                     M_030_bb += 1 / 2 * lib.einsum('jbad,ljbc,ic->idla',
                                                    v_ceee_bbbb,
                                                    t1_ccee_bbbb[:,
-                                                                a:a + k,
+                                                                a:b,
                                                                 :,
                                                                 :],
                                                    t1_ce_bb,
                                                    optimize=einsum_type)
                     M_030_bb[:,
                              :,
-                             a:a + k,
+                             a:b,
                              :] -= 1 / 2 * lib.einsum('lbda,ijbc,jc->idla',
                                                       v_ceee_bbbb,
                                                       t1_ccee_bbbb,
@@ -2487,7 +2476,7 @@ def get_imds(adc, eris=None):
                                                       optimize=einsum_type)
                     M_030_bb[:,
                              :,
-                             a:a + k,
+                             a:b,
                              :] -= 1 / 2 * lib.einsum('lbda,jicb,jc->idla',
                                                       v_ceee_bbbb,
                                                       t1_ccee_abab,
@@ -2496,14 +2485,14 @@ def get_imds(adc, eris=None):
                     M_030_bb += 1 / 2 * lib.einsum('jbda,ijbc,lc->idla',
                                                    v_ceee_bbbb,
                                                    t1_ccee_bbbb[:,
-                                                                a:a + k,
+                                                                a:b,
                                                                 :,
                                                                 :],
                                                    t1_ce_bb,
                                                    optimize=einsum_type)
                     M_030_bb[:,
                              :,
-                             a:a + k,
+                             a:b,
                              :] += 1 / 2 * lib.einsum('ladb,ijbc,jc->idla',
                                                       v_ceee_bbbb,
                                                       t1_ccee_bbbb,
@@ -2511,7 +2500,7 @@ def get_imds(adc, eris=None):
                                                       optimize=einsum_type)
                     M_030_bb[:,
                              :,
-                             a:a + k,
+                             a:b,
                              :] += 1 / 2 * lib.einsum('ladb,jicb,jc->idla',
                                                       v_ceee_bbbb,
                                                       t1_ccee_abab,
@@ -2519,7 +2508,7 @@ def get_imds(adc, eris=None):
                                                       optimize=einsum_type)
                     M_030_bb[:,
                              :,
-                             a:a + k,
+                             a:b,
                              :] += lib.einsum('labc,ijdc,jb->idla',
                                               v_ceee_bbbb,
                                               t1_ccee_bbbb,
@@ -2528,7 +2517,7 @@ def get_imds(adc, eris=None):
                     M_030_bb -= 1 / 2 * lib.einsum('jadb,ijbc,lc->idla',
                                                    v_ceee_bbbb,
                                                    t1_ccee_bbbb[:,
-                                                                a:a + k,
+                                                                a:b,
                                                                 :,
                                                                 :],
                                                    t1_ce_bb,
@@ -2536,12 +2525,12 @@ def get_imds(adc, eris=None):
                     M_030_bb -= lib.einsum('jabc,ijdc,lb->idla',
                                            v_ceee_bbbb,
                                            t1_ccee_bbbb[:,
-                                                        a:a + k,
+                                                        a:b,
                                                         :,
                                                         :],
                                            t1_ce_bb,
                                            optimize=einsum_type)
-                    M_030_bb[a:a + k,
+                    M_030_bb[a:b,
                              :,
                              :,
                              :] += 1 / 2 * lib.einsum('idab,ljbc,jc->idla',
@@ -2549,7 +2538,7 @@ def get_imds(adc, eris=None):
                                                       t1_ccee_bbbb,
                                                       t1_ce_bb,
                                                       optimize=einsum_type)
-                    M_030_bb[a:a + k,
+                    M_030_bb[a:b,
                              :,
                              :,
                              :] += 1 / 2 * lib.einsum('idab,jlcb,jc->idla',
@@ -2557,7 +2546,7 @@ def get_imds(adc, eris=None):
                                                       t1_ccee_abab,
                                                       t1_ce_aa,
                                                       optimize=einsum_type)
-                    M_030_bb[a:a + k,
+                    M_030_bb[a:b,
                              :,
                              :,
                              :] -= 1 / 2 * lib.einsum('ibac,ljcb,jd->idla',
@@ -2568,14 +2557,14 @@ def get_imds(adc, eris=None):
                     M_030_bb -= 1 / 2 * lib.einsum('jdab,ljbc,ic->idla',
                                                    v_ceee_bbbb,
                                                    t1_ccee_bbbb[:,
-                                                                a:a + k,
+                                                                a:b,
                                                                 :,
                                                                 :],
                                                    t1_ce_bb,
                                                    optimize=einsum_type)
                     M_030_bb[:,
                              :,
-                             a:a + k,
+                             a:b,
                              :] -= lib.einsum('lbca,jc,ijdb->idla',
                                               v_ceee_bbbb,
                                               t1_ce_bb,
@@ -2585,11 +2574,11 @@ def get_imds(adc, eris=None):
                                            v_ceee_bbbb,
                                            t1_ce_bb,
                                            t1_ccee_bbbb[:,
-                                                        a:a + k,
+                                                        a:b,
                                                         :,
                                                         :],
                                            optimize=einsum_type)
-                    M_030_bb[a:a + k,
+                    M_030_bb[a:b,
                              :,
                              :,
                              :] += lib.einsum('idbc,ljac,jb->idla',
@@ -2600,20 +2589,20 @@ def get_imds(adc, eris=None):
                     M_030_bb -= lib.einsum('jdbc,ljac,ib->idla',
                                            v_ceee_bbbb,
                                            t1_ccee_bbbb[:,
-                                                        a:a + k,
+                                                        a:b,
                                                         :,
                                                         :],
                                            t1_ce_bb,
                                            optimize=einsum_type)
                     M_030_bb[:,
                              :,
-                             a:a + k,
+                             a:b,
                              :] -= 1 / 2 * lib.einsum('lbdc,ijcb,ja->idla',
                                                       v_ceee_bbbb,
                                                       t1_ccee_bbbb,
                                                       t1_ce_bb,
                                                       optimize=einsum_type)
-                    M_030_bb[a:a + k,
+                    M_030_bb[a:b,
                              :,
                              :,
                              :] -= lib.einsum('ibcd,jc,ljab->idla',
@@ -2625,11 +2614,11 @@ def get_imds(adc, eris=None):
                                            v_ceee_bbbb,
                                            t1_ce_bb,
                                            t1_ccee_bbbb[:,
-                                                        a:a + k,
+                                                        a:b,
                                                         :,
                                                         :],
                                            optimize=einsum_type)
-                    M_030_bb[a:a + k,
+                    M_030_bb[a:b,
                              vir_list_b,
                              :,
                              vir_list_b] -= lib.einsum('ibce,ljbe,jc->il',
@@ -2639,7 +2628,7 @@ def get_imds(adc, eris=None):
                                                        optimize=einsum_type)
                     M_030_bb[:,
                              vir_list_b,
-                             a:a + k,
+                             a:b,
                              vir_list_b] -= lib.einsum('lbce,ijbe,jc->il',
                                                        v_ceee_bbbb,
                                                        t1_ccee_bbbb,
@@ -2651,7 +2640,7 @@ def get_imds(adc, eris=None):
                              vir_list_b] += lib.einsum('jbce,ijbe,lc->il',
                                                        v_ceee_bbbb,
                                                        t1_ccee_bbbb[:,
-                                                                    a:a + k,
+                                                                    a:b,
                                                                     :,
                                                                     :],
                                                        t1_ce_bb,
@@ -2663,7 +2652,7 @@ def get_imds(adc, eris=None):
                                                        v_ceee_bbbb,
                                                        t1_ce_bb,
                                                        t1_ccee_bbbb[:,
-                                                                    a:a + k,
+                                                                    a:b,
                                                                     :,
                                                                     :],
                                                        optimize=einsum_type)
@@ -2672,7 +2661,7 @@ def get_imds(adc, eris=None):
                              occ_list_b,
                              :] += 1 / 2 * lib.einsum('jbad,jkbc,kc->da',
                                                       v_ceee_bbbb,
-                                                      t1_ccee_bbbb[a:a + k,
+                                                      t1_ccee_bbbb[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -2684,7 +2673,7 @@ def get_imds(adc, eris=None):
                              :] += 1 / 2 * lib.einsum('jbad,kjcb,kc->da',
                                                       v_ceee_bbbb,
                                                       t1_ccee_abab[:,
-                                                                   a:a + k,
+                                                                   a:b,
                                                                    :,
                                                                    :],
                                                       t1_ce_aa,
@@ -2694,7 +2683,7 @@ def get_imds(adc, eris=None):
                              occ_list_b,
                              :] += 1 / 2 * lib.einsum('jbda,jkbc,kc->da',
                                                       v_ceee_bbbb,
-                                                      t1_ccee_bbbb[a:a + k,
+                                                      t1_ccee_bbbb[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -2706,7 +2695,7 @@ def get_imds(adc, eris=None):
                              :] += 1 / 2 * lib.einsum('jbda,kjcb,kc->da',
                                                       v_ceee_bbbb,
                                                       t1_ccee_abab[:,
-                                                                   a:a + k,
+                                                                   a:b,
                                                                    :,
                                                                    :],
                                                       t1_ce_aa,
@@ -2716,7 +2705,7 @@ def get_imds(adc, eris=None):
                              occ_list_b,
                              :] -= 1 / 2 * lib.einsum('jadb,jkbc,kc->da',
                                                       v_ceee_bbbb,
-                                                      t1_ccee_bbbb[a:a + k,
+                                                      t1_ccee_bbbb[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -2728,7 +2717,7 @@ def get_imds(adc, eris=None):
                              :] -= 1 / 2 * lib.einsum('jadb,kjcb,kc->da',
                                                       v_ceee_bbbb,
                                                       t1_ccee_abab[:,
-                                                                   a:a + k,
+                                                                   a:b,
                                                                    :,
                                                                    :],
                                                       t1_ce_aa,
@@ -2738,7 +2727,7 @@ def get_imds(adc, eris=None):
                              occ_list_b,
                              :] -= lib.einsum('jabc,jkdc,kb->da',
                                               v_ceee_bbbb,
-                                              t1_ccee_bbbb[a:a + k,
+                                              t1_ccee_bbbb[a:b,
                                                            :,
                                                            :,
                                                            :],
@@ -2749,7 +2738,7 @@ def get_imds(adc, eris=None):
                              occ_list_b,
                              :] -= 1 / 2 * lib.einsum('jdab,jkbc,kc->da',
                                                       v_ceee_bbbb,
-                                                      t1_ccee_bbbb[a:a + k,
+                                                      t1_ccee_bbbb[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -2761,7 +2750,7 @@ def get_imds(adc, eris=None):
                              :] -= 1 / 2 * lib.einsum('jdab,kjcb,kc->da',
                                                       v_ceee_bbbb,
                                                       t1_ccee_abab[:,
-                                                                   a:a + k,
+                                                                   a:b,
                                                                    :,
                                                                    :],
                                                       t1_ce_aa,
@@ -2771,7 +2760,7 @@ def get_imds(adc, eris=None):
                              occ_list_b,
                              :] += 1 / 2 * lib.einsum('jbac,jkcb,kd->da',
                                                       v_ceee_bbbb,
-                                                      t1_ccee_bbbb[a:a + k,
+                                                      t1_ccee_bbbb[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -2783,7 +2772,7 @@ def get_imds(adc, eris=None):
                              :] += lib.einsum('jbca,kc,jkdb->da',
                                               v_ceee_bbbb,
                                               t1_ce_bb,
-                                              t1_ccee_bbbb[a:a + k,
+                                              t1_ccee_bbbb[a:b,
                                                            :,
                                                            :,
                                                            :],
@@ -2793,7 +2782,7 @@ def get_imds(adc, eris=None):
                              occ_list_b,
                              :] -= lib.einsum('jdbc,jkac,kb->da',
                                               v_ceee_bbbb,
-                                              t1_ccee_bbbb[a:a + k,
+                                              t1_ccee_bbbb[a:b,
                                                            :,
                                                            :,
                                                            :],
@@ -2804,7 +2793,7 @@ def get_imds(adc, eris=None):
                              occ_list_b,
                              :] += 1 / 2 * lib.einsum('jbdc,jkcb,ka->da',
                                                       v_ceee_bbbb,
-                                                      t1_ccee_bbbb[a:a + k,
+                                                      t1_ccee_bbbb[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -2816,14 +2805,14 @@ def get_imds(adc, eris=None):
                              :] += lib.einsum('jbcd,kc,jkab->da',
                                               v_ceee_bbbb,
                                               t1_ce_bb,
-                                              t1_ccee_bbbb[a:a + k,
+                                              t1_ccee_bbbb[a:b,
                                                            :,
                                                            :,
                                                            :],
                                               optimize=einsum_type)
                     M_030_aabb[:,
                                :,
-                               a:a + k,
+                               a:b,
                                :] += lib.einsum('labc,IiDc,ib->IDla',
                                                 v_ceee_bbbb,
                                                 t1_ccee_abab,
@@ -2832,14 +2821,14 @@ def get_imds(adc, eris=None):
                     M_030_aabb -= lib.einsum('iabc,IiDc,lb->IDla',
                                              v_ceee_bbbb,
                                              t1_ccee_abab[:,
-                                                          a:a + k,
+                                                          a:b,
                                                           :,
                                                           :],
                                              t1_ce_bb,
                                              optimize=einsum_type)
                     M_030_aabb[:,
                                :,
-                               a:a + k,
+                               a:b,
                                :] -= lib.einsum('lbca,ic,IiDb->IDla',
                                                 v_ceee_bbbb,
                                                 t1_ce_bb,
@@ -2849,14 +2838,15 @@ def get_imds(adc, eris=None):
                                              v_ceee_bbbb,
                                              t1_ce_bb,
                                              t1_ccee_abab[:,
-                                                          a:a + k,
+                                                          a:b,
                                                           :,
                                                           :],
                                              optimize=einsum_type)
 
                 del v_ceee_bbbb
-                a += k
         else:
+            v_ceee_bbbb = uadc_ao2mo.unpack_eri_1(eris.OVVV, nvir_b)
+
             M_030_bb -= lib.einsum('ib,lbda->idla',
                                    t2_ce_bb, v_ceee_bbbb, optimize=einsum_type)
             M_030_bb += lib.einsum('ib,ladb->idla',
@@ -3121,20 +3111,19 @@ def get_imds(adc, eris=None):
                                      t1_ce_bb,
                                      t1_ccee_abab,
                                      optimize=einsum_type)
+            del v_ceee_bbbb
 
         if isinstance(eris.OVvv, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-            a = 0
-            for p in range(0, nocc_b, chnk_size):
+            for a,b in lib.prange(0,nocc_b,chnk_size):
 
                 v_ceee_bbaa = dfadc.get_ovvv_spin_df(
-                    adc, eris.LOV, eris.Lvv, p, chnk_size).reshape(-1, nvir_b, nvir_a, nvir_a)
-                k = v_ceee_bbaa.shape[0]
+                    adc, eris.LOV, eris.Lvv, a, chnk_size).reshape(-1, nvir_b, nvir_a, nvir_a)
                 M_030_aa[occ_list_a,
                          :,
                          occ_list_a,
                          :] += lib.einsum('ia,iaAD->DA',
-                                          t2_ce_bb[a:a + k,
+                                          t2_ce_bb[a:b,
                                                    :],
                                           v_ceee_bbaa,
                                           optimize=einsum_type)
@@ -3142,13 +3131,13 @@ def get_imds(adc, eris=None):
                          :,
                          occ_list_a,
                          :] += lib.einsum('ia,iaDA->DA',
-                                          t2_ce_bb[a:a + k,
+                                          t2_ce_bb[a:b,
                                                    :],
                                           v_ceee_bbaa,
                                           optimize=einsum_type)
                 M_030_aabb[:,
                            :,
-                           a:a + k,
+                           a:b,
                            :] += lib.einsum('Ib,laDb->IDla',
                                             t2_ce_aa,
                                             v_ceee_bbaa,
@@ -3158,7 +3147,7 @@ def get_imds(adc, eris=None):
                     M_030_aa -= 1 / 2 * lib.einsum('iaAD,Liba,Ib->IDLA',
                                                    v_ceee_bbaa,
                                                    t1_ccee_abab[:,
-                                                                a:a + k,
+                                                                a:b,
                                                                 :,
                                                                 :],
                                                    t1_ce_aa,
@@ -3166,7 +3155,7 @@ def get_imds(adc, eris=None):
                     M_030_aa -= 1 / 2 * lib.einsum('iaDA,Iiba,Lb->IDLA',
                                                    v_ceee_bbaa,
                                                    t1_ccee_abab[:,
-                                                                a:a + k,
+                                                                a:b,
                                                                 :,
                                                                 :],
                                                    t1_ce_aa,
@@ -3175,7 +3164,7 @@ def get_imds(adc, eris=None):
                                            v_ceee_bbaa,
                                            t1_ce_aa,
                                            t1_ccee_abab[:,
-                                                        a:a + k,
+                                                        a:b,
                                                         :,
                                                         :],
                                            optimize=einsum_type)
@@ -3183,7 +3172,7 @@ def get_imds(adc, eris=None):
                                            v_ceee_bbaa,
                                            t1_ce_aa,
                                            t1_ccee_abab[:,
-                                                        a:a + k,
+                                                        a:b,
                                                         :,
                                                         :],
                                            optimize=einsum_type)
@@ -3194,7 +3183,7 @@ def get_imds(adc, eris=None):
                                                        v_ceee_bbaa,
                                                        t1_ce_aa,
                                                        t1_ccee_abab[:,
-                                                                    a:a + k,
+                                                                    a:b,
                                                                     :,
                                                                     :],
                                                        optimize=einsum_type)
@@ -3204,7 +3193,7 @@ def get_imds(adc, eris=None):
                              vir_list_a] -= lib.einsum('iabc,Iica,Lb->IL',
                                                        v_ceee_bbaa,
                                                        t1_ccee_abab[:,
-                                                                    a:a + k,
+                                                                    a:b,
                                                                     :,
                                                                     :],
                                                        t1_ce_aa,
@@ -3214,7 +3203,7 @@ def get_imds(adc, eris=None):
                              occ_list_a,
                              :] += 1 / 2 * lib.einsum('iaAD,ijab,jb->DA',
                                                       v_ceee_bbaa,
-                                                      t1_ccee_bbbb[a:a + k,
+                                                      t1_ccee_bbbb[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -3226,7 +3215,7 @@ def get_imds(adc, eris=None):
                              :] += 1 / 2 * lib.einsum('iaAD,jiba,jb->DA',
                                                       v_ceee_bbaa,
                                                       t1_ccee_abab[:,
-                                                                   a:a + k,
+                                                                   a:b,
                                                                    :,
                                                                    :],
                                                       t1_ce_aa,
@@ -3236,7 +3225,7 @@ def get_imds(adc, eris=None):
                              occ_list_a,
                              :] += 1 / 2 * lib.einsum('iaDA,ijab,jb->DA',
                                                       v_ceee_bbaa,
-                                                      t1_ccee_bbbb[a:a + k,
+                                                      t1_ccee_bbbb[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -3248,7 +3237,7 @@ def get_imds(adc, eris=None):
                              :] += 1 / 2 * lib.einsum('iaDA,jiba,jb->DA',
                                                       v_ceee_bbaa,
                                                       t1_ccee_abab[:,
-                                                                   a:a + k,
+                                                                   a:b,
                                                                    :,
                                                                    :],
                                                       t1_ce_aa,
@@ -3259,7 +3248,7 @@ def get_imds(adc, eris=None):
                              :] -= 1 / 2 * lib.einsum('iaAb,jiba,jD->DA',
                                                       v_ceee_bbaa,
                                                       t1_ccee_abab[:,
-                                                                   a:a + k,
+                                                                   a:b,
                                                                    :,
                                                                    :],
                                                       t1_ce_aa,
@@ -3271,7 +3260,7 @@ def get_imds(adc, eris=None):
                                               v_ceee_bbaa,
                                               t1_ce_aa,
                                               t1_ccee_abab[:,
-                                                           a:a + k,
+                                                           a:b,
                                                            :,
                                                            :],
                                               optimize=einsum_type)
@@ -3281,7 +3270,7 @@ def get_imds(adc, eris=None):
                              :] -= 1 / 2 * lib.einsum('iaDb,jiba,jA->DA',
                                                       v_ceee_bbaa,
                                                       t1_ccee_abab[:,
-                                                                   a:a + k,
+                                                                   a:b,
                                                                    :,
                                                                    :],
                                                       t1_ce_aa,
@@ -3293,19 +3282,19 @@ def get_imds(adc, eris=None):
                                               v_ceee_bbaa,
                                               t1_ce_aa,
                                               t1_ccee_abab[:,
-                                                           a:a + k,
+                                                           a:b,
                                                            :,
                                                            :],
                                               optimize=einsum_type)
                     M_030_bb[:,
                              :,
-                             a:a + k,
+                             a:b,
                              :] += lib.einsum('labc,jicd,jb->idla',
                                               v_ceee_bbaa,
                                               t1_ccee_abab,
                                               t1_ce_aa,
                                               optimize=einsum_type)
-                    M_030_bb[a:a + k,
+                    M_030_bb[a:b,
                              :,
                              :,
                              :] += lib.einsum('idbc,jlca,jb->idla',
@@ -3313,7 +3302,7 @@ def get_imds(adc, eris=None):
                                               t1_ccee_abab,
                                               t1_ce_aa,
                                               optimize=einsum_type)
-                    M_030_bb[a:a + k,
+                    M_030_bb[a:b,
                              vir_list_b,
                              :,
                              vir_list_b] -= lib.einsum('ibce,jleb,jc->il',
@@ -3323,7 +3312,7 @@ def get_imds(adc, eris=None):
                                                        optimize=einsum_type)
                     M_030_bb[:,
                              vir_list_b,
-                             a:a + k,
+                             a:b,
                              vir_list_b] -= lib.einsum('lbce,jieb,jc->il',
                                                        v_ceee_bbaa,
                                                        t1_ccee_abab,
@@ -3335,7 +3324,7 @@ def get_imds(adc, eris=None):
                              :] -= lib.einsum('jabc,kjcd,kb->da',
                                               v_ceee_bbaa,
                                               t1_ccee_abab[:,
-                                                           a:a + k,
+                                                           a:b,
                                                            :,
                                                            :],
                                               t1_ce_aa,
@@ -3346,14 +3335,14 @@ def get_imds(adc, eris=None):
                              :] -= lib.einsum('jdbc,kjca,kb->da',
                                               v_ceee_bbaa,
                                               t1_ccee_abab[:,
-                                                           a:a + k,
+                                                           a:b,
                                                            :,
                                                            :],
                                               t1_ce_aa,
                                               optimize=einsum_type)
                     M_030_aabb[:,
                                :,
-                               a:a + k,
+                               a:b,
                                :] += 1 / 2 * lib.einsum('laDb,Iibc,ic->IDla',
                                                         v_ceee_bbaa,
                                                         t1_ccee_aaaa,
@@ -3361,7 +3350,7 @@ def get_imds(adc, eris=None):
                                                         optimize=einsum_type)
                     M_030_aabb[:,
                                :,
-                               a:a + k,
+                               a:b,
                                :] += 1 / 2 * lib.einsum('laDb,Iibc,ic->IDla',
                                                         v_ceee_bbaa,
                                                         t1_ccee_abab,
@@ -3369,7 +3358,7 @@ def get_imds(adc, eris=None):
                                                         optimize=einsum_type)
                     M_030_aabb[:,
                                :,
-                               a:a + k,
+                               a:b,
                                :] -= 1 / 2 * lib.einsum('lbDc,Iicb,ia->IDla',
                                                         v_ceee_bbaa,
                                                         t1_ccee_abab,
@@ -3378,7 +3367,7 @@ def get_imds(adc, eris=None):
                     M_030_aabb -= 1 / 2 * lib.einsum('iaDb,Iibc,lc->IDla',
                                                      v_ceee_bbaa,
                                                      t1_ccee_abab[:,
-                                                                  a:a + k,
+                                                                  a:b,
                                                                   :,
                                                                   :],
                                                      t1_ce_bb,
@@ -3387,21 +3376,22 @@ def get_imds(adc, eris=None):
                                              v_ceee_bbaa,
                                              t1_ce_aa,
                                              t1_ccee_bbbb[:,
-                                                          a:a + k,
+                                                          a:b,
                                                           :,
                                                           :],
                                              optimize=einsum_type)
                     M_030_aabb[:,
                                :,
-                               a:a + k,
+                               a:b,
                                :] += lib.einsum('labc,IiDc,ib->IDla',
                                                 v_ceee_bbaa,
                                                 t1_ccee_aaaa,
                                                 t1_ce_aa,
                                                 optimize=einsum_type)
                 del v_ceee_bbaa
-                a += k
         else:
+            v_ceee_bbaa = uadc_ao2mo.unpack_eri_1(eris.OVvv, nvir_a)
+
             M_030_aa[occ_list_a,
                      :,
                      occ_list_a,
@@ -3574,30 +3564,29 @@ def get_imds(adc, eris=None):
                                      t1_ccee_aaaa,
                                      t1_ce_aa,
                                      optimize=einsum_type)
+            del v_ceee_bbaa
 
         if isinstance(eris.ovVV, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-            a = 0
-            for p in range(0, nocc_a, chnk_size):
+            for a,b in lib.prange(0,nocc_a,chnk_size):
 
                 v_ceee_aabb = dfadc.get_ovvv_spin_df(
-                    adc, eris.Lov, eris.LVV, p, chnk_size).reshape(-1, nvir_a, nvir_b, nvir_b)
-                k = v_ceee_aabb.shape[0]
+                    adc, eris.Lov, eris.LVV, a, chnk_size).reshape(-1, nvir_a, nvir_b, nvir_b)
                 M_030_bb[occ_list_b,
                          :,
                          occ_list_b] += lib.einsum('jb,jbad->da',
-                                                   t2_ce_aa[a:a + k,
+                                                   t2_ce_aa[a:b,
                                                             :],
                                                    v_ceee_aabb,
                                                    optimize=einsum_type)
                 M_030_bb[occ_list_b,
                          :,
                          occ_list_b] += lib.einsum('jb,jbda->da',
-                                                   t2_ce_aa[a:a + k,
+                                                   t2_ce_aa[a:b,
                                                             :],
                                                    v_ceee_aabb,
                                                    optimize=einsum_type)
-                M_030_aabb[a:a + k,
+                M_030_aabb[a:b,
                            :,
                            :,
                            :] += lib.einsum('lb,IDab->IDla',
@@ -3608,13 +3597,13 @@ def get_imds(adc, eris=None):
                 if isinstance(adc._scf, scf.rohf.ROHF):
                     M_030_aa[:,
                              :,
-                             a:a + k,
+                             a:b,
                              :] += lib.einsum('LAab,IiDb,ia->IDLA',
                                               v_ceee_aabb,
                                               t1_ccee_abab,
                                               t1_ce_bb,
                                               optimize=einsum_type)
-                    M_030_aa[a:a + k,
+                    M_030_aa[a:b,
                              :,
                              :,
                              :] += lib.einsum('IDab,LiAb,ia->IDLA',
@@ -3622,7 +3611,7 @@ def get_imds(adc, eris=None):
                                               t1_ccee_abab,
                                               t1_ce_bb,
                                               optimize=einsum_type)
-                    M_030_aa[a:a + k,
+                    M_030_aa[a:b,
                              vir_list_a,
                              :,
                              vir_list_a] -= lib.einsum('Iabc,Liac,ib->IL',
@@ -3632,7 +3621,7 @@ def get_imds(adc, eris=None):
                                                        optimize=einsum_type)
                     M_030_aa[:,
                              vir_list_a,
-                             a:a + k,
+                             a:b,
                              vir_list_a] -= lib.einsum('Labc,Iiac,ib->IL',
                                                        v_ceee_aabb,
                                                        t1_ccee_abab,
@@ -3643,7 +3632,7 @@ def get_imds(adc, eris=None):
                              occ_list_a,
                              :] -= lib.einsum('iAab,ijDb,ja->DA',
                                               v_ceee_aabb,
-                                              t1_ccee_abab[a:a + k,
+                                              t1_ccee_abab[a:b,
                                                            :,
                                                            :,
                                                            :],
@@ -3654,7 +3643,7 @@ def get_imds(adc, eris=None):
                              occ_list_a,
                              :] -= lib.einsum('iDab,ijAb,ja->DA',
                                               v_ceee_aabb,
-                                              t1_ccee_abab[a:a + k,
+                                              t1_ccee_abab[a:b,
                                                            :,
                                                            :,
                                                            :],
@@ -3662,7 +3651,7 @@ def get_imds(adc, eris=None):
                                               optimize=einsum_type)
                     M_030_bb -= 1 / 2 * lib.einsum('jbad,jlbc,ic->idla',
                                                    v_ceee_aabb,
-                                                   t1_ccee_abab[a:a + k,
+                                                   t1_ccee_abab[a:b,
                                                                 :,
                                                                 :,
                                                                 :],
@@ -3670,7 +3659,7 @@ def get_imds(adc, eris=None):
                                                    optimize=einsum_type)
                     M_030_bb -= 1 / 2 * lib.einsum('jbda,jibc,lc->idla',
                                                    v_ceee_aabb,
-                                                   t1_ccee_abab[a:a + k,
+                                                   t1_ccee_abab[a:b,
                                                                 :,
                                                                 :,
                                                                 :],
@@ -3679,7 +3668,7 @@ def get_imds(adc, eris=None):
                     M_030_bb += lib.einsum('jbca,lc,jibd->idla',
                                            v_ceee_aabb,
                                            t1_ce_bb,
-                                           t1_ccee_abab[a:a + k,
+                                           t1_ccee_abab[a:b,
                                                         :,
                                                         :,
                                                         :],
@@ -3687,7 +3676,7 @@ def get_imds(adc, eris=None):
                     M_030_bb += lib.einsum('jbcd,ic,jlba->idla',
                                            v_ceee_aabb,
                                            t1_ce_bb,
-                                           t1_ccee_abab[a:a + k,
+                                           t1_ccee_abab[a:b,
                                                         :,
                                                         :,
                                                         :],
@@ -3698,7 +3687,7 @@ def get_imds(adc, eris=None):
                              vir_list_b] -= lib.einsum('jbce,ic,jlbe->il',
                                                        v_ceee_aabb,
                                                        t1_ce_bb,
-                                                       t1_ccee_abab[a:a + k,
+                                                       t1_ccee_abab[a:b,
                                                                     :,
                                                                     :,
                                                                     :],
@@ -3709,7 +3698,7 @@ def get_imds(adc, eris=None):
                              vir_list_b] -= lib.einsum('jbce,lc,jibe->il',
                                                        v_ceee_aabb,
                                                        t1_ce_bb,
-                                                       t1_ccee_abab[a:a + k,
+                                                       t1_ccee_abab[a:b,
                                                                     :,
                                                                     :,
                                                                     :],
@@ -3719,7 +3708,7 @@ def get_imds(adc, eris=None):
                              occ_list_b,
                              :] += 1 / 2 * lib.einsum('jbad,jkbc,kc->da',
                                                       v_ceee_aabb,
-                                                      t1_ccee_aaaa[a:a + k,
+                                                      t1_ccee_aaaa[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -3730,7 +3719,7 @@ def get_imds(adc, eris=None):
                              occ_list_b,
                              :] += 1 / 2 * lib.einsum('jbad,jkbc,kc->da',
                                                       v_ceee_aabb,
-                                                      t1_ccee_abab[a:a + k,
+                                                      t1_ccee_abab[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -3741,7 +3730,7 @@ def get_imds(adc, eris=None):
                              occ_list_b,
                              :] += 1 / 2 * lib.einsum('jbda,jkbc,kc->da',
                                                       v_ceee_aabb,
-                                                      t1_ccee_aaaa[a:a + k,
+                                                      t1_ccee_aaaa[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -3752,7 +3741,7 @@ def get_imds(adc, eris=None):
                              occ_list_b,
                              :] += 1 / 2 * lib.einsum('jbda,jkbc,kc->da',
                                                       v_ceee_aabb,
-                                                      t1_ccee_abab[a:a + k,
+                                                      t1_ccee_abab[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -3763,7 +3752,7 @@ def get_imds(adc, eris=None):
                              occ_list_b,
                              :] -= 1 / 2 * lib.einsum('jbac,jkbc,kd->da',
                                                       v_ceee_aabb,
-                                                      t1_ccee_abab[a:a + k,
+                                                      t1_ccee_abab[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -3775,7 +3764,7 @@ def get_imds(adc, eris=None):
                              :] -= lib.einsum('jbca,kc,jkbd->da',
                                               v_ceee_aabb,
                                               t1_ce_bb,
-                                              t1_ccee_abab[a:a + k,
+                                              t1_ccee_abab[a:b,
                                                            :,
                                                            :,
                                                            :],
@@ -3785,7 +3774,7 @@ def get_imds(adc, eris=None):
                              occ_list_b,
                              :] -= 1 / 2 * lib.einsum('jbdc,jkbc,ka->da',
                                                       v_ceee_aabb,
-                                                      t1_ccee_abab[a:a + k,
+                                                      t1_ccee_abab[a:b,
                                                                    :,
                                                                    :,
                                                                    :],
@@ -3797,12 +3786,12 @@ def get_imds(adc, eris=None):
                              :] -= lib.einsum('jbcd,kc,jkba->da',
                                               v_ceee_aabb,
                                               t1_ce_bb,
-                                              t1_ccee_abab[a:a + k,
+                                              t1_ccee_abab[a:b,
                                                            :,
                                                            :,
                                                            :],
                                               optimize=einsum_type)
-                    M_030_aabb[a:a + k,
+                    M_030_aabb[a:b,
                                :,
                                :,
                                :] += 1 / 2 * lib.einsum('IDab,libc,ic->IDla',
@@ -3810,7 +3799,7 @@ def get_imds(adc, eris=None):
                                                         t1_ccee_bbbb,
                                                         t1_ce_bb,
                                                         optimize=einsum_type)
-                    M_030_aabb[a:a + k,
+                    M_030_aabb[a:b,
                                :,
                                :,
                                :] += 1 / 2 * lib.einsum('IDab,ilcb,ic->IDla',
@@ -3818,7 +3807,7 @@ def get_imds(adc, eris=None):
                                                         t1_ccee_abab,
                                                         t1_ce_aa,
                                                         optimize=einsum_type)
-                    M_030_aabb[a:a + k,
+                    M_030_aabb[a:b,
                                :,
                                :,
                                :] += lib.einsum('IDbc,liac,ib->IDla',
@@ -3828,13 +3817,13 @@ def get_imds(adc, eris=None):
                                                 optimize=einsum_type)
                     M_030_aabb -= 1 / 2 * lib.einsum('iDab,ilcb,Ic->IDla',
                                                      v_ceee_aabb,
-                                                     t1_ccee_abab[a:a + k,
+                                                     t1_ccee_abab[a:b,
                                                                   :,
                                                                   :,
                                                                   :],
                                                      t1_ce_aa,
                                                      optimize=einsum_type)
-                    M_030_aabb[a:a + k,
+                    M_030_aabb[a:b,
                                :,
                                :,
                                :] -= 1 / 2 * lib.einsum('Ibac,ilbc,iD->IDla',
@@ -3846,14 +3835,15 @@ def get_imds(adc, eris=None):
                                              v_ceee_aabb,
                                              t1_ce_bb,
                                              t1_ccee_aaaa[:,
-                                                          a:a + k,
+                                                          a:b,
                                                           :,
                                                           :],
                                              optimize=einsum_type)
 
                 del v_ceee_aabb
-                a += k
         else:
+            v_ceee_aabb = uadc_ao2mo.unpack_eri_1(eris.ovVV, nvir_b)
+
             M_030_aa += lib.einsum('LAab,IiDb,ia->IDLA',
                                    v_ceee_aabb,
                                    t1_ccee_abab,
@@ -10472,8 +10462,7 @@ def get_diag(adc, M_ia_jb=None, eris=None):
 
     d_ij_abab = e_occ_a[:, None] + e_occ_b
     d_ab_abab = e_vir_a[:, None] + e_vir_b
-    diag[s_abab:f_abab] = (-d_ij_abab.reshape(-1, 1) +
-                           d_ab_abab.reshape(-1)).reshape(-1)
+    diag[s_abab:f_abab] = (-d_ij_abab.reshape(-1, 1) + d_ab_abab.reshape(-1)).reshape(-1)
 
     if M_ia_jb is None:
         M_ia_jb = adc.get_imds()
@@ -10608,8 +10597,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
                                      ij_ind_b[1]].reshape(-1)) * r[s_bbbb:f_bbbb]
         del D_ijab_b
 
-        s[s_abab:f_ab] = ((-d_ij_abab.reshape(-1, 1) +
-                           d_ab_abab.reshape(-1)).reshape(-1)) * r1_ab
+        s[s_abab:f_ab] = ((-d_ij_abab.reshape(-1, 1) + d_ab_abab.reshape(-1)).reshape(-1)) * r1_ab
 
         r1_ab = r1_ab.reshape(nocc_a, nocc_b, nvir_a, nvir_b)
         # M^(1)_h0_h1
@@ -10617,34 +10605,31 @@ def matvec(adc, M_ia_jb=None, eris=None):
 
         if isinstance(eris.ovvv, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-            a = 0
-            for p in range(0, nocc_a, chnk_size):
+            for a,b in lib.prange(0,nocc_a,chnk_size):
                 eris_ovvv = dfadc.get_ovvv_spin_df(
-                    adc, eris.Lov, eris.Lvv, p, chnk_size).reshape(-1, nvir_a, nvir_a, nvir_a)
-                k = eris_ovvv.shape[0]
+                    adc, eris.Lov, eris.Lvv, a, chnk_size).reshape(-1, nvir_a, nvir_a, nvir_a)
                 s[s_a:f_a] += 0.5 * lib.einsum('imef,mfea->ia',
                                                r2_a[:,
-                                                    a:a + k],
+                                                    a:b],
                                                eris_ovvv,
                                                optimize=True).reshape(-1)
                 s[s_a:f_a] -= 0.5 * lib.einsum('imef,mefa->ia',
                                                r2_a[:,
-                                                    a:a + k],
+                                                    a:b],
                                                eris_ovvv,
                                                optimize=True).reshape(-1)
-                temp_a[:, a:a + k] += - \
+                temp_a[:, a:b] += - \
                     lib.einsum('ie,jabe->ijab', r1_a_ov, eris_ovvv, optimize=True)
                 temp_a[:,
-                       a:a + k] += lib.einsum('ie,jbae->ijab',
+                       a:b] += lib.einsum('ie,jbae->ijab',
                                               r1_a_ov,
                                               eris_ovvv,
                                               optimize=True)
-                temp_a[a:a + k] += lib.einsum('je,iabe->ijab',
+                temp_a[a:b] += lib.einsum('je,iabe->ijab',
                                               r1_a_ov, eris_ovvv, optimize=True)
-                temp_a[a:a + k] -= lib.einsum('je,ibae->ijab',
+                temp_a[a:b] -= lib.einsum('je,ibae->ijab',
                                               r1_a_ov, eris_ovvv, optimize=True)
                 del eris_ovvv
-                a += k
             temp_a = temp_a[:, :, ab_ind_a[0], ab_ind_a[1]]
             s[s_aaaa:f_aaaa] += temp_a[ij_ind_a[0],
                                        ij_ind_a[1]].reshape(n_doubles_aaaa)
@@ -10672,23 +10657,20 @@ def matvec(adc, M_ia_jb=None, eris=None):
         temp_abab = np.zeros((nocc_a, nocc_b, nvir_a, nvir_b))
         if isinstance(eris.OVvv, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-            a = 0
-            for p in range(0, nocc_b, chnk_size):
+            for a,b in lib.prange(0,nocc_b,chnk_size):
                 eris_OVvv = dfadc.get_ovvv_spin_df(
-                    adc, eris.LOV, eris.Lvv, p, chnk_size).reshape(-1, nvir_b, nvir_a, nvir_a)
-                k = eris_OVvv.shape[0]
+                    adc, eris.LOV, eris.Lvv, a, chnk_size).reshape(-1, nvir_b, nvir_a, nvir_a)
                 s[s_a:f_a] += lib.einsum('imef,mfea->ia',
                                          r1_ab[:,
-                                               a:a + k],
+                                               a:b],
                                          eris_OVvv,
                                          optimize=True).reshape(-1)
                 temp_abab[:,
-                          a:a + k] += lib.einsum('ie,jbae->ijab',
+                          a:b] += lib.einsum('ie,jbae->ijab',
                                                  r1_a_ov,
                                                  eris_OVvv,
                                                  optimize=True)
                 del eris_OVvv
-                a += k
             s[s_abab:f_ab] += temp_abab.reshape(-1)
             del temp_abab
         else:
@@ -10709,34 +10691,32 @@ def matvec(adc, M_ia_jb=None, eris=None):
         temp_b = np.zeros((nocc_b, nocc_b, nvir_b, nvir_b))
         if isinstance(eris.OVVV, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-            a = 0
-            for p in range(0, nocc_b, chnk_size):
+            for a,b in lib.prange(0,nocc_b,chnk_size):
                 eris_OVVV = dfadc.get_ovvv_spin_df(
-                    adc, eris.LOV, eris.LVV, p, chnk_size).reshape(-1, nvir_b, nvir_b, nvir_b)
+                    adc, eris.LOV, eris.LVV, a, chnk_size).reshape(-1, nvir_b, nvir_b, nvir_b)
                 k = eris_OVVV.shape[0]
                 s[s_b:f_b] += 0.5 * lib.einsum('imef,mfea->ia',
                                                r2_b[:,
-                                                    a:a + k],
+                                                    a:b],
                                                eris_OVVV,
                                                optimize=True).reshape(-1)
                 s[s_b:f_b] -= 0.5 * lib.einsum('imef,mefa->ia',
                                                r2_b[:,
-                                                    a:a + k],
+                                                    a:b],
                                                eris_OVVV,
                                                optimize=True).reshape(-1)
-                temp_b[:, a:a + k] += - \
+                temp_b[:, a:b] += - \
                     lib.einsum('ie,jabe->ijab', r1_b_ov, eris_OVVV, optimize=True)
                 temp_b[:,
-                       a:a + k] += lib.einsum('ie,jbae->ijab',
+                       a:b] += lib.einsum('ie,jbae->ijab',
                                               r1_b_ov,
                                               eris_OVVV,
                                               optimize=True)
-                temp_b[a:a + k] += lib.einsum('je,iabe->ijab',
+                temp_b[a:b] += lib.einsum('je,iabe->ijab',
                                               r1_b_ov, eris_OVVV, optimize=True)
-                temp_b[a:a + k] -= lib.einsum('je,ibae->ijab',
+                temp_b[a:b] -= lib.einsum('je,ibae->ijab',
                                               r1_b_ov, eris_OVVV, optimize=True)
                 del eris_OVVV
-                a += k
             temp_b = temp_b[:, :, ab_ind_b[0], ab_ind_b[1]]
             s[s_bbbb:f_bbbb] += temp_b[ij_ind_b[0],
                                        ij_ind_b[1]].reshape(n_doubles_bbbb)
@@ -10764,19 +10744,16 @@ def matvec(adc, M_ia_jb=None, eris=None):
         temp_abab = np.zeros((nocc_a, nocc_b, nvir_a, nvir_b))
         if isinstance(eris.ovVV, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-            a = 0
-            for p in range(0, nocc_a, chnk_size):
+            for a,b in lib.prange(0,nocc_a,chnk_size):
                 eris_ovVV = dfadc.get_ovvv_spin_df(
-                    adc, eris.Lov, eris.LVV, p, chnk_size).reshape(-1, nvir_a, nvir_b, nvir_b)
-                k = eris_ovVV.shape[0]
+                    adc, eris.Lov, eris.LVV, a, chnk_size).reshape(-1, nvir_a, nvir_b, nvir_b)
                 s[s_b:f_b] += lib.einsum('mife,mfea->ia',
-                                         r1_ab[a:a + k],
+                                         r1_ab[a:b],
                                          eris_ovVV,
                                          optimize=True).reshape(-1)
-                temp_abab[a:a + k] += lib.einsum('je,iabe->ijab',
+                temp_abab[a:b] += lib.einsum('je,iabe->ijab',
                                                  r1_b_ov, eris_ovVV, optimize=True)
                 del eris_ovVV
-                a += k
             s[s_abab:f_ab] += temp_abab.reshape(-1)
             del temp_abab
         else:
@@ -11048,21 +11025,6 @@ def matvec(adc, M_ia_jb=None, eris=None):
             v_cecc_aabb = eris.ovOO
             v_cecc_bbaa = eris.OVoo
 
-            if isinstance(
-                    eris.vvvv_p,
-                    np.ndarray) or isinstance(
-                    eris.vvvv_p,
-                    list):
-                eris_ovvv = uadc_ao2mo.unpack_eri_1(eris.ovvv, nvir_a)
-                eris_OVVV = uadc_ao2mo.unpack_eri_1(eris.OVVV, nvir_b)
-                eris_ovVV = uadc_ao2mo.unpack_eri_1(eris.ovVV, nvir_b)
-                eris_OVvv = uadc_ao2mo.unpack_eri_1(eris.OVvv, nvir_a)
-
-                v_ceee_aaaa = eris_ovvv.copy()
-                v_ceee_bbbb = eris_OVVV.copy()
-                v_ceee_aabb = eris_ovVV.copy()
-                v_ceee_bbaa = eris_OVvv.copy()
-
             e_core_a = adc.mo_energy_a[:nocc_a].copy()
             e_extern_a = adc.mo_energy_a[nocc_a:].copy()
 
@@ -11077,26 +11039,24 @@ def matvec(adc, M_ia_jb=None, eris=None):
                     t1_ccee_abab,
                     t1_ccee_abab,
                     optimize=einsum_type)
-                a = 0
                 temp_1 = np.zeros((nocc_a, nvir_a, nocc_a, nvir_a))
                 array_1 = np.zeros((nocc_a, nocc_a, nvir_a, nvir_a))
                 chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-                for p in range(0, nvir_a, chnk_size):
+                for a,b in lib.prange(0,nvir_a,chnk_size):
                     v_eeee_aaaa = dfadc.get_vVvV_df(
-                        adc, eris.Lvv, eris.Lvv, p, chnk_size)
-                    k = v_eeee_aaaa.shape[0]
+                        adc, eris.Lvv, eris.Lvv, a, chnk_size)
 
                     temp_1[:,
                            :,
                            :,
-                           a:a + k] += -lib.einsum('AaDb,ILab->IDLA',
+                           a:b] += -lib.einsum('AaDb,ILab->IDLA',
                                                    v_eeee_aaaa,
                                                    int_1,
                                                    optimize=einsum_type)
                     temp_1[:,
                            :,
                            :,
-                           a:a + k] += lib.einsum('AabD,ILab->IDLA',
+                           a:b] += lib.einsum('AabD,ILab->IDLA',
                                                   v_eeee_aaaa,
                                                   int_1,
                                                   optimize=einsum_type)
@@ -11105,7 +11065,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
 
                         array_1[:,
                                 :,
-                                a:a + k,
+                                a:b,
                                 :] += lib.einsum('Ia,Jb,CDab->IJCD',
                                                  Y_aa,
                                                  t1_ce_aa,
@@ -11113,7 +11073,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
                                                  optimize=einsum_type)
                         array_1[:,
                                 :,
-                                a:a + k,
+                                a:b,
                                 :] -= lib.einsum('Ja,Ib,CDab->IJCD',
                                                  Y_aa,
                                                  t1_ce_aa,
@@ -11122,7 +11082,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
 
                         array_1[:,
                                 :,
-                                a:a + k,
+                                a:b,
                                 :] -= lib.einsum('Ia,Jb,CDba->IJCD',
                                                  Y_aa,
                                                  t1_ce_aa,
@@ -11130,7 +11090,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
                                                  optimize=einsum_type)
                         array_1[:,
                                 :,
-                                a:a + k,
+                                a:b,
                                 :] += lib.einsum('Ja,Ib,CDba->IJCD',
                                                  Y_aa,
                                                  t1_ce_aa,
@@ -11138,7 +11098,6 @@ def matvec(adc, M_ia_jb=None, eris=None):
                                                  optimize=einsum_type)
 
                     del v_eeee_aaaa
-                    a += k
                 temp_1 = temp_1.reshape(n_singles_a, n_singles_a)
                 s[s_a:f_a] += lib.einsum('ab,b->a',
                                          temp_1, r1_a, optimize=True)
@@ -11152,7 +11111,6 @@ def matvec(adc, M_ia_jb=None, eris=None):
                     del ladder_int_a
 
             if isinstance(eris.vvvv_p, type(None)):
-                a = 0
                 temp_a = np.zeros((nocc_a, nvir_a, nocc_a, nvir_a))
                 int_1 = lib.einsum(
                     "Iica,Licb->ILab",
@@ -11161,22 +11119,20 @@ def matvec(adc, M_ia_jb=None, eris=None):
                     optimize=einsum_type)
 
                 chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-                for p in range(0, nvir_a, chnk_size):
+                for a,b in lib.prange(0,nvir_a,chnk_size):
                     vVvV = dfadc.get_vVvV_df(
-                        adc, eris.Lvv, eris.LVV, p, chnk_size)
-                    k = vVvV.shape[0]
+                        adc, eris.Lvv, eris.LVV, a, chnk_size)
                     v_eeee_abab = vVvV
 
                     temp_a[:,
                            :,
                            :,
-                           a:a + k] += -lib.einsum('AaDb,ILab->IDLA',
+                           a:b] += -lib.einsum('AaDb,ILab->IDLA',
                                                    v_eeee_abab,
                                                    int_1,
                                                    optimize=einsum_type)
 
                     del v_eeee_abab
-                    a += k
                 temp_a = temp_a.reshape(n_singles_a, n_singles_a)
                 s[s_a:f_a] += lib.einsum('ab,b->a',
                                          temp_a, r1_a, optimize=True)
@@ -11560,21 +11516,18 @@ def matvec(adc, M_ia_jb=None, eris=None):
                     M_12Y0_ab = temp_ab
 
                 if isinstance(eris.vvvv_p, type(None)):
-                    a = 0
-
                     temp_ab = np.zeros((nocc_a, nocc_b, nvir_a, nvir_b))
                     temp_aa = np.zeros((nocc_a, nvir_a))
                     temp_bb = np.zeros((nocc_b, nvir_b))
                     chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-                    for p in range(0, nvir_a, chnk_size):
+                    for a,b in lib.prange(0,nvir_a,chnk_size):
                         vVvV = dfadc.get_vVvV_df(
-                            adc, eris.Lvv, eris.LVV, p, chnk_size)
-                        k = vVvV.shape[0]
+                            adc, eris.Lvv, eris.LVV, a, chnk_size)
                         v_eeee_abab = vVvV
 
                         temp_ab[:,
                                 :,
-                                a:a + k,
+                                a:b,
                                 :] += lib.einsum('Ia,jb,Cdab->IjCd',
                                                  Y_aa,
                                                  t1_ce_bb,
@@ -11582,7 +11535,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
                                                  optimize=einsum_type)
                         temp_ab[:,
                                 :,
-                                a:a + k,
+                                a:b,
                                 :] += lib.einsum('ja,Ib,Cdba->IjCd',
                                                  Y_bb,
                                                  t1_ce_aa,
@@ -11590,7 +11543,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
                                                  optimize=einsum_type)
 
                         temp_aa[:,
-                                a:a + k] += lib.einsum('Iiab,ic,Dcab->ID',
+                                a:b] += lib.einsum('Iiab,ic,Dcab->ID',
                                                        Y_abab,
                                                        t1_ce_bb,
                                                        v_eeee_abab,
@@ -11598,11 +11551,10 @@ def matvec(adc, M_ia_jb=None, eris=None):
                         temp_bb += lib.einsum('jiab,jc,cdab->id',
                                               Y_abab,
                                               t1_ce_aa[:,
-                                                       a:a + k],
+                                                       a:b],
                                               v_eeee_abab,
                                               optimize=einsum_type)
                         del v_eeee_abab
-                        a += k
 
                     M_02Y1_aa += temp_aa
                     M_02Y1_bb = temp_bb
@@ -11689,17 +11641,15 @@ def matvec(adc, M_ia_jb=None, eris=None):
                     M_02Y1_bb += temp_4
 
                 if isinstance(eris.vvvv_p, type(None)):
-                    a = 0
                     temp_3 = np.zeros((nocc_b, nocc_b, nvir_b, nvir_b))
                     chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-                    for p in range(0, nvir_b, chnk_size):
+                    for a,b in lib.prange(0,nvir_b,chnk_size):
                         v_eeee_bbbb = dfadc.get_vVvV_df(
-                            adc, eris.LVV, eris.LVV, p, chnk_size)
-                        k = v_eeee_bbbb.shape[0]
+                            adc, eris.LVV, eris.LVV, a, chnk_size)
 
                         temp_3[:,
                                :,
-                               a:a + k,
+                               a:b,
                                :] += lib.einsum('ia,jb,cdab->ijcd',
                                                 Y_bb,
                                                 t1_ce_bb,
@@ -11707,7 +11657,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
                                                 optimize=einsum_type)
                         temp_3[:,
                                :,
-                               a:a + k,
+                               a:b,
                                :] -= lib.einsum('ja,ib,cdab->ijcd',
                                                 Y_bb,
                                                 t1_ce_bb,
@@ -11716,7 +11666,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
 
                         temp_3[:,
                                :,
-                               a:a + k,
+                               a:b,
                                :] -= lib.einsum('ia,jb,cdba->ijcd',
                                                 Y_bb,
                                                 t1_ce_bb,
@@ -11724,14 +11674,13 @@ def matvec(adc, M_ia_jb=None, eris=None):
                                                 optimize=einsum_type)
                         temp_3[:,
                                :,
-                               a:a + k,
+                               a:b,
                                :] += lib.einsum('ja,ib,cdba->ijcd',
                                                 Y_bb,
                                                 t1_ce_bb,
                                                 v_eeee_bbbb,
                                                 optimize=einsum_type)
                         del v_eeee_bbbb
-                        a += k
                     M_12Y0_bb = temp_3
                     M_02Y1_bb += lib.einsum('ijdc,jc->id',
                                             ladder_int_b,
@@ -11749,157 +11698,155 @@ def matvec(adc, M_ia_jb=None, eris=None):
 
             if isinstance(eris.ovvv, type(None)):
                 chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-                a = 0
-                for p in range(0, nocc_a, chnk_size):
+                for a,b in lib.prange(0,nocc_a,chnk_size):
                     v_ceee_aaaa = dfadc.get_ovvv_spin_df(
-                        adc, eris.Lov, eris.Lvv, p, chnk_size).reshape(-1, nvir_a, nvir_a, nvir_a)
-                    k = v_ceee_aaaa.shape[0]
+                        adc, eris.Lov, eris.Lvv, a, chnk_size).reshape(-1, nvir_a, nvir_a, nvir_a)
 
                     M_12Y0_aa += -lib.einsum('Ia,JiCb,ibDa->IJCD',
                                              Y_aa,
                                              t1_ccee_aaaa[:,
-                                                          a:a + k],
+                                                          a:b],
                                              v_ceee_aaaa,
                                              optimize=einsum_type)
                     M_12Y0_aa += lib.einsum('Ia,JiCb,iaDb->IJCD',
                                             Y_aa,
                                             t1_ccee_aaaa[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_12Y0_aa += lib.einsum('Ia,JiDb,ibCa->IJCD',
                                             Y_aa,
                                             t1_ccee_aaaa[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_12Y0_aa -= lib.einsum('Ia,JiDb,iaCb->IJCD',
                                             Y_aa,
                                             t1_ccee_aaaa[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_12Y0_aa += lib.einsum('Ja,IiCb,ibDa->IJCD',
                                             Y_aa,
                                             t1_ccee_aaaa[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_12Y0_aa -= lib.einsum('Ja,IiCb,iaDb->IJCD',
                                             Y_aa,
                                             t1_ccee_aaaa[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_12Y0_aa -= lib.einsum('Ja,IiDb,ibCa->IJCD',
                                             Y_aa,
                                             t1_ccee_aaaa[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_12Y0_aa += lib.einsum('Ja,IiDb,iaCb->IJCD',
                                             Y_aa,
                                             t1_ccee_aaaa[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_12Y0_aa += lib.einsum('iC,IJab,ibDa->IJCD',
-                                            Y_aa[a:a + k],
+                                            Y_aa[a:b],
                                             t1_ccee_aaaa,
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_12Y0_aa -= lib.einsum('iD,IJab,ibCa->IJCD',
-                                            Y_aa[a:a + k],
+                                            Y_aa[a:b],
                                             t1_ccee_aaaa,
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_12Y0_aa -= lib.einsum('ia,IJCb,ibDa->IJCD',
-                                            Y_aa[a:a + k],
+                                            Y_aa[a:b],
                                             t1_ccee_aaaa,
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_12Y0_aa += lib.einsum('ia,IJCb,iaDb->IJCD',
-                                            Y_aa[a:a + k],
+                                            Y_aa[a:b],
                                             t1_ccee_aaaa,
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_12Y0_aa += lib.einsum('ia,IJDb,ibCa->IJCD',
-                                            Y_aa[a:a + k],
+                                            Y_aa[a:b],
                                             t1_ccee_aaaa,
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_12Y0_aa -= lib.einsum('ia,IJDb,iaCb->IJCD',
-                                            Y_aa[a:a + k],
+                                            Y_aa[a:b],
                                             t1_ccee_aaaa,
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_12Y0_ab += lib.einsum('Ia,ijbd,ibCa->IjCd',
                                             Y_aa,
-                                            t1_ccee_abab[a:a + k],
+                                            t1_ccee_abab[a:b],
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_12Y0_ab -= lib.einsum('Ia,ijbd,iaCb->IjCd',
                                             Y_aa,
-                                            t1_ccee_abab[a:a + k],
+                                            t1_ccee_abab[a:b],
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_12Y0_ab -= lib.einsum('ia,Ijbd,ibCa->IjCd',
-                                            Y_aa[a:a + k],
+                                            Y_aa[a:b],
                                             t1_ccee_abab,
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_12Y0_ab += lib.einsum('ia,Ijbd,iaCb->IjCd',
-                                            Y_aa[a:a + k],
+                                            Y_aa[a:b],
                                             t1_ccee_abab,
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_02Y1_aa += lib.einsum('IiDa,ijbc,jcab->ID',
                                             Y_aaaa,
                                             t1_ccee_aaaa[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_02Y1_aa -= lib.einsum('Iiab,ijac,jcbD->ID',
                                             Y_aaaa,
                                             t1_ccee_aaaa[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_02Y1_aa += lib.einsum('Iiab,ijac,jDbc->ID',
                                             Y_aaaa,
                                             t1_ccee_aaaa[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_02Y1_aa += lib.einsum('Iiab,jicb,jcaD->ID',
                                             Y_abab,
-                                            t1_ccee_abab[a:a + k],
+                                            t1_ccee_abab[a:b],
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_02Y1_aa -= lib.einsum('Iiab,jicb,jDac->ID',
                                             Y_abab,
-                                            t1_ccee_abab[a:a + k],
+                                            t1_ccee_abab[a:b],
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
                     M_02Y1_bb += lib.einsum('jiad,jkbc,kcab->id',
                                             Y_abab,
                                             t1_ccee_aaaa[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_aaaa,
                                             optimize=einsum_type)
-                    M_02Y1_aa[a:a + k] -= 1 / 2 * lib.einsum(
+                    M_02Y1_aa[a:b] -= 1 / 2 * lib.einsum(
                         'ijDa,ijbc,Ibac->ID', Y_aaaa, t1_ccee_aaaa, v_ceee_aaaa, optimize=einsum_type)
-                    M_02Y1_aa[a:a + k] += 1 / 2 * lib.einsum(
+                    M_02Y1_aa[a:b] += 1 / 2 * lib.einsum(
                         'ijab,ijac,IDbc->ID', Y_aaaa, t1_ccee_aaaa, v_ceee_aaaa, optimize=einsum_type)
-                    M_02Y1_aa[a:a + k] -= 1 / 2 * lib.einsum(
+                    M_02Y1_aa[a:b] -= 1 / 2 * lib.einsum(
                         'ijab,ijac,IcbD->ID', Y_aaaa, t1_ccee_aaaa, v_ceee_aaaa, optimize=einsum_type)
-                    M_02Y1_aa[a:a + k] += lib.einsum(
+                    M_02Y1_aa[a:b] += lib.einsum(
                         'ijab,ijcb,IDac->ID', Y_abab, t1_ccee_abab, v_ceee_aaaa, optimize=einsum_type)
-                    M_02Y1_aa[a:a + k] -= lib.einsum(
+                    M_02Y1_aa[a:b] -= lib.einsum(
                         'ijab,ijcb,IcaD->ID', Y_abab, t1_ccee_abab, v_ceee_aaaa, optimize=einsum_type)
                     del v_ceee_aaaa
-                    a += k
             else:
+                v_ceee_aaaa = uadc_ao2mo.unpack_eri_1(eris.ovvv, nvir_a)
                 M_12Y0_aa -= lib.einsum('Ia,JiCb,ibDa->IJCD',
                                         Y_aa,
                                         t1_ccee_aaaa,
@@ -12036,164 +11983,164 @@ def matvec(adc, M_ia_jb=None, eris=None):
                                         t1_ccee_aaaa,
                                         v_ceee_aaaa,
                                         optimize=einsum_type)
+                del v_ceee_aaaa
 
             if isinstance(eris.OVVV, type(None)):
                 chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-                a = 0
-                for p in range(0, nocc_b, chnk_size):
+                for a,b in lib.prange(0,nocc_b,chnk_size):
                     v_ceee_bbbb = dfadc.get_ovvv_spin_df(
-                        adc, eris.LOV, eris.LVV, p, chnk_size).reshape(-1, nvir_b, nvir_b, nvir_b)
-                    k = v_ceee_bbbb.shape[0]
+                        adc, eris.LOV, eris.LVV, a, chnk_size).reshape(-1, nvir_b, nvir_b, nvir_b)
                     M_12Y0_bb += -lib.einsum('ia,jkcb,kbda->ijcd',
                                              Y_bb,
                                              t1_ccee_bbbb[:,
-                                                          a:a + k],
+                                                          a:b],
                                              v_ceee_bbbb,
                                              optimize=einsum_type)
                     M_12Y0_bb += lib.einsum('ia,jkcb,kadb->ijcd',
                                             Y_bb,
                                             t1_ccee_bbbb[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_12Y0_bb += lib.einsum('ia,jkdb,kbca->ijcd',
                                             Y_bb,
                                             t1_ccee_bbbb[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_12Y0_bb -= lib.einsum('ia,jkdb,kacb->ijcd',
                                             Y_bb,
                                             t1_ccee_bbbb[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_12Y0_bb += lib.einsum('ja,ikcb,kbda->ijcd',
                                             Y_bb,
                                             t1_ccee_bbbb[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_12Y0_bb -= lib.einsum('ja,ikcb,kadb->ijcd',
                                             Y_bb,
                                             t1_ccee_bbbb[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_12Y0_bb -= lib.einsum('ja,ikdb,kbca->ijcd',
                                             Y_bb,
                                             t1_ccee_bbbb[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_12Y0_bb += lib.einsum('ja,ikdb,kacb->ijcd',
                                             Y_bb,
                                             t1_ccee_bbbb[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_12Y0_bb += lib.einsum('kc,ijab,kbda->ijcd',
-                                            Y_bb[a:a + k],
+                                            Y_bb[a:b],
                                             t1_ccee_bbbb,
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_12Y0_bb -= lib.einsum('kd,ijab,kbca->ijcd',
-                                            Y_bb[a:a + k],
+                                            Y_bb[a:b],
                                             t1_ccee_bbbb,
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_12Y0_bb -= lib.einsum('ka,ijcb,kbda->ijcd',
-                                            Y_bb[a:a + k],
+                                            Y_bb[a:b],
                                             t1_ccee_bbbb,
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_12Y0_bb += lib.einsum('ka,ijcb,kadb->ijcd',
-                                            Y_bb[a:a + k],
+                                            Y_bb[a:b],
                                             t1_ccee_bbbb,
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_12Y0_bb += lib.einsum('ka,ijdb,kbca->ijcd',
-                                            Y_bb[a:a + k],
+                                            Y_bb[a:b],
                                             t1_ccee_bbbb,
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_12Y0_bb -= lib.einsum('ka,ijdb,kacb->ijcd',
-                                            Y_bb[a:a + k],
+                                            Y_bb[a:b],
                                             t1_ccee_bbbb,
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_12Y0_ab += lib.einsum('ja,IiCb,ibda->IjCd',
                                             Y_bb,
                                             t1_ccee_abab[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_12Y0_ab -= lib.einsum('ja,IiCb,iadb->IjCd',
                                             Y_bb,
                                             t1_ccee_abab[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_12Y0_ab -= lib.einsum('ia,IjCb,ibda->IjCd',
-                                            Y_bb[a:a + k],
+                                            Y_bb[a:b],
                                             t1_ccee_abab,
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_12Y0_ab += lib.einsum('ia,IjCb,iadb->IjCd',
-                                            Y_bb[a:a + k],
+                                            Y_bb[a:b],
                                             t1_ccee_abab,
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_02Y1_bb += lib.einsum('ijda,jkbc,kcab->id',
                                             Y_bbbb,
                                             t1_ccee_bbbb[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_02Y1_bb -= lib.einsum('ijab,jkac,kcbd->id',
                                             Y_bbbb,
                                             t1_ccee_bbbb[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_02Y1_bb += lib.einsum('ijab,jkac,kdbc->id',
                                             Y_bbbb,
                                             t1_ccee_bbbb[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_02Y1_aa += lib.einsum('IiDa,ijbc,jcab->ID',
                                             Y_abab,
                                             t1_ccee_bbbb[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_02Y1_bb += lib.einsum('jiab,jkac,kcbd->id',
                                             Y_abab,
                                             t1_ccee_abab[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
                     M_02Y1_bb -= lib.einsum('jiab,jkac,kdbc->id',
                                             Y_abab,
                                             t1_ccee_abab[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbbb,
                                             optimize=einsum_type)
-                    M_02Y1_bb[a:a + k] -= 1 / 2 * lib.einsum(
+                    M_02Y1_bb[a:b] -= 1 / 2 * lib.einsum(
                         'jkda,jkbc,ibac->id', Y_bbbb, t1_ccee_bbbb, v_ceee_bbbb, optimize=einsum_type)
-                    M_02Y1_bb[a:a + k] += 1 / 2 * lib.einsum(
+                    M_02Y1_bb[a:b] += 1 / 2 * lib.einsum(
                         'jkab,jkac,idbc->id', Y_bbbb, t1_ccee_bbbb, v_ceee_bbbb, optimize=einsum_type)
-                    M_02Y1_bb[a:a + k] -= 1 / 2 * lib.einsum(
+                    M_02Y1_bb[a:b] -= 1 / 2 * lib.einsum(
                         'jkab,jkac,icbd->id', Y_bbbb, t1_ccee_bbbb, v_ceee_bbbb, optimize=einsum_type)
-                    M_02Y1_bb[a:a + k] += lib.einsum(
+                    M_02Y1_bb[a:b] += lib.einsum(
                         'jkab,jkac,idbc->id', Y_abab, t1_ccee_abab, v_ceee_bbbb, optimize=einsum_type)
-                    M_02Y1_bb[a:a + k] -= lib.einsum(
+                    M_02Y1_bb[a:b] -= lib.einsum(
                         'jkab,jkac,icbd->id', Y_abab, t1_ccee_abab, v_ceee_bbbb, optimize=einsum_type)
                     del v_ceee_bbbb
-                    a += k
 
             else:
+                v_ceee_bbbb = uadc_ao2mo.unpack_eri_1(eris.OVVV, nvir_b)
+
                 M_12Y0_bb -= lib.einsum('ia,jkcb,kbda->ijcd',
                                         Y_bb,
                                         t1_ccee_bbbb,
@@ -12330,100 +12277,100 @@ def matvec(adc, M_ia_jb=None, eris=None):
                                         t1_ccee_abab,
                                         v_ceee_bbbb,
                                         optimize=einsum_type)
+                del v_ceee_bbbb
 
             if isinstance(eris.ovVV, type(None)):
                 chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-                a = 0
-                for p in range(0, nocc_a, chnk_size):
+                for a,b in lib.prange(0,nocc_a,chnk_size):
                     v_ceee_aabb = dfadc.get_ovvv_spin_df(
-                        adc, eris.Lov, eris.LVV, p, chnk_size).reshape(-1, nvir_a, nvir_b, nvir_b)
-                    k = v_ceee_aabb.shape[0]
+                        adc, eris.Lov, eris.LVV, a, chnk_size).reshape(-1, nvir_a, nvir_b, nvir_b)
                     M_12Y0_bb -= lib.einsum('ia,kjbc,kbda->ijcd',
                                             Y_bb,
-                                            t1_ccee_abab[a:a + k],
+                                            t1_ccee_abab[a:b],
                                             v_ceee_aabb,
                                             optimize=einsum_type)
                     M_12Y0_bb += lib.einsum('ia,kjbd,kbca->ijcd',
                                             Y_bb,
-                                            t1_ccee_abab[a:a + k],
+                                            t1_ccee_abab[a:b],
                                             v_ceee_aabb,
                                             optimize=einsum_type)
                     M_12Y0_bb += lib.einsum('ja,kibc,kbda->ijcd',
                                             Y_bb,
-                                            t1_ccee_abab[a:a + k],
+                                            t1_ccee_abab[a:b],
                                             v_ceee_aabb,
                                             optimize=einsum_type)
                     M_12Y0_bb -= lib.einsum('ja,kibd,kbca->ijcd',
                                             Y_bb,
-                                            t1_ccee_abab[a:a + k],
+                                            t1_ccee_abab[a:b],
                                             v_ceee_aabb,
                                             optimize=einsum_type)
                     M_12Y0_bb += lib.einsum('ka,ijcb,kadb->ijcd',
-                                            Y_aa[a:a + k],
+                                            Y_aa[a:b],
                                             t1_ccee_bbbb,
                                             v_ceee_aabb,
                                             optimize=einsum_type)
                     M_12Y0_bb -= lib.einsum('ka,ijdb,kacb->ijcd',
-                                            Y_aa[a:a + k],
+                                            Y_aa[a:b],
                                             t1_ccee_bbbb,
                                             v_ceee_aabb,
                                             optimize=einsum_type)
                     M_12Y0_ab -= lib.einsum('Ia,ijCb,iadb->IjCd',
                                             Y_aa,
-                                            t1_ccee_abab[a:a + k],
+                                            t1_ccee_abab[a:b],
                                             v_ceee_aabb,
                                             optimize=einsum_type)
                     M_12Y0_ab -= lib.einsum('iC,Ijab,iadb->IjCd',
-                                            Y_aa[a:a + k],
+                                            Y_aa[a:b],
                                             t1_ccee_abab,
                                             v_ceee_aabb,
                                             optimize=einsum_type)
                     M_12Y0_ab += lib.einsum('ia,IjCb,iadb->IjCd',
-                                            Y_aa[a:a + k],
+                                            Y_aa[a:b],
                                             t1_ccee_abab,
                                             v_ceee_aabb,
                                             optimize=einsum_type)
                     M_12Y0_ab += lib.einsum('ja,IiCb,ibda->IjCd',
                                             Y_bb,
                                             t1_ccee_aaaa[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_aabb,
                                             optimize=einsum_type)
                     M_02Y1_bb += lib.einsum('ijda,kjbc,kbac->id',
                                             Y_bbbb,
-                                            t1_ccee_abab[a:a + k],
+                                            t1_ccee_abab[a:b],
                                             v_ceee_aabb,
                                             optimize=einsum_type)
                     M_02Y1_bb -= lib.einsum('ijab,kjca,kcbd->id',
                                             Y_bbbb,
-                                            t1_ccee_abab[a:a + k],
+                                            t1_ccee_abab[a:b],
                                             v_ceee_aabb,
                                             optimize=einsum_type)
                     M_02Y1_aa += lib.einsum('IiDa,jibc,jbac->ID',
                                             Y_abab,
-                                            t1_ccee_abab[a:a + k],
+                                            t1_ccee_abab[a:b],
                                             v_ceee_aabb,
                                             optimize=einsum_type)
                     M_02Y1_aa -= lib.einsum('Iiab,jiac,jDbc->ID',
                                             Y_abab,
-                                            t1_ccee_abab[a:a + k],
+                                            t1_ccee_abab[a:b],
                                             v_ceee_aabb,
                                             optimize=einsum_type)
                     M_02Y1_bb += lib.einsum('jiab,jkac,kcbd->id',
                                             Y_abab,
                                             t1_ccee_aaaa[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_aabb,
                                             optimize=einsum_type)
-                    M_02Y1_aa[a:a + k] += 1 / 2 * lib.einsum(
+                    M_02Y1_aa[a:b] += 1 / 2 * lib.einsum(
                         'ijab,ijac,IDbc->ID', Y_bbbb, t1_ccee_bbbb, v_ceee_aabb, optimize=einsum_type)
-                    M_02Y1_aa[a:a + k] -= lib.einsum(
+                    M_02Y1_aa[a:b] -= lib.einsum(
                         'ijDa,ijbc,Ibac->ID', Y_abab, t1_ccee_abab, v_ceee_aabb, optimize=einsum_type)
-                    M_02Y1_aa[a:a + k] += lib.einsum(
+                    M_02Y1_aa[a:b] += lib.einsum(
                         'ijab,ijac,IDbc->ID', Y_abab, t1_ccee_abab, v_ceee_aabb, optimize=einsum_type)
                     del v_ceee_aabb
-                    a += k
             else:
+                v_ceee_aabb = uadc_ao2mo.unpack_eri_1(eris.ovVV, nvir_b)
+
                 M_12Y0_bb -= lib.einsum('ia,kjbc,kbda->ijcd',
                                         Y_bb,
                                         t1_ccee_abab,
@@ -12512,108 +12459,109 @@ def matvec(adc, M_ia_jb=None, eris=None):
                                         v_ceee_aabb,
                                         optimize=einsum_type)
 
+                del v_ceee_aabb
+
             if isinstance(eris.OVvv, type(None)):
                 chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-                a = 0
-                for p in range(0, nocc_b, chnk_size):
+                for a,b in lib.prange(0,nocc_b,chnk_size):
                     v_ceee_bbaa = dfadc.get_ovvv_spin_df(
-                        adc, eris.LOV, eris.Lvv, p, chnk_size).reshape(-1, nvir_b, nvir_a, nvir_a)
-                    k = v_ceee_bbaa.shape[0]
+                        adc, eris.LOV, eris.Lvv, a, chnk_size).reshape(-1, nvir_b, nvir_a, nvir_a)
                     M_12Y0_aa -= lib.einsum('Ia,JiCb,ibDa->IJCD',
                                             Y_aa,
                                             t1_ccee_abab[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbaa,
                                             optimize=einsum_type)
                     M_12Y0_aa += lib.einsum('Ia,JiDb,ibCa->IJCD',
                                             Y_aa,
                                             t1_ccee_abab[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbaa,
                                             optimize=einsum_type)
                     M_12Y0_aa += lib.einsum('Ja,IiCb,ibDa->IJCD',
                                             Y_aa,
                                             t1_ccee_abab[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbaa,
                                             optimize=einsum_type)
                     M_12Y0_aa -= lib.einsum('Ja,IiDb,ibCa->IJCD',
                                             Y_aa,
                                             t1_ccee_abab[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbaa,
                                             optimize=einsum_type)
                     M_12Y0_aa += lib.einsum('ia,IJCb,iaDb->IJCD',
-                                            Y_bb[a:a + k],
+                                            Y_bb[a:b],
                                             t1_ccee_aaaa,
                                             v_ceee_bbaa,
                                             optimize=einsum_type)
                     M_12Y0_aa -= lib.einsum('ia,IJDb,iaCb->IJCD',
-                                            Y_bb[a:a + k],
+                                            Y_bb[a:b],
                                             t1_ccee_aaaa,
                                             v_ceee_bbaa,
                                             optimize=einsum_type)
                     M_12Y0_ab += lib.einsum('Ia,jidb,ibCa->IjCd',
                                             Y_aa,
                                             t1_ccee_bbbb[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbaa,
                                             optimize=einsum_type)
                     M_12Y0_ab -= lib.einsum('ja,Iibd,iaCb->IjCd',
                                             Y_bb,
                                             t1_ccee_abab[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbaa,
                                             optimize=einsum_type)
                     M_12Y0_ab -= lib.einsum('id,Ijab,ibCa->IjCd',
-                                            Y_bb[a:a + k],
+                                            Y_bb[a:b],
                                             t1_ccee_abab,
                                             v_ceee_bbaa,
                                             optimize=einsum_type)
                     M_12Y0_ab += lib.einsum('ia,Ijbd,iaCb->IjCd',
-                                            Y_bb[a:a + k],
+                                            Y_bb[a:b],
                                             t1_ccee_abab,
                                             v_ceee_bbaa,
                                             optimize=einsum_type)
                     M_02Y1_aa += lib.einsum('IiDa,ijbc,jcab->ID',
                                             Y_aaaa,
                                             t1_ccee_abab[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbaa,
                                             optimize=einsum_type)
                     M_02Y1_aa -= lib.einsum('Iiab,ijac,jcbD->ID',
                                             Y_aaaa,
                                             t1_ccee_abab[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbaa,
                                             optimize=einsum_type)
                     M_02Y1_aa += lib.einsum('Iiab,ijbc,jcaD->ID',
                                             Y_abab,
                                             t1_ccee_bbbb[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbaa,
                                             optimize=einsum_type)
                     M_02Y1_bb += lib.einsum('jiad,jkbc,kcab->id',
                                             Y_abab,
                                             t1_ccee_abab[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbaa,
                                             optimize=einsum_type)
                     M_02Y1_bb -= lib.einsum('jiab,jkcb,kdac->id',
                                             Y_abab,
                                             t1_ccee_abab[:,
-                                                         a:a + k],
+                                                         a:b],
                                             v_ceee_bbaa,
                                             optimize=einsum_type)
-                    M_02Y1_bb[a:a + k] += 1 / 2 * lib.einsum(
+                    M_02Y1_bb[a:b] += 1 / 2 * lib.einsum(
                         'jkab,jkac,idbc->id', Y_aaaa, t1_ccee_aaaa, v_ceee_bbaa, optimize=einsum_type)
-                    M_02Y1_bb[a:a + k] -= lib.einsum(
+                    M_02Y1_bb[a:b] -= lib.einsum(
                         'jkad,jkbc,icab->id', Y_abab, t1_ccee_abab, v_ceee_bbaa, optimize=einsum_type)
-                    M_02Y1_bb[a:a + k] += lib.einsum(
+                    M_02Y1_bb[a:b] += lib.einsum(
                         'jkab,jkcb,idac->id', Y_abab, t1_ccee_abab, v_ceee_bbaa, optimize=einsum_type)
                     del v_ceee_bbaa
-                    a += k
             else:
+                v_ceee_bbaa = uadc_ao2mo.unpack_eri_1(eris.OVvv, nvir_a)
+
                 M_12Y0_aa -= lib.einsum('Ia,JiCb,ibDa->IJCD',
                                         Y_aa,
                                         t1_ccee_abab,
@@ -12701,6 +12649,8 @@ def matvec(adc, M_ia_jb=None, eris=None):
                                         t1_ccee_abab,
                                         v_ceee_bbaa,
                                         optimize=einsum_type)
+
+                del v_ceee_bbaa
 
             M_12Y0_aa -= lib.einsum('Ia,ijCD,jaiJ->IJCD',
                                     Y_aa,
@@ -14833,11 +14783,15 @@ def matvec(adc, M_ia_jb=None, eris=None):
     return sigma_
 
 
-
 def make_rdm1(adc):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
+
+    if adc.method == "adc(3)":
+        logger.warn(
+            adc, 
+            "EE-ADC(3) RDMs include contributions up to ADC(2)-X only...")
 
     method = adc.method
 
@@ -14868,21 +14822,17 @@ def make_rdm1(adc):
     t1_ccee_abab = t2[0][1][:]
     t1_ccee_bbbb = t2[0][2][:]
 
-
     nmo_a = nocc_a + nvir_a
     nmo_b = nocc_b + nvir_b
 
     temp_a = np.zeros((nmo_a, nmo_a))
     temp_b = np.zeros((nmo_b, nmo_b))
 
-
-
     n_singles_a = nocc_a * nvir_a
     n_singles_b = nocc_b * nvir_b
     n_doubles_aaaa = nocc_a * (nocc_a - 1) * nvir_a * (nvir_a - 1) // 4
     n_doubles_ab = nocc_a * nocc_b * nvir_a * nvir_b
     n_doubles_bbbb = nocc_b * (nocc_b - 1) * nvir_b * (nvir_b - 1) // 4
-
 
     ij_ind_a = np.tril_indices(nocc_a, k=-1)
     ij_ind_b = np.tril_indices(nocc_b, k=-1)
@@ -16094,7 +16044,6 @@ def make_rdm1(adc):
         temp_ic -= 1 / 2 * \
             lib.einsum('ja,ka,ijcb,kb->ic', Y_bb, Y_bb, t1_ccee_bbbb, t1_ce_bb, optimize=True)
 
-
 # OPDM ADC(2)-X
         if (method == "adc(2)-x"):
 
@@ -16153,6 +16102,11 @@ def get_spin_square(adc):
     method = adc.method
     dm_a, dm_b = adc.make_rdm1()
 
+    if adc.method == "adc(3)":
+        logger.warn(
+            adc, 
+            "EE-ADC(3) <S^2> includes contributions up to ADC(2)-X only...")
+
     t1 = adc.t1
     t2 = adc.t2
     nocc_a = adc.nocc_a
@@ -16194,14 +16148,11 @@ def get_spin_square(adc):
     temp_a = np.zeros((nmo_a, nmo_a))
     temp_b = np.zeros((nmo_b, nmo_b))
 
-
-
     n_singles_a = nocc_a * nvir_a
     n_singles_b = nocc_b * nvir_b
     n_doubles_aaaa = nocc_a * (nocc_a - 1) * nvir_a * (nvir_a - 1) // 4
     n_doubles_ab = nocc_a * nocc_b * nvir_a * nvir_b
     n_doubles_bbbb = nocc_b * (nocc_b - 1) * nvir_b * (nvir_b - 1) // 4
-
 
     ij_ind_a = np.tril_indices(nocc_a, k=-1)
     ij_ind_b = np.tril_indices(nocc_b, k=-1)
@@ -17417,7 +17368,6 @@ def get_spin_square(adc):
             lib.einsum('ja,jb,ikca,kb->ic', Y_bb, Y_bb, t1_ccee_bbbb, t1_ce_bb, optimize=True)
         temp_ic -= 1 / 2 * \
             lib.einsum('ja,ka,ijcb,kb->ic', Y_bb, Y_bb, t1_ccee_bbbb, t1_ce_bb, optimize=True)
-
 
 # OPDM ADC(2)-X
         if (method == "adc(2)-x"):
@@ -21603,6 +21553,12 @@ def get_trans_moments(adc):
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
 
+    if adc.method == "adc(3)":
+        logger.warn(
+            adc, 
+            "EE-ADC(3) oscillator strengths do not include \
+            contributions from third-order amplitudes...")
+
     method = adc.method
 
     t1 = adc.t1
@@ -21634,8 +21590,6 @@ def get_trans_moments(adc):
     n_doubles_aaaa = nocc_a * (nocc_a - 1) * nvir_a * (nvir_a - 1) // 4
     n_doubles_ab = nocc_a * nocc_b * nvir_a * nvir_b
     n_doubles_bbbb = nocc_b * (nocc_b - 1) * nvir_b * (nvir_b - 1) // 4
-
-
 
     ij_ind_a = np.tril_indices(nocc_a, k=-1)
     ij_ind_b = np.tril_indices(nocc_b, k=-1)
@@ -23369,7 +23323,6 @@ def get_trans_moments(adc):
                                                       t1_ccee_abab,
                                                       optimize=einsum_type)
 
-
 #            TY_b[nocc_b:,nocc_b:] += lib.einsum('ic,ia->ac', Y_b, t3_bb, optimize = einsum_type)
             TY_b[nocc_b:,
                  nocc_b:] += 1 / 2 * lib.einsum('ic,ijab,jb->ac',
@@ -24230,7 +24183,7 @@ def analyze(myadc):
 
         header = (
             "\n*************************************************************"
-            "\n            Transition moment matrix analysis summary"
+            "\n          Spectroscopic amplitude analysis summary"
             "\n*************************************************************")
         logger.info(myadc, header)
 
