@@ -388,21 +388,18 @@ def matvec(adc, M_ij=None, eris=None):
 
             if isinstance(eris.ovvv, type(None)):
                 chnk_size = radc_ao2mo.calculate_chunk_size(adc)
-                a = 0
-                for p in range(0,nocc,chnk_size):
+                for a,b in lib.prange(0,nocc,chnk_size):
                     eris_ovvv = dfadc.get_ovvv_df(
-                        adc, eris.Lov, eris.Lvv, p, chnk_size).reshape(-1,nvir,nvir,nvir)
-                    k = eris_ovvv.shape[0]
-                    temp_singles[a:a+k] += lib.einsum('abc,icab->i',temp, eris_ovvv, optimize=True)
-                    temp_singles[a:a+k] -= lib.einsum('abc,ibac->i',temp, eris_ovvv, optimize=True)
-                    temp_singles[a:a+k] += lib.einsum('abc,icab->i',
+                        adc, eris.Lov, eris.Lvv, a, chnk_size).reshape(-1,nvir,nvir,nvir)
+                    temp_singles[a:b] += lib.einsum('abc,icab->i',temp, eris_ovvv, optimize=True)
+                    temp_singles[a:b] -= lib.einsum('abc,ibac->i',temp, eris_ovvv, optimize=True)
+                    temp_singles[a:b] += lib.einsum('abc,icab->i',
                                                       temp_1, eris_ovvv, optimize=True)
-                    temp_doubles = lib.einsum('i,icab->cba',r1[a:a+k],eris_ovvv,optimize=True)
+                    temp_doubles = lib.einsum('i,icab->cba',r1[a:b],eris_ovvv,optimize=True)
                     s[s2:f2] += lib.einsum('cba,kjcb->ajk',temp_doubles,
                                            t2_1, optimize=True).reshape(-1)
                     del eris_ovvv
                     del temp_doubles
-                    a += k
             else :
                 eris_ovvv = radc_ao2mo.unpack_eri_1(eris.ovvv, nvir)
 

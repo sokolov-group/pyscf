@@ -735,20 +735,17 @@ def matvec(adc, M_ij=None, eris=None):
             temp_1 = lib.einsum('pbc,ap->abc',t2_1_a_t,r_aaa, optimize=True)
             if isinstance(eris.ovvv, type(None)):
                 chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-                a = 0
-                for p in range(0,nocc_a,chnk_size):
+                for a,b in lib.prange(0,nocc_a,chnk_size):
                     eris_ovvv = dfadc.get_ovvv_spin_df(
-                        adc, eris.Lov, eris.Lvv, p, chnk_size).reshape(-1,nvir_a,nvir_a,nvir_a)
-                    k = eris_ovvv.shape[0]
-                    temp_singles[a:a+k] += 0.5* \
+                        adc, eris.Lov, eris.Lvv, a, chnk_size).reshape(-1,nvir_a,nvir_a,nvir_a)
+                    temp_singles[a:b] += 0.5* \
                         lib.einsum('abc,icab->i',temp_1, eris_ovvv, optimize=True)
-                    temp_singles[a:a+k] -= 0.5* \
+                    temp_singles[a:b] -= 0.5* \
                         lib.einsum('abc,ibac->i',temp_1, eris_ovvv, optimize=True)
 
-                    temp_doubles += lib.einsum('i,icab->bca',r_a[a:a+k],eris_ovvv,optimize=True)
-                    temp_doubles -= lib.einsum('i,ibac->bca',r_a[a:a+k],eris_ovvv,optimize=True)
+                    temp_doubles += lib.einsum('i,icab->bca',r_a[a:b],eris_ovvv,optimize=True)
+                    temp_doubles -= lib.einsum('i,ibac->bca',r_a[a:b],eris_ovvv,optimize=True)
                     del eris_ovvv
-                    a += k
             else :
                 eris_ovvv = radc_ao2mo.unpack_eri_1(eris.ovvv, nvir_a)
                 temp_singles += 0.5*lib.einsum('abc,icab->i',temp_1, eris_ovvv, optimize=True)
@@ -812,19 +809,17 @@ def matvec(adc, M_ij=None, eris=None):
             if isinstance(eris.OVVV, type(None)):
                 chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
                 a = 0
-                for p in range(0,nocc_b,chnk_size):
+                for a,b in lib.prange(0,nocc_b,chnk_size):
                     eris_OVVV = dfadc.get_ovvv_spin_df(
-                        adc, eris.LOV, eris.LVV, p, chnk_size).reshape(-1,nvir_b,nvir_b,nvir_b)
-                    k = eris_OVVV.shape[0]
-                    temp_singles[a:a+k] += 0.5* \
+                        adc, eris.LOV, eris.LVV, a, chnk_size).reshape(-1,nvir_b,nvir_b,nvir_b)
+                    temp_singles[a:b] += 0.5* \
                         lib.einsum('abc,icab->i',temp_1, eris_OVVV, optimize=True)
-                    temp_singles[a:a+k] -= 0.5* \
+                    temp_singles[a:b] -= 0.5* \
                         lib.einsum('abc,ibac->i',temp_1, eris_OVVV, optimize=True)
 
-                    temp_doubles += lib.einsum('i,icab->bca',r_b[a:a+k],eris_OVVV,optimize=True)
-                    temp_doubles -= lib.einsum('i,ibac->bca',r_b[a:a+k],eris_OVVV,optimize=True)
+                    temp_doubles += lib.einsum('i,icab->bca',r_b[a:b],eris_OVVV,optimize=True)
+                    temp_doubles -= lib.einsum('i,ibac->bca',r_b[a:b],eris_OVVV,optimize=True)
                     del eris_OVVV
-                    a += k
             else :
                 eris_OVVV = radc_ao2mo.unpack_eri_1(eris.OVVV, nvir_b)
                 temp_singles += 0.5*lib.einsum('abc,icab->i',temp_1, eris_OVVV, optimize=True)
@@ -882,17 +877,14 @@ def matvec(adc, M_ij=None, eris=None):
             temp_2 = np.zeros((nvir_a, nvir_b, nvir_b))
             if isinstance(eris.ovVV, type(None)):
                 chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-                a = 0
-                for p in range(0,nocc_a,chnk_size):
+                for a,b in lib.prange(0,nocc_a,chnk_size):
                     eris_ovVV = dfadc.get_ovvv_spin_df(
-                        adc, eris.Lov, eris.LVV, p, chnk_size).reshape(-1,nvir_a,nvir_b,nvir_b)
-                    k = eris_ovVV.shape[0]
+                        adc, eris.Lov, eris.LVV, a, chnk_size).reshape(-1,nvir_a,nvir_b,nvir_b)
 
-                    s[s_a:f_a][a:a+k] += lib.einsum('abc,icab->i',temp_1, eris_ovVV, optimize=True)
+                    s[s_a:f_a][a:b] += lib.einsum('abc,icab->i',temp_1, eris_ovVV, optimize=True)
 
-                    temp_2 += lib.einsum('i,icab->cba',r_a[a:a+k],eris_ovVV,optimize=True)
+                    temp_2 += lib.einsum('i,icab->cba',r_a[a:b],eris_ovVV,optimize=True)
                     del eris_ovVV
-                    a += k
             else :
                 eris_ovVV = radc_ao2mo.unpack_eri_1(eris.ovVV, nvir_b)
                 s[s_a:f_a] += lib.einsum('abc,icab->i',temp_1, eris_ovVV, optimize=True)
@@ -908,15 +900,13 @@ def matvec(adc, M_ij=None, eris=None):
             if isinstance(eris.OVvv, type(None)):
                 chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
                 a = 0
-                for p in range(0,nocc_b,chnk_size):
+                for a,b in lib.prange(0,nocc_b,chnk_size):
                     eris_OVvv = dfadc.get_ovvv_spin_df(
-                        adc, eris.LOV, eris.Lvv, p, chnk_size).reshape(-1,nvir_b,nvir_a,nvir_a)
-                    k = eris_OVvv.shape[0]
-                    s[s_b:f_b][a:a+k] += lib.einsum('abc,icab->i',temp_1, eris_OVvv, optimize=True)
+                        adc, eris.LOV, eris.Lvv, a, chnk_size).reshape(-1,nvir_b,nvir_a,nvir_a)
+                    s[s_b:f_b][a:b] += lib.einsum('abc,icab->i',temp_1, eris_OVvv, optimize=True)
 
-                    temp_2 += lib.einsum('i,icab->bca',r_b[a:a+k],eris_OVvv,optimize=True)
+                    temp_2 += lib.einsum('i,icab->bca',r_b[a:b],eris_OVvv,optimize=True)
                     del eris_OVvv
-                    a += k
             else :
                 eris_OVvv = radc_ao2mo.unpack_eri_1(eris.OVvv, nvir_a)
                 s[s_b:f_b] += lib.einsum('abc,icab->i',temp_1, eris_OVvv, optimize=True)
