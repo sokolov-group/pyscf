@@ -46,7 +46,6 @@ class KnownValues(unittest.TestCase):
 
     def test_df_gs(self):
 
-        mf = scf.RHF(mol).run()
         myadc.with_df = df.DF(mol, auxbasis='cc-pvdz-ri')
         e, t_amp1, t_amp2 = myadc.kernel_gs()
         self.assertAlmostEqual(e, -0.31081009625, 6)
