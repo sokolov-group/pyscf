@@ -47,7 +47,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     if eris is None:
         eris = adc.transform_integrals()
 
-    if adc.approx_trans_moments == True:
+    if adc.approx_trans_moments:
         if adc.method in ("adc(2)", "adc(2)-x"):
             logger.warn(
                 adc,

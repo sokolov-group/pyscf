@@ -20372,7 +20372,7 @@ def get_trans_moments(adc):
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
 
-    if adc.method == "adc(3)" and adc.approx_trans_moments == False:
+    if adc.method == "adc(3)" and not adc.approx_trans_moments:
         logger.warn(
             adc,
             "EE-ADC(3) oscillator strengths do not include"
