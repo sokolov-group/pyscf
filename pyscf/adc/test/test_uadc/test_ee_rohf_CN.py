@@ -27,7 +27,6 @@ def setUpModule():
     global mol, mf, myadc
     basis = 'cc-pVDZ'
     mol = gto.Mole()
-    mol.verbose = 4
     mol.atom = '''
         C 0.00000000 0.00000000 -1.18953886
         N 0.00000000 0.00000000 1.01938091
