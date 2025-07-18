@@ -920,6 +920,7 @@ class UADC(lib.StreamObject):
         return (list_rdm1_a, list_rdm1_b)
 
 
+
 if __name__ == '__main__':
     from pyscf import gto
     from pyscf import adc

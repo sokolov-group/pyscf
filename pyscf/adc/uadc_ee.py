@@ -32,7 +32,6 @@ from pyscf.adc import dfadc
 from pyscf import scf
 from pyscf.data.nist import HARTREE2EV
 
-
 def get_imds(adc, eris=None):
 
     cput0 = (logger.process_clock(), logger.perf_counter())
@@ -21113,6 +21112,12 @@ def get_trans_moments(adc):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
+
+    if adc.method == "adc(3)" and not adc.approx_trans_moments:
+        logger.warn(
+            adc,
+            "EE-ADC(3) oscillator strengths do not include"
+            + " contributions from third-order amplitudes...")
 
     method = adc.method
 
