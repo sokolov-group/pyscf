@@ -697,7 +697,6 @@ def analyze_spec_factor(adc):
         if np.sum(spec_Contribution) == 0.0:
             continue
 
-        logger.info(adc,'%s | root %d \n',adc.method ,i)
         logger.info(adc, '%s | root %d | Energy (eV) = %12.8f \n',
                 adc.method, i, adc.E[i]*27.2114)
         logger.info(adc, "     HF MO     Spec. Contribution     Orbital symmetry")
