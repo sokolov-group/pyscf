@@ -470,8 +470,6 @@ def matvec(adc, M_ab=None, eris=None):
             s[s2:f2] += lib.einsum('jwyi,jxw->ixy',eris_ovvo,r2,optimize=True).reshape(-1)
             s[s2:f2] -= 0.5*lib.einsum('jwyi,jwx->ixy',eris_ovvo,r2,optimize=True).reshape(-1)
 
-            #print("Calculating additional terms for adc(3)")
-
         if (method == "adc(3)"):
 
             eris_ovoo = eris.ovoo
@@ -786,8 +784,8 @@ def analyze_eigenvector(adc):
 
             iter_num += 1
 
-        logger.info(adc, '%s | root %d | norm(1p)  = %6.4f | norm(1h2p) = %6.4f ',
-                    adc.method ,I, U1dotU1, U2dotU2)
+        logger.info(adc, '%s | root %d | Energy (eV) = %12.8f | norm(1p)  = %6.4f | norm(1h2p) = %6.4f ',
+                    adc.method, I, adc.E[I]*27.2114, U1dotU1, U2dotU2)
 
         if singles_val:
             logger.info(adc, "\n1p block: ")
@@ -804,7 +802,8 @@ def analyze_eigenvector(adc):
                 logger.info(adc, '  %4d  %4d  %4d     %7.4f',
                             print_doubles[0], print_doubles[1], print_doubles[2], doubles_val[idx])
 
-        logger.info(adc, "\n*************************************************************\n")
+        logger.info(adc,
+            "***************************************************************************************\n")
 
 
 def analyze_spec_factor(adc):
@@ -835,7 +834,8 @@ def analyze_spec_factor(adc):
         if np.sum(spec_Contribution) == 0.0:
             continue
 
-        logger.info(adc,'%s | root %d \n',adc.method ,i)
+        logger.info(adc, '%s | root %d | Energy (eV) = %12.8f \n',
+                adc.method, i, adc.E[i]*27.2114)
         logger.info(adc, "     HF MO     Spec. Contribution     Orbital symmetry")
         logger.info(adc, "-----------------------------------------------------------")
 
@@ -844,7 +844,8 @@ def analyze_spec_factor(adc):
                         index_mo[c], spec_Contribution[c], sym[c])
 
         logger.info(adc, '\nPartial spec. factor sum = %10.8f', np.sum(spec_Contribution))
-        logger.info(adc, "\n*************************************************************\n")
+        logger.info(adc,
+        "***********************************************************\n")
 
 
 def renormalize_eigenvectors(adc, nroots=1):

@@ -14821,8 +14821,12 @@ def make_rdm1(adc):
         t1_ce_aa = t1[2][0][:]
         t1_ce_bb = t1[2][1][:]
 
-    t2_ce_aa = t1[0][0][:]
-    t2_ce_bb = t1[0][1][:]
+    if t1[0][0] is not None:
+        t2_ce_aa = t1[0][0][:]
+        t2_ce_bb = t1[0][1][:]
+    else:
+        t2_ce_aa = None
+        t2_ce_bb = None
 
     t1_ccee_aaaa = t2[0][0][:]
     t1_ccee_abab = t2[0][1][:]
@@ -15430,14 +15434,15 @@ def make_rdm1(adc):
             lib.einsum('jkCa,jkab,Ib->IC', t1_ccee_aaaa, Y_aaaa, Y_aa, optimize=True)
         temp_IC -= lib.einsum('jkCa,jkba,Ib->IC',
                               t1_ccee_abab, Y_abab, Y_aa, optimize=True)
-        temp_IC += lib.einsum('IC,ja,ja->IC', t2_ce_aa,
-                              Y_aa, Y_aa, optimize=True)
-        temp_IC += lib.einsum('IC,ja,ja->IC', t2_ce_aa,
-                              Y_bb, Y_bb, optimize=True)
-        temp_IC -= lib.einsum('jC,ja,Ia->IC', t2_ce_aa,
-                              Y_aa, Y_aa, optimize=True)
-        temp_IC -= lib.einsum('Ia,ja,jC->IC', t2_ce_aa,
-                              Y_aa, Y_aa, optimize=True)
+        if t2_ce_aa is not None:
+            temp_IC += lib.einsum('IC,ja,ja->IC', t2_ce_aa,
+                                  Y_aa, Y_aa, optimize=True)
+            temp_IC += lib.einsum('IC,ja,ja->IC', t2_ce_aa,
+                                  Y_bb, Y_bb, optimize=True)
+            temp_IC -= lib.einsum('jC,ja,Ia->IC', t2_ce_aa,
+                                  Y_aa, Y_aa, optimize=True)
+            temp_IC -= lib.einsum('Ia,ja,jC->IC', t2_ce_aa,
+                                  Y_aa, Y_aa, optimize=True)
         temp_IC -= 1 / 2 * \
             lib.einsum('Ia,ja,jkCb,kb->IC', Y_aa, Y_aa, t1_ccee_aaaa, t1_ce_aa, optimize=True)
         temp_IC -= 1 / 2 * \
@@ -16009,14 +16014,15 @@ def make_rdm1(adc):
                               t1_ccee_abab, Y_abab, Y_bb, optimize=True)
         temp_ic += 1 / 2 * \
             lib.einsum('jkca,jkab,ib->ic', t1_ccee_bbbb, Y_bbbb, Y_bb, optimize=True)
-        temp_ic += lib.einsum('ic,ja,ja->ic', t2_ce_bb,
-                              Y_aa, Y_aa, optimize=True)
-        temp_ic += lib.einsum('ic,ja,ja->ic', t2_ce_bb,
-                              Y_bb, Y_bb, optimize=True)
-        temp_ic -= lib.einsum('jc,ja,ia->ic', t2_ce_bb,
-                              Y_bb, Y_bb, optimize=True)
-        temp_ic -= lib.einsum('ia,ja,jc->ic', t2_ce_bb,
-                              Y_bb, Y_bb, optimize=True)
+        if t2_ce_bb is not None:
+            temp_ic += lib.einsum('ic,ja,ja->ic', t2_ce_bb,
+                                  Y_aa, Y_aa, optimize=True)
+            temp_ic += lib.einsum('ic,ja,ja->ic', t2_ce_bb,
+                                  Y_bb, Y_bb, optimize=True)
+            temp_ic -= lib.einsum('jc,ja,ia->ic', t2_ce_bb,
+                                  Y_bb, Y_bb, optimize=True)
+            temp_ic -= lib.einsum('ia,ja,jc->ic', t2_ce_bb,
+                                  Y_bb, Y_bb, optimize=True)
         temp_ic -= 1 / 2 * \
             lib.einsum('ia,jb,ka,jkbc->ic', Y_bb, Y_aa, t1_ce_bb, t1_ccee_abab, optimize=True)
         temp_ic -= 1 / 2 * \
@@ -16134,16 +16140,25 @@ def get_spin_square(adc):
         t1_ce_aa = t1[2][0][:]
         t1_ce_bb = t1[2][1][:]
 
-    t2_ce_aa = t1[0][0][:]
-    t2_ce_bb = t1[0][1][:]
+    if t1[0][0] is not None:
+        t2_ce_aa = t1[0][0][:]
+        t2_ce_bb = t1[0][1][:]
+    else:
+        t2_ce_aa = np.zeros((nocc_a, nvir_a))
+        t2_ce_bb = np.zeros((nocc_b, nvir_b))
 
     t1_ccee_aaaa = t2[0][0][:]
     t1_ccee_abab = t2[0][1][:]
     t1_ccee_bbbb = t2[0][2][:]
 
-    t2_ccee_aaaa = t2[1][0][:]
-    t2_ccee_abab = t2[1][1][:]
-    t2_ccee_bbbb = t2[1][2][:]
+    if t2[1][0] is not None:
+        t2_ccee_aaaa = t2[1][0][:]
+        t2_ccee_abab = t2[1][1][:]
+        t2_ccee_bbbb = t2[1][2][:]
+    else:
+        t2_ccee_aaaa = np.zeros((nocc_a, nocc_a, nvir_a, nvir_a))
+        t2_ccee_abab = np.zeros((nocc_a, nocc_b, nvir_a, nvir_b))
+        t2_ccee_bbbb = np.zeros((nocc_b, nocc_b, nvir_b, nvir_b))
 
     n_singles_a = nocc_a * nvir_a
     n_singles_b = nocc_b * nvir_b
@@ -20357,7 +20372,7 @@ def get_trans_moments(adc):
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
 
-    if adc.method == "adc(3)":
+    if adc.method == "adc(3)" and adc.approx_trans_moments == False:
         logger.warn(
             adc,
             "EE-ADC(3) oscillator strengths do not include"
@@ -20445,22 +20460,24 @@ def get_trans_moments(adc):
         del Y_vv_u_b
 
         # T_U2_Y0 qp block
-        t1_2_a = t1[0][0][:]
-        TY_a[:nocc_a, :nocc_a] = - \
-            lib.einsum('pg,qg->pq', Y_a, t1_2_a, optimize=True)
-        TY_a[nocc_a:, nocc_a:] = lib.einsum(
-            'xr,xv->vr', Y_a, t1_2_a, optimize=True)
-        del t1_2_a
+        if t1[0][0] is not None:
+            t1_2_a = t1[0][0][:]
+            TY_a[:nocc_a, :nocc_a] = - \
+                lib.einsum('pg,qg->pq', Y_a, t1_2_a, optimize=True)
+            TY_a[nocc_a:, nocc_a:] = lib.einsum(
+                'xr,xv->vr', Y_a, t1_2_a, optimize=True)
+            del t1_2_a
 
         TY_a[:nocc_a, nocc_a:] = Y_a
         TY_b[:nocc_b, nocc_b:] = Y_b
 
-        t1_2_b = t1[0][1][:]
-        TY_b[:nocc_b, :nocc_b] = - \
-            lib.einsum('pg,qg->pq', Y_b, t1_2_b, optimize=True)
-        TY_b[nocc_b:, nocc_b:] = lib.einsum(
-            'xr,xv->vr', Y_b, t1_2_b, optimize=True)
-        del t1_2_b
+        if t1[0][0] is not None:
+            t1_2_b = t1[0][1][:]
+            TY_b[:nocc_b, :nocc_b] = - \
+                lib.einsum('pg,qg->pq', Y_b, t1_2_b, optimize=True)
+            TY_b[nocc_b:, nocc_b:] = lib.einsum(
+                'xr,xv->vr', Y_b, t1_2_b, optimize=True)
+            del t1_2_b
 
         t2_1_a = t2[0][0][:]
         t2_1_ab = t2[0][1][:]
@@ -20659,34 +20676,35 @@ def get_trans_moments(adc):
                                     t1_1_b,
                                     optimize=True)
 
-        t2_2_a = t2[1][0][:]
-        TY_a[nocc_a:,
-             :nocc_a] += lib.einsum('xg,pxvg->vp',
-                                    Y_a,
-                                    t2_2_a,
-                                    optimize=True)
-        del t2_2_a
+        if t2[1][0] is not None:
+            t2_2_a = t2[1][0][:]
+            TY_a[nocc_a:,
+                 :nocc_a] += lib.einsum('xg,pxvg->vp',
+                                        Y_a,
+                                        t2_2_a,
+                                        optimize=True)
+            del t2_2_a
 
-        t2_2_b = t2[1][2][:]
-        TY_b[nocc_b:,
-             :nocc_b] += lib.einsum('xg,pxvg->vp',
-                                    Y_b,
-                                    t2_2_b,
-                                    optimize=True)
-        del t2_2_b
+            t2_2_b = t2[1][2][:]
+            TY_b[nocc_b:,
+                 :nocc_b] += lib.einsum('xg,pxvg->vp',
+                                        Y_b,
+                                        t2_2_b,
+                                        optimize=True)
+            del t2_2_b
 
-        t2_2_ab = t2[1][1][:]
-        TY_b[nocc_b:,
-             :nocc_b] += lib.einsum('xg,xpgv->vp',
-                                    Y_a,
-                                    t2_2_ab,
-                                    optimize=True)
-        TY_a[nocc_a:,
-             :nocc_a] += lib.einsum('xg,pxvg->vp',
-                                    Y_b,
-                                    t2_2_ab,
-                                    optimize=True)
-        del t2_2_ab
+            t2_2_ab = t2[1][1][:]
+            TY_b[nocc_b:,
+                 :nocc_b] += lib.einsum('xg,xpgv->vp',
+                                        Y_a,
+                                        t2_2_ab,
+                                        optimize=True)
+            TY_a[nocc_a:,
+                 :nocc_a] += lib.einsum('xg,pxvg->vp',
+                                        Y_b,
+                                        t2_2_ab,
+                                        optimize=True)
+            del t2_2_ab
 
         if (method == "adc(2)"):
             del Y1_abab
@@ -20694,44 +20712,45 @@ def get_trans_moments(adc):
             del Y1_oovv_u_b
 
         if (method == "adc(2)-x") or (method == "adc(3)"):
-            # T_U2_Y1 qp block
-            t2_2_a = t2[1][0][:]
-            TY_a[:nocc_a, :nocc_a] -= 0.5 * \
-                lib.einsum('pxgh,qxgh->pq', Y1_oovv_u_a, t2_2_a, optimize=True)
-            TY_a[nocc_a:, nocc_a:] += 0.5 * \
-                lib.einsum('xyrg,xyvg->vr', Y1_oovv_u_a, t2_2_a, optimize=True)
-            del t2_2_a
+            if t2[1][0] is not None:
+                # T_U2_Y1 qp block
+                t2_2_a = t2[1][0][:]
+                TY_a[:nocc_a, :nocc_a] -= 0.5 * \
+                    lib.einsum('pxgh,qxgh->pq', Y1_oovv_u_a, t2_2_a, optimize=True)
+                TY_a[nocc_a:, nocc_a:] += 0.5 * \
+                    lib.einsum('xyrg,xyvg->vr', Y1_oovv_u_a, t2_2_a, optimize=True)
+                del t2_2_a
 
-            t2_2_b = t2[1][2][:]
-            TY_b[:nocc_b, :nocc_b] -= 0.5 * \
-                lib.einsum('pxgh,qxgh->pq', Y1_oovv_u_b, t2_2_b, optimize=True)
-            TY_b[nocc_b:, nocc_b:] += 0.5 * \
-                lib.einsum('xyrg,xyvg->vr', Y1_oovv_u_b, t2_2_b, optimize=True)
-            del t2_2_b
+                t2_2_b = t2[1][2][:]
+                TY_b[:nocc_b, :nocc_b] -= 0.5 * \
+                    lib.einsum('pxgh,qxgh->pq', Y1_oovv_u_b, t2_2_b, optimize=True)
+                TY_b[nocc_b:, nocc_b:] += 0.5 * \
+                    lib.einsum('xyrg,xyvg->vr', Y1_oovv_u_b, t2_2_b, optimize=True)
+                del t2_2_b
 
-            t2_2_ab = t2[1][1][:]
-            TY_a[:nocc_a,
-                 :nocc_a] -= lib.einsum('pxgh,qxgh->pq',
-                                        Y1_abab,
-                                        t2_2_ab,
-                                        optimize=True)
-            TY_b[:nocc_b,
-                 :nocc_b] -= lib.einsum('xpgh,xqgh->pq',
-                                        Y1_abab,
-                                        t2_2_ab,
-                                        optimize=True)
-            # T_U2_Y1 rv block
-            TY_a[nocc_a:,
-                 nocc_a:] += lib.einsum('xyrg,xyvg->vr',
-                                        Y1_abab,
-                                        t2_2_ab,
-                                        optimize=True)
-            TY_b[nocc_b:,
-                 nocc_b:] += lib.einsum('xygr,xygv->vr',
-                                        Y1_abab,
-                                        t2_2_ab,
-                                        optimize=True)
-            del t2_2_ab
+                t2_2_ab = t2[1][1][:]
+                TY_a[:nocc_a,
+                     :nocc_a] -= lib.einsum('pxgh,qxgh->pq',
+                                            Y1_abab,
+                                            t2_2_ab,
+                                            optimize=True)
+                TY_b[:nocc_b,
+                     :nocc_b] -= lib.einsum('xpgh,xqgh->pq',
+                                            Y1_abab,
+                                            t2_2_ab,
+                                            optimize=True)
+                # T_U2_Y1 rv block
+                TY_a[nocc_a:,
+                     nocc_a:] += lib.einsum('xyrg,xyvg->vr',
+                                            Y1_abab,
+                                            t2_2_ab,
+                                            optimize=True)
+                TY_b[nocc_b:,
+                     nocc_b:] += lib.einsum('xygr,xygv->vr',
+                                            Y1_abab,
+                                            t2_2_ab,
+                                            optimize=True)
+                del t2_2_ab
 
     #           # T_U2_Y1 vp block
 
@@ -20844,7 +20863,8 @@ def get_trans_moments(adc):
             del Y1_abab
             del Y1_oovv_u_a
             del Y1_oovv_u_b
-        else:
+
+        if (method == "adc(3)"):
             t2_ce_aa = t1[0][0][:]
             t2_ce_bb = t1[0][1][:]
             einsum_type = True
@@ -20857,17 +20877,15 @@ def get_trans_moments(adc):
             t2_ccee_bbbb = t2[1][2][:]
             t2_ccee_abab = t2[1][1][:]
 
-        if adc.f_ov is None:
-            f_ov_a = np.zeros((nocc_a, nvir_a))
-            f_ov_b = np.zeros((nocc_b, nvir_b))
-            t1_ce_aa = np.zeros((nocc_a, nvir_a))
-            t1_ce_bb = np.zeros((nocc_b, nvir_b))
-        else:
-            f_ov_a, f_ov_b = adc.f_ov
-            t1_ce_aa = t1[2][0][:]
-            t1_ce_bb = t1[2][1][:]
-
-        if (method == "adc(3)"):
+            if adc.f_ov is None:
+                f_ov_a = np.zeros((nocc_a, nvir_a))
+                f_ov_b = np.zeros((nocc_b, nvir_b))
+                t1_ce_aa = np.zeros((nocc_a, nvir_a))
+                t1_ce_bb = np.zeros((nocc_b, nvir_b))
+            else:
+                f_ov_a, f_ov_b = adc.f_ov
+                t1_ce_aa = t1[2][0][:]
+                t1_ce_bb = t1[2][1][:]
 
             #            TY_a[:nocc_a,:nocc_a] -= lib.einsum('Ia,La->IL', Y_a, t3_aa, optimize = einsum_type)
             TY_a[:nocc_a,
@@ -22895,7 +22913,8 @@ def analyze_spec_factor(adc):
             adc,
             "Hole_MO       Particle_MO        X_a^2       Orbital symmetry      excitation energy")
         logger.info(
-            adc, "-----------------------------------------------------------")
+            adc,
+            "-------------------------------------------------------------------------------------")
 
         for hp in range(X_a_root.shape[0]):
             P = ((sort_a[hp]) % nmo_a)
@@ -22914,11 +22933,10 @@ def analyze_spec_factor(adc):
         logger.info(
             adc,
             '\nPartial norm of X_a = %10.8f',
-            np.linalg.norm(
-                np.sqrt(X_a_root)))
+            np.sqrt(np.sum(X_a_root)))
         logger.info(
             adc,
-            "*************************************************************\n")
+            "*************************************************************************************\n")
 
     for root_b in range(X_b.shape[0]):
 
@@ -22937,7 +22955,8 @@ def analyze_spec_factor(adc):
             adc,
             "Hole_MO       Particle_MO        X_b^2       Orbital symmetry      excitation energy")
         logger.info(
-            adc, "-----------------------------------------------------------")
+            adc,
+            "-------------------------------------------------------------------------------------")
 
         for hp in range(X_b_root.shape[0]):
             P = sort_b[hp] % nmo_b
@@ -22956,11 +22975,10 @@ def analyze_spec_factor(adc):
         logger.info(
             adc,
             '\nPartial norm of X_b = %10.8f',
-            np.linalg.norm(
-                np.sqrt(X_b_root)))
+            np.sqrt(np.sum(X_b_root)))
         logger.info(
             adc,
-            "*************************************************************\n")
+            "*************************************************************************************\n")
 
 
 def get_properties(adc, nroots=1):

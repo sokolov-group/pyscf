@@ -1385,8 +1385,8 @@ def analyze_eigenvector(adc):
         doubles_aaa_val = list(U_sorted_aaa)
         doubles_bbb_val = list(U_sorted_bbb)
 
-        logger.info(adc,'%s | root %d | norm(1h)  = %6.4f | norm(2h1p) = %6.4f ',
-                    adc.method ,I, U1dotU1, U2dotU2)
+        logger.info(adc,'%s | root %d | Energy (eV) = %12.8f | norm(1h)  = %6.4f | norm(2h1p) = %6.4f ',
+                    adc.method, I, adc.E[I]*27.2114, U1dotU1, U2dotU2)
 
         if singles_a_val:
             logger.info(adc, "\n1h(alpha) block: ")
@@ -1434,7 +1434,8 @@ def analyze_eigenvector(adc):
                 logger.info(adc, '  %4d  %4d  %4d     %7.4f',
                             print_doubles[1], print_doubles[2], print_doubles[0], doubles_bbb_val[idx])
 
-        logger.info(adc, "\n*************************************************************\n")
+        logger.info(adc,
+            "***************************************************************************************\n")
 
 
 def analyze_spec_factor(adc):
@@ -1483,7 +1484,8 @@ def analyze_spec_factor(adc):
             if np.sum(spec_Contribution) == 0.0:
                 continue
 
-            logger.info(adc, '%s | root %d %s\n', adc.method, i, spin)
+            logger.info(adc, '%s | root %d | Energy (eV) = %12.8f | %s\n',
+                    adc.method, i, adc.E[i]*27.2114, spin)
             logger.info(adc, "     HF MO     Spec. Contribution     Orbital symmetry")
             logger.info(adc, "-----------------------------------------------------------")
 
@@ -1492,7 +1494,8 @@ def analyze_spec_factor(adc):
                             index_mo[c], spec_Contribution[c], sym[c])
 
             logger.info(adc, '\nPartial spec. factor sum = %10.8f', np.sum(spec_Contribution))
-            logger.info(adc, "\n*************************************************************\n")
+            logger.info(adc,
+            "***********************************************************\n")
 
 
 def get_properties(adc, nroots=1):

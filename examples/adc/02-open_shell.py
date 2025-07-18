@@ -47,4 +47,4 @@ myadc.method_type = "ee"
 myadc.compute_properties = True
 myadc.compute_spin_square = True
 eea,vea,pea,xea = myadc.kernel(nroots=4)
-
+myadc.analyze()

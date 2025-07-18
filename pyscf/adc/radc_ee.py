@@ -21,6 +21,7 @@ Restricted algebraic diagrammatic construction
 '''
 import numpy as np
 from pyscf import lib
+from pyscf.lib import logger
 from pyscf.adc import radc
 from pyscf.adc import radc_ao2mo, radc_amplitudes
 from pyscf.adc import dfadc
@@ -1091,6 +1092,16 @@ def matvec(adc, M_ab=None, eris=None):
 
     return sigma_
 
+def analyze(myadc):
+
+    if myadc.compute_properties:
+
+        header = (
+            "\n*************************************************************"
+            "\n          Spectroscopic amplitude analysis summary"
+            "\n*************************************************************")
+        logger.info(myadc, header)
+
 class RADCEE(radc.RADC):
     '''restricted ADC for EE energies and spectroscopic amplitudes
 
@@ -1178,6 +1189,9 @@ class RADCEE(radc.RADC):
     get_imds = get_imds
     matvec = matvec
     get_diag = get_diag
+
+    analyze = analyze
+
     def get_init_guess(self, nroots=1, diag=None, ascending = True):
         if diag is None :
             diag = self.get_diag()
