@@ -10823,6 +10823,8 @@ def matvec(adc, M_ia_jb=None, eris=None):
 
         if (method == "adc(2)-x") or (method == "adc(3)"):
 
+            ladder_int_a, ladder_int_b = None, None
+
             if isinstance(eris.vvvv_p, np.ndarray):
                 interim = np.ascontiguousarray(
                     r2_a[:, :, ab_ind_a[0], ab_ind_a[1]]).reshape(nocc_a * nocc_a, -1)
@@ -10834,6 +10836,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
                 s[s_aaaa:f_aaaa] += uadc_amplitudes.contract_ladder_antisym(
                     adc, r2_a, eris.vvvv_p)[ij_ind_a[0], ij_ind_a[1]].reshape(n_doubles_aaaa)
 
+            # Save intermediate for DF-ADC(3)/ROHF
             elif isinstance(adc._scf, scf.rohf.ROHF) and isinstance(eris.vvvv_p, type(None)) and method == "adc(3)":
                 ladder_int_a = uadc_amplitudes.contract_ladder(
                     adc, r2_a, (eris.Lvv, eris.Lvv), pack=False)
@@ -10866,6 +10869,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
                 s[s_bbbb:f_bbbb] += uadc_amplitudes.contract_ladder_antisym(
                     adc, r2_b, eris.VVVV_p)[ij_ind_b[0], ij_ind_b[1]].reshape(n_doubles_bbbb)
 
+            # Save intermediate for DF-ADC(3)/ROHF
             elif isinstance(adc._scf, scf.rohf.ROHF) and isinstance(eris.vvvv_p, type(None)) and method == "adc(3)":
                 ladder_int_b = uadc_amplitudes.contract_ladder(
                     adc, r2_b, (eris.LVV, eris.LVV), pack=False)
@@ -11639,6 +11643,8 @@ def matvec(adc, M_ia_jb=None, eris=None):
                         a += k
                     M_12Y0_bb = temp_3
                     M_02Y1_bb += temp_4
+                    del temp_3
+                    del temp_4
 
                 if isinstance(eris.vvvv_p, type(None)):
                     temp_3 = np.zeros((nocc_b, nocc_b, nvir_b, nvir_b))
@@ -14790,7 +14796,7 @@ def make_rdm1(adc):
 
     if adc.method == "adc(3)":
         logger.warn(
-            adc, 
+            adc,
             "EE-ADC(3) RDMs include contributions up to ADC(2)-X only...")
 
     method = adc.method
@@ -16104,7 +16110,7 @@ def get_spin_square(adc):
 
     if adc.method == "adc(3)":
         logger.warn(
-            adc, 
+            adc,
             "EE-ADC(3) <S^2> includes contributions up to ADC(2)-X only...")
 
     t1 = adc.t1
@@ -21555,9 +21561,9 @@ def get_trans_moments(adc):
 
     if adc.method == "adc(3)":
         logger.warn(
-            adc, 
-            "EE-ADC(3) oscillator strengths do not include \
-            contributions from third-order amplitudes...")
+            adc,
+            "EE-ADC(3) oscillator strengths do not include"
+            + " contributions from third-order amplitudes...")
 
     method = adc.method
 
