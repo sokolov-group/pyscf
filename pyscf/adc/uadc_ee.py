@@ -20401,9 +20401,6 @@ def get_trans_moments(adc):
     nmo_a = nocc_a + nvir_a
     nmo_b = nocc_b + nvir_b
 
-    TY_a = np.zeros((nmo_a, nmo_a))
-    TY_b = np.zeros((nmo_b, nmo_b))
-
     n_singles_a = nocc_a * nvir_a
     n_singles_b = nocc_b * nvir_b
     n_doubles_aaaa = nocc_a * (nocc_a - 1) * nvir_a * (nvir_a - 1) // 4
@@ -20431,6 +20428,9 @@ def get_trans_moments(adc):
     TY_bb = np.zeros((nroots, nmo_b, nmo_b))
 
     for r in range(U.shape[0]):
+
+        TY_a = np.zeros((nmo_a, nmo_a))
+        TY_b = np.zeros((nmo_b, nmo_b))
 
         Y_a = U[r][:f_a].reshape(nocc_a, nvir_a)
         Y_b = U[r][f_a:f_b].reshape(nocc_b, nvir_b)
