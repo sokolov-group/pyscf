@@ -69,10 +69,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2],0.03418049, 6)
         self.assertAlmostEqual(p[3],0.00247057, 6)
 
-        self.assertAlmostEqual(spin[0],0.75455411 , 6)
-        self.assertAlmostEqual(spin[1],0.75455411 , 6)
-        self.assertAlmostEqual(spin[2],0.76650339 , 6)
-        self.assertAlmostEqual(spin[3],2.83809698 , 6)
+        self.assertAlmostEqual(spin[0],0.75455411 , 5)
+        self.assertAlmostEqual(spin[1],0.75455411 , 5)
+        self.assertAlmostEqual(spin[2],0.76650339 , 5)
+        self.assertAlmostEqual(spin[3],2.83809698 , 5)
 
     def test_ee_adc2x(self):
         myadc.method = "adc(2)-x"

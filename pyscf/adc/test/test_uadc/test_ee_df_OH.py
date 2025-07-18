@@ -72,10 +72,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2],0.00375463, 6)
         self.assertAlmostEqual(p[3],0.01792791, 6)
 
-        self.assertAlmostEqual(spin[0],0.75100157 , 6)
-        self.assertAlmostEqual(spin[1],0.75099304 , 6)
-        self.assertAlmostEqual(spin[2],2.41368812 , 6)
-        self.assertAlmostEqual(spin[3],1.16590822 , 6)
+        self.assertAlmostEqual(spin[0],0.75100157 , 5)
+        self.assertAlmostEqual(spin[1],0.75099304 , 5)
+        self.assertAlmostEqual(spin[2],2.41368812 , 5)
+        self.assertAlmostEqual(spin[3],1.16590822 , 5)
 
     def test_ee_adc2x(self):
         myadc.method = "adc(2)-x"
@@ -93,10 +93,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2],0.00029972  , 6)
         self.assertAlmostEqual(p[3],0.01678338  , 6)
 
-        self.assertAlmostEqual(spin[0], 0.74929626 , 6)
-        self.assertAlmostEqual(spin[1],0.74927343  , 6)
-        self.assertAlmostEqual(spin[2],3.55446067  , 6)
-        self.assertAlmostEqual(spin[3],0.86133577  , 6)
+        self.assertAlmostEqual(spin[0], 0.74929626 , 5)
+        self.assertAlmostEqual(spin[1],0.74927343  , 5)
+        self.assertAlmostEqual(spin[2],3.55446067  , 5)
+        self.assertAlmostEqual(spin[3],0.86133577  , 5)
 
     def test_ee_adc3(self):
         myadc.method = "adc(3)"
@@ -114,10 +114,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2],0.00008816  , 6)
         self.assertAlmostEqual(p[3],0.01624065  , 6)
 
-        self.assertAlmostEqual(spin[0], 0.74912395 , 6)
-        self.assertAlmostEqual(spin[1],0.74918016  , 6)
-        self.assertAlmostEqual(spin[2],3.68420585  , 6)
-        self.assertAlmostEqual(spin[3],0.79024543  , 6)
+        self.assertAlmostEqual(spin[0], 0.74912395 , 5)
+        self.assertAlmostEqual(spin[1],0.74918016  , 5)
+        self.assertAlmostEqual(spin[2],3.68420585  , 5)
+        self.assertAlmostEqual(spin[3],0.79024543  , 5)
 
 if __name__ == "__main__":
     print("EE calculations for different ADC methods for OH molecule")

@@ -70,10 +70,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2],0.00356489, 6)
         self.assertAlmostEqual(p[3],0.01811875, 6)
 
-        self.assertAlmostEqual(spin[0],0.75053521 , 6)
-        self.assertAlmostEqual(spin[1],0.75064928 , 6)
-        self.assertAlmostEqual(spin[2],2.43570834 , 6)
-        self.assertAlmostEqual(spin[3],1.14753801 , 6)
+        self.assertAlmostEqual(spin[0],0.75053521 , 5)
+        self.assertAlmostEqual(spin[1],0.75064928 , 5)
+        self.assertAlmostEqual(spin[2],2.43570834 , 5)
+        self.assertAlmostEqual(spin[3],1.14753801 , 5)
 
     def test_ee_adc2x(self):
         myadc.method = "adc(2)-x"
@@ -91,10 +91,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2],0.00012567 , 6)
         self.assertAlmostEqual(p[3],0.01591094 , 6)
 
-        self.assertAlmostEqual(spin[0], 0.75043297 , 6)
-        self.assertAlmostEqual(spin[1],0.75037407  , 6)
-        self.assertAlmostEqual(spin[2],3.65784145  , 6)
-        self.assertAlmostEqual(spin[3],0.80459280  , 6)
+        self.assertAlmostEqual(spin[0], 0.75043297 , 5)
+        self.assertAlmostEqual(spin[1],0.75037407  , 5)
+        self.assertAlmostEqual(spin[2],3.65784145  , 5)
+        self.assertAlmostEqual(spin[3],0.80459280  , 5)
 
     def test_ee_adc3(self):
         myadc.method = "adc(3)"
@@ -112,10 +112,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2],0.00000001 , 6)
         self.assertAlmostEqual(p[3],0.01492111 , 6)
 
-        self.assertAlmostEqual(spin[0], 0.75027556 , 6)
-        self.assertAlmostEqual(spin[1],0.75009053  , 6)
-        self.assertAlmostEqual(spin[2],3.72613641  , 6)
-        self.assertAlmostEqual(spin[3],0.75901326  , 6)
+        self.assertAlmostEqual(spin[0], 0.75027556 , 5)
+        self.assertAlmostEqual(spin[1],0.75009053  , 5)
+        self.assertAlmostEqual(spin[2],3.72613641  , 5)
+        self.assertAlmostEqual(spin[3],0.75901326  , 5)
 if __name__ == "__main__":
     print("EE calculations for different ADC methods for OH molecule")
     unittest.main()

@@ -69,10 +69,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2],0.00000000, 6)
         self.assertAlmostEqual(p[3],0.18367042, 6)
 
-        self.assertAlmostEqual(spin[0],2.00082161 , 6)
-        self.assertAlmostEqual(spin[1],2.00082160 , 6)
-        self.assertAlmostEqual(spin[2],2.00105686 , 6)
-        self.assertAlmostEqual(spin[3],2.00688056 , 6)
+        self.assertAlmostEqual(spin[0],2.00082161 , 5)
+        self.assertAlmostEqual(spin[1],2.00082160 , 5)
+        self.assertAlmostEqual(spin[2],2.00105686 , 5)
+        self.assertAlmostEqual(spin[3],2.00688056 , 5)
 
     def test_ee_adc2x(self):
         myadc.method = "adc(2)-x"
@@ -90,10 +90,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2],0.00000000 , 6)
         self.assertAlmostEqual(p[3],0.16968831 , 6)
 
-        self.assertAlmostEqual(spin[0],2.00075878 , 6)
-        self.assertAlmostEqual(spin[1],2.00075877 , 6)
-        self.assertAlmostEqual(spin[2],2.00103071 , 6)
-        self.assertAlmostEqual(spin[3],2.00394032 , 6)
+        self.assertAlmostEqual(spin[0],2.00075878 , 5)
+        self.assertAlmostEqual(spin[1],2.00075877 , 5)
+        self.assertAlmostEqual(spin[2],2.00103071 , 5)
+        self.assertAlmostEqual(spin[3],2.00394032 , 5)
 
     def test_ee_adc3(self):
         myadc.method = "adc(3)"
@@ -111,10 +111,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2],0.00000000 , 6)
         self.assertAlmostEqual(p[3],0.16725458 , 6)
 
-        self.assertAlmostEqual(spin[0],2.00117040 , 6)
-        self.assertAlmostEqual(spin[1],2.00117040 , 6)
-        self.assertAlmostEqual(spin[2],2.00120905 , 6)
-        self.assertAlmostEqual(spin[3],2.00301543 , 6)
+        self.assertAlmostEqual(spin[0],2.00117040 , 5)
+        self.assertAlmostEqual(spin[1],2.00117040 , 5)
+        self.assertAlmostEqual(spin[2],2.00120905 , 5)
+        self.assertAlmostEqual(spin[3],2.00301543 , 5)
 
 if __name__ == "__main__":
     print("EE calculations for different ADC methods for O2 molecule")

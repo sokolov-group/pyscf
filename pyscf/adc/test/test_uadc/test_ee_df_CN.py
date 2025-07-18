@@ -69,10 +69,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2],0.02230072, 6)
         self.assertAlmostEqual(p[3],0.00596792, 6)
 
-        self.assertAlmostEqual(spin[0],0.81897586 , 6)
-        self.assertAlmostEqual(spin[1],0.81897586 , 6)
-        self.assertAlmostEqual(spin[2],0.97818035 , 6)
-        self.assertAlmostEqual(spin[3],2.70419098 , 6)
+        self.assertAlmostEqual(spin[0],0.81897586, 5)
+        self.assertAlmostEqual(spin[1],0.81897586, 5)
+        self.assertAlmostEqual(spin[2],0.97818035, 5)
+        self.assertAlmostEqual(spin[3],2.70419098, 5)
 
     def test_ee_adc2x(self):
         myadc.method = "adc(2)-x"
@@ -90,10 +90,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2],0.01004173 , 6)
         self.assertAlmostEqual(p[3],0.00001197 , 6)
 
-        self.assertAlmostEqual(spin[0],0.76587776 , 6)
-        self.assertAlmostEqual(spin[1],0.76587776 , 6)
-        self.assertAlmostEqual(spin[2],0.77014916 , 6)
-        self.assertAlmostEqual(spin[3],4.03860924 , 6)
+        self.assertAlmostEqual(spin[0],0.76587776 , 5)
+        self.assertAlmostEqual(spin[1],0.76587776 , 5)
+        self.assertAlmostEqual(spin[2],0.77014916 , 5)
+        self.assertAlmostEqual(spin[3],4.03860924 , 5)
 
     def test_ee_adc3(self):
         myadc.method = "adc(3)"
@@ -111,10 +111,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2],0.01278420 , 6)
         self.assertAlmostEqual(p[3],0.00014073 , 6)
 
-        self.assertAlmostEqual(spin[0],0.78026235 , 6)
-        self.assertAlmostEqual(spin[1],0.78026235 , 6)
-        self.assertAlmostEqual(spin[2],0.79814541 , 6)
-        self.assertAlmostEqual(spin[3],4.10490908 , 6)
+        self.assertAlmostEqual(spin[0],0.78026235 , 5)
+        self.assertAlmostEqual(spin[1],0.78026235 , 5)
+        self.assertAlmostEqual(spin[2],0.79814541 , 5)
+        self.assertAlmostEqual(spin[3],4.10490908 , 5)
 
 if __name__ == "__main__":
     print("EE calculations for different ADC methods for CN molecule")

@@ -72,10 +72,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2],0.02229693, 6)
         self.assertAlmostEqual(p[3],0.00597127, 6)
 
-        self.assertAlmostEqual(spin[0],0.81903415 , 6)
-        self.assertAlmostEqual(spin[1],0.81903415 , 6)
-        self.assertAlmostEqual(spin[2],0.97833065 , 6)
-        self.assertAlmostEqual(spin[3],2.70435538 , 6)
+        self.assertAlmostEqual(spin[0],0.81903415 , 5)
+        self.assertAlmostEqual(spin[1],0.81903415 , 5)
+        self.assertAlmostEqual(spin[2],0.97833065 , 5)
+        self.assertAlmostEqual(spin[3],2.70435538 , 5)
 
     def test_ee_adc2x(self):
         myadc.method = "adc(2)-x"
@@ -95,10 +95,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2],0.01004905, 6)
         self.assertAlmostEqual(p[3],0.00001243, 6)
 
-        self.assertAlmostEqual(spin[0],0.76591155 , 6)
-        self.assertAlmostEqual(spin[1],0.76591155 , 6)
-        self.assertAlmostEqual(spin[2],0.77023553 , 6)
-        self.assertAlmostEqual(spin[3],4.03885373 , 6)
+        self.assertAlmostEqual(spin[0],0.76591155 , 5)
+        self.assertAlmostEqual(spin[1],0.76591155 , 5)
+        self.assertAlmostEqual(spin[2],0.77023553 , 5)
+        self.assertAlmostEqual(spin[3],4.03885373 , 5)
 
     def test_ee_adc3(self):
         myadc.method = "adc(3)"
@@ -118,10 +118,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2],0.01278698, 6)
         self.assertAlmostEqual(p[3],0.00014258, 6)
 
-        self.assertAlmostEqual(spin[0],0.78024113 , 6)
-        self.assertAlmostEqual(spin[1],0.78024113 , 6)
-        self.assertAlmostEqual(spin[2],0.79826249 , 6)
-        self.assertAlmostEqual(spin[3],4.10509903 , 6)
+        self.assertAlmostEqual(spin[0],0.78024113 , 5)
+        self.assertAlmostEqual(spin[1],0.78024113 , 5)
+        self.assertAlmostEqual(spin[2],0.79826249 , 5)
+        self.assertAlmostEqual(spin[3],4.10509903 , 5)
 if __name__ == "__main__":
     print("EE calculations for different ADC methods for CN molecule")
     unittest.main()

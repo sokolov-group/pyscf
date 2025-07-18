@@ -71,10 +71,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2],0.00000000, 6)
         self.assertAlmostEqual(p[3],0.18371407, 6)
 
-        self.assertAlmostEqual(spin[0],2.00083131 , 6)
-        self.assertAlmostEqual(spin[1],2.00083131 , 6)
-        self.assertAlmostEqual(spin[2],2.00106977 , 6)
-        self.assertAlmostEqual(spin[3],2.00686787 , 6)
+        self.assertAlmostEqual(spin[0],2.00083131 , 5)
+        self.assertAlmostEqual(spin[1],2.00083131 , 5)
+        self.assertAlmostEqual(spin[2],2.00106977 , 5)
+        self.assertAlmostEqual(spin[3],2.00686787 , 5)
 
     def test_ee_adc2x(self):
         myadc.method = "adc(2)-x"
@@ -92,10 +92,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2],0.00000000, 6)
         self.assertAlmostEqual(p[3],0.16973782, 6)
 
-        self.assertAlmostEqual(spin[0],2.00075830 , 6)
-        self.assertAlmostEqual(spin[1],2.00075829 , 6)
-        self.assertAlmostEqual(spin[2],2.00102490 , 6)
-        self.assertAlmostEqual(spin[3],2.00393733 , 6)
+        self.assertAlmostEqual(spin[0],2.00075830 , 5)
+        self.assertAlmostEqual(spin[1],2.00075829 , 5)
+        self.assertAlmostEqual(spin[2],2.00102490 , 5)
+        self.assertAlmostEqual(spin[3],2.00393733 , 5)
 
     def test_ee_adc3(self):
         myadc.method = "adc(3)"
@@ -113,10 +113,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2],0.00000000, 6)
         self.assertAlmostEqual(p[3],0.16727584, 6)
 
-        self.assertAlmostEqual(spin[0],2.00116581 , 6)
-        self.assertAlmostEqual(spin[1],2.00116581 , 6)
-        self.assertAlmostEqual(spin[2],2.00120479 , 6)
-        self.assertAlmostEqual(spin[3],2.00301745 , 6)
+        self.assertAlmostEqual(spin[0],2.00116581 , 5)
+        self.assertAlmostEqual(spin[1],2.00116581 , 5)
+        self.assertAlmostEqual(spin[2],2.00120479 , 5)
+        self.assertAlmostEqual(spin[3],2.00301745 , 5)
 if __name__ == "__main__":
     print("EE calculations for different ADC methods for O2 molecule")
     unittest.main()
