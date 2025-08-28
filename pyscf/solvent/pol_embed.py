@@ -44,7 +44,7 @@ References:
 '''
 
 import numpy
-
+import h5py
 import cppe
 from packaging.version import parse as _parse_version
 min_version = '0.3.1'
@@ -155,7 +155,7 @@ class PolEmbed(lib.StreamObject):
     _keys = {
         'mol', 'max_cycle', 'conv_tol', 'state_id', 'frozen',
         'equilibrium_solvation', 'options', 'do_ecp', 'eef', 'cppe_state',
-        'potentials', 'V_es', 'ecpmol', 'e', 'v',
+        'potentials', 'V_es', 'ecpmol', 'e', 'v', 'use_xr', 'h5_file',
     }
 
     def __init__(self, mol, options_or_potfile):
@@ -190,6 +190,8 @@ class PolEmbed(lib.StreamObject):
         self.do_ecp = self.options.pop("ecp", False)
         # use effective external field (EEF)
         self.eef = self.options.pop("eef", False)
+        self.h5_file = self.options.pop("h5_file", None)
+        self.use_xr = self.options.pop("use_xr", False)
         self.cppe_state = self._create_cppe_state(mol)
         self.potentials = self.cppe_state.potentials
         self.V_es = None
@@ -209,6 +211,30 @@ class PolEmbed(lib.StreamObject):
                                 basis={}, unit="Bohr")
             # add the normal mol to compute integrals
             self.ecpmol += self.mol
+
+        # Author: James Serna. including ability of exchange-repulsion
+        if self.use_xr and self.h5_file is None:
+            raise ValueError(".h5 file must be specified to use exchange-repulsion.")
+        elif self.use_xr and self.h5_file is not None:
+            if not self.h5_file.lower().endswith(".h5"):
+                raise ValueError(f"XR requires an HDF5 file (.h5), but got: {self.h5_file}")
+            
+            with h5py.File(self.h5_file, "r") as f:
+                # read nbasis robustly
+                nbasis = int(numpy.array(f["num_bas"]).squeeze())
+                xr_raw = numpy.array(f["exchange-repulsion matrix"]).ravel()
+                L = xr_raw.size
+
+                print("nbasis:", nbasis)
+                print("raw length:", L)
+
+                # packed upper-triangle (row-major): use triu indices
+                xr = numpy.zeros((nbasis, nbasis), dtype=xr_raw.dtype)
+                iu = numpy.triu_indices(nbasis)
+                xr[iu] = xr_raw
+                # mirror to lower triangle (keep diagonal once)
+                xr = xr + xr.T - numpy.diag(numpy.diag(xr))
+                self.xr = xr
 
         # e (the electrostatic and induction energy)
         # and v (the additional potential) are
@@ -377,6 +403,12 @@ class PolEmbed(lib.StreamObject):
         if is_single_dm:
             e = e[0]
             vmat = vmat[0]
+            
+        if self.use_xr:
+            if self.xr.shape != vmat.shape:
+                raise ValueError(f"Shape mismatch in XR correction: xr.shape={self.xr.shape}, vmat.shape={vmat.shape}... Is the .h5 file using the same basis set?")
+            vmat += self.xr
+            
         return e, vmat
 
     def _compute_multipole_potential_integrals(self, all_sites, all_orders, all_moments, n_chunks=1):
