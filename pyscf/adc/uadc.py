@@ -151,26 +151,11 @@ def make_ref_rdm1(adc):
 
     rdm1_b[:nocc_b, :nocc_b]  = einsum('IJ->IJ', np.identity(nocc_b), optimize = einsum_type).copy()
 
-    rdm1_a[:nocc_a, :nocc_a] -= 1/16 * einsum('Iiab,Jiab->IJ', t2_1_a, t2_1_a, optimize = einsum_type)
-    rdm1_a[:nocc_a, :nocc_a] += 1/16 * einsum('Iiab,Jiba->IJ', t2_1_a, t2_1_a, optimize = einsum_type)
-    rdm1_a[:nocc_a, :nocc_a] += 1/16 * einsum('Iiab,iJab->IJ', t2_1_a, t2_1_a, optimize = einsum_type)
-    rdm1_a[:nocc_a, :nocc_a] -= 1/16 * einsum('Iiab,iJba->IJ', t2_1_a, t2_1_a, optimize = einsum_type)
-    rdm1_a[:nocc_a, :nocc_a] += 1/16 * einsum('Jiab,iIab->IJ', t2_1_a, t2_1_a, optimize = einsum_type)
-    rdm1_a[:nocc_a, :nocc_a] -= 1/16 * einsum('Jiab,iIba->IJ', t2_1_a, t2_1_a, optimize = einsum_type)
-    rdm1_a[:nocc_a, :nocc_a] -= 1/16 * einsum('iIab,iJab->IJ', t2_1_a, t2_1_a, optimize = einsum_type)
-    rdm1_a[:nocc_a, :nocc_a] += 1/16 * einsum('iIab,iJba->IJ', t2_1_a, t2_1_a, optimize = einsum_type)
+    rdm1_a[:nocc_a, :nocc_a] -= 1/2 * einsum('Iiab,Jiab->IJ', t2_1_a, t2_1_a, optimize = einsum_type)
     rdm1_a[:nocc_a, :nocc_a] -= einsum('Iiab,Jiab->IJ', t2_1_ab, t2_1_ab, optimize = einsum_type)
 
-    rdm1_b[:nocc_b, :nocc_b] -= einsum('iIab,iJab->IJ', t2_1_ab, t2_1_ab, optimize = einsum_type)
-    rdm1_b[:nocc_b, :nocc_b] -= 1/16 * einsum('Iiab,Jiab->IJ', t2_1_b, t2_1_b, optimize = einsum_type)
-    rdm1_b[:nocc_b, :nocc_b] += 1/16 * einsum('Iiab,Jiba->IJ', t2_1_b, t2_1_b, optimize = einsum_type)
-    rdm1_b[:nocc_b, :nocc_b] += 1/16 * einsum('Iiab,iJab->IJ', t2_1_b, t2_1_b, optimize = einsum_type)
-    rdm1_b[:nocc_b, :nocc_b] -= 1/16 * einsum('Iiab,iJba->IJ', t2_1_b, t2_1_b, optimize = einsum_type)
-    rdm1_b[:nocc_b, :nocc_b] += 1/16 * einsum('Jiab,iIab->IJ', t2_1_b, t2_1_b, optimize = einsum_type)
-    rdm1_b[:nocc_b, :nocc_b] -= 1/16 * einsum('Jiab,iIba->IJ', t2_1_b, t2_1_b, optimize = einsum_type)
-    rdm1_b[:nocc_b, :nocc_b] -= 1/16 * einsum('iIab,iJab->IJ', t2_1_b, t2_1_b, optimize = einsum_type)
-    rdm1_b[:nocc_b, :nocc_b] += 1/16 * einsum('iIab,iJba->IJ', t2_1_b, t2_1_b, optimize = einsum_type)
-
+    rdm1_b[:nocc_b, :nocc_b] -= einsum('Iiab,Jiab->IJ', t2_1_ab, t2_1_ab, optimize = einsum_type)
+    rdm1_b[:nocc_b, :nocc_b] -= 1/2 * einsum('Iiab,Jiab->IJ', t2_1_b, t2_1_b, optimize = einsum_type)
 
     ### OCC-VIR ###
     rdm1_a[:nocc_a, nocc_a:]  = einsum('IA->IA', t1_2_a, optimize = einsum_type).copy()
@@ -183,25 +168,11 @@ def make_ref_rdm1(adc):
     rdm1_b[nocc_b:, :nocc_b]  = rdm1_b[:nocc_b, nocc_b:].T
 
     ### VIR-VIR ###
-    rdm1_a[nocc_a:, nocc_a:]  = 1/16 * einsum('ijAa,ijBa->AB', t2_1_a, t2_1_a, optimize = einsum_type)
-    rdm1_a[nocc_a:, nocc_a:] -= 1/16 * einsum('ijAa,ijaB->AB', t2_1_a, t2_1_a, optimize = einsum_type)
-    rdm1_a[nocc_a:, nocc_a:] -= 1/16 * einsum('ijAa,jiBa->AB', t2_1_a, t2_1_a, optimize = einsum_type)
-    rdm1_a[nocc_a:, nocc_a:] += 1/16 * einsum('ijAa,jiaB->AB', t2_1_a, t2_1_a, optimize = einsum_type)
-    rdm1_a[nocc_a:, nocc_a:] -= 1/16 * einsum('ijBa,ijaA->AB', t2_1_a, t2_1_a, optimize = einsum_type)
-    rdm1_a[nocc_a:, nocc_a:] += 1/16 * einsum('ijBa,jiaA->AB', t2_1_a, t2_1_a, optimize = einsum_type)
-    rdm1_a[nocc_a:, nocc_a:] += 1/16 * einsum('ijaA,ijaB->AB', t2_1_a, t2_1_a, optimize = einsum_type)
-    rdm1_a[nocc_a:, nocc_a:] -= 1/16 * einsum('ijaA,jiaB->AB', t2_1_a, t2_1_a, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:]  = 1/2 * einsum('ijAa,ijBa->AB', t2_1_a, t2_1_a, optimize = einsum_type)
     rdm1_a[nocc_a:, nocc_a:] += einsum('ijAa,ijBa->AB', t2_1_ab, t2_1_ab, optimize = einsum_type)
 
-    rdm1_b[nocc_b:, nocc_b:]  = einsum('ijaA,ijaB->AB', t2_1_ab, t2_1_ab, optimize = einsum_type)
-    rdm1_b[nocc_b:, nocc_b:] += 1/16 * einsum('ijAa,ijBa->AB', t2_1_b, t2_1_b, optimize = einsum_type)
-    rdm1_b[nocc_b:, nocc_b:] -= 1/16 * einsum('ijAa,ijaB->AB', t2_1_b, t2_1_b, optimize = einsum_type)
-    rdm1_b[nocc_b:, nocc_b:] -= 1/16 * einsum('ijAa,jiBa->AB', t2_1_b, t2_1_b, optimize = einsum_type)
-    rdm1_b[nocc_b:, nocc_b:] += 1/16 * einsum('ijAa,jiaB->AB', t2_1_b, t2_1_b, optimize = einsum_type)
-    rdm1_b[nocc_b:, nocc_b:] -= 1/16 * einsum('ijBa,ijaA->AB', t2_1_b, t2_1_b, optimize = einsum_type)
-    rdm1_b[nocc_b:, nocc_b:] += 1/16 * einsum('ijBa,jiaA->AB', t2_1_b, t2_1_b, optimize = einsum_type)
-    rdm1_b[nocc_b:, nocc_b:] += 1/16 * einsum('ijaA,ijaB->AB', t2_1_b, t2_1_b, optimize = einsum_type)
-    rdm1_b[nocc_b:, nocc_b:] -= 1/16 * einsum('ijaA,jiaB->AB', t2_1_b, t2_1_b, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:]  = einsum('ijAa,ijBa->AB', t2_1_ab, t2_1_ab, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += 1/2 * einsum('ijAa,ijBa->AB', t2_1_b, t2_1_b, optimize = einsum_type)
 
     ####### ADC(3) SPIN ADAPTED REF OPDM WITH SQA ################
     if adc.method == "adc(3)":
@@ -212,57 +183,24 @@ def make_ref_rdm1(adc):
         t1_3_b = adc.t1[1][1][:]
 
         #### OCC-OCC ###
-        rdm1_a[:nocc_a, :nocc_a] -= 1/16 * einsum('Iiab,Jiab->IJ', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, :nocc_a] += 1/16 * einsum('Iiab,Jiba->IJ', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, :nocc_a] += 1/16 * einsum('Iiab,iJab->IJ', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, :nocc_a] -= 1/16 * einsum('Iiab,iJba->IJ', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, :nocc_a] -= 1/16 * einsum('Jiab,Iiab->IJ', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, :nocc_a] += 1/16 * einsum('Jiab,Iiba->IJ', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, :nocc_a] += 1/16 * einsum('Jiab,iIab->IJ', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, :nocc_a] -= 1/16 * einsum('Jiab,iIba->IJ', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, :nocc_a] += 1/16 * einsum('iIab,Jiab->IJ', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, :nocc_a] -= 1/16 * einsum('iIab,Jiba->IJ', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, :nocc_a] -= 1/16 * einsum('iIab,iJab->IJ', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, :nocc_a] += 1/16 * einsum('iIab,iJba->IJ', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, :nocc_a] += 1/16 * einsum('iJab,Iiab->IJ', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, :nocc_a] -= 1/16 * einsum('iJab,Iiba->IJ', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, :nocc_a] -= 1/16 * einsum('iJab,iIab->IJ', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, :nocc_a] += 1/16 * einsum('iJab,iIba->IJ', t2_1_a, t2_2_a, optimize = einsum_type)
+        rdm1_a[:nocc_a, :nocc_a] -= 1/2 * einsum('Iiab,Jiab->IJ', t2_1_a, t2_2_a, optimize = einsum_type)
+        rdm1_a[:nocc_a, :nocc_a] -= 1/2 * einsum('Jiab,Iiab->IJ', t2_1_a, t2_2_a, optimize = einsum_type)
         rdm1_a[:nocc_a, :nocc_a] -= einsum('Iiab,Jiab->IJ', t2_1_ab, t2_2_ab, optimize = einsum_type)
         rdm1_a[:nocc_a, :nocc_a] -= einsum('Jiab,Iiab->IJ', t2_1_ab, t2_2_ab, optimize = einsum_type)
 
-        rdm1_b[:nocc_b, :nocc_b] -= einsum('iIab,iJab->IJ', t2_1_ab, t2_2_ab, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] -= einsum('iJab,iIab->IJ', t2_1_ab, t2_2_ab, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] -= 1/16 * einsum('Iiab,Jiab->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] += 1/16 * einsum('Iiab,Jiba->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] += 1/16 * einsum('Iiab,iJab->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] -= 1/16 * einsum('Iiab,iJba->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] -= 1/16 * einsum('Jiab,Iiab->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] += 1/16 * einsum('Jiab,Iiba->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] += 1/16 * einsum('Jiab,iIab->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] -= 1/16 * einsum('Jiab,iIba->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] += 1/16 * einsum('iIab,Jiab->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] -= 1/16 * einsum('iIab,Jiba->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] -= 1/16 * einsum('iIab,iJab->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] += 1/16 * einsum('iIab,iJba->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] += 1/16 * einsum('iJab,Iiab->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] -= 1/16 * einsum('iJab,Iiba->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] -= 1/16 * einsum('iJab,iIab->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] += 1/16 * einsum('iJab,iIba->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
+        rdm1_b[:nocc_b, :nocc_b] -= einsum('Iiab,Jiab->IJ', t2_1_ab, t2_2_ab, optimize = einsum_type)
+        rdm1_b[:nocc_b, :nocc_b] -= einsum('Jiab,Iiab->IJ', t2_1_ab, t2_2_ab, optimize = einsum_type)
+        rdm1_b[:nocc_b, :nocc_b] -= 1/2 * einsum('Iiab,Jiab->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
+        rdm1_b[:nocc_b, :nocc_b] -= 1/2 * einsum('Jiab,Iiab->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
+
         ##### OCC-VIR ### ####
         rdm1_a[:nocc_a, nocc_a:] += einsum('IA->IA', t1_3_a, optimize = einsum_type).copy()
-        rdm1_a[:nocc_a, nocc_a:] += 1/8 * einsum('ia,IiAa->IA', t1_2_a, t2_1_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, nocc_a:] -= 1/8 * einsum('ia,IiaA->IA', t1_2_a, t2_1_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, nocc_a:] -= 1/8 * einsum('ia,iIAa->IA', t1_2_a, t2_1_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, nocc_a:] += 1/8 * einsum('ia,iIaA->IA', t1_2_a, t2_1_a, optimize = einsum_type)
+        rdm1_a[:nocc_a, nocc_a:] += 1/2 * einsum('ia,IiAa->IA', t1_2_a, t2_1_a, optimize = einsum_type)
         rdm1_a[:nocc_a, nocc_a:] += 1/2 * einsum('ia,IiAa->IA', t1_2_b, t2_1_ab, optimize = einsum_type)
 
         rdm1_b[:nocc_b, nocc_b:] += einsum('IA->IA', t1_3_b, optimize = einsum_type).copy()
-        rdm1_b[:nocc_b, nocc_b:] += 1/2 * einsum('ia,iIaA->IA', t1_2_a, t2_1_ab, optimize = einsum_type)
-        rdm1_b[:nocc_b, nocc_b:] += 1/8 * einsum('ia,IiAa->IA', t1_2_b, t2_1_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, nocc_b:] -= 1/8 * einsum('ia,IiaA->IA', t1_2_b, t2_1_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, nocc_b:] -= 1/8 * einsum('ia,iIAa->IA', t1_2_b, t2_1_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, nocc_b:] += 1/8 * einsum('ia,iIaA->IA', t1_2_b, t2_1_b, optimize = einsum_type)
+        rdm1_b[:nocc_b, nocc_b:] += 1/2 * einsum('ia,IiAa->IA', t1_2_a, t2_1_ab, optimize = einsum_type)
+        rdm1_b[:nocc_b, nocc_b:] += 1/2 * einsum('ia,IiAa->IA', t1_2_b, t2_1_b, optimize = einsum_type)
 
         ###### VIR-OCC ###
         rdm1_a[nocc_a:, :nocc_a] = rdm1_a[:nocc_a, nocc_a:].T
@@ -270,49 +208,21 @@ def make_ref_rdm1(adc):
         rdm1_b[nocc_b:, :nocc_b] = rdm1_b[:nocc_b, nocc_b:].T
 
         ##### VIR=VIR ###
-        rdm1_a[nocc_a:, nocc_a:] += 1/16 * einsum('ijAa,ijBa->AB', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[nocc_a:, nocc_a:] -= 1/16 * einsum('ijAa,ijaB->AB', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[nocc_a:, nocc_a:] -= 1/16 * einsum('ijAa,jiBa->AB', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[nocc_a:, nocc_a:] += 1/16 * einsum('ijAa,jiaB->AB', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[nocc_a:, nocc_a:] += 1/16 * einsum('ijBa,ijAa->AB', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[nocc_a:, nocc_a:] -= 1/16 * einsum('ijBa,ijaA->AB', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[nocc_a:, nocc_a:] -= 1/16 * einsum('ijBa,jiAa->AB', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[nocc_a:, nocc_a:] += 1/16 * einsum('ijBa,jiaA->AB', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[nocc_a:, nocc_a:] -= 1/16 * einsum('ijaA,ijBa->AB', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[nocc_a:, nocc_a:] += 1/16 * einsum('ijaA,ijaB->AB', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[nocc_a:, nocc_a:] += 1/16 * einsum('ijaA,jiBa->AB', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[nocc_a:, nocc_a:] -= 1/16 * einsum('ijaA,jiaB->AB', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[nocc_a:, nocc_a:] -= 1/16 * einsum('ijaB,ijAa->AB', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[nocc_a:, nocc_a:] += 1/16 * einsum('ijaB,ijaA->AB', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[nocc_a:, nocc_a:] += 1/16 * einsum('ijaB,jiAa->AB', t2_1_a, t2_2_a, optimize = einsum_type)
-        rdm1_a[nocc_a:, nocc_a:] -= 1/16 * einsum('ijaB,jiaA->AB', t2_1_a, t2_2_a, optimize = einsum_type)
+        rdm1_a[nocc_a:, nocc_a:] += 1/2 * einsum('ijAa,ijBa->AB', t2_1_a, t2_2_a, optimize = einsum_type)
+        rdm1_a[nocc_a:, nocc_a:] += 1/2 * einsum('ijBa,ijAa->AB', t2_1_a, t2_2_a, optimize = einsum_type)
         rdm1_a[nocc_a:, nocc_a:] += einsum('ijAa,ijBa->AB', t2_1_ab, t2_2_ab, optimize = einsum_type)
         rdm1_a[nocc_a:, nocc_a:] += einsum('ijBa,ijAa->AB', t2_1_ab, t2_2_ab, optimize = einsum_type)
 
-        rdm1_b[nocc_b:, nocc_b:] += einsum('ijaA,ijaB->AB', t2_1_ab, t2_2_ab, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] += einsum('ijaB,ijaA->AB', t2_1_ab, t2_2_ab, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] += 1/16 * einsum('ijAa,ijBa->AB', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] -= 1/16 * einsum('ijAa,ijaB->AB', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] -= 1/16 * einsum('ijAa,jiBa->AB', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] += 1/16 * einsum('ijAa,jiaB->AB', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] += 1/16 * einsum('ijBa,ijAa->AB', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] -= 1/16 * einsum('ijBa,ijaA->AB', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] -= 1/16 * einsum('ijBa,jiAa->AB', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] += 1/16 * einsum('ijBa,jiaA->AB', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] -= 1/16 * einsum('ijaA,ijBa->AB', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] += 1/16 * einsum('ijaA,ijaB->AB', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] += 1/16 * einsum('ijaA,jiBa->AB', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] -= 1/16 * einsum('ijaA,jiaB->AB', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] -= 1/16 * einsum('ijaB,ijAa->AB', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] += 1/16 * einsum('ijaB,ijaA->AB', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] += 1/16 * einsum('ijaB,jiAa->AB', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] -= 1/16 * einsum('ijaB,jiaA->AB', t2_1_b, t2_2_b, optimize = einsum_type)
+        rdm1_b[nocc_b:, nocc_b:] += einsum('ijAa,ijBa->AB', t2_1_ab, t2_2_ab, optimize = einsum_type)
+        rdm1_b[nocc_b:, nocc_b:] += einsum('ijBa,ijAa->AB', t2_1_ab, t2_2_ab, optimize = einsum_type)
+        rdm1_b[nocc_b:, nocc_b:] += 1/2 * einsum('ijAa,ijBa->AB', t2_1_b, t2_2_b, optimize = einsum_type)
+        rdm1_b[nocc_b:, nocc_b:] += 1/2 * einsum('ijBa,ijAa->AB', t2_1_b, t2_2_b, optimize = einsum_type)
 
     return (rdm1_a, rdm1_b)
 
-def get_fno_ref(myadc,nroots,ref_state):
+def get_fno_ref(myadc,nroots,ref_state,guess):
     adc2_ref = UADC(myadc._scf,myadc.frozen).set(verbose = 0,method_type = myadc.method_type,with_df = myadc.with_df,if_naf = myadc.if_naf,thresh_naf = myadc.thresh_naf)
-    myadc.e2_ref,myadc.v2_ref,myadc.p2_ref,myadc.x2_ref = adc2_ref.kernel(nroots)
+    myadc.e2_ref,_,_,_ = adc2_ref.kernel(nroots,guess)
     rdm1_gs = adc2_ref.make_ref_rdm1()
     if ref_state is not None:
         rdm1_gs_a = rdm1_gs[0]
@@ -856,8 +766,7 @@ class UADC(lib.StreamObject):
 
 class UFNOADC3(UADC):
     #J. Chem. Phys. 159, 084113 (2023)
-    _keys = UADC._keys | {'delta_e','delta_v','delta_p','delta_x',
-                          'e2_ref','v2_ref','p2_ref','x2_ref',
+    _keys = UADC._keys | {'delta_e','e2_ref',
                           'rdm1_ss','correction','frozen_core','ref_state'
                           }
 
@@ -865,28 +774,19 @@ class UFNOADC3(UADC):
         import copy
         super().__init__(mf, frozen, mo_coeff, mo_occ)
         self.delta_e = None
-        self.delta_v = None
-        self.delta_p = None
-        self.delta_x = None
         self.method = "adc(3)"
         self.correction = correction
         self.e2_ref = None
-        self.v2_ref = None
-        self.p2_ref = None
-        self.x2_ref = None
         self.rdm1_ss = None
         self.ref_state = None
         self.if_naf = True
         self.frozen_core = copy.deepcopy(self.frozen)
 
-    def compute_correction(self, mf, frozen, nroots, eris=None):
+    def compute_correction(self, mf, frozen, nroots, eris=None, guess=None):
         adc2_ssfno = UADC(mf, frozen, self.mo_coeff).set(verbose = 0,method_type = self.method_type,\
                                                          with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,naux = self.naux)
-        e2_ssfno,v2_ssfno,p2_ssfno,x2_ssfno = adc2_ssfno.kernel(nroots, eris = eris)
+        e2_ssfno,v2_ssfno,p2_ssfno,x2_ssfno = adc2_ssfno.kernel(nroots, eris = eris, guess = guess)
         self.delta_e = self.e2_ref - e2_ssfno
-        #self.delta_v = self.v2_ref - v2_ssfno
-        #self.delta_p = self.p2_ref - p2_ssfno
-        #self.delta_x = self.x2_ref - x2_ssfno
 
     def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, ref_state = None):
         import copy
@@ -894,7 +794,7 @@ class UFNOADC3(UADC):
         self.ref_state = ref_state
         self.naux = None
         if ref_state is None:
-            print("Do fnoadc3 calculation")
+            print("Do fno adc3 calculation")
             self.if_naf = False
         elif isinstance(ref_state, int) and 0<ref_state<=nroots:
             print(f"Do ss-fno adc3 calculation, the specic state is {ref_state}")
@@ -902,28 +802,28 @@ class UFNOADC3(UADC):
                 self.if_naf = False
         else:
             raise ValueError("ref_state should be an int type and in (0,nroots]")
-        
-        get_fno_ref(self, nroots, self.ref_state)
+
+        print(f"number of origin orbital is {self._nmo}")
+        get_fno_ref(self, nroots, self.ref_state, guess)
         self.mo_coeff,self.frozen = make_fno(self, self.rdm1_ss, self._scf, thresh)
         adc3_ssfno = UADC(self._scf, self.frozen, self.mo_coeff).set(verbose = self.verbose,method_type = self.method_type,method = "adc(3)",\
                                                          with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,\
                                                             if_heri_eris = self.if_heri_eris)
+        print(f"number of new orbital is {adc3_ssfno._nmo}")
         if not self.correction or self.if_heri_eris is False:
             e_exc, v_exc, spec_fac, x = adc3_ssfno.kernel(nroots, guess, eris)
             if self.correction:
-                self.compute_correction(self._scf, self.frozen, nroots)
+                self.compute_correction(self._scf, self.frozen, nroots, guess=guess)
                 e_exc = e_exc + self.delta_e
         elif self.if_naf:
             e_exc, v_exc, spec_fac, x, eris, self.naux = adc3_ssfno.kernel(nroots, guess, eris)
-            self.compute_correction(self._scf, self.frozen, nroots, eris)
+            self.compute_correction(self._scf, self.frozen, nroots, eris, guess)
             e_exc = e_exc + self.delta_e
         else:
             e_exc, v_exc, spec_fac, x, eris = adc3_ssfno.kernel(nroots, guess, eris)
-            self.compute_correction(self._scf, self.frozen, nroots, eris)
+            self.compute_correction(self._scf, self.frozen, nroots, eris, guess)
             e_exc = e_exc + self.delta_e
-        v_exc = v_exc# + self.delta_v
-        spec_fac = spec_fac# + self.delta_p
-        x = x# + self.delta_x
+
         return e_exc, v_exc, spec_fac, x
 
 if __name__ == '__main__':

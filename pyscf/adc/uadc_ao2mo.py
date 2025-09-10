@@ -416,6 +416,7 @@ def transform_integrals_df(myadc):
         n,N = np.linalg.eigh(W)
         N_trunc = N[:,n>myadc.thresh_naf].T
         myadc.naux = N_trunc.shape[0]
+        print(f"origin naux is {naux}")
         print(f"naux is {myadc.naux}")
         Loo = lib.ddot(N_trunc,Loo)
         eris.Lov = lib.ddot(N_trunc,eris.Lov)

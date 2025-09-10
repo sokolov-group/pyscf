@@ -22685,6 +22685,7 @@ class UADCEE(uadc.UADC):
 
     def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, eris=None):
         if type == "cis":
+            print("Generating CIS initial guess for eigenvector")
             nocc_a = self.nocc_a
             nocc_b = self.nocc_b
             nvir_a = self.nvir_a
