@@ -37,8 +37,6 @@ from pyscf.adc import uadc_ea
 
 
 def ADC(mf, frozen=None, mo_coeff=None, mo_occ=None):
-    if not (frozen is None or frozen == 0):
-        raise NotImplementedError
 
     if mf.istype('UHF'):
         return UADC(mf, frozen, mo_coeff, mo_occ)
@@ -54,8 +52,6 @@ ADC.__doc__ = uadc.UADC.__doc__
 
 
 def UADC(mf, frozen=None, mo_coeff=None, mo_occ=None):
-    if not (frozen is None or frozen == 0):
-        raise NotImplementedError
 
     if not (mf.istype('UHF') or mf.istype('ROHF')):
         mf = mf.to_uhf()
@@ -65,8 +61,6 @@ def UADC(mf, frozen=None, mo_coeff=None, mo_occ=None):
 UADC.__doc__ = uadc.UADC.__doc__
 
 def RADC(mf, frozen=None, mo_coeff=None, mo_occ=None):
-    if not (frozen is None or frozen == 0):
-        raise NotImplementedError
 
     mf = mf.remove_soscf()
     if not mf.istype('RHF'):
@@ -75,3 +69,21 @@ def RADC(mf, frozen=None, mo_coeff=None, mo_occ=None):
     return radc.RADC(mf, frozen, mo_coeff, mo_occ)
 
 RADC.__doc__ = radc.RADC.__doc__
+
+def FNOADC3(mf, frozen=None, mo_coeff=None, mo_occ=None, correction=True):
+    #J. Chem. Phys. 159, 084113 (2023)
+
+    import numpy
+    if mf.istype('UHF'):
+        return uadc.UFNOADC3(mf, frozen, mo_coeff, mo_occ, correction)
+    elif mf.istype('ROHF'):
+        raise NotImplementedError
+    elif mf.istype('RHF'):
+        return radc.RFNOADC3(mf, frozen, mo_coeff, mo_occ, correction)
+    else :
+        raise RuntimeError('ADC3 code only supports RHF, ROHF, and UHF references')
+    
+    
+RADC.__doc__ = radc.RFNOADC3.__doc__
+
+
