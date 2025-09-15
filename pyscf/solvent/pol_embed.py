@@ -220,7 +220,6 @@ class PolEmbed(lib.StreamObject):
                 raise ValueError(f"XR requires an HDF5 file (.h5), but got: {self.h5_file}")
             
             with h5py.File(self.h5_file, "r") as f:
-                # read nbasis robustly
                 nbasis = int(numpy.array(f["num_bas"]).squeeze())
                 xr_raw = numpy.array(f["exchange-repulsion matrix"]).ravel()
                 L = xr_raw.size
@@ -346,8 +345,14 @@ class PolEmbed(lib.StreamObject):
         )
 
         e_ecp = 0.0
+        e_xr = 0.0
+        
         if self.do_ecp:
             e_ecp = numpy.einsum('ij,xij->x', self.V_ecp, dms)[0]
+            
+        if self.use_xr:
+            e_xr = numpy.einsum('ij,xij->x', -self.xr, dms)[0]
+            print(e_xr)
 
         positions = self.cppe_state.positions_polarizable
         n_sites = positions.shape[0]
@@ -376,7 +381,7 @@ class PolEmbed(lib.StreamObject):
                 self.cppe_state.update_induced_moments(elec_fields[i_dm].ravel(), elec_only)
                 induced_moments[i_dm] = numpy.array(self.cppe_state.get_induced_moments())
 
-                e_tot.append(self.cppe_state.total_energy + e_ecp)
+                e_tot.append(self.cppe_state.total_energy + e_ecp + e_xr)
                 e_pol.append(self.cppe_state.energies["Polarization"]["Electronic"])
 
             induced_moments = induced_moments.reshape(n_dm, n_sites, 3)
@@ -395,6 +400,9 @@ class PolEmbed(lib.StreamObject):
             vmat = self.V_es + V_ind
             if self.do_ecp:
                 vmat += self.V_ecp
+            if self.use_xr:
+                if self.xr.shape != vmat[0].shape:
+                    raise ValueError(f"Shape mismatch in XR correction: xr.shape={self.xr.shape}, vmat.shape={vmat.shape}... Is the .h5 file using the same basis set?")
             e = numpy.array(e_tot)
         else:
             vmat = V_ind
@@ -403,12 +411,7 @@ class PolEmbed(lib.StreamObject):
         if is_single_dm:
             e = e[0]
             vmat = vmat[0]
-            
-        if self.use_xr:
-            if self.xr.shape != vmat.shape:
-                raise ValueError(f"Shape mismatch in XR correction: xr.shape={self.xr.shape}, vmat.shape={vmat.shape}... Is the .h5 file using the same basis set?")
-            vmat += self.xr
-            
+                               
         return e, vmat
 
     def _compute_multipole_potential_integrals(self, all_sites, all_orders, all_moments, n_chunks=1):
