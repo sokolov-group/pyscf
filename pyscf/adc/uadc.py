@@ -785,7 +785,6 @@ class UFNOADC3(UADC):
         self.if_naf = True
         self.frozen_core = copy.deepcopy(self.frozen)
         self.trans_guess = False
-        self.if_heri_eris = True
 
 
     def compute_correction(self, mf, frozen, nroots, eris=None, guess=None):
@@ -799,6 +798,7 @@ class UFNOADC3(UADC):
         self.frozen = copy.deepcopy(self.frozen_core)
         self.ref_state = ref_state
         self.naux = None
+        self.if_heri_eris = True
         if ref_state is None:
             print("Do fno adc3 calculation")
             self.if_naf = False
