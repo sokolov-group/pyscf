@@ -73,7 +73,6 @@ RADC.__doc__ = radc.RADC.__doc__
 def FNOADC3(mf, frozen=None, mo_coeff=None, mo_occ=None, correction=True):
     #J. Chem. Phys. 159, 084113 (2023)
 
-    import numpy
     if mf.istype('UHF'):
         return uadc.UFNOADC3(mf, frozen, mo_coeff, mo_occ, correction)
     elif mf.istype('ROHF'):

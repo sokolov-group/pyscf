@@ -1441,7 +1441,7 @@ def make_rdm1_eigenvectors(adc, L, R):
     if adc.method == "adc(3)":
         ### Redudant Variables used for names from SQA
         einsum_type = True
-        t3 = adc.t1[1][:]
+        t3_ce = adc.t1[1][:]
         t2_ccee = adc.t2[1][:]
         ###################################################
 
@@ -1563,9 +1563,9 @@ def make_rdm1_eigenvectors(adc, L, R):
         #----------------------------------------------------------------------------------------------------------#
 ############# block- ia
         ### 030 ###
-        rdm1[:nocc, nocc:] -= einsum('ia,Ia,iA->IA', L1, R1, t3, optimize = einsum_type)
-        rdm1[:nocc, nocc:] -= einsum('ia,iA,Ia->IA', L1, R1, t3, optimize = einsum_type)
-        rdm1[:nocc, nocc:] += 2 * einsum('ia,ia,IA->IA', L1, R1, t3, optimize = einsum_type)
+        rdm1[:nocc, nocc:] -= einsum('ia,Ia,iA->IA', L1, R1, t3_ce, optimize = einsum_type)
+        rdm1[:nocc, nocc:] -= einsum('ia,iA,Ia->IA', L1, R1, t3_ce, optimize = einsum_type)
+        rdm1[:nocc, nocc:] += 2 * einsum('ia,ia,IA->IA', L1, R1, t3_ce, optimize = einsum_type)
         rdm1[:nocc, nocc:] -= einsum('ia,Ia,ijAb,jb->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
         rdm1[:nocc, nocc:] += 1/2 * einsum('ia,Ia,jiAb,jb->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
         rdm1[:nocc, nocc:] += 1/2 * einsum('ia,Ib,ijAa,jb->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
@@ -1748,7 +1748,15 @@ class RADCEE(radc.RADC):
     analyze_spec_factor = analyze_spec_factor
     get_properties = get_properties
 
-    def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, eris=None):
+    def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, eris=None, ini=None):
+        def der_sig(n_singles,nocc,nvir,dim,M_ab):
+            def sigma_(r):
+                r1 = r[0:n_singles]
+                s = np.zeros(dim)
+                s[0:n_singles] = lib.einsum('ab,b->a',M_ab,r1, optimize = True)
+                return s
+            return sigma_
+
         if (type=="cis"):
             print("Generating CIS initial guess for eigenvector")
             
@@ -1756,6 +1764,7 @@ class RADCEE(radc.RADC):
             nextern = self._nvir
             n_singles = ncore * nextern
             n_doubles = ncore * ncore * nextern * nextern
+            dim = n_singles + n_doubles
 
             einsum = lib.einsum
             einsum_type = True
@@ -1775,17 +1784,34 @@ class RADCEE(radc.RADC):
 
             ####010#####################
             M_ab -= einsum('ILAD->IDLA', v_ccee, optimize = einsum_type).copy()
-            M_ab += einsum('LADI->IDLA', v_ceec, optimize = einsum_type).copy()
-
-            M_ab += einsum('LADI->IDLA', v_ceec, optimize = einsum_type).copy()
+            M_ab += 2 * einsum('LADI->IDLA', v_ceec, optimize = einsum_type).copy()
 
             M_ab = M_ab.reshape(n_singles, n_singles)
-            from scipy.linalg import eigh
-            uu, vecs = eigh(M_ab)
-            vecs=vecs[:,:nroots]
+            guess = self.get_init_guess(nroots, diag, ascending = True)
+            sigma = der_sig(n_singles,ncore,nextern,dim,M_ab)
+            conv, uu, g = lib.linalg_helper.davidson_nosym1(
+            lambda xs : [sigma(x) for x in xs],
+            guess, diag, nroots=nroots, verbose=self.verbose, tol=self.conv_tol, max_memory=self.max_memory,
+            max_cycle=self.max_cycle, max_space=self.max_space, tol_residual=self.tol_residual)
+            nfalse = np.shape(conv)[0] - np.sum(conv)
+            if nfalse >= 1:
+                print("ADC1 Davidson iterations for " + str(nfalse) + " root(s) did not converge!!!")
+            g = np.array(g).T
             if not ascending:
                 vecs = vecs[:, ::-1]
-            g = np.vstack([vecs, np.zeros((n_doubles, vecs.shape[1]), dtype=vecs.dtype)])
+        elif (type=="read"):
+            print("obtain initial guess from input variable")
+            ncore = self._nocc
+            nextern = self._nvir
+            n_singles = ncore * nextern
+            n_doubles = ncore * ncore * nextern * nextern
+            dim = n_singles + n_doubles
+            if isinstance(ini, list):
+                g = np.array(ini)
+            else:
+                g = ini
+            if g.shape[0] != dim or g.shape[1] != nroots:
+                raise ValueError(f"Shape of guess should be ({dim},{nroots})")
         else:
             if diag is None :
                 diag = self.get_diag()

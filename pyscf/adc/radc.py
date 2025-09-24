@@ -67,8 +67,10 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     if guess is None:
         guess = adc.get_init_guess(nroots, diag, ascending = True)
-    elif guess == "cis" and adc.method_type == "ee":
+    elif isinstance(guess, str) and guess == "cis" and adc.method_type == "ee":
         guess = adc.get_init_guess(nroots, diag, ascending = True, type = "cis", eris = eris)
+    elif hasattr(guess, '__len__'):
+        guess = adc.get_init_guess(nroots, diag, ascending = True, type = "read", ini = guess)
     else:
         raise NotImplementedError("Guess type not implemented")
 
@@ -187,7 +189,7 @@ def get_fno_ref(myadc,nroots,ref_state,guess):
     adc2_ref = RADC(myadc._scf).set(verbose = 0,method_type = myadc.method_type,\
                                     with_df = myadc.with_df,if_naf = myadc.if_naf,thresh_naf = myadc.thresh_naf,\
                                     ncvs = myadc.ncvs)
-    myadc.e2_ref,_,_,_ = adc2_ref.kernel(nroots,guess=guess)
+    myadc.e2_ref,myadc.v2_ref,_,_ = adc2_ref.kernel(nroots,guess=guess)
     rdm1_gs = adc2_ref.make_ref_rdm1()
     if ref_state is not None:
         rdm1_ref = adc2_ref.make_rdm1()[ref_state - 1]
@@ -553,8 +555,8 @@ class RADC(lib.StreamObject):
 
 class RFNOADC3(RADC):
     #J. Chem. Phys. 159, 084113 (2023)
-    _keys = RADC._keys | {'delta_e','e2_ref',
-                          'rdm1_ss','correction','frozen_core','ref_state'
+    _keys = RADC._keys | {'delta_e','e2_ref','v2_ref'
+                          'rdm1_ss','correction','frozen_core','ref_state','trans_guess'
                           }
 
     def __init__(self, mf, frozen=0, mo_coeff=None, mo_occ=None, correction=True):
@@ -564,16 +566,18 @@ class RFNOADC3(RADC):
         self.method = "adc(3)"
         self.correction = correction
         self.e2_ref = None
+        self.v2_ref = None
         self.rdm1_ss = None
         self.ref_state = None
         self.if_naf = True
         self.frozen_core = copy.deepcopy(self.frozen)
+        self.trans_guess = False
 
     def compute_correction(self, mf, frozen, nroots, eris=None, guess=None):
         adc2_ssfno = RADC(mf, frozen, self.mo_coeff).set(verbose = 0,method_type = self.method_type,\
                                                          with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,naux = self.naux,\
                                                          ncvs = self.ncvs)
-        e2_ssfno,v2_ssfno,p2_ssfno,x2_ssfno = adc2_ssfno.kernel(nroots, eris = eris)
+        e2_ssfno,v2_ssfno,p2_ssfno,x2_ssfno = adc2_ssfno.kernel(nroots, eris = eris, guess=guess)
         self.delta_e = self.e2_ref - e2_ssfno
 
     def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, ref_state = None):
@@ -581,6 +585,7 @@ class RFNOADC3(RADC):
         self.frozen = copy.deepcopy(self.frozen_core)
         self.ref_state = ref_state
         self.naux = None
+        self.if_heri_eris = True
         if ref_state is None:
             print("Do fno adc3 calculation")
             self.if_naf = False
@@ -598,18 +603,18 @@ class RFNOADC3(RADC):
                                                          with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,\
                                                             if_heri_eris = self.if_heri_eris,ncvs = self.ncvs)
         print(f"number of new orbital is {adc3_ssfno._nmo}")
-        if not self.correction or self.if_heri_eris is False:
-            e_exc, v_exc, spec_fac, x = adc3_ssfno.kernel(nroots, guess, eris)
-            if self.correction:
-                self.compute_correction(self._scf, self.frozen, nroots, guess=guess)
-                e_exc = e_exc + self.delta_e
-        elif self.if_naf:
-            e_exc, v_exc, spec_fac, x, eris, self.naux = adc3_ssfno.kernel(nroots, guess, eris)
-            self.compute_correction(self._scf, self.frozen, nroots, eris, guess)
-            e_exc = e_exc + self.delta_e
+        if self.if_naf:
+            if self.trans_guess:
+                e_exc, v_exc, spec_fac, x, eris, self.naux = adc3_ssfno.kernel(nroots, guess=self.v2_ref, eris=eris)
+            else:
+                e_exc, v_exc, spec_fac, x, eris, self.naux = adc3_ssfno.kernel(nroots, guess, eris)
         else:
-            e_exc, v_exc, spec_fac, x, eris = adc3_ssfno.kernel(nroots, guess, eris)
-            self.compute_correction(self._scf, self.frozen, nroots, eris, guess)
+            if self.trans_guess:
+                e_exc, v_exc, spec_fac, x, eris = adc3_ssfno.kernel(nroots, guess=self.v2_ref, eris=eris)
+            else:
+                e_exc, v_exc, spec_fac, x, eris = adc3_ssfno.kernel(nroots, guess, eris)
+        if self.correction:
+            self.compute_correction(self._scf, self.frozen, nroots, eris, guess=v_exc)
             e_exc = e_exc + self.delta_e
 
         return e_exc, v_exc, spec_fac, x

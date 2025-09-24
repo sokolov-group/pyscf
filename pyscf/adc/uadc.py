@@ -72,8 +72,10 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     if guess is None:
         guess = adc.get_init_guess(nroots, diag, ascending = True)
-    elif guess=="cis" and adc.method_type == "ee":
+    elif  isinstance(guess, str) and guess == "cis" and adc.method_type == "ee":
         guess = adc.get_init_guess(nroots, diag, ascending = True, type="cis", eris=eris)
+    elif isinstance(guess, np.ndarray) or isinstance(guess, list):
+        guess = adc.get_init_guess(nroots, diag, ascending = True, type = "read", ini = guess)
     else:
         raise NotImplementedError("Guess type not implemented")
 
@@ -222,7 +224,7 @@ def make_ref_rdm1(adc):
 
 def get_fno_ref(myadc,nroots,ref_state,guess):
     adc2_ref = UADC(myadc._scf,myadc.frozen).set(verbose = 0,method_type = myadc.method_type,with_df = myadc.with_df,if_naf = myadc.if_naf,thresh_naf = myadc.thresh_naf)
-    myadc.e2_ref,_,_,_ = adc2_ref.kernel(nroots,guess)
+    myadc.e2_ref,myadc.v2_ref,_,_ = adc2_ref.kernel(nroots,guess)
     rdm1_gs = adc2_ref.make_ref_rdm1()
     if ref_state is not None:
         rdm1_gs_a = rdm1_gs[0]
@@ -766,8 +768,8 @@ class UADC(lib.StreamObject):
 
 class UFNOADC3(UADC):
     #J. Chem. Phys. 159, 084113 (2023)
-    _keys = UADC._keys | {'delta_e','e2_ref',
-                          'rdm1_ss','correction','frozen_core','ref_state'
+    _keys = UADC._keys | {'delta_e','e2_ref', 'v2_ref'
+                          'rdm1_ss','correction','frozen_core','ref_state','trans_guess'
                           }
 
     def __init__(self, mf, frozen=0, mo_coeff=None, mo_occ=None, correction=True):
@@ -777,10 +779,14 @@ class UFNOADC3(UADC):
         self.method = "adc(3)"
         self.correction = correction
         self.e2_ref = None
+        self.v2_ref = None
         self.rdm1_ss = None
         self.ref_state = None
         self.if_naf = True
         self.frozen_core = copy.deepcopy(self.frozen)
+        self.trans_guess = False
+        self.if_heri_eris = True
+
 
     def compute_correction(self, mf, frozen, nroots, eris=None, guess=None):
         adc2_ssfno = UADC(mf, frozen, self.mo_coeff).set(verbose = 0,method_type = self.method_type,\
@@ -810,18 +816,18 @@ class UFNOADC3(UADC):
                                                          with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,\
                                                             if_heri_eris = self.if_heri_eris)
         print(f"number of new orbital is {adc3_ssfno._nmo}")
-        if not self.correction or self.if_heri_eris is False:
-            e_exc, v_exc, spec_fac, x = adc3_ssfno.kernel(nroots, guess, eris)
-            if self.correction:
-                self.compute_correction(self._scf, self.frozen, nroots, guess=guess)
-                e_exc = e_exc + self.delta_e
-        elif self.if_naf:
-            e_exc, v_exc, spec_fac, x, eris, self.naux = adc3_ssfno.kernel(nroots, guess, eris)
-            self.compute_correction(self._scf, self.frozen, nroots, eris, guess)
-            e_exc = e_exc + self.delta_e
+        if self.if_naf:
+            if self.trans_guess:
+                e_exc, v_exc, spec_fac, x, eris, self.naux = adc3_ssfno.kernel(nroots, guess=self.v2_ref, eris=eris)
+            else:
+                e_exc, v_exc, spec_fac, x, eris, self.naux = adc3_ssfno.kernel(nroots, guess, eris)
         else:
-            e_exc, v_exc, spec_fac, x, eris = adc3_ssfno.kernel(nroots, guess, eris)
-            self.compute_correction(self._scf, self.frozen, nroots, eris, guess)
+            if self.trans_guess:
+                e_exc, v_exc, spec_fac, x, eris = adc3_ssfno.kernel(nroots, guess=self.v2_ref, eris=eris)
+            else:
+                e_exc, v_exc, spec_fac, x, eris = adc3_ssfno.kernel(nroots, guess, eris)
+        if self.correction:
+            self.compute_correction(self._scf, self.frozen, nroots, eris, guess=v_exc)
             e_exc = e_exc + self.delta_e
 
         return e_exc, v_exc, spec_fac, x

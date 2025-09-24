@@ -2099,6 +2099,7 @@ class UADCIP(uadc.UADC):
         self.U = adc.U
         self.P = adc.P
         self.X = adc.X
+        self.frozen = adc.frozen
 
     kernel = uadc.kernel
     get_imds = get_imds
@@ -2113,19 +2114,46 @@ class UADCIP(uadc.UADC):
     compute_dyson_mo = compute_dyson_mo
     make_rdm1 = make_rdm1
 
-    def get_init_guess(self, nroots=1, diag=None, ascending=True):
-        if diag is None :
-            diag = self.get_diag()
-        idx = None
-        if ascending:
-            idx = np.argsort(diag)
+    def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None):
+        if (type=="read"):
+            print("obtain initial guess from input variable")
+            nocc_a = self.nocc_a
+            nocc_b = self.nocc_b
+            nvir_a = self.nvir_a
+            nvir_b = self.nvir_b
+            n_singles_a = nocc_a
+            n_singles_b = nocc_b
+            n_doubles_aaa = nocc_a* (nocc_a - 1) * nvir_a // 2
+            n_doubles_bab = nvir_b * nocc_a* nocc_b
+            n_doubles_aba = nvir_a * nocc_b* nocc_a
+            n_doubles_bbb = nocc_b* (nocc_b - 1) * nvir_b // 2
+
+            dim = n_singles_a + n_singles_b + n_doubles_aaa + n_doubles_bab + n_doubles_aba + n_doubles_bbb
+            if isinstance(ini, list):
+                g = np.array(ini)
+            else:
+                g = ini
+            if g.shape[0] != dim or g.shape[1] != nroots:
+                if self.frozen is None:
+                    raise ValueError(f"Shape of guess should be ({dim},{nroots})")
+                else:
+                    g = self.fro_guess(g,self.frozen)
+                    if (g.shape[0] != dim or g.shape[1] != nroots):
+                        raise ValueError(f"Shape of guess should be ({dim},{nroots})")
+
         else:
-            idx = np.argsort(diag)[::-1]
-        guess = np.zeros((diag.shape[0], nroots))
-        min_shape = min(diag.shape[0], nroots)
-        guess[:min_shape,:min_shape] = np.identity(min_shape)
-        g = np.zeros((diag.shape[0], nroots))
-        g[idx] = guess.copy()
+            if diag is None :
+                diag = self.get_diag()
+            idx = None
+            if ascending:
+                idx = np.argsort(diag)
+            else:
+                idx = np.argsort(diag)[::-1]
+            guess = np.zeros((diag.shape[0], nroots))
+            min_shape = min(diag.shape[0], nroots)
+            guess[:min_shape,:min_shape] = np.identity(min_shape)
+            g = np.zeros((diag.shape[0], nroots))
+            g[idx] = guess.copy()
         guess = []
         for p in range(g.shape[1]):
             guess.append(g[:,p])
@@ -2138,3 +2166,70 @@ class UADCIP(uadc.UADC):
         matvec = self.matvec(imds, eris)
         #matvec = lambda x: self.matvec()
         return matvec, diag
+
+    def fro_guess(self,ini,frozen):
+        nocc = self._scf.nelec
+        nocc_a = nocc[0]
+        nocc_b = nocc[1]
+        if frozen[0] is None:
+            pass
+        elif isinstance(frozen[0], (int, np.integer)):
+            nvir_a = self.nvir_a
+            olist_a = list(range(frozen[0],nocc_a))
+            vlist_a = list(range(nvir_a))
+        elif hasattr(frozen[0], '__len__'):
+            nvir_a = self._nmo[0] + len(frozen[0]) - nocc_a
+            vlist_a = list(range(nvir_a))
+            olist_a = list(range(nocc_a))
+        for n in frozen[0]:
+            if n < nocc_a:
+                olist_a.remove(n)
+            else:
+                vlist_a.remove(n-nocc_a)
+
+        if frozen[1] is None:
+            pass
+        elif isinstance(frozen[1], (int, np.integer)):
+            nvir_b = self.nvir_b
+            olist_b = list(range(frozen[1],nocc_b))
+            vlist_b = list(range(self.nvir_b))
+        elif hasattr(frozen[1], '__len__'):
+            nvir_b = self._nmo[1] + len(frozen[1]) - nocc_b
+            vlist_b = list(range(nvir_b))
+            olist_b = list(range(nocc_b))
+        for n in frozen[1]:
+            if n < nocc_b:
+                olist_b.remove(n)
+            else:
+                vlist_b.remove(n-nocc_b)
+
+        sidx_a = np.zeros(nocc_a, dtype=bool)
+        sidx_b = np.zeros(nocc_b, dtype=bool)
+        didx_aaa = np.zeros((nvir_a, nocc_a, nocc_a), dtype=bool)
+        didx_bab = np.zeros((nvir_b, nocc_a, nocc_b), dtype=bool)
+        didx_aba = np.zeros((nvir_a, nocc_b, nocc_a), dtype=bool)
+        didx_bbb = np.zeros((nvir_b, nocc_b, nocc_b), dtype=bool)
+        for n, i in enumerate(olist_a):
+            sidx_a[i] = True
+            for j in vlist_a:
+                for k in olist_a[n:]:
+                    didx_aaa[j][i][k] = True
+            for j in vlist_b:
+                for k in olist_b:
+                    didx_bab[j][i][k] = True
+        for n, i in enumerate(olist_b):
+            sidx_b[i] = True
+            for j in vlist_b:
+                for k in olist_b[n:]:
+                    didx_bbb[j][i][k] = True
+            for j in vlist_a:
+                for k in olist_a:
+                    didx_aba[j][i][k] = True
+        mask_a = np.triu(np.ones(nocc_a, dtype=bool), k=1)
+        mask_b = np.triu(np.ones(nocc_a, dtype=bool), k=1)
+        flat_mask_a = mask_a.ravel()
+        flat_mask_b = mask_b.ravel() 
+        didx_aaa = didx_aaa.reshape(nvir_a, -1)[:, flat_mask_a].ravel()
+        didx_bbb = didx_bbb.reshape(nvir_b, -1)[:, flat_mask_b].ravel()
+        ini = ini[np.concatenate((sidx_a, sidx_b, didx_aaa, didx_bab.ravel(), didx_aba.ravel(), didx_bbb))]
+        return ini

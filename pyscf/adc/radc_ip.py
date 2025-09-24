@@ -1349,7 +1349,7 @@ class RADCIP(radc.RADC):
         'max_space', 't2', 'max_cycle',
         'nmo', 'transform_integrals', 'with_df', 'if_naf', 'naux','compute_properties',
         'approx_trans_moments', 'E', 'U', 'P', 'X',
-        'evec_print_tol', 'spec_factor_print_tol',
+        'evec_print_tol', 'spec_factor_print_tol', 'frozen'
     }
 
     def __init__(self, adc):
@@ -1380,6 +1380,7 @@ class RADCIP(radc.RADC):
         self.approx_trans_moments = adc.approx_trans_moments
         self.if_naf = adc.if_naf
         self.naux = adc.naux
+        self.frozen = adc.frozen
 
         self.evec_print_tol = adc.evec_print_tol
         self.spec_factor_print_tol = adc.spec_factor_print_tol
@@ -1403,19 +1404,39 @@ class RADCIP(radc.RADC):
     compute_dyson_mo = compute_dyson_mo
     make_rdm1 = make_rdm1
 
-    def get_init_guess(self, nroots=1, diag=None, ascending=True):
-        if diag is None :
-            diag = self.get_diag()
-        idx = None
-        if ascending:
-            idx = np.argsort(diag)
+    def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None):
+        if (type=="read"):
+            print("obtain initial guess from input variable")
+            ncore = self._nocc
+            nextern = self._nvir
+            n_singles = ncore
+            n_doubles = ncore * ncore * nextern
+            dim = n_singles + n_doubles
+            if isinstance(ini, list):
+                g = np.array(ini)
+            else:
+                g = ini
+            if g.shape[0] != dim or g.shape[1] != nroots:
+                if self.frozen is None:
+                    raise ValueError(f"Shape of guess should be ({dim},{nroots})")
+                else:
+                    g = self.fro_guess(g,self.frozen)
+                    if (g.shape[0] != dim or g.shape[1] != nroots):
+                        raise ValueError(f"Shape of guess should be ({dim},{nroots})")
+
         else:
-            idx = np.argsort(diag)[::-1]
-        guess = np.zeros((diag.shape[0], nroots))
-        min_shape = min(diag.shape[0], nroots)
-        guess[:min_shape,:min_shape] = np.identity(min_shape)
-        g = np.zeros((diag.shape[0], nroots))
-        g[idx] = guess.copy()
+            if diag is None :
+                diag = self.get_diag()
+            idx = None
+            if ascending:
+                idx = np.argsort(diag)
+            else:
+                idx = np.argsort(diag)[::-1]
+            guess = np.zeros((diag.shape[0], nroots))
+            min_shape = min(diag.shape[0], nroots)
+            guess[:min_shape,:min_shape] = np.identity(min_shape)
+            g = np.zeros((diag.shape[0], nroots))
+            g[idx] = guess.copy()
         guess = []
         for p in range(g.shape[1]):
             guess.append(g[:,p])
@@ -1427,3 +1448,32 @@ class RADCIP(radc.RADC):
         diag = self.get_diag(imds, eris)
         matvec = self.matvec(imds, eris)
         return matvec, diag
+
+    def fro_guess(self,ini,frozen):
+        nocc = self._scf.mol.nelectron//2
+        if isinstance(frozen, (int, np.integer)):
+            sidx = np.zeros(nocc, dtype=bool)
+            didx = np.zeros((self._nvir, nocc, nocc), dtype=bool)
+            vlist = list(range(self._nvir))
+            olist = list(range(frozen,nocc))
+        elif hasattr(frozen, '__len__'):
+            nvir = self._nmo + len(frozen) - nocc
+            sidx = np.zeros(nocc, dtype=bool)
+            didx = np.zeros((nvir, nocc, nocc), dtype=bool)
+            vlist = list(range(nvir))
+            olist = list(range(nocc))
+            for n in frozen:
+                if n < nocc:
+                    olist.remove(n)
+                else:
+                    vlist.remove(n-nocc)
+        for i in olist:
+            sidx[i] = True
+            for j in vlist:
+                for k in olist:
+                    didx[j][i][k] = True
+        didx = didx.ravel()
+        ini = ini[np.concatenate((sidx, didx))]
+        return ini
+
+

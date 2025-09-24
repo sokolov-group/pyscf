@@ -22683,7 +22683,20 @@ class UADCEE(uadc.UADC):
     analyze_spec_factor = analyze_spec_factor
     analyze = analyze
 
-    def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, eris=None):
+    def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, eris=None, ini=None):
+        def der_sig(s_aa,f_aa,s_bb,f_bb,dim,M_ia_jb_a,M_ia_jb_b,M_aabb):
+            def sigma_(r):
+                r1_a = r[s_aa:f_aa]
+                r1_b = r[s_bb:f_bb]
+                s = np.zeros(dim)
+                s[s_aa:f_aa] = lib.einsum('ab,b->a', M_ia_jb_a, r1_a, optimize=True)
+
+                s[s_bb:f_bb] = lib.einsum('ab,b->a', M_ia_jb_b, r1_b, optimize=True)
+
+                s[s_aa:f_aa] += lib.einsum('ab,b->a', M_aabb, r1_b, optimize=True)
+                s[s_bb:f_bb] += lib.einsum('ba,b->a', M_aabb, r1_a, optimize=True)
+                return s
+            return sigma_
         if type == "cis":
             print("Generating CIS initial guess for eigenvector")
             nocc_a = self.nocc_a
@@ -22732,12 +22745,38 @@ class UADCEE(uadc.UADC):
             M_f[s_aa:f_aa, s_bb:f_bb] = M_aabb
             M_f[s_bb:f_bb, s_aa:f_aa] = M_aabb.T
 
-            from scipy.linalg import eigh
-            uu, vecs = eigh(M_f)
-            vecs=vecs[:,:nroots]
+            guess = self.get_init_guess(nroots, diag, ascending = True)
+            sigma = der_sig(s_aa,f_aa,s_bb,f_bb,dim,M_ia_jb_a,M_ia_jb_b,M_aabb)
+            conv, uu, g = lib.linalg_helper.davidson_nosym1(
+            lambda xs : [sigma(x) for x in xs],
+            guess, diag, nroots=nroots, verbose=self.verbose, tol=self.conv_tol, max_memory=self.max_memory,
+            max_cycle=self.max_cycle, max_space=self.max_space, tol_residual=self.tol_residual)
+            nfalse = np.shape(conv)[0] - np.sum(conv)
+            if nfalse >= 1:
+                print("ADC1 Davidson iterations for " + str(nfalse) + " root(s) did not converge!!!")
+            g = np.array(g).T
             if not ascending:
                 vecs = vecs[:, ::-1]
-            g = np.vstack([vecs, np.zeros((dim-dim_a-dim_b, vecs.shape[1]), dtype=vecs.dtype)])
+        elif (type=="read"):
+            print("obtain initial guess from input variable")
+            nocc_a = self.nocc_a
+            nocc_b = self.nocc_b
+            nvir_a = self.nvir_a
+            nvir_b = self.nvir_b
+            n_singles_a = nocc_a * nvir_a
+            dim_a = int(n_singles_a)
+            n_singles_b = nocc_b * nvir_b
+            dim_b = int(n_singles_b)
+            n_doubles_aaaa = nocc_a * (nocc_a - 1) * nvir_a * (nvir_a - 1) // 4
+            n_doubles_abab = nocc_a * nocc_b * nvir_a * nvir_b
+            n_doubles_bbbb = nocc_b * (nocc_b - 1) * nvir_b * (nvir_b - 1) // 4
+            dim = int(n_singles_a + n_singles_b + n_doubles_aaaa + n_doubles_abab + n_doubles_bbbb)
+            if isinstance(ini, list):
+                g = np.array(ini)
+            else:
+                g = ini
+            if g.shape[0] != dim or g.shape[1] != nroots:
+                raise ValueError(f"Shape of guess should be ({dim},{nroots})")
         else:
             if diag is None:
                 diag = self.get_diag()
