@@ -351,8 +351,11 @@ class PolEmbed(lib.StreamObject):
             e_ecp = numpy.einsum('ij,xij->x', self.V_ecp, dms)[0]
             
         if self.use_xr:
+           
             e_xr = numpy.einsum('ij,xij->x', -self.xr, dms)[0]
+            e_xr = e_xr 
             print(e_xr)
+
 
         positions = self.cppe_state.positions_polarizable
         n_sites = positions.shape[0]
@@ -393,9 +396,9 @@ class PolEmbed(lib.StreamObject):
             V_ind = V_ind + V_ind.transpose(0, 2, 1)
         else:
             for i_dm in range(n_dm):
-                e_tot.append(self.cppe_state.total_energy + e_ecp)
+                e_tot.append(self.cppe_state.total_energy + e_ecp + e_xr)
                 e_pol.append(0.0)
-
+                
         if not elec_only:
             vmat = self.V_es + V_ind
             if self.do_ecp:
@@ -410,8 +413,7 @@ class PolEmbed(lib.StreamObject):
 
         if is_single_dm:
             e = e[0]
-            vmat = vmat[0]
-                               
+            vmat = vmat[0]         
         return e, vmat
 
     def _compute_multipole_potential_integrals(self, all_sites, all_orders, all_moments, n_chunks=1):
