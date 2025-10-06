@@ -55,10 +55,10 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     guess = adc.get_init_guess(nroots, diag, ascending = True)
     
-    if  adc.lanczos == True:
+    if adc.lanczos == True:
         print('hi')
         exit()
-        conv, adc.E, U = lib.linalg_helper.lanczos(
+        conv, adc.E, U = lib.linalg_helper.lanczos_no_sym(
             lambda xs : [matvec(x) for x in xs],
             guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol,
             max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual=adc.tol_residual)
