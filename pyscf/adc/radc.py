@@ -54,11 +54,20 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     matvec, diag = adc.gen_matvec(imds, eris)
 
     guess = adc.get_init_guess(nroots, diag, ascending = True)
+    
+    if  adc.lanczos == True:
+        print('hi')
+        exit()
+        conv, adc.E, U = lib.linalg_helper.lanczos(
+            lambda xs : [matvec(x) for x in xs],
+            guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol,
+            max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual=adc.tol_residual)
 
-    conv, adc.E, U = lib.linalg_helper.davidson_nosym1(
-        lambda xs : [matvec(x) for x in xs],
-        guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol,
-        max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual=adc.tol_residual)
+    else:
+        conv, adc.E, U = lib.linalg_helper.davidson_nosym1(
+            lambda xs : [matvec(x) for x in xs],
+            guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol,
+            max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual=adc.tol_residual)
 
     adc.U = np.array(U).T.copy()
 
@@ -194,7 +203,7 @@ class RADC(lib.StreamObject):
         'scf_energy', 'e_tot', 't1', 't2', 'frozen', 'chkfile',
         'max_space', 'mo_occ', 'max_cycle', 'imds', 'with_df', 'compute_properties',
         'approx_trans_moments', 'evec_print_tol', 'spec_factor_print_tol',
-        'E', 'U', 'P', 'X', 'ncvs', 'dip_mom', 'dip_mom_nuc'
+        'E', 'U', 'P', 'X', 'ncvs', 'dip_mom', 'dip_mom_nuc', 'lanczos'
     }
 
     def __init__(self, mf, frozen=0, mo_coeff=None, mo_occ=None):
@@ -242,6 +251,7 @@ class RADC(lib.StreamObject):
         self.evec_print_tol = 0.1
         self.spec_factor_print_tol = 0.1
         self.ncvs = None
+        self.lanczos = False
 
         self.E = None
         self.U = None

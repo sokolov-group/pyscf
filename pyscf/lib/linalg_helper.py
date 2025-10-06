@@ -401,6 +401,8 @@ def davidson1(aop, x0, precond, tol=1e-12, max_cycle=50, max_space=12,
     fresh_start = True
     e = None
     v = None
+    print('this is the function for unrestricted ref.')
+    #exit()
     conv = numpy.zeros(nroots, dtype=bool)
     emin = None
 
@@ -777,7 +779,8 @@ def davidson_nosym1(aop, x0, precond, tol=1e-12, max_cycle=50, max_space=20,
     v = None
     conv = numpy.zeros(nroots, dtype=bool)
     emin = None
-
+    print('this is the function for restricted ref.')
+    
     for icyc in range(max_cycle):
         if fresh_start:
             if _incore:
