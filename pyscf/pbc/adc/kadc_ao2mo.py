@@ -38,7 +38,7 @@ def transform_integrals_incore(myadc):
     nvir = nmo - nocc
     dtype = myadc.mo_coeff[0].dtype
 
-    mo_coeff = myadc.mo_coeff = padded_mo_coeff(myadc, myadc.mo_coeff)
+    mo_coeff = padded_mo_coeff(myadc, myadc.mo_coeff)
 
     fao2mo = myadc._scf.with_df.ao2mo
 
@@ -74,7 +74,7 @@ def transform_integrals_incore(myadc):
             eris.ovvv[kp,kq,kr] = eri_kpt_symm[:nocc,nocc:,nocc:,nocc:]/nkpts
             eris.ovvo[kp,kq,kr] = eri_kpt_symm[:nocc,nocc:,nocc:,:nocc]/nkpts
 
-    if (myadc.method == "adc(2)-x" and myadc.higher_excitations is True) or (myadc.method == "adc(3)"):
+    if (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False) or (myadc.method == "adc(3)"):
         eris.vvvv = myadc._scf.with_df.ao2mo_7d(orbv, factor=1./nkpts).transpose(0,2,1,3,5,4,6)
 
     return eris
@@ -94,7 +94,7 @@ def transform_integrals_outcore(myadc):
 
     dtype = myadc.mo_coeff[0].dtype
 
-    mo_coeff = myadc.mo_coeff = padded_mo_coeff(myadc, myadc.mo_coeff)
+    mo_coeff = padded_mo_coeff(myadc, myadc.mo_coeff)
 
     fao2mo = myadc._scf.with_df.ao2mo
 
@@ -152,7 +152,7 @@ def transform_integrals_outcore(myadc):
                 eris.ovvv[kp, kq, kr, :, :, :, :] = buf_kpt[:, :, nocc:, nocc:] / nkpts
             cput1 = log.timer_debug1('transforming ovpq', *cput1)
 
-    if (myadc.method == "adc(2)-x" and myadc.higher_excitations is True) or (myadc.method == "adc(3)"):
+    if (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False) or (myadc.method == "adc(3)"):
         mem_now = lib.current_memory()[0]
         if nvir ** 4 * 16 / 1e6 + mem_now < myadc.max_memory:
             for (ikp, ikq, ikr) in khelper.symm_map.keys():
@@ -209,7 +209,7 @@ def transform_integrals_df(myadc):
         myadc._scf.with_df.build()
     dtype = myadc.mo_coeff[0].dtype
 
-    mo_coeff = myadc.mo_coeff = padded_mo_coeff(myadc, myadc.mo_coeff)
+    mo_coeff = padded_mo_coeff(myadc, myadc.mo_coeff)
 
     kconserv = myadc.khelper.kconserv
 
