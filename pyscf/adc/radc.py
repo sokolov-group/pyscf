@@ -186,8 +186,8 @@ def make_ref_rdm1(adc):
     return 2 * OPDM
 
 def get_fno_ref(myadc,nroots,ref_state,guess):
-    adc2_ref = RADC(myadc._scf).set(verbose = 0,method_type = myadc.method_type,\
-                                    with_df = myadc.with_df,if_naf = myadc.if_naf,thresh_naf = myadc.thresh_naf,\
+    adc2_ref = RADC(myadc._scf).set(verbose = 0,method_type = myadc.method_type,
+                                    with_df = myadc.with_df,if_naf = myadc.if_naf,thresh_naf = myadc.thresh_naf,
                                     ncvs = myadc.ncvs)
     myadc.e2_ref,myadc.v2_ref,_,_ = adc2_ref.kernel(nroots,guess=guess)
     rdm1_gs = adc2_ref.make_ref_rdm1()
@@ -205,7 +205,7 @@ def make_fno(myadc, rdm1_ss, mf, thresh):
     myadc._nmo = None
     masks = mp2._mo_splitter(myadc)
     myadc._nmo = nmo
-    
+
     n,V = numpy.linalg.eigh(rdm1_ss[nocc:,nocc:])
     idx = numpy.argsort(n)[::-1]
     n,V = n[idx], V[:,idx]
@@ -221,7 +221,7 @@ def make_fno(myadc, rdm1_ss, mf, thresh):
     F_na_trunc = V_trunc.T.dot(F_can).dot(V_trunc)
     _,Z_na_trunc = numpy.linalg.eigh(F_na_trunc[:n_keep,:n_keep])
     U_vir_act = orbvir.dot(V_trunc[:,:n_keep]).dot(Z_na_trunc)
-    U_vir_fro = orbvir.dot(V_trunc[:,n_keep:]) 
+    U_vir_fro = orbvir.dot(V_trunc[:,n_keep:])
     no_comp = (orboccfrz0,orbocc,U_vir_act,U_vir_fro,orbvirfrz0)
     no_coeff = numpy.hstack(no_comp)
     nocc_loc = numpy.cumsum([0]+[x.shape[1] for x in no_comp]).astype(int)
@@ -267,7 +267,7 @@ class RADC(lib.StreamObject):
         'scf_energy', 'e_tot', 't1', 't2', 'frozen', 'chkfile',
         'max_space', 'mo_occ', 'max_cycle', 'imds', 'with_df', 'compute_properties',
         'approx_trans_moments', 'evec_print_tol', 'spec_factor_print_tol',
-        'E', 'U', 'P', 'X', 'ncvs', 'dip_mom', 'dip_mom_nuc', 'if_naf', 'thresh_naf', 
+        'E', 'U', 'P', 'X', 'ncvs', 'dip_mom', 'dip_mom_nuc', 'if_naf', 'thresh_naf',
         'naux', 'if_heri_eris'
     }
 
@@ -465,7 +465,7 @@ class RADC(lib.StreamObject):
                     return radc_ao2mo.transform_integrals_df(self)
                 self.transform_integrals = df_transform
             elif (self._scf._eri is None or
-                (mem_incore+mem_now >= self.max_memory and not self.incore_complete)):
+                    (mem_incore+mem_now >= self.max_memory and not self.incore_complete)):
                 def outcore_transform():
                     return radc_ao2mo.transform_integrals_outcore(self)
                 self.transform_integrals = outcore_transform
@@ -578,9 +578,9 @@ class RFNOADC(RADC):
     def compute_correction(self, mf, frozen, nroots, eris=None, guess=None):
         if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
             if self.with_df is None:
-                self.with_df = self._scf.with_df      
-        adc2_ssfno = RADC(mf, frozen, self.mo_coeff).set(verbose = 0,method_type = self.method_type,\
-                                                         with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,naux = self.naux,\
+                self.with_df = self._scf.with_df
+        adc2_ssfno = RADC(mf, frozen, self.mo_coeff).set(verbose = 0,method_type = self.method_type,
+                                                         with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,naux = self.naux,
                                                          ncvs = self.ncvs)
         e2_ssfno,v2_ssfno,p2_ssfno,x2_ssfno = adc2_ssfno.kernel(nroots, eris = eris, guess=guess)
         self.delta_e = self.e2_ref - e2_ssfno
@@ -600,12 +600,12 @@ class RFNOADC(RADC):
                 self.if_naf = False
         else:
             raise ValueError("ref_state should be an int type and in (0,nroots]")
-        
+
         print(f"number of origin orbital is {self._nmo}")
         get_fno_ref(self, nroots, self.ref_state, guess)
         self.mo_coeff,self.frozen = make_fno(self, self.rdm1_ss, self._scf, thresh)
-        adc3_ssfno = RADC(self._scf, self.frozen, self.mo_coeff).set(verbose = self.verbose,method_type = self.method_type,method = "adc(3)",\
-                                                         with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,\
+        adc3_ssfno = RADC(self._scf, self.frozen, self.mo_coeff).set(verbose = self.verbose,method_type = self.method_type,method = "adc(3)",
+                                                         with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,
                                                             if_heri_eris = self.if_heri_eris,ncvs = self.ncvs)
         print(f"number of new orbital is {adc3_ssfno._nmo}")
         if self.if_naf:

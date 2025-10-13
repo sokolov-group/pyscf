@@ -2140,7 +2140,7 @@ def analyze_eigenvector(adc):
             logger.info(adc, "     i     j     a     U(i,j,a)")
             logger.info(adc, "-------------------------------")
             for idx, print_doubles in enumerate(doubles_bba_idx):
-                logger.info(adc, '  %4d  %4d  %4d     %7.4f', 
+                logger.info(adc, '  %4d  %4d  %4d     %7.4f',
                             print_doubles[1],print_doubles[2], print_doubles[0], doubles_bba_val[idx])
 
         if doubles_bbb_val:
@@ -2150,7 +2150,7 @@ def analyze_eigenvector(adc):
             for idx, print_doubles in enumerate(doubles_bbb_idx):
                 logger.info(adc, '  %4d  %4d  %4d     %7.4f',
                             print_doubles[1], print_doubles[2], print_doubles[0], doubles_bbb_val[idx])
-        
+
         logger.info(adc,
             "***************************************************************************************\n")
 

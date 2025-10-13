@@ -132,7 +132,7 @@ def get_vVvV_df(myadc, Lvv, LVV, p, chnk_size):
     naux = myadc.with_df.get_naoaux()
     if myadc.if_naf:
         naux = myadc.naux
-        
+
     nvir_1 = Lvv.shape[1]
     nvir_2 = LVV.shape[1]
 

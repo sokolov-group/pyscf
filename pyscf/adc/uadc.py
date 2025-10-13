@@ -72,7 +72,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     if guess is None:
         guess = adc.get_init_guess(nroots, diag, ascending = True)
-    elif  isinstance(guess, str) and guess == "cis" and adc.method_type == "ee":
+    elif isinstance(guess, str) and guess == "cis" and adc.method_type == "ee":
         guess = adc.get_init_guess(nroots, diag, ascending = True, type="cis", eris=eris)
     elif isinstance(guess, np.ndarray) or isinstance(guess, list):
         guess = adc.get_init_guess(nroots, diag, ascending = True, type = "read", ini = guess)
@@ -223,7 +223,8 @@ def make_ref_rdm1(adc):
     return (rdm1_a, rdm1_b)
 
 def get_fno_ref(myadc,nroots,ref_state,guess):
-    adc2_ref = UADC(myadc._scf,myadc.frozen).set(verbose = 0,method_type = myadc.method_type,with_df = myadc.with_df,if_naf = myadc.if_naf,thresh_naf = myadc.thresh_naf)
+    adc2_ref = UADC(myadc._scf,myadc.frozen).set(verbose = 0,method_type = myadc.method_type,
+                    with_df = myadc.with_df,if_naf = myadc.if_naf,thresh_naf = myadc.thresh_naf)
     myadc.e2_ref,myadc.v2_ref,_,_ = adc2_ref.kernel(nroots,guess)
     rdm1_gs = adc2_ref.make_ref_rdm1()
     if ref_state is not None:
@@ -467,7 +468,7 @@ class UADC(lib.StreamObject):
 #NOTE:update start
         self.naux = None
         self.if_naf = False
-        self.thresh_naf = 1e-2        
+        self.thresh_naf = 1e-2
         self.if_heri_eris = False
         self._nmo = None
         if frozen is None:
@@ -794,8 +795,8 @@ class UFNOADC(UADC):
     def compute_correction(self, mf, frozen, nroots, eris=None, guess=None):
         if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
             if self.with_df is None:
-                self.with_df = self._scf.with_df      
-        adc2_ssfno = UADC(mf, frozen, self.mo_coeff).set(verbose = 0,method_type = self.method_type,\
+                self.with_df = self._scf.with_df
+        adc2_ssfno = UADC(mf, frozen, self.mo_coeff).set(verbose = 0,method_type = self.method_type,
                                                          with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,naux = self.naux)
         e2_ssfno,v2_ssfno,p2_ssfno,x2_ssfno = adc2_ssfno.kernel(nroots, eris = eris, guess = guess)
         self.delta_e = self.e2_ref - e2_ssfno
@@ -819,8 +820,8 @@ class UFNOADC(UADC):
         print(f"number of origin orbital is {self._nmo}")
         get_fno_ref(self, nroots, self.ref_state, guess)
         self.mo_coeff,self.frozen = make_fno(self, self.rdm1_ss, self._scf, thresh)
-        adc3_ssfno = UADC(self._scf, self.frozen, self.mo_coeff).set(verbose = self.verbose,method_type = self.method_type,method = "adc(3)",\
-                                                         with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,\
+        adc3_ssfno = UADC(self._scf, self.frozen, self.mo_coeff).set(verbose = self.verbose,method_type = self.method_type,method = "adc(3)",
+                                                         with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,
                                                             if_heri_eris = self.if_heri_eris)
         print(f"number of new orbital is {adc3_ssfno._nmo}")
         if self.if_naf:

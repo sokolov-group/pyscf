@@ -1345,7 +1345,7 @@ def make_rdm1_eigenvectors(adc, L, R):
     ### 000 ###
     rdm1[:nocc, :nocc] =- einsum('Ja,Ia->IJ', L1, R1, optimize = einsum_type)
     rdm1[:nocc, :nocc] += 2 * einsum('ia,ia,IJ->IJ', L1, R1, np.identity(ncore), optimize = einsum_type)
-    
+
     ### 101 ###
     rdm1[:nocc, :nocc] -= 2 * einsum('Jiab,Iiab->IJ', L2, R2, optimize = einsum_type)
     rdm1[:nocc, :nocc] += einsum('Jiab,Iiba->IJ', L2, R2, optimize = einsum_type)
@@ -1382,7 +1382,7 @@ def make_rdm1_eigenvectors(adc, L, R):
 ############# block- ab
     ### 000 ###
     rdm1[nocc:, nocc:]  = einsum('iA,iB->AB', L1, R1, optimize = einsum_type)
-    
+
     ### 101 ###
     rdm1[nocc:, nocc:] += 2 * einsum('ijAa,ijBa->AB', L2, R2, optimize = einsum_type)
     rdm1[nocc:, nocc:] -= einsum('ijAa,ijaB->AB', L2, R2, optimize = einsum_type)
@@ -1649,7 +1649,7 @@ def make_rdm1_eigenvectors(adc, L, R):
 
     return rdm1
 
-    
+
 class RADCEE(radc.RADC):
     '''restricted ADC for EE energies and spectroscopic amplitudes
 
@@ -1759,7 +1759,7 @@ class RADCEE(radc.RADC):
 
         if (type=="cis"):
             print("Generating CIS initial guess for eigenvector")
-            
+
             ncore = self._nocc
             nextern = self._nvir
             n_singles = ncore * nextern
@@ -1790,9 +1790,9 @@ class RADCEE(radc.RADC):
             guess = self.get_init_guess(nroots, diag, ascending = True)
             sigma = der_sig(n_singles,ncore,nextern,dim,M_ab)
             conv, uu, g = lib.linalg_helper.davidson_nosym1(
-            lambda xs : [sigma(x) for x in xs],
-            guess, diag, nroots=nroots, verbose=self.verbose, tol=self.conv_tol, max_memory=self.max_memory,
-            max_cycle=self.max_cycle, max_space=self.max_space, tol_residual=self.tol_residual)
+                lambda xs : [sigma(x) for x in xs],
+                guess, diag, nroots=nroots, verbose=self.verbose, tol=self.conv_tol, max_memory=self.max_memory,
+                max_cycle=self.max_cycle, max_space=self.max_space, tol_residual=self.tol_residual)
             nfalse = np.shape(conv)[0] - np.sum(conv)
             if nfalse >= 1:
                 print("ADC1 Davidson iterations for " + str(nfalse) + " root(s) did not converge!!!")

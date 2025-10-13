@@ -429,7 +429,7 @@ def transform_integrals_df(myadc):
 
         eris.Lvv = eris.Lvv.reshape(myadc.naux,nvir_a,nvir_a)
         eris.LVV = eris.LVV.reshape(myadc.naux,nvir_b,nvir_b)
-    
+
     eris.Lee_p = Lvv_p = lib.pack_tril(eris.Lvv)
     eris.LEE_p = LVV_p = lib.pack_tril(eris.LVV)
 

@@ -81,8 +81,7 @@ def FNOADC(mf, frozen=None, mo_coeff=None, mo_occ=None, correction=True):
         return radc.RFNOADC(mf, frozen, mo_coeff, mo_occ, correction)
     else :
         raise RuntimeError('FNOADC code only supports RHF and UHF references')
-    
-    
+
 FNOADC.__doc__ = uadc.UFNOADC.__doc__
 
 
