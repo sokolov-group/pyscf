@@ -327,17 +327,19 @@ class RADC(lib.StreamObject):
             self.mo_coeff = mo_coeff[:,mask]
             if self._nocc == 0:
                 raise ValueError("No occupied orbitals found")
+            if mo_coeff is self._scf.mo_coeff and self._scf.converged:
+                self.mo_energy = self.mo_energy[mask]
+                self.scf_energy = self._scf.e_tot
+            else:
+                dm = self._scf.make_rdm1(mo_coeff, self.mo_occ)
+                vhf = self._scf.get_veff(self.mol, dm)
+                fockao = self._scf.get_fock(vhf=vhf, dm=dm)
+                fock = self.mo_coeff.conj().T.dot(fockao).dot(self.mo_coeff)
+                self.mo_energy = fock.diagonal().real
+                self.scf_energy = self._scf.energy_tot(dm=dm, vhf=vhf)
         self._nvir = self._nmo - self._nocc
-        if self.mo_coeff is self._scf.mo_coeff and self._scf.converged:
-            self.mo_energy = self.mo_energy[mask]
-            self.scf_energy = self._scf.e_tot
-        else:
-            dm = self._scf.make_rdm1(mo_coeff, self.mo_occ)
-            vhf = self._scf.get_veff(self.mol, dm)
-            fockao = self._scf.get_fock(vhf=vhf, dm=dm)
-            fock = self.mo_coeff.conj().T.dot(fockao).dot(self.mo_coeff)
-            self.mo_energy = fock.diagonal().real
-            self.scf_energy = self._scf.energy_tot(dm=dm, vhf=vhf)
+        if self._nvir == 0:
+            raise ValueError("No virtual orbitals found")
 #NOTE:update_end
         self.chkfile = mf.chkfile
         self.method = "adc(2)"
@@ -553,7 +555,7 @@ class RADC(lib.StreamObject):
     def make_rdm1(self):
         return self._adc_es.make_rdm1()
 
-class RFNOADC3(RADC):
+class RFNOADC(RADC):
     #J. Chem. Phys. 159, 084113 (2023)
     _keys = RADC._keys | {'delta_e','e2_ref','v2_ref'
                           'rdm1_ss','correction','frozen_core','ref_state','trans_guess'
@@ -574,6 +576,9 @@ class RFNOADC3(RADC):
         self.trans_guess = False
 
     def compute_correction(self, mf, frozen, nroots, eris=None, guess=None):
+        if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
+            if self.with_df is None:
+                self.with_df = self._scf.with_df      
         adc2_ssfno = RADC(mf, frozen, self.mo_coeff).set(verbose = 0,method_type = self.method_type,\
                                                          with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,naux = self.naux,\
                                                          ncvs = self.ncvs)
@@ -587,10 +592,10 @@ class RFNOADC3(RADC):
         self.naux = None
         self.if_heri_eris = True
         if ref_state is None:
-            print("Do fno adc3 calculation")
+            print("Do fno adc calculation")
             self.if_naf = False
         elif isinstance(ref_state, int) and 0<ref_state<=nroots:
-            print(f"Do ss-fno adc3 calculation, the specic state is {ref_state}")
+            print(f"Do ss-fno adc calculation, the specic state is {ref_state}")
             if self.with_df == None:
                 self.if_naf = False
         else:

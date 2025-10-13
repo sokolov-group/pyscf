@@ -70,19 +70,19 @@ def RADC(mf, frozen=None, mo_coeff=None, mo_occ=None):
 
 RADC.__doc__ = radc.RADC.__doc__
 
-def FNOADC3(mf, frozen=None, mo_coeff=None, mo_occ=None, correction=True):
+def FNOADC(mf, frozen=None, mo_coeff=None, mo_occ=None, correction=True):
     #J. Chem. Phys. 159, 084113 (2023)
 
     if mf.istype('UHF'):
-        return uadc.UFNOADC3(mf, frozen, mo_coeff, mo_occ, correction)
+        return uadc.UFNOADC(mf, frozen, mo_coeff, mo_occ, correction)
     elif mf.istype('ROHF'):
         raise NotImplementedError
     elif mf.istype('RHF'):
-        return radc.RFNOADC3(mf, frozen, mo_coeff, mo_occ, correction)
+        return radc.RFNOADC(mf, frozen, mo_coeff, mo_occ, correction)
     else :
-        raise RuntimeError('ADC3 code only supports RHF, ROHF, and UHF references')
+        raise RuntimeError('FNOADC code only supports RHF and UHF references')
     
     
-RADC.__doc__ = radc.RFNOADC3.__doc__
+FNOADC.__doc__ = uadc.UFNOADC.__doc__
 
 

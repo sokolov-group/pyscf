@@ -501,26 +501,28 @@ class UADC(lib.StreamObject):
             occ_b = maskocc_b & mask_b
             self._nocc = (int(occ_a.sum()), int(occ_b.sum()))
             self.mo_coeff = (mo_coeff[0][:,mask_a], mo_coeff[1][:,mask_b])
-            if self._nocc[0] == 0 or self._nocc[1] == 0:
-                raise ValueError("No occupied alpha or beta orbitals found")
-
-        if self.mo_coeff is self._scf.mo_coeff and self._scf.converged:
-            self.mo_energy_a = self.mo_energy_a[mask_a]
-            self.mo_energy_b = self.mo_energy_b[mask_b]
-        else:
-            dm = self._scf.make_rdm1(mo_coeff, self.mo_occ)
-            vhf = self._scf.get_veff(self.mol, dm)
-            fockao_a, fockao_b = self._scf.get_fock(vhf=vhf, dm=dm)
-            fock_a = self.mo_coeff[0].conj().T.dot(fockao_a).dot(self.mo_coeff[0])
-            fock_b = self.mo_coeff[1].conj().T.dot(fockao_b).dot(self.mo_coeff[1])
-            (self.mo_energy_a,self.mo_energy_b) = (fock_a.diagonal().real,fock_b.diagonal().real)
-            self.scf_energy = self._scf.energy_tot(dm=dm, vhf=vhf)
-#NOTE:update end
+            if mo_coeff is self._scf.mo_coeff and self._scf.converged:
+                self.mo_energy_a = self.mo_energy_a[mask_a]
+                self.mo_energy_b = self.mo_energy_b[mask_b]
+            else:
+                dm = self._scf.make_rdm1(mo_coeff, self.mo_occ)
+                vhf = self._scf.get_veff(self.mol, dm)
+                fockao_a, fockao_b = self._scf.get_fock(vhf=vhf, dm=dm)
+                fock_a = self.mo_coeff[0].conj().T.dot(fockao_a).dot(self.mo_coeff[0])
+                fock_b = self.mo_coeff[1].conj().T.dot(fockao_b).dot(self.mo_coeff[1])
+                (self.mo_energy_a,self.mo_energy_b) = (fock_a.diagonal().real,fock_b.diagonal().real)
+                self.scf_energy = self._scf.energy_tot(dm=dm, vhf=vhf)
         self._nvir = (self._nmo[0] - self._nocc[0], self._nmo[1] - self._nocc[1])
         self.nocc_a = self._nocc[0]
         self.nocc_b = self._nocc[1]
         self.nvir_a = self._nvir[0]
         self.nvir_b = self._nvir[1]
+        if self.nocc_a == 0 or self.nocc_b == 0:
+            raise ValueError("No occupied alpha or beta orbitals found")
+        if self.nvir_a == 0 or self.nvir_b == 0:
+            raise ValueError("No virtual alpha or beta orbitals found")
+
+#NOTE:update end
         self.chkfile = mf.chkfile
         self.method = "adc(2)"
         self.method_type = "ip"
@@ -766,7 +768,7 @@ class UADC(lib.StreamObject):
     def make_rdm1(self):
         return self._adc_es.make_rdm1()
 
-class UFNOADC3(UADC):
+class UFNOADC(UADC):
     #J. Chem. Phys. 159, 084113 (2023)
     _keys = UADC._keys | {'delta_e','e2_ref', 'v2_ref'
                           'rdm1_ss','correction','frozen_core','ref_state','trans_guess'
@@ -775,6 +777,8 @@ class UFNOADC3(UADC):
     def __init__(self, mf, frozen=0, mo_coeff=None, mo_occ=None, correction=True):
         import copy
         super().__init__(mf, frozen, mo_coeff, mo_occ)
+        if isinstance(mf, scf.rohf.ROHF):
+            raise NotImplementedError('ROHF reference for FNOADC')
         self.delta_e = None
         self.method = "adc(3)"
         self.correction = correction
@@ -788,6 +792,9 @@ class UFNOADC3(UADC):
 
 
     def compute_correction(self, mf, frozen, nroots, eris=None, guess=None):
+        if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
+            if self.with_df is None:
+                self.with_df = self._scf.with_df      
         adc2_ssfno = UADC(mf, frozen, self.mo_coeff).set(verbose = 0,method_type = self.method_type,\
                                                          with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,naux = self.naux)
         e2_ssfno,v2_ssfno,p2_ssfno,x2_ssfno = adc2_ssfno.kernel(nroots, eris = eris, guess = guess)
@@ -800,10 +807,10 @@ class UFNOADC3(UADC):
         self.naux = None
         self.if_heri_eris = True
         if ref_state is None:
-            print("Do fno adc3 calculation")
+            print("Do fno adc calculation")
             self.if_naf = False
         elif isinstance(ref_state, int) and 0<ref_state<=nroots:
-            print(f"Do ss-fno adc3 calculation, the specic state is {ref_state}")
+            print(f"Do ss-fno adc calculation, the specic state is {ref_state}")
             if self.with_df == None:
                 self.if_naf = False
         else:
