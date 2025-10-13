@@ -48,7 +48,7 @@ def transform_integrals_incore(myadc):
         or (myadc.method == "adc(2)-x" and myadc.method_type == "ee")
         or (myadc.method == "adc(3)")):
         eris.vvvv = ao2mo.general(myadc._scf._eri, (vir, vir, vir, vir),
-                                  compact=False).reshape(nvir, nvir, nvir, nvir)
+                                compact=False).reshape(nvir, nvir, nvir, nvir)
         eris.vvvv = np.ascontiguousarray(eris.vvvv.transpose(0,2,1,3))
         eris.vvvv = eris.vvvv.reshape(nvir*nvir, nvir*nvir)
 
@@ -91,7 +91,8 @@ def transform_integrals_outcore(myadc):
     def save_occ_frac(p0, p1, eri):
         eri = eri.reshape(p1-p0,nocc,nmo,nmo)
         eris.oooo[p0:p1] = eri[:,:,:nocc,:nocc]
-        eris.oovv[p0:p1] = eri[:,:,nocc:,nocc:]
+        if nvir > 0:
+            eris.oovv[p0:p1] = eri[:,:,nocc:,nocc:]
 
     def save_vir_frac(p0, p1, eri):
         eri = eri.reshape(p1-p0,nocc,nmo,nmo)
@@ -140,16 +141,17 @@ def transform_integrals_outcore(myadc):
         cput2 = log.timer_debug1('transforming oopp', *cput2)
 
         prefetch(buf_prefetch, nocc, nmo)
-        for p0, p1 in lib.prange(0, nvir, blksize):
-            buf, buf_prefetch = buf_prefetch, buf
-            prefetch(buf_prefetch, nocc+p1, nmo)
+        if nvir > 0:
+            for p0, p1 in lib.prange(0, nvir, blksize):
+                buf, buf_prefetch = buf_prefetch, buf
+                prefetch(buf_prefetch, nocc+p1, nmo)
 
-            nrow = (p1 - p0) * nocc
-            dat = ao2mo._ao2mo.nr_e2(buf[:nrow], mo_coeff, (0,nmo,0,nmo),
-                                     's4', 's1', out=outbuf, ao_loc=ao_loc)
-            save_vir_frac(p0, p1, dat)
+                nrow = (p1 - p0) * nocc
+                dat = ao2mo._ao2mo.nr_e2(buf[:nrow], mo_coeff, (0,nmo,0,nmo),
+                                        's4', 's1', out=outbuf, ao_loc=ao_loc)
+                save_vir_frac(p0, p1, dat)
 
-            cput2 = log.timer_debug1('transforming ovpp [%d:%d]'%(p0,p1), *cput2)
+                cput2 = log.timer_debug1('transforming ovpp [%d:%d]'%(p0,p1), *cput2)
 
     cput1 = log.timer_debug1('transforming oppp', *cput1)
 
@@ -158,7 +160,6 @@ def transform_integrals_outcore(myadc):
     if ((myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False)
         or (myadc.method == "adc(2)-x" and myadc.method_type == "ee")
         or (myadc.method == "adc(3)")):
-
         eris.vvvv = []
 
         cput3 = logger.process_clock(), logger.perf_counter()
@@ -177,14 +178,14 @@ def transform_integrals_outcore(myadc):
 
             with lib.H5TmpFile() as tmpf:
                 ao2mo.outcore.general(mol, (orb_slice, vir, vir, vir), tmpf,
-                                      max_memory=avail_mem, ioblk_size=100, compact=False)
+                                    max_memory=avail_mem, ioblk_size=100, compact=False)
                 vvvv = tmpf['eri_mo'][:]
             vvvv = vvvv.reshape(orb_slice.shape[1], vir.shape[1], vir.shape[1], vir.shape[1])
             vvvv = np.ascontiguousarray(vvvv.transpose(0,2,1,3)).reshape(-1, nvir, nvir * nvir)
             vvvv_p = h5cache_vvvv.create_dataset(str(p), data=vvvv)
             eris.vvvv.append(vvvv_p)
             vvvv = None
-        cput3 = log.timer_debug1('transforming vvvv', *cput3)
+            cput3 = log.timer_debug1('transforming vvvv', *cput3)
 
     log.timer('ADC integral transformation', *cput0)
 
@@ -242,6 +243,18 @@ def transform_integrals_df(myadc):
         eris.Lee = eris.Lvv
         eris.Lce = eris.Lce.reshape(naux,myadc.ncvs*nvir)
 
+    if myadc.if_naf:
+        W = lib.ddot(Loo, Loo.T) + lib.ddot(eris.Lov,eris.Lov.T) + lib.ddot(Lvo,Lvo.T) + lib.ddot(eris.Lvv,eris.Lvv.T)
+        n,N = np.linalg.eigh(W)
+        N_trunc = N[:,n>myadc.thresh_naf].T
+        myadc.naux = N_trunc.shape[0]
+        print(f"origin naux is {naux}")
+        print(f"naux is {myadc.naux}")
+        Loo = lib.ddot(N_trunc,Loo)
+        eris.Lov = lib.ddot(N_trunc,eris.Lov)
+        Lvo = lib.ddot(N_trunc,Lvo)
+        eris.Lvv = lib.ddot(N_trunc,eris.Lvv)
+
     eris.feri1 = lib.H5TmpFile()
     eris.oooo = eris.feri1.create_dataset('oooo', (nocc,nocc,nocc,nocc), 'f8')
     eris.oovv = eris.feri1.create_dataset(
@@ -250,11 +263,10 @@ def transform_integrals_df(myadc):
         'ovoo', (nocc,nvir,nocc,nocc), 'f8', chunks=(nocc,1,nocc,nocc))
     eris.ovvo = eris.feri1.create_dataset(
         'ovvo', (nocc,nvir,nvir,nocc), 'f8', chunks=(nocc,1,nvir,nocc))
-
-    eris.oooo[:] = lib.ddot(Loo.T, Loo).reshape(nocc,nocc,nocc,nocc)
     eris.ovoo[:] = lib.ddot(eris.Lov.T, Loo).reshape(nocc,nvir,nocc,nocc)
     eris.oovv[:] = lib.ddot(Loo.T, eris.Lvv).reshape(nocc,nocc,nvir,nvir)
     eris.ovvo[:] = lib.ddot(eris.Lov.T, Lvo).reshape(nocc,nvir,nvir,nocc)
+    eris.oooo[:] = lib.ddot(Loo.T, Loo).reshape(nocc,nocc,nocc,nocc)
 
     log.timer('DF-ADC integral transformation', *cput0)
     return eris
@@ -265,7 +277,10 @@ def calculate_chunk_size(myadc):
     avail_mem = (myadc.max_memory - lib.current_memory()[0]) * 0.5
     vvv_mem = (myadc._nvir**3) * 8/1e6
 
-    chnk_size =  int(avail_mem/vvv_mem)
+    if vvv_mem == 0:
+        chnk_size = 1
+    else:
+        chnk_size =  int(avail_mem/vvv_mem)
 
     if chnk_size <= 0 :
         chnk_size = 1

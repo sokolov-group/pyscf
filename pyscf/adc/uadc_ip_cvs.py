@@ -1876,6 +1876,282 @@ def get_trans_moments_orbital(adc, orb, spin="alpha"):
 
     return T
 
+
+def analyze_eigenvector(adc):
+
+    nocc_a = adc.nocc_a
+    nocc_b = adc.nocc_b
+    nvir_a = adc.nvir_a
+    nvir_b = adc.nvir_b
+    ncvs = adc.ncvs
+    nval_a = nocc_a - ncvs
+    nval_b = nocc_b - ncvs
+    evec_print_tol = adc.evec_print_tol
+
+    logger.info(adc, "Number of alpha occupied orbitals = %d", nocc_a)
+    logger.info(adc, "Number of beta occupied orbitals = %d", nocc_b)
+    logger.info(adc, "Number of alpha virtual orbitals =  %d", nvir_a)
+    logger.info(adc, "Number of beta virtual orbitals =  %d", nvir_b)
+    logger.info(adc, "Number of alpha core orbitals = %d",ncvs)
+    logger.info(adc, "Number of beta core orbitals = %d",ncvs)
+    logger.info(adc, "Number of alpha valence orbitals = %d",nval_a)
+    logger.info(adc, "Number of beta valence orbitals = %d",nval_b)
+    logger.info(adc, "Print eigenvector elements > %f\n", evec_print_tol)
+
+    ij_ind_ncvs = np.tril_indices(ncvs, k=-1)
+
+    n_singles_a = ncvs
+    n_singles_b = ncvs
+    n_doubles_aaa_ecc = nvir_a * ncvs * (ncvs - 1) // 2
+    n_doubles_aaa_ecv = nvir_a * ncvs * nval_a
+    n_doubles_bba_ecc = nvir_b * ncvs * ncvs
+    n_doubles_bba_ecv = nvir_b * ncvs * nval_a
+    n_doubles_bba_evc = nvir_b * nval_b * ncvs
+    n_doubles_aab_ecc = nvir_a * ncvs * ncvs
+    n_doubles_aab_ecv = nvir_a * ncvs * nval_b
+    n_doubles_aab_evc = nvir_a * nval_a * ncvs
+    n_doubles_bbb_ecc = nvir_b * ncvs * (ncvs - 1) // 2
+    n_doubles_bbb_ecv = nvir_b * ncvs * nval_b
+
+    s_a = 0
+    f_a = n_singles_a
+    s_b = f_a
+    f_b = s_b + n_singles_b
+    s_aaa_ecc = f_b
+    f_aaa_ecc = s_aaa_ecc + n_doubles_aaa_ecc
+    s_aaa_ecv = f_aaa_ecc
+    f_aaa_ecv = s_aaa_ecv + n_doubles_aaa_ecv
+    s_bba_ecc = f_aaa_ecv
+    f_bba_ecc = s_bba_ecc + n_doubles_bba_ecc
+    s_bba_ecv = f_bba_ecc
+    f_bba_ecv = s_bba_ecv + n_doubles_bba_ecv
+    s_bba_evc = f_bba_ecv
+    f_bba_evc = s_bba_evc + n_doubles_bba_evc
+    s_aab_ecc = f_bba_evc
+    f_aab_ecc = s_aab_ecc + n_doubles_aab_ecc
+    s_aab_ecv = f_aab_ecc
+    f_aab_ecv = s_aab_ecv + n_doubles_aab_ecv
+    s_aab_evc = f_aab_ecv
+    f_aab_evc = s_aab_evc + n_doubles_aab_evc
+    s_bbb_ecc = f_aab_evc
+    f_bbb_ecc = s_bbb_ecc + n_doubles_bbb_ecc
+    s_bbb_ecv = f_bbb_ecc
+    f_bbb_ecv = s_bbb_ecv + n_doubles_bbb_ecv
+
+    U = adc.U
+
+    for I in range(U.shape[1]):
+        U1 = U[:f_b,I]
+        U2 = U[f_b:,I]
+        U1dotU1 = np.dot(U1, U1)
+        U2dotU2 = np.dot(U2, U2)
+
+        U_aaa_ecc_u = U[s_aaa_ecc:f_aaa_ecc,I].reshape(nvir_a,-1)
+        U_bbb_ecc_u = U[s_bbb_ecc:f_bbb_ecc,I].reshape(nvir_b,-1)
+
+        temp_aaa_ecc_u = np.zeros((nvir_a,ncvs,ncvs))
+        temp_aaa_ecc_u[:,ij_ind_ncvs[0],ij_ind_ncvs[1]]= U_aaa_ecc_u.copy()
+        temp_aaa_ecc_u[:,ij_ind_ncvs[1],ij_ind_ncvs[0]]= -U_aaa_ecc_u.copy()
+        U_aaa_ecc = temp_aaa_ecc_u.reshape(-1).copy()
+
+        temp_bbb_ecc_u = np.zeros((nvir_b,ncvs,ncvs))
+        temp_bbb_ecc_u[:,ij_ind_ncvs[0],ij_ind_ncvs[1]]= U_bbb_ecc_u.copy()
+        temp_bbb_ecc_u[:,ij_ind_ncvs[1],ij_ind_ncvs[0]]= -U_bbb_ecc_u.copy()
+        U_bbb_ecc = temp_bbb_ecc_u.reshape(-1).copy()
+
+        U_sq = U[:,I].copy()**2
+        ind_idx = np.argsort(-U_sq)
+        U_sq = U_sq[ind_idx]
+        U_sorted = U[ind_idx,I].copy()
+
+        U_sq_aaa_ecc = U_aaa_ecc.copy()**2
+        U_sq_bbb_ecc = U_bbb_ecc.copy()**2
+        ind_idx_aaa_ecc = np.argsort(-U_sq_aaa_ecc)
+        ind_idx_bbb_ecc = np.argsort(-U_sq_bbb_ecc)
+        U_sq_aaa_ecc = U_sq_aaa_ecc[ind_idx_aaa_ecc]
+        U_sq_bbb_ecc = U_sq_bbb_ecc[ind_idx_bbb_ecc]
+        U_sorted_aaa_ecc = U_aaa_ecc[ind_idx_aaa_ecc].copy()
+        U_sorted_bbb_ecc = U_bbb_ecc[ind_idx_bbb_ecc].copy()
+
+        U_sorted = U_sorted[U_sq > evec_print_tol**2]
+        ind_idx = ind_idx[U_sq > evec_print_tol**2]
+        U_sorted_aaa_ecc = U_sorted_aaa_ecc[U_sq_aaa_ecc > evec_print_tol**2]
+        U_sorted_bbb_ecc = U_sorted_bbb_ecc[U_sq_bbb_ecc > evec_print_tol**2]
+        ind_idx_aaa_ecc = ind_idx_aaa_ecc[U_sq_aaa_ecc > evec_print_tol**2]
+        ind_idx_bbb_ecc = ind_idx_bbb_ecc[U_sq_bbb_ecc > evec_print_tol**2]
+
+        singles_a_idx = []
+        singles_b_idx = []
+        doubles_aaa_idx = []
+        doubles_bba_idx = []
+        doubles_aab_idx = []
+        doubles_bbb_idx = []
+        singles_a_val = []
+        singles_b_val = []
+        doubles_aaa_val = []
+        doubles_bba_val = []
+        doubles_aab_val = []
+        doubles_bbb_val = []
+        iter_idx = 0
+
+        for orb_idx in ind_idx:
+
+            if orb_idx in range(s_a,f_a):
+                i_idx = orb_idx + 1
+                singles_a_idx.append(i_idx)
+                singles_a_val.append(U_sorted[iter_idx])
+
+            if orb_idx in range(s_b,f_b):
+                i_idx = orb_idx - s_b + 1
+                singles_b_idx.append(i_idx)
+                singles_b_val.append(U_sorted[iter_idx])
+
+            if orb_idx in range(s_aaa_ecv,f_aaa_ecv):
+                aij_idx = orb_idx - s_aaa_ecv
+                ij_rem = aij_idx % (ncvs*nval_a)
+                a_idx = aij_idx//(ncvs*nval_a)
+                i_idx = ij_rem//nval_a
+                j_idx = ij_rem % nval_a
+                doubles_aaa_idx.append((a_idx + 1 + nocc_a, i_idx + 1, j_idx + 1 + ncvs))
+                doubles_aaa_val.append(U_sorted[iter_idx])
+
+            if orb_idx in range(s_bba_ecc,f_bba_ecc):
+                aij_idx = orb_idx - s_bba_ecc
+                ij_rem = aij_idx % (ncvs*ncvs)
+                a_idx = aij_idx//(ncvs*ncvs)
+                i_idx = ij_rem//ncvs
+                j_idx = ij_rem % ncvs
+                doubles_bba_idx.append((a_idx + 1 + nocc_b, i_idx + 1, j_idx + 1))
+                doubles_bba_val.append(U_sorted[iter_idx])
+
+            if orb_idx in range(s_bba_ecv,f_bba_ecv):
+                aij_idx = orb_idx - s_bba_ecv
+                ij_rem = aij_idx % (ncvs*nval_a)
+                a_idx = aij_idx//(ncvs*nval_a)
+                i_idx = ij_rem//nval_a
+                j_idx = ij_rem % nval_a
+                doubles_bba_idx.append((a_idx + 1 + nocc_b, i_idx + 1, j_idx + 1 + ncvs))
+                doubles_bba_val.append(U_sorted[iter_idx])
+
+            if orb_idx in range(s_bba_evc,f_bba_evc):
+                aij_idx = orb_idx - s_bba_evc
+                ij_rem = aij_idx % (ncvs*nval_a)
+                a_idx = aij_idx//(ncvs*nval_a)
+                i_idx = ij_rem//ncvs
+                j_idx = ij_rem % ncvs
+                doubles_bba_idx.append((a_idx + 1 + nocc_b, i_idx + 1 + ncvs, j_idx + 1))
+                doubles_bba_val.append(U_sorted[iter_idx])
+
+            if orb_idx in range(s_aab_ecc,f_aab_ecc):
+                aij_idx = orb_idx - s_aab_ecc
+                ij_rem = aij_idx % (ncvs*ncvs)
+                a_idx = aij_idx//(ncvs*ncvs)
+                i_idx = ij_rem//ncvs
+                j_idx = ij_rem % ncvs
+                doubles_aab_idx.append((a_idx + 1 + nocc_a, i_idx + 1, j_idx + 1))
+                doubles_aab_val.append(U_sorted[iter_idx])
+
+            if orb_idx in range(s_aab_ecv,f_aab_ecv):
+                aij_idx = orb_idx - s_aab_ecv
+                ij_rem = aij_idx % (ncvs*nval_b)
+                a_idx = aij_idx//(ncvs*nval_b)
+                i_idx = ij_rem//nval_b
+                j_idx = ij_rem % nval_b
+                doubles_aab_idx.append((a_idx + 1 + nocc_a, i_idx + 1, j_idx + 1 + ncvs))
+                doubles_aab_val.append(U_sorted[iter_idx])
+
+            if orb_idx in range(s_aab_evc,f_aab_evc):
+                aij_idx = orb_idx - s_aab_evc
+                ij_rem = aij_idx % (ncvs*nval_b)
+                a_idx = aij_idx//(ncvs*nval_b)
+                i_idx = ij_rem//ncvs
+                j_idx = ij_rem % ncvs
+                doubles_aab_idx.append((a_idx + 1 + nocc_a, i_idx + 1 + ncvs, j_idx + 1))
+                doubles_aab_val.append(U_sorted[iter_idx])
+
+            if orb_idx in range(s_bbb_ecv,f_bbb_ecv):
+                aij_idx = orb_idx - s_bbb_ecv
+                ij_rem = aij_idx % (ncvs*nval_b)
+                a_idx = aij_idx//(ncvs*nval_b)
+                i_idx = ij_rem//nval_b
+                j_idx = ij_rem % nval_b
+                doubles_bbb_idx.append((a_idx + 1 + nocc_b, i_idx + 1, j_idx + 1 + ncvs))
+                doubles_bbb_val.append(U_sorted[iter_idx])
+
+            iter_idx += 1
+
+        doubles_aaa_ecc_val = list(U_sorted_aaa_ecc)
+        doubles_bbb_ecc_val = list(U_sorted_bbb_ecc)
+
+        for idx, orb_aaa_ecc in enumerate(ind_idx_aaa_ecc):
+            ij_rem = orb_aaa_ecc % (ncvs*ncvs)
+            a_idx = orb_aaa_ecc//(ncvs*ncvs)
+            i_idx = ij_rem//ncvs
+            j_idx = ij_rem % ncvs
+            doubles_aaa_idx.append((a_idx + 1 + nocc_a, i_idx + 1, j_idx + 1))
+            doubles_aaa_val.append(doubles_aaa_ecc_val[idx])
+
+        for idx, orb_bbb_ecc in enumerate(ind_idx_bbb_ecc):
+            ij_rem = orb_bbb_ecc % (ncvs*ncvs)
+            a_idx = orb_bbb_ecc//(ncvs*ncvs)
+            i_idx = ij_rem//ncvs
+            j_idx = ij_rem % ncvs
+            doubles_bbb_idx.append((a_idx + 1 + nocc_b, i_idx + 1, j_idx + 1))
+            doubles_bbb_val.append(doubles_bbb_ecc_val[idx])
+
+        logger.info(adc,'%s | root %d | Energy (eV) = %12.8f | norm(1h)  = %6.4f | norm(2h1p) = %6.4f ',
+                    adc.method, I, adc.E[I]*27.2114, U1dotU1, U2dotU2)
+
+        if singles_a_val:
+            logger.info(adc, "\n1h(alpha) block: ")
+            logger.info(adc, "     i     U(i)")
+            logger.info(adc, "------------------")
+            for idx, print_singles in enumerate(singles_a_idx):
+                logger.info(adc, '  %4d   %7.4f', print_singles, singles_a_val[idx])
+
+        if singles_b_val:
+            logger.info(adc, "\n1h(beta) block: ")
+            logger.info(adc, "     i     U(i)")
+            logger.info(adc, "------------------")
+            for idx, print_singles in enumerate(singles_b_idx):
+                logger.info(adc, '  %4d   %7.4f', print_singles, singles_b_val[idx])
+
+        if doubles_aaa_val:
+            logger.info(adc, "\n2h1p(alpha|alpha|alpha) block: ")
+            logger.info(adc, "     i     j     a     U(i,j,a)")
+            logger.info(adc, "-------------------------------")
+            for idx, print_doubles in enumerate(doubles_aaa_idx):
+                logger.info(adc, '  %4d  %4d  %4d     %7.4f',
+                            print_doubles[1], print_doubles[2], print_doubles[0], doubles_aaa_val[idx])
+
+        if doubles_aab_val:
+            logger.info(adc, "\n2h1p(alpha|beta|alpha) block: ")
+            logger.info(adc, "     i     j     a     U(i,j,a)")
+            logger.info(adc, "-------------------------------")
+            for idx, print_doubles in enumerate(doubles_aab_idx):
+                logger.info(adc, '  %4d  %4d  %4d     %7.4f',
+                            print_doubles[1], print_doubles[2], print_doubles[0], doubles_aab_val[idx])
+
+        if doubles_bba_val:
+            logger.info(adc, "\n2h1p(beta|alpha|beta) block: ")
+            logger.info(adc, "     i     j     a     U(i,j,a)")
+            logger.info(adc, "-------------------------------")
+            for idx, print_doubles in enumerate(doubles_bba_idx):
+                logger.info(adc, '  %4d  %4d  %4d     %7.4f',
+                            print_doubles[1],print_doubles[2], print_doubles[0], doubles_bba_val[idx])
+
+        if doubles_bbb_val:
+            logger.info(adc, "\n2h1p(beta|beta|beta) block: ")
+            logger.info(adc, "     i     j     a     U(i,j,a)")
+            logger.info(adc, "-------------------------------")
+            for idx, print_doubles in enumerate(doubles_bbb_idx):
+                logger.info(adc, '  %4d  %4d  %4d     %7.4f',
+                            print_doubles[1], print_doubles[2], print_doubles[0], doubles_bbb_val[idx])
+
+        logger.info(adc,
+            "***************************************************************************************\n")
+
+
 def analyze_spec_factor(adc):
 
     X_a = adc.X[0]
@@ -1962,13 +2238,12 @@ def get_properties(adc, nroots=1):
 
 def analyze(myadc):
 
-    #TODO: Implement eigenvector analysis for CVS-UADC:
-    #header = ("\n*************************************************************"
-    #          "\n           Eigenvector analysis summary"
-    #          "\n*************************************************************")
-    #logger.info(myadc, header)
+    header = ("\n*************************************************************"
+              "\n           Eigenvector analysis summary"
+              "\n*************************************************************")
+    logger.info(myadc, header)
 
-    #myadc.analyze_eigenvector()
+    myadc.analyze_eigenvector()
 
     if myadc.compute_properties:
 
@@ -2098,23 +2373,55 @@ class UADCIPCVS(uadc.UADC):
     get_properties = get_properties
 
     analyze_spec_factor = analyze_spec_factor
-    #analyze_eigenvector = analyze_eigenvector
+    analyze_eigenvector = analyze_eigenvector
     analyze = analyze
     compute_dyson_mo = compute_dyson_mo
 
-    def get_init_guess(self, nroots=1, diag=None, ascending=True):
-        if diag is None :
-            diag = self.get_diag()
-        idx = None
-        if ascending:
-            idx = np.argsort(diag)
+    def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None):
+        if (type=="read"):
+            print("obtain initial guess from input variable")
+            nocc_a = self.nocc_a
+            nocc_b = self.nocc_b
+            nvir_a = self.nvir_a
+            nvir_b = self.nvir_b
+            ncvs = self.ncvs
+            nval_a = nocc_a - ncvs
+            nval_b = nocc_b - ncvs
+            n_singles_a = ncvs
+            n_singles_b = ncvs
+            n_doubles_aaa_ecc = nvir_a * ncvs * (ncvs - 1) // 2
+            n_doubles_aaa_ecv = nvir_a * ncvs * nval_a
+            n_doubles_bba_ecc = nvir_b * ncvs * ncvs
+            n_doubles_bba_ecv = nvir_b * ncvs * nval_a
+            n_doubles_bba_evc = nvir_b * nval_b * ncvs
+            n_doubles_aab_ecc = nvir_a * ncvs * ncvs
+            n_doubles_aab_ecv = nvir_a * ncvs * nval_b
+            n_doubles_aab_evc = nvir_a * nval_a * ncvs
+            n_doubles_bbb_ecc = nvir_b * ncvs * (ncvs - 1) // 2
+            n_doubles_bbb_ecv = nvir_b * ncvs * nval_b
+            dim = n_singles_a + n_singles_b + n_doubles_aaa_ecc + n_doubles_aaa_ecv + n_doubles_bba_ecc + \
+                n_doubles_bba_ecv + n_doubles_bba_evc + n_doubles_aab_ecc + n_doubles_aab_ecv + \
+                    n_doubles_aab_evc + n_doubles_bbb_ecc + n_doubles_bbb_ecv
+            if isinstance(ini, list):
+                g = np.array(ini)
+            else:
+                g = ini
+            if g.shape[0] != dim or g.shape[1] != nroots:
+                raise ValueError(f"Shape of guess should be ({dim},{nroots})")
+
         else:
-            idx = np.argsort(diag)[::-1]
-        guess = np.zeros((diag.shape[0], nroots))
-        min_shape = min(diag.shape[0], nroots)
-        guess[:min_shape,:min_shape] = np.identity(min_shape)
-        g = np.zeros((diag.shape[0], nroots))
-        g[idx] = guess.copy()
+            if diag is None :
+                diag = self.get_diag()
+            idx = None
+            if ascending:
+                idx = np.argsort(diag)
+            else:
+                idx = np.argsort(diag)[::-1]
+            guess = np.zeros((diag.shape[0], nroots))
+            min_shape = min(diag.shape[0], nroots)
+            guess[:min_shape,:min_shape] = np.identity(min_shape)
+            g = np.zeros((diag.shape[0], nroots))
+            g[idx] = guess.copy()
         guess = []
         for p in range(g.shape[1]):
             guess.append(g[:,p])

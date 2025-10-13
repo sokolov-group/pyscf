@@ -864,6 +864,7 @@ def renormalize_eigenvectors(adc, nroots=1):
                        np.dot(U2.ravel(), U2.transpose(0,2,1).ravel())
         U[:,I] /= np.sqrt(UdotU)
 
+
     return U
 
 
@@ -1469,7 +1470,7 @@ class RADCEA(radc.RADC):
     _keys = {
         'tol_residual','conv_tol', 'e_corr', 'method', 'mo_coeff',
         'mo_energy', 't1', 'max_space', 't2', 'max_cycle',
-        'nmo', 'transform_integrals', 'with_df', 'compute_properties',
+        'nmo', 'transform_integrals', 'with_df', 'if_naf', 'naux', 'compute_properties',
         'approx_trans_moments', 'E', 'U', 'P', 'X',
         'evec_print_tol', 'spec_factor_print_tol',
     }
@@ -1504,6 +1505,9 @@ class RADCEA(radc.RADC):
         self.evec_print_tol = adc.evec_print_tol
         self.spec_factor_print_tol = adc.spec_factor_print_tol
 
+        self.if_naf = adc.if_naf
+        self.naux = adc.naux
+
         self.E = adc.E
         self.U = adc.U
         self.P = adc.P
@@ -1523,19 +1527,34 @@ class RADCEA(radc.RADC):
     compute_dyson_mo = compute_dyson_mo
     make_rdm1 = make_rdm1
 
-    def get_init_guess(self, nroots=1, diag=None, ascending=True):
-        if diag is None :
-            diag = self.get_diag()
-        idx = None
-        if ascending:
-            idx = np.argsort(diag)
+    def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None):
+        if (type=="read"):
+            print("obtain initial guess from input variable")
+            ncore = self._nocc
+            nextern = self._nvir
+            n_singles = nextern
+            n_doubles = ncore * nextern * nextern
+            dim = n_singles + n_doubles
+            if isinstance(ini, list):
+                g = np.array(ini)
+            else:
+                g = ini
+            if g.shape[0] != dim or g.shape[1] != nroots:
+                raise ValueError(f"Shape of guess should be ({dim},{nroots})")
+
         else:
-            idx = np.argsort(diag)[::-1]
-        guess = np.zeros((diag.shape[0], nroots))
-        min_shape = min(diag.shape[0], nroots)
-        guess[:min_shape,:min_shape] = np.identity(min_shape)
-        g = np.zeros((diag.shape[0], nroots))
-        g[idx] = guess.copy()
+            if diag is None :
+                diag = self.get_diag()
+            idx = None
+            if ascending:
+                idx = np.argsort(diag)
+            else:
+                idx = np.argsort(diag)[::-1]
+            guess = np.zeros((diag.shape[0], nroots))
+            min_shape = min(diag.shape[0], nroots)
+            guess[:min_shape,:min_shape] = np.identity(min_shape)
+            g = np.zeros((diag.shape[0], nroots))
+            g[idx] = guess.copy()
         guess = []
         for p in range(g.shape[1]):
             guess.append(g[:,p])
