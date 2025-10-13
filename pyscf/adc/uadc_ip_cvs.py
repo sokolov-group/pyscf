@@ -1912,9 +1912,6 @@ def analyze_eigenvector(adc):
     n_doubles_aab_evc = nvir_a * nval_a * ncvs
     n_doubles_bbb_ecc = nvir_b * ncvs * (ncvs - 1) // 2
     n_doubles_bbb_ecv = nvir_b * ncvs * nval_b
-    dim = n_singles_a + n_singles_b + n_doubles_aaa_ecc + n_doubles_aaa_ecv + n_doubles_bba_ecc + n_doubles_bba_ecv + \
-        n_doubles_bba_evc + n_doubles_aab_ecc + n_doubles_aab_ecv + \
-            n_doubles_aab_evc + n_doubles_bbb_ecc + n_doubles_bbb_ecv
 
     s_a = 0
     f_a = n_singles_a
@@ -2402,8 +2399,8 @@ class UADCIPCVS(uadc.UADC):
             n_doubles_aab_evc = nvir_a * nval_a * ncvs
             n_doubles_bbb_ecc = nvir_b * ncvs * (ncvs - 1) // 2
             n_doubles_bbb_ecv = nvir_b * ncvs * nval_b
-            dim = n_singles_a + n_singles_b + n_doubles_aaa_ecc + n_doubles_aaa_ecv + n_doubles_bba_ecc + n_doubles_bba_ecv + \
-                n_doubles_bba_evc + n_doubles_aab_ecc + n_doubles_aab_ecv + \
+            dim = n_singles_a + n_singles_b + n_doubles_aaa_ecc + n_doubles_aaa_ecv + n_doubles_bba_ecc + \
+                n_doubles_bba_ecv + n_doubles_bba_evc + n_doubles_aab_ecc + n_doubles_aab_ecv + \
                     n_doubles_aab_evc + n_doubles_bbb_ecc + n_doubles_bbb_ecv
             if isinstance(ini, list):
                 g = np.array(ini)

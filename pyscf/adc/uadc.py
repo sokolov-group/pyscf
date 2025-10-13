@@ -239,8 +239,6 @@ def get_fno_ref(myadc,nroots,ref_state,guess):
 def make_fno(myadc, rdm1_ss, mf, thresh):
     nocc_a = myadc.nocc_a
     nocc_b = myadc.nocc_b
-    nvir_a = myadc.nvir_a
-    nvir_b = myadc.nvir_b
     mo_energy_a = myadc.mo_energy_a
     mo_energy_b = myadc.mo_energy_b
     mo_a_coeff = myadc.mo_coeff[0]
@@ -797,7 +795,8 @@ class UFNOADC(UADC):
             if self.with_df is None:
                 self.with_df = self._scf.with_df
         adc2_ssfno = UADC(mf, frozen, self.mo_coeff).set(verbose = 0,method_type = self.method_type,
-                                                         with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,naux = self.naux)
+                                                         with_df = self.with_df,if_naf = self.if_naf,
+                                                         thresh_naf = self.thresh_naf,naux = self.naux)
         e2_ssfno,v2_ssfno,p2_ssfno,x2_ssfno = adc2_ssfno.kernel(nroots, eris = eris, guess = guess)
         self.delta_e = self.e2_ref - e2_ssfno
 
@@ -812,7 +811,7 @@ class UFNOADC(UADC):
             self.if_naf = False
         elif isinstance(ref_state, int) and 0<ref_state<=nroots:
             print(f"Do ss-fno adc calculation, the specic state is {ref_state}")
-            if self.with_df == None:
+            if self.with_df is None:
                 self.if_naf = False
         else:
             raise ValueError("ref_state should be an int type and in (0,nroots]")
@@ -820,9 +819,11 @@ class UFNOADC(UADC):
         print(f"number of origin orbital is {self._nmo}")
         get_fno_ref(self, nroots, self.ref_state, guess)
         self.mo_coeff,self.frozen = make_fno(self, self.rdm1_ss, self._scf, thresh)
-        adc3_ssfno = UADC(self._scf, self.frozen, self.mo_coeff).set(verbose = self.verbose,method_type = self.method_type,method = "adc(3)",
-                                                         with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,
-                                                            if_heri_eris = self.if_heri_eris)
+        adc3_ssfno = UADC(self._scf, self.frozen, self.mo_coeff).set(verbose = self.verbose,
+                                                                     method_type = self.method_type,method = "adc(3)",
+                                                                     with_df = self.with_df,
+                                                                     if_naf = self.if_naf,thresh_naf = self.thresh_naf,
+                                                                     if_heri_eris = self.if_heri_eris)
         print(f"number of new orbital is {adc3_ssfno._nmo}")
         if self.if_naf:
             if self.trans_guess:

@@ -1192,45 +1192,7 @@ def analyze_eigenvector(adc):
 
 def analyze_spec_factor(adc):
 
-    X = adc.X
-    X_2 = (X.copy()**2)*2
-    thresh = adc.spec_factor_print_tol
-
-    logger.info(adc, "Print spectroscopic factors > %E\n", adc.spec_factor_print_tol)
-
-    for i in range(X_2.shape[1]):
-
-        sort = np.argsort(-X_2[:,i])
-        X_2_row = X_2[:,i]
-        X_2_row = X_2_row[sort]
-
-        if not adc.mol.symmetry:
-            sym = np.repeat(['A'], X_2_row.shape[0])
-        else:
-            sym = [symm.irrep_id2name(adc.mol.groupname, x) for x in adc._scf.mo_coeff.orbsym]
-            sym = np.array(sym)
-
-            sym = sym[sort]
-
-        spec_Contribution = X_2_row[X_2_row > thresh]
-        index_mo = sort[X_2_row > thresh]+1
-
-        if np.sum(spec_Contribution) == 0.0:
-            continue
-
-        logger.info(adc, '%s | root %d | Energy (eV) = %12.8f \n',
-                adc.method, i, adc.E[i]*27.2114)
-        logger.info(adc, "     HF MO     Spec. Contribution     Orbital symmetry")
-        logger.info(adc, "-----------------------------------------------------------")
-
-        for c in range(index_mo.shape[0]):
-            logger.info(adc, '     %3.d          %10.8f                %s',
-                        index_mo[c], spec_Contribution[c], sym[c])
-
-        logger.info(adc, '\nPartial spec. factor sum = %10.8f', np.sum(spec_Contribution))
-        logger.info(adc,
-        "***********************************************************\n")
-
+    return None
 
 def renormalize_eigenvectors(adc, nroots=1):
 
@@ -1254,10 +1216,10 @@ def renormalize_eigenvectors(adc, nroots=1):
 def get_properties(adc, nroots=1):
 
     #Transition moments
-    T = adc.get_trans_moments()
+    #T = adc.get_trans_moments()
 
     #Spectroscopic amplitudes
-    U = adc.renormalize_eigenvectors(nroots)
+    #U = adc.renormalize_eigenvectors(nroots)
     #X = np.dot(T, U).reshape(-1, nroots)
     X = None
 
@@ -1798,7 +1760,7 @@ class RADCEE(radc.RADC):
                 print("ADC1 Davidson iterations for " + str(nfalse) + " root(s) did not converge!!!")
             g = np.array(g).T
             if not ascending:
-                vecs = vecs[:, ::-1]
+                g = g[:, ::-1]
         elif (type=="read"):
             print("obtain initial guess from input variable")
             ncore = self._nocc

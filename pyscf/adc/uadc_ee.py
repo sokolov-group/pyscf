@@ -23685,7 +23685,8 @@ def analyze_eigenvector(adc):
             logger.info(adc, "---------------------------------------")
             for idx, print_doubles in enumerate(doubles_aaaa_idx):
                 logger.info(adc, '  %4d  %4d  %4d  %4d  %7.4f',
-                            print_doubles[0], print_doubles[1], print_doubles[2], print_doubles[3], doubles_aaaa_val[idx])
+                            print_doubles[0], print_doubles[1], print_doubles[2],
+                            print_doubles[3], doubles_aaaa_val[idx])
 
         if doubles_ab_val:
             logger.info(adc, "\n2p2h(alpha|beta|alpha|beta) block: ")
@@ -23693,7 +23694,8 @@ def analyze_eigenvector(adc):
             logger.info(adc, "---------------------------------------")
             for idx, print_doubles in enumerate(doubles_ab_idx):
                 logger.info(adc, '  %4d  %4d  %4d  %4d  %7.4f',
-                            print_doubles[0], print_doubles[1], print_doubles[2], print_doubles[3], doubles_ab_val[idx])
+                            print_doubles[0], print_doubles[1], print_doubles[2],
+                            print_doubles[3], doubles_ab_val[idx])
 
         if doubles_bbbb_val:
             logger.info(adc, "\n2p2h(beta|beta|beta|beta) block: ")
@@ -23701,7 +23703,8 @@ def analyze_eigenvector(adc):
             logger.info(adc, "---------------------------------------")
             for idx, print_doubles in enumerate(doubles_bbbb_idx):
                 logger.info(adc, '  %4d  %4d  %4d  %4d  %7.4f',
-                            print_doubles[0], print_doubles[1], print_doubles[2], print_doubles[3], doubles_bbbb_val[idx])
+                            print_doubles[0], print_doubles[1], print_doubles[2],
+                            print_doubles[3], doubles_bbbb_val[idx])
 
         logger.info(adc,
             "***************************************************************************************\n")
@@ -24062,7 +24065,7 @@ class UADCEE(uadc.UADC):
                 print("ADC1 Davidson iterations for " + str(nfalse) + " root(s) did not converge!!!")
             g = np.array(g).T
             if not ascending:
-                vecs = vecs[:, ::-1]
+                g = g[:, ::-1]
         elif (type=="read"):
             print("obtain initial guess from input variable")
             nocc_a = self.nocc_a

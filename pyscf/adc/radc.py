@@ -580,7 +580,8 @@ class RFNOADC(RADC):
             if self.with_df is None:
                 self.with_df = self._scf.with_df
         adc2_ssfno = RADC(mf, frozen, self.mo_coeff).set(verbose = 0,method_type = self.method_type,
-                                                         with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,naux = self.naux,
+                                                         with_df = self.with_df,if_naf = self.if_naf,
+                                                         thresh_naf = self.thresh_naf,naux = self.naux,
                                                          ncvs = self.ncvs)
         e2_ssfno,v2_ssfno,p2_ssfno,x2_ssfno = adc2_ssfno.kernel(nroots, eris = eris, guess=guess)
         self.delta_e = self.e2_ref - e2_ssfno
@@ -596,7 +597,7 @@ class RFNOADC(RADC):
             self.if_naf = False
         elif isinstance(ref_state, int) and 0<ref_state<=nroots:
             print(f"Do ss-fno adc calculation, the specic state is {ref_state}")
-            if self.with_df == None:
+            if self.with_df is None:
                 self.if_naf = False
         else:
             raise ValueError("ref_state should be an int type and in (0,nroots]")
@@ -604,9 +605,11 @@ class RFNOADC(RADC):
         print(f"number of origin orbital is {self._nmo}")
         get_fno_ref(self, nroots, self.ref_state, guess)
         self.mo_coeff,self.frozen = make_fno(self, self.rdm1_ss, self._scf, thresh)
-        adc3_ssfno = RADC(self._scf, self.frozen, self.mo_coeff).set(verbose = self.verbose,method_type = self.method_type,method = "adc(3)",
-                                                         with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,
-                                                            if_heri_eris = self.if_heri_eris,ncvs = self.ncvs)
+        adc3_ssfno = RADC(self._scf, self.frozen, self.mo_coeff).set(verbose = self.verbose,
+                                                                     method_type = self.method_type,method = "adc(3)",
+                                                                     with_df = self.with_df,
+                                                                     if_naf = self.if_naf,thresh_naf = self.thresh_naf,
+                                                                     if_heri_eris = self.if_heri_eris,ncvs = self.ncvs)
         print(f"number of new orbital is {adc3_ssfno._nmo}")
         if self.if_naf:
             if self.trans_guess:
