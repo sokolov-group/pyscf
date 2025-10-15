@@ -536,7 +536,6 @@ def get_diag(adc,kshift,M_ab=None,eris=None):
 
     # Compute precond in h1-h1 block
     M_ab_diag = np.diagonal(M_ab[kshift])
-    diag[s1:f1] = M_ab_diag.copy()
 
     # Compute precond in 2p1h-2p1h block
     for kj in range(nkpts):
@@ -546,7 +545,11 @@ def get_diag(adc,kshift,M_ab=None,eris=None):
             d_i = e_occ[kj][:,None]
             D_n = -d_i + d_ab.reshape(-1)
             doubles[kj,ka] += D_n.reshape(-1)
+    if (adc.frozen is not None) or (not np.all([x.shape[1] == adc.nmo for x in mo_coeff])):
+        doubles = doubles.reshape(nkpts,nkpts,nocc,nvir,nvir)
+        (M_ab_diag,doubles) = mask_frozen_ea(adc,M_ab_diag,doubles,kshift)
 
+    diag[s1:f1] = M_ab_diag.copy()
     diag[s2:f2] = doubles.reshape(-1)
     log.timer_debug1("Completed ea_diag calculation")
 
@@ -887,9 +890,9 @@ def matvec(adc, kshift, M_ab=None, eris=None):
                 for ky in range(nkpts):
                     ki = kconserv[ky,kshift,kx]
                     for kl in range(nkpts):
-                        temp = np.zeros((nocc,nvir,nvir),dtype=eris.oooo.dtype)
-                        temp_1_1 = np.zeros((nocc,nvir,nvir),dtype=eris.oooo.dtype)
-                        temp_2_1 = np.zeros((nocc,nvir,nvir),dtype=eris.oooo.dtype)
+                        temp = np.zeros((nocc,nvir,nvir),dtype=np.complex128)
+                        temp_1_1 = np.zeros((nocc,nvir,nvir),dtype=np.complex128)
+                        temp_2_1 = np.zeros((nocc,nvir,nvir),dtype=np.complex128)
                         if isinstance(eris.ovvv, type(None)):
                             chnk_size = adc.chnk_size
                             if chnk_size > nocc:
@@ -957,6 +960,7 @@ def matvec(adc, kshift, M_ab=None, eris=None):
 
         s2 = s2.reshape(-1)
         s = np.hstack((s1,s2))
+        print("s is ",s)
         del s1
         del s2
 
@@ -1302,7 +1306,6 @@ def make_rdm1_eigenvectors(adc, L, R, kshift):
     return rdm1
 
 
-
 def get_properties(adc, kshift, U, nroots=1):
 
     #Transition moments
@@ -1317,6 +1320,27 @@ def get_properties(adc, kshift, U, nroots=1):
     P = P.real
 
     return P,X
+
+
+def mask_frozen_ea(adc, v1, v2, kshift, const=LARGE_DENOM):
+    '''Replaces all frozen orbital indices of `vector` with the value `const`.'''
+    nkpts = adc.nkpts
+    kconserv = adc.khelper.kconserv
+
+    # Get location of padded elements in occupied and virtual space
+    nonzero_opadding, nonzero_vpadding = padding_k_idx(adc)
+
+    new_v1 = const * np.ones_like(v1)
+    new_v2 = const * np.ones_like(v2)
+
+    new_v1[nonzero_vpadding[kshift]] = v1[nonzero_vpadding[kshift]]
+    for ki in range(nkpts):
+        for ka in range(nkpts):
+            kb = kconserv[kshift, ka, ki]
+            idx = np.ix_([ki], [ka], nonzero_opadding[ki], nonzero_vpadding[ka], nonzero_vpadding[kb])
+            new_v2[idx] = v2[idx]
+
+    return (new_v1, new_v2)
 
 
 class RADCEA(kadc_rhf.RADC):
@@ -1413,20 +1437,24 @@ class RADCEA(kadc_rhf.RADC):
     get_properties = get_properties
     make_rdm1 = make_rdm1
 
-    def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None):
+    def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None, kshift=None):
         if (type=="read"):
             print("obtain initial guess from input variable")
             ncore = self.nocc
             nextern = self.nmo - ncore
-            n_singles = ncore
-            n_doubles = ncore * ncore * nextern
-            dim = n_singles + n_doubles
-            if isinstance(ini, list):
-                g = np.array(ini)
-            else:
-                g = ini
-            if g.shape[2] != dim or g.shape[1] != nroots or g.shape[0] != self.nkpts:
-                raise ValueError(f"Shape of guess should be ({self.nkpts},{nroots},{dim})")
+            nkpts = self.nkpts
+            n_singles = nextern
+            n_doubles = nkpts * nkpts * ncore * nextern * nextern
+            dim  = n_singles + n_doubles
+            g = ini.T
+            if (self.frozen is not None) or (not np.all([x.shape[1] == self.nmo for x in self.mo_coeff])):
+                for p in range(g.shape[1]):
+                    singles = g[:n_singles,p]
+                    doubles = g[n_singles:,p].reshape(nkpts,nkpts,ncore,nextern,nextern)
+                    (singles,doubles) = mask_frozen_ea(self,singles,doubles,kshift,const = 0.0)
+                    g[:,p] = np.hstack((singles,doubles.ravel()))
+            if g.shape[0] != dim or g.shape[1] != nroots:
+                raise ValueError(f"Shape of guess each k point should be ({dim},{nroots})")
         else:
             if diag is None :
                 diag = self.get_diag()
@@ -1443,6 +1471,15 @@ class RADCEA(kadc_rhf.RADC):
             g[idx] = guess.copy()
         guess = []
         for p in range(g.shape[1]):
+            if (self.frozen is not None) or (not np.all([x.shape[1] == self.nmo for x in self.mo_coeff])) or (type=="read"):
+                guess_norm = np.linalg.norm(g[:,p])
+                guess_norm_tol = LOOSE_ZERO_TOL
+                if guess_norm < guess_norm_tol:
+                    raise ValueError('Guess vector for root %d with norm %.4g is below threshold %.4g.\n'
+                                    'This could possibly be due to freezing orbitals.\n'
+                                    'Check your guess vector to make sure it has sufficiently large norm.'
+                                    % (p, guess_norm, guess_norm_tol))
+
             guess.append(g[:,p])
         return guess
 

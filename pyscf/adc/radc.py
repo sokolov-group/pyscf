@@ -62,6 +62,10 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
                 + " transition properties will neglect third-order amplitudes...")
 
     imds = adc.get_imds(eris)
+    from scipy.linalg import eigh
+    e,v=eigh(imds)
+    sorte = np.sort(e)
+    print(e)
     matvec, diag = adc.gen_matvec(imds, eris)
 
     guess = adc.get_init_guess(nroots, diag, ascending = True)
