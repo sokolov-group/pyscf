@@ -81,20 +81,23 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
     X = np.zeros((len(kptlist),nmo,nroots), dtype)
 
     imds = adc.get_imds(eris)
-
     guess_type = None
     if guess is None:
         pass
     elif hasattr(guess, '__len__'):
         guess_type = "read"
+        if isinstance(guess, list):
+            guess_k = np.array(guess)
+        else:
+            guess_k = guess.copy()
+
 
     for k, kshift in enumerate(kptlist):
         matvec, diag = adc.gen_matvec(kshift, imds, eris)
-
         if guess_type is None:
             guess = adc.get_init_guess(nroots, diag, ascending = True)
         elif guess_type == "read":
-            guess = adc.get_init_guess(nroots, diag, ascending = True, type = guess_type, ini = guess)
+            guess = adc.get_init_guess(nroots, diag, ascending = True, type = guess_type, ini = guess_k[k], kshift = kshift)
         else:
             raise NotImplementedError("Guess type not implemented")
 
@@ -210,7 +213,6 @@ def make_ref_rdm1(adc):
 def mo_splitter(myadc):
     masks = []
     maskact = get_frozen_mask(myadc)
-    print("maskact is",maskact)
     for kpt in range(myadc.nkpts):
         maskact_k = maskact[kpt]
         maskocc_k = myadc.mo_occ[kpt]>1e-6
@@ -328,13 +330,19 @@ class RADC(pyscf.adc.radc.RADC):
         self.thresh_naf = 1e-2
 
         if self.mo_coeff is not self._scf.mo_coeff or not self._scf.converged:
+            masks = mo_splitter(self)
             dm = self._scf.make_rdm1(self.mo_coeff, self.mo_occ)
             vhf = self._scf.get_veff(self._scf.mol, dm)
             fockao = self._scf.get_fock(vhf=vhf, dm=dm)
             vecs = []
             for k in range(self.nkpts):
-                fock_k = self.mo_coeff[k].conj().T.dot(fockao[k]).dot(self.mo_coeff[k])
-                vecs.append(fock_k.diagonal().real)
+                moeoccfrz0, moeocc, moevir, moevirfrz0 = [self.mo_energy[k][m] for m in masks[k]]
+                orboccfrz0, orbocc, orbvir, orbvirfrz0 = [self.mo_coeff[k][:,m] for m in masks[k]]
+                mo_coeff_k = np.hstack((orbocc, orbvir))
+                fock_k = mo_coeff_k.conj().T.dot(fockao[k]).dot(mo_coeff_k)
+                moe = fock_k.diagonal().real
+                mo_energy_k = np.hstack((moeoccfrz0,moe,moevirfrz0))
+                vecs.append(mo_energy_k)
             self.mo_energy = np.vstack(vecs)
             self.scf_energy = self._scf.energy_tot(dm=dm, vhf=vhf)
 
@@ -486,7 +494,7 @@ class RADC(pyscf.adc.radc.RADC):
             self.with_df = with_df
         return self
 
-class RFNOADC3(RADC):
+class RFNOADC(RADC):
     #J. Chem. Phys. 159, 084113 (2023)
     _keys = RADC._keys | {'delta_e','e2_ref','v2_ref'
                           'rdm1_ss','correction','frozen_core','ref_state','trans_guess'
@@ -521,10 +529,10 @@ class RFNOADC3(RADC):
         self.naux = None
         self.if_heri_eris = True
         if ref_state is None:
-            print("Do fno kadc3 calculation")
+            print("Do fno kadc calculation")
             self.if_naf = False
         elif isinstance(ref_state, int) and 0<ref_state<=nroots:
-            print(f"Do ss-fno kadc3 calculation, the specic state is {ref_state}")
+            print(f"Do ss-fno kadc calculation, the specic state is {ref_state}")
             if self.with_df == None:
                 self.if_naf = False
         else:

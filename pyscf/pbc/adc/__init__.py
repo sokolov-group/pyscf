@@ -23,7 +23,7 @@ def KRADC(mf, frozen=None, mo_coeff=None, mo_occ=None):
         mf = mf.to_rhf()
     return kadc_rhf.RADC(mf, frozen, mo_coeff, mo_occ)
 
-def KRFNOADC3(mf, frozen=None, mo_coeff=None, mo_occ=None, correction = True):
+def KRFNOADC(mf, frozen=None, mo_coeff=None, mo_occ=None, correction = True):
     if not isinstance(mf, scf.khf.KRHF):
         mf = mf.to_rhf()
-    return kadc_rhf.RFNOADC3(mf, frozen, mo_coeff, mo_occ, correction)
+    return kadc_rhf.RFNOADC(mf, frozen, mo_coeff, mo_occ, correction)
