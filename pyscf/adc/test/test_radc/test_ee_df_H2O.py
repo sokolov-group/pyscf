@@ -131,7 +131,7 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[1],0.3786943953781337, 6)
         self.assertAlmostEqual(e[2],0.4016489362006092, 6)
         self.assertAlmostEqual(e[3],0.4769191360661929, 6)
-        
+
         dm1_exc = np.array(myadcee_fr.make_rdm1())
         self.assertAlmostEqual(rdms_test_fr(dm1_exc[0]), 26.48828708968802, 6)
         self.assertAlmostEqual(rdms_test_fr(dm1_exc[1]), 27.68836485661637, 6)
