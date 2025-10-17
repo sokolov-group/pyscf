@@ -48,7 +48,7 @@ def transform_integrals_incore(myadc):
         or (myadc.method == "adc(2)-x" and myadc.method_type == "ee")
         or (myadc.method == "adc(3)")):
         eris.vvvv = ao2mo.general(myadc._scf._eri, (vir, vir, vir, vir),
-                                  compact=False).reshape(nvir, nvir, nvir, nvir)
+                                compact=False).reshape(nvir, nvir, nvir, nvir)
         eris.vvvv = np.ascontiguousarray(eris.vvvv.transpose(0,2,1,3))
         eris.vvvv = eris.vvvv.reshape(nvir*nvir, nvir*nvir)
 
@@ -177,7 +177,7 @@ def transform_integrals_outcore(myadc):
 
             with lib.H5TmpFile() as tmpf:
                 ao2mo.outcore.general(mol, (orb_slice, vir, vir, vir), tmpf,
-                                      max_memory=avail_mem, ioblk_size=100, compact=False)
+                                    max_memory=avail_mem, ioblk_size=100, compact=False)
                 vvvv = tmpf['eri_mo'][:]
             vvvv = vvvv.reshape(orb_slice.shape[1], vir.shape[1], vir.shape[1], vir.shape[1])
             vvvv = np.ascontiguousarray(vvvv.transpose(0,2,1,3)).reshape(-1, nvir, nvir * nvir)

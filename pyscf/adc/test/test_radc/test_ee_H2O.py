@@ -24,7 +24,7 @@ from pyscf import scf
 from pyscf import adc
 
 def setUpModule():
-    global mol, mf, myadc
+    global mol, mf, myadc, myadc_fr
     mol = gto.Mole()
     r = 0.957492
     x = r * math.sin(104.468205 * math.pi/(2 * 180.0))
@@ -42,14 +42,21 @@ def setUpModule():
     mf.conv_tol = 1e-12
     mf.kernel()
     myadc = adc.ADC(mf)
+    myadc_fr = adc.ADC(mf,frozen=1)
 
 def tearDownModule():
-    global mol, mf, myadc
-    del mol, mf, myadc
+    global mol, mf, myadc, myadc_fr
+    del mol, mf, myadc, myadc_fr
 
 def rdms_test(dm):
     r2_int = mol.intor('int1e_r2')
     dm_ao = np.einsum('pi,ij,qj->pq', mf.mo_coeff, dm, mf.mo_coeff.conj())
+    r2 = np.einsum('pq,pq->',r2_int,dm_ao)
+    return r2
+
+def rdms_test_fr(dm):
+    r2_int = mol.intor('int1e_r2')
+    dm_ao = np.einsum('pi,ij,qj->pq', myadc_fr.mo_coeff, dm, myadc_fr.mo_coeff.conj())
     r2 = np.einsum('pq,pq->',r2_int,dm_ao)
     return r2
 
@@ -107,6 +114,31 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[1],0.3790532845, 6)
         self.assertAlmostEqual(e[2],0.4019531805, 6)
         self.assertAlmostEqual(e[3],0.4772033490, 6)
+
+
+    def test_ee_adc3_frozen(self):
+        myadc_fr.method = "adc(3)"
+        myadc_fr.method_type = "ee"
+        e, t_amp1, t_amp2 = myadc_fr.kernel_gs()
+        self.assertAlmostEqual(e, -0.20864693991051747, 6)
+
+        dm1_gs = myadc_fr.make_ref_rdm1()
+        r2_gs = rdms_test_fr(dm1_gs)
+        self.assertAlmostEqual(r2_gs, 18.937446026791235, 6)
+
+        myadcee_fr = adc.radc_ee.RADCEE(myadc_fr)
+        e,v,p,x = myadcee_fr.kernel(nroots=4)
+
+        self.assertAlmostEqual(e[0],0.305226299494516, 6)
+        self.assertAlmostEqual(e[1],0.378960682716727, 6)
+        self.assertAlmostEqual(e[2],0.401899074497284, 6)
+        self.assertAlmostEqual(e[3],0.477160722527800, 6)
+        
+        dm1_exc = np.array(myadcee_fr.make_rdm1())
+        self.assertAlmostEqual(rdms_test_fr(dm1_exc[0]), 26.478802159763, 6)
+        self.assertAlmostEqual(rdms_test_fr(dm1_exc[1]), 27.684744801941, 6)
+        self.assertAlmostEqual(rdms_test_fr(dm1_exc[2]), 26.419197324651, 6)
+        self.assertAlmostEqual(rdms_test_fr(dm1_exc[3]), 27.963988530385, 6)
 
 if __name__ == "__main__":
     print("EE calculations for different ADC methods for water molecule")

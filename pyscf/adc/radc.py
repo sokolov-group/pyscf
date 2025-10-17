@@ -29,6 +29,7 @@ from pyscf.adc import radc_ao2mo
 from pyscf.adc import radc_amplitudes
 from pyscf import __config__
 from pyscf import df
+from pyscf.mp import mp2
 
 
 # Excited-state kernel
@@ -64,7 +65,14 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     imds = adc.get_imds(eris)
     matvec, diag = adc.gen_matvec(imds, eris)
 
-    guess = adc.get_init_guess(nroots, diag, ascending = True)
+    if guess is None:
+        guess = adc.get_init_guess(nroots, diag, ascending = True)
+    elif isinstance(guess, str) and guess == "cis" and adc.method_type == "ee":
+        guess = adc.get_init_guess(nroots, diag, ascending = True, type = "cis", eris = eris)
+    elif hasattr(guess, '__len__'):
+        guess = adc.get_init_guess(nroots, diag, ascending = True, type = "read", ini = guess)
+    else:
+        raise NotImplementedError("Guess type not implemented")
 
     conv, adc.E, U = lib.linalg_helper.davidson_nosym1(
         lambda xs : [matvec(x) for x in xs],
@@ -73,7 +81,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     adc.U = np.array(U).T.copy()
 
-    if adc.compute_properties and adc.method_type != "ee":
+    if adc.compute_properties:
         adc.P,adc.X = adc.get_properties(nroots)
     else:
         adc.P = None
@@ -215,10 +223,10 @@ class RADC(lib.StreamObject):
         'scf_energy', 'e_tot', 't1', 't2', 'frozen', 'chkfile',
         'max_space', 'mo_occ', 'max_cycle', 'imds', 'with_df', 'compute_properties',
         'approx_trans_moments', 'evec_print_tol', 'spec_factor_print_tol',
-        'E', 'U', 'P', 'X', 'ncvs', 'dip_mom', 'dip_mom_nuc'
+        'E', 'U', 'P', 'X', 'ncvs', 'dip_mom', 'dip_mom_nuc', 'if_heri_eris'
     }
 
-    def __init__(self, mf, frozen=0, mo_coeff=None, mo_occ=None):
+    def __init__(self, mf, frozen=None, mo_coeff=None, mo_occ=None):
 
         if 'dft' in str(mf.__module__):
             raise NotImplementedError('DFT reference for UADC')
@@ -238,21 +246,49 @@ class RADC(lib.StreamObject):
         self.max_cycle = getattr(__config__, 'adc_radc_RADC_max_cycle', 50)
         self.conv_tol = getattr(__config__, 'adc_radc_RADC_conv_tol', 1e-8)
         self.tol_residual = getattr(__config__, 'adc_radc_RADC_tol_residual', 1e-5)
-        self.scf_energy = mf.e_tot
 
         self.frozen = frozen
         self.incore_complete = self.incore_complete or self.mol.incore_anyway
 
-        self.mo_coeff = mo_coeff
         self.mo_occ = mo_occ
         self.e_corr = None
         self.t1 = None
         self.t2 = None
         self.imds = lambda:None
         self._nocc = mf.mol.nelectron//2
-        self._nmo = mo_coeff.shape[1]
-        self._nvir = self._nmo - self._nocc
+        self.mo_coeff = mo_coeff
         self.mo_energy = mf.mo_energy
+        self.if_heri_eris = False
+        self._nmo = None
+        mask = self.get_frozen_mask()
+        if frozen is None:
+            self._nmo = mo_coeff.shape[1]
+        elif isinstance(frozen, (int, np.integer)):
+            self._nmo = mo_coeff.shape[1]-frozen
+        elif hasattr(frozen, '__len__'):
+            self._nmo = mo_coeff.shape[1]-len(frozen)
+        else:
+            raise NotImplementedError
+        if frozen is not None:
+            maskocc = mf.mo_occ>1e-6
+            occ = maskocc & mask
+            self._nocc = int(occ.sum())
+            self.mo_coeff = mo_coeff[:,mask]
+            if self._nocc == 0:
+                raise ValueError("No occupied orbitals found")
+            if mo_coeff is self._scf.mo_coeff and self._scf.converged:
+                self.mo_energy = self.mo_energy[mask]
+                self.scf_energy = self._scf.e_tot
+            else:
+                dm = self._scf.make_rdm1(mo_coeff, self.mo_occ)
+                vhf = self._scf.get_veff(self.mol, dm)
+                fockao = self._scf.get_fock(vhf=vhf, dm=dm)
+                fock = self.mo_coeff.conj().T.dot(fockao).dot(self.mo_coeff)
+                self.mo_energy = fock.diagonal().real
+                self.scf_energy = self._scf.energy_tot(dm=dm, vhf=vhf)
+        self._nvir = self._nmo - self._nocc
+        if self._nvir == 0:
+            raise ValueError("No virtual orbitals found")
         self.chkfile = mf.chkfile
         self.method = "adc(2)"
         self.method_type = "ip"
@@ -273,7 +309,7 @@ class RADC(lib.StreamObject):
 
         for i in range(dip_ints.shape[0]):
             dip = dip_ints[i,:,:]
-            dip_mom[i,:,:] = np.dot(mo_coeff.T, np.dot(dip, mo_coeff))
+            dip_mom[i,:,:] = np.dot(self.mo_coeff.T, np.dot(dip, self.mo_coeff))
 
         self.dip_mom = dip_mom
 
@@ -285,6 +321,7 @@ class RADC(lib.StreamObject):
     compute_energy = radc_amplitudes.compute_energy
     transform_integrals = radc_ao2mo.transform_integrals_incore
     make_ref_rdm1 = make_ref_rdm1
+    get_frozen_mask = mp2.get_frozen_mask
 
     def dump_flags(self, verbose=None):
         logger.info(self, '')
@@ -364,22 +401,23 @@ class RADC(lib.StreamObject):
         mem_incore = (max(nao_pair**2, nmo**4) + nmo_pair**2) * 8/1e6
         mem_now = lib.current_memory()[0]
 
-        if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
-            if getattr(self, 'with_df', None):
-                self.with_df = self.with_df
-            else:
-                self.with_df = self._scf.with_df
+        if eris is None:
+            if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
+                if getattr(self, 'with_df', None):
+                    self.with_df = self.with_df
+                else:
+                    self.with_df = self._scf.with_df
 
-            def df_transform():
-                return radc_ao2mo.transform_integrals_df(self)
-            self.transform_integrals = df_transform
-        elif (self._scf._eri is None or
-              (mem_incore+mem_now >= self.max_memory and not self.incore_complete)):
-            def outcore_transform():
-                return radc_ao2mo.transform_integrals_outcore(self)
-            self.transform_integrals = outcore_transform
+                def df_transform():
+                    return radc_ao2mo.transform_integrals_df(self)
+                self.transform_integrals = df_transform
+            elif (self._scf._eri is None or
+                    (mem_incore+mem_now >= self.max_memory and not self.incore_complete)):
+                def outcore_transform():
+                    return radc_ao2mo.transform_integrals_outcore(self)
+                self.transform_integrals = outcore_transform
 
-        eris = self.transform_integrals()
+            eris = self.transform_integrals()
 
         self.e_corr, self.t1, self.t2 = radc_amplitudes.compute_amplitudes_energy(
             self, eris=eris, verbose=self.verbose)
@@ -402,7 +440,10 @@ class RADC(lib.StreamObject):
         else:
             raise NotImplementedError(self.method_type)
         self._adc_es = adc_es
-        return e_exc, v_exc, spec_fac, x
+        if self.if_heri_eris:
+            return e_exc, v_exc, spec_fac, x, eris
+        else:
+            return e_exc, v_exc, spec_fac, x
 
     def _finalize(self):
         '''Hook for dumping results and clearing up the object.'''

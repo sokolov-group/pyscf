@@ -24,7 +24,7 @@ from pyscf import scf
 from pyscf import adc
 
 def setUpModule():
-    global mol, mf, myadc
+    global mol, mf, myadc, myadc_fr
     mol = gto.Mole()
     r = 0.957492
     x = r * math.sin(104.468205 * math.pi/(2 * 180.0))
@@ -42,14 +42,21 @@ def setUpModule():
     mf.conv_tol = 1e-12
     mf.kernel()
     myadc = adc.ADC(mf)
+    myadc_fr = adc.ADC(mf,frozen=1)
 
 def tearDownModule():
-    global mol, mf, myadc
-    del mol, mf, myadc
+    global mol, mf, myadc, myadc_fr
+    del mol, mf, myadc, myadc_fr
 
 def rdms_test(dm):
     r2_int = mol.intor('int1e_r2')
     dm_ao = np.einsum('pi,ij,qj->pq', mf.mo_coeff, dm, mf.mo_coeff.conj())
+    r2 = np.einsum('pq,pq->',r2_int,dm_ao)
+    return r2
+
+def rdms_test_fr(dm):
+    r2_int = mol.intor('int1e_r2')
+    dm_ao = np.einsum('pi,ij,qj->pq', myadc_fr.mo_coeff, dm, myadc_fr.mo_coeff.conj())
     r2 = np.einsum('pq,pq->',r2_int,dm_ao)
     return r2
 
@@ -101,6 +108,22 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[1],0.3790532845, 6)
         self.assertAlmostEqual(e[2],0.4019531805, 6)
         self.assertAlmostEqual(e[3],0.4772033490, 6)
+
+    def test_ee_adc3_frozen(self):
+        myadc_fr.method = "adc(3)"
+        myadc_fr.method_type = "ee"
+        myadc_fr.max_memory = 20
+        myadc_fr.incore_complete = False
+        e, t_amp1, t_amp2 = myadc_fr.kernel_gs()
+        self.assertAlmostEqual(e, -0.20864693991051741, 6)
+
+        myadcee_fr = adc.radc_ee.RADCEE(myadc_fr)
+        e,v,p,x = myadcee_fr.kernel(nroots=4)
+
+        self.assertAlmostEqual(e[0],0.3052262994945224, 6)
+        self.assertAlmostEqual(e[1],0.3789606827167341, 6)
+        self.assertAlmostEqual(e[2],0.4018990744972834, 6)
+        self.assertAlmostEqual(e[3],0.4771607225277996, 6)
 
 if __name__ == "__main__":
     print("EE calculations for different ADC methods for water molecule")

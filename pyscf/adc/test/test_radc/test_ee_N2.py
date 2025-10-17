@@ -24,7 +24,7 @@ from pyscf import scf
 from pyscf import adc
 
 def setUpModule():
-    global mol, mf, myadc
+    global mol, mf, myadc, myadc_fr
     r = 1.098
     mol = gto.Mole()
     mol.atom = [
@@ -38,10 +38,11 @@ def setUpModule():
     mf.conv_tol = 1e-12
     mf.kernel()
     myadc = adc.ADC(mf)
+    myadc_fr = adc.ADC(mf,frozen=1)
 
 def tearDownModule():
-    global mol, mf, myadc
-    del mol, mf, myadc
+    global mol, mf, myadc, myadc_fr
+    del mol, mf, myadc, myadc_fr
 
 class KnownValues(unittest.TestCase):
 
@@ -82,6 +83,20 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[2],0.3534967080, 6)
         self.assertAlmostEqual(e[3],0.3673275757, 6)
 
+
+    def test_ee_adc3_frozen(self):
+        myadc_fr.method = "adc(3)"
+        myadc_fr.method_type = "ee"
+        e, t_amp1, t_amp2 = myadc_fr.kernel_gs()
+
+        myadcee_fr = adc.radc_ee.RADCEE(myadc_fr)
+        e,v,p,x = myadcee_fr.kernel(nroots=4)
+
+        self.assertAlmostEqual(e[0],0.3424857152380730, 6)
+        self.assertAlmostEqual(e[1],0.3424857152380766, 6)
+        self.assertAlmostEqual(e[2],0.3535001951670751, 6)
+        self.assertAlmostEqual(e[3],0.3673334752099558, 6)
+
 if __name__ == "__main__":
-    print("EE calculations for different ADC methods for water molecule")
+    print("EE calculations for different ADC methods for nitrogen molecule")
     unittest.main()

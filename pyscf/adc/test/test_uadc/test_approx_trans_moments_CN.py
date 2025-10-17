@@ -23,7 +23,7 @@ from pyscf import adc
 from pyscf.adc.uadc_ee import get_spin_square
 
 def setUpModule():
-    global mol, mf, myadc
+    global mol, mf, myadc, myadc_fr
     basis = 'cc-pVDZ'
     mol = gto.Mole()
     mol.atom = '''
@@ -43,10 +43,11 @@ def setUpModule():
     mf.scf()
 
     myadc = adc.ADC(mf)
+    myadc_fr = adc.ADC(mf,frozen=[1,1])
 
 def tearDownModule():
-    global mol, mf, myadc
-    del mol, mf, myadc
+    global mol, mf, myadc, myadc_fr
+    del mol, mf, myadc, myadc_fr
 
 
 class KnownValues(unittest.TestCase):
@@ -92,7 +93,6 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2], 0.92740352, 6)
         self.assertAlmostEqual(p[3], 0.93979624, 6)
 
-
     def test_ip_adc2(self):
         myadc.method = "adc(2)"
         myadc.method_type = "ip"
@@ -110,6 +110,63 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2], 0.93748642, 6)
         self.assertAlmostEqual(p[3], 0.93748642, 6)
 
+    def test_ee_adc2_frozen(self):
+        myadc_fr.method = "adc(2)"
+        myadc_fr.method_type = "ee"
+        myadc_fr.approx_trans_moments = True
+        myadc_fr.compute_spin_square = True
+
+        e,v,p,x = myadc_fr.kernel(nroots=5)
+        spin = get_spin_square(myadc_fr._adc_es)[0]
+
+        self.assertAlmostEqual(e[0],0.0789393239, 6)
+        self.assertAlmostEqual(e[1],0.0789393239, 6)
+        self.assertAlmostEqual(e[2],0.1397085217, 6)
+        self.assertAlmostEqual(e[3],0.2552893678, 6)
+
+        self.assertAlmostEqual(p[0],0.00338362, 6)
+        self.assertAlmostEqual(p[1],0.00338362, 6)
+        self.assertAlmostEqual(p[2],0.01188668, 6)
+        self.assertAlmostEqual(p[3],0.00598859, 6)
+
+        self.assertAlmostEqual(spin[0],0.88753961, 5)
+        self.assertAlmostEqual(spin[1],0.88753961, 5)
+        self.assertAlmostEqual(spin[2],1.10172022, 5)
+        self.assertAlmostEqual(spin[3],2.66684999, 5)
+
+    def test_ea_adc2_frozen(self):
+        myadc_fr.method = "adc(2)"
+        myadc_fr.method_type = "ea"
+        myadc_fr.approx_trans_moments = True
+
+        e,v,p,x = myadc_fr.kernel(nroots=4)
+
+        self.assertAlmostEqual(e[0], -0.1123860177, 6)
+        self.assertAlmostEqual(e[1],  0.1309866865, 6)
+        self.assertAlmostEqual(e[2],  0.1309866865, 6)
+        self.assertAlmostEqual(e[3],  0.1652852298, 6)
+
+        self.assertAlmostEqual(p[0], 0.91914237, 6)
+        self.assertAlmostEqual(p[1], 0.92740352, 6)
+        self.assertAlmostEqual(p[2], 0.92740352, 6)
+        self.assertAlmostEqual(p[3], 0.93979624, 6)
+
+    def test_ip_adc2_frozen(self):
+        myadc_fr.method = "adc(2)"
+        myadc_fr.method_type = "ip"
+        myadc_fr.approx_trans_moments = True
+
+        e,v,p,x = myadc_fr.kernel(nroots=4)
+
+        self.assertAlmostEqual(e[0], 0.4963840022, 6)
+        self.assertAlmostEqual(e[1], 0.4963840022, 6)
+        self.assertAlmostEqual(e[2], 0.5237162997, 6)
+        self.assertAlmostEqual(e[3], 0.5237162997, 6)
+
+        self.assertAlmostEqual(p[0], 0.89871663, 6)
+        self.assertAlmostEqual(p[1], 0.89871663, 6)
+        self.assertAlmostEqual(p[2], 0.93748642, 6)
+        self.assertAlmostEqual(p[3], 0.93748642, 6)
 
 if __name__ == "__main__":
     print("EE calculations for different ADC methods for CN molecule")
