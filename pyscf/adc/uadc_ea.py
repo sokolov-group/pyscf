@@ -1882,6 +1882,13 @@ def make_rdm1_eigenvectors(adc, L, R):
     L = np.array(L).ravel()
     R = np.array(R).ravel()
 
+    nocc_a = adc.nocc_a
+    nocc_b = adc.nocc_b
+    nvir_a = adc.nvir_a
+    nvir_b = adc.nvir_b
+    nmo_a = nocc_a + nvir_a
+    nmo_b = nocc_b + nvir_b
+
     t2_1_a = adc.t2[0][0][:]
     t2_1_ab = adc.t2[0][1][:]
     t2_1_b = adc.t2[0][2][:]
@@ -1891,13 +1898,6 @@ def make_rdm1_eigenvectors(adc, L, R):
     else:
         t1_2_a = np.zeros((nocc_a, nvir_a))
         t1_2_b = np.zeros((nocc_b, nvir_b))
-
-    nocc_a = adc.nocc_a
-    nocc_b = adc.nocc_b
-    nvir_a = adc.nvir_a
-    nvir_b = adc.nvir_b
-    nmo_a = nocc_a + nvir_a
-    nmo_b = nocc_b + nvir_b
 
     ab_ind_a = np.tril_indices(nvir_a, k=-1)
     ab_ind_b = np.tril_indices(nvir_b, k=-1)
