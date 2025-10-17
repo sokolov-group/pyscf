@@ -16,6 +16,7 @@
 #         Samragni Banerjee <samragnibanerjee4@gmail.com>
 #         James Serna <jamcar456@gmail.com>
 #         Terrence Stahl <terrencestahl1@gmail.com>
+#         Ning-Yuan Chen <cny003@outlook.com>
 #         Alexander Sokolov <alexander.y.sokolov@gmail.com>
 
 '''
@@ -419,6 +420,9 @@ class UADC(lib.StreamObject):
         self.incore_complete = self.incore_complete or self.mol.incore_anyway
 
         self.f_ov = None
+        self._nmo = None
+        self._nocc = mf.nelec
+        self.mo_occ = mo_occ
 
         if isinstance(mf, scf.rohf.ROHF):
 
@@ -441,6 +445,17 @@ class UADC(lib.StreamObject):
             else:
                 ndocc = nalpha
                 nsocc = nbeta - nalpha
+
+            if frozen is not None:
+                from pyscf.mp import mp2
+                mask = mp2.get_frozen_mask(self)
+                mo_a = mo_a[:, mask]
+                ndocc -= np.count_nonzero(~mask[:ndocc])
+                nsocc -= np.count_nonzero(~mask[ndocc:ndocc+nsocc])
+                if nalpha > nbeta:
+                    self._nocc = (ndocc + nsocc, ndocc)
+                else:
+                    self._nocc = (ndocc, ndocc + nsocc)
 
             fock_a = np.dot(mo_a.T,np.dot(fock_a, mo_a))
             fock_b = np.dot(mo_a.T,np.dot(fock_b, mo_a))
@@ -465,15 +480,12 @@ class UADC(lib.StreamObject):
             self.mo_energy_b = mf.mo_energy[1]
 
         self.mo_coeff = mo_coeff
-        self.mo_occ = mo_occ
         self.e_corr = None
         self.t1 = None
         self.t2 = None
         self.imds = lambda:None
-        self._nocc = mf.nelec
         self.if_heri_eris = False
-        self._nmo = None
-        if frozen is None:
+        if frozen is None or isinstance(mf, scf.rohf.ROHF):
             self._nmo = (mo_coeff[0].shape[1], mo_coeff[1].shape[1])
         elif hasattr(frozen, '__len__'):
             if len(frozen) != 2:
@@ -501,9 +513,9 @@ class UADC(lib.StreamObject):
                 raise NotImplementedError
             self._nmo = (nmo_a, nmo_b)
         else:
-            raise NotImplementedError("frozen should be announced as None or a tuple with two elements")
+            raise NotImplementedError("each element of frozen should be None, an integer or a array-like object")
 
-        if frozen is not None:
+        if frozen is not None and not isinstance(mf, scf.rohf.ROHF):
             (mask_a,mask_b) = self.get_frozen_mask()
             maskocc_a = mf.mo_occ[0]>1e-6
             maskocc_b = mf.mo_occ[1]>1e-6

@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 # Author: Samragni Banerjee <samragnibanerjee4@gmail.com>
+#         Ning-Yuan Chen <cny003@outlook.com>
 #         Alexander Sokolov <alexander.y.sokolov@gmail.com>
 #
 
@@ -23,7 +24,7 @@ from pyscf import scf
 from pyscf import adc
 
 def setUpModule():
-    global mol, mf, myadc
+    global mol, mf, myadc, myadc_fr
     r = 0.969286393
     mol = gto.Mole()
     mol.atom = [
@@ -41,10 +42,13 @@ def setUpModule():
     myadc = adc.ADC(mf)
     myadc.conv_tol = 1e-12
     myadc.tol_residual = 1e-6
+    myadc_fr = adc.ADC(mf,frozen=(1,1))
+    myadc_fr.conv_tol = 1e-12
+    myadc_fr.tol_residual = 1e-6
 
 def tearDownModule():
-    global mol, mf, myadc
-    del mol, mf, myadc
+    global mol, mf, myadc, myadc_fr
+    del mol, mf, myadc, myadc_fr
 
 class KnownValues(unittest.TestCase):
 
@@ -96,6 +100,24 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[0], 0.9282869467221032, 6)
         self.assertAlmostEqual(p[1], 0.5188529241094367, 6)
         self.assertAlmostEqual(p[2], 0.40655844616580944, 6)
+
+    def test_ip_adc3_frozen(self):
+
+        myadc_fr.method = "adc(3)"
+        e, t_amp1, t_amp2 = myadc_fr.kernel_gs()
+        self.assertAlmostEqual(e, -0.17416890784191427, 6)
+
+        myadc_fr.method_type = "ip"
+        e,v,p,x = myadc_fr.kernel(nroots=3)
+        myadc_fr.analyze()
+
+        self.assertAlmostEqual(e[0], 0.479335828293046, 6)
+        self.assertAlmostEqual(e[1], 0.487239087759452, 6)
+        self.assertAlmostEqual(e[2], 0.572673343025919, 6)
+
+        self.assertAlmostEqual(p[0], 0.928283370231907, 6)
+        self.assertAlmostEqual(p[1], 0.520023087174258, 6)
+        self.assertAlmostEqual(p[2], 0.405384799660555, 6)
 
     def test_ip_adc3_oneroot(self):
 

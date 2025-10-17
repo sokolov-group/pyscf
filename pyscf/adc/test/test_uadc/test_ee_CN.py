@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 # Author: Terrence Stahl <terrencestahl1@@gmail.com>
+#         Ning-Yuan Chen <cny003@outlook.com>
 #         Alexander Sokolov <alexander.y.sokolov@gmail.com>
 #
 
@@ -24,7 +25,7 @@ from pyscf import adc
 from pyscf.adc.uadc_ee import get_spin_square
 
 def setUpModule():
-    global mol, mf, myadc
+    global mol, mf, myadc, myadc_fr
     basis = 'cc-pVDZ'
     mol = gto.Mole()
     mol.atom = '''
@@ -44,10 +45,11 @@ def setUpModule():
     mf.scf()
 
     myadc = adc.ADC(mf)
+    myadc_fr = adc.ADC(mf,frozen=(1,1))
 
 def tearDownModule():
-    global mol, mf, myadc
-    del mol, mf, myadc
+    global mol, mf, myadc, myadc_fr
+    del mol, mf, myadc, myadc_fr
 
 
 class KnownValues(unittest.TestCase):
@@ -115,6 +117,29 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(spin[1],0.78024113, 5)
         self.assertAlmostEqual(spin[2],0.79826249, 5)
         self.assertAlmostEqual(spin[3],4.10509903, 5)
+
+    def test_ee_adc3_frozen(self):
+        myadc_fr.method = "adc(3)"
+
+        myadc_fr.method_type = "ee"
+        e,v,p,x = myadc_fr.kernel(nroots=4)
+        spin = get_spin_square(myadc_fr._adc_es)[0]
+
+        self.assertAlmostEqual(e[0],0.0431909287777104, 6)
+        self.assertAlmostEqual(e[1],0.0431909287777112, 6)
+        self.assertAlmostEqual(e[2],0.1277046802429511, 6)
+        self.assertAlmostEqual(e[3],0.1848932663040389, 6)
+
+        self.assertAlmostEqual(p[0],0.0019289485904522, 6)
+        self.assertAlmostEqual(p[1],0.0019289485904523, 6)
+        self.assertAlmostEqual(p[2],0.0127961889037364, 6)
+        self.assertAlmostEqual(p[3],0.0001413766514383, 6)
+
+        self.assertAlmostEqual(spin[0],0.780275417780729, 5)
+        self.assertAlmostEqual(spin[1],0.780275417780728, 5)
+        self.assertAlmostEqual(spin[2],0.798396848726367, 5)
+        self.assertAlmostEqual(spin[3],4.105017182578975, 5)
+
 if __name__ == "__main__":
     print("EE calculations for different ADC methods for CN molecule")
     unittest.main()

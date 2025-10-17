@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 # Author: Terrence Stahl <terrencestahl1@@gmail.com>
+#         Ning-Yuan Chen <cny003@outlook.com>
 #         Alexander Sokolov <alexander.y.sokolov@gmail.com>
 #
 
@@ -25,7 +26,7 @@ from pyscf import adc
 from pyscf.adc.uadc_ee import get_spin_square
 
 def setUpModule():
-    global mol, mf, myadc
+    global mol, mf, myadc, myadc_fr
     basis = 'cc-pVDZ'
     mol = gto.Mole()
     mol.verbose = 0
@@ -45,10 +46,11 @@ def setUpModule():
     mf.scf()
 
     myadc = adc.ADC(mf)
+    myadc_fr = adc.ADC(mf,frozen=[1,1])
 
 def tearDownModule():
-    global mol, mf, myadc
-    del mol, mf, myadc
+    global mol, mf, myadc, myadc_fr
+    del mol, mf, myadc, myadc_fr
 
 
 class KnownValues(unittest.TestCase):
@@ -122,6 +124,31 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(spin[1],0.78024113 , 5)
         self.assertAlmostEqual(spin[2],0.79826249 , 5)
         self.assertAlmostEqual(spin[3],4.10509903 , 5)
+
+    def test_ee_adc3_frozen(self):
+        myadc_fr.method = "adc(3)"
+        myadc_fr.max_memory = 20
+        myadc_fr.incore_complete = False
+
+        myadc_fr.method_type = "ee"
+        e,v,p,x = myadc_fr.kernel(nroots=4)
+        spin = get_spin_square(myadc_fr._adc_es)[0]
+
+        self.assertAlmostEqual(e[0],0.04319092877771163, 6)
+        self.assertAlmostEqual(e[1],0.04319092877771207, 6)
+        self.assertAlmostEqual(e[2],0.12770468024295392, 6)
+        self.assertAlmostEqual(e[3],0.18489326630403885, 6)
+
+        self.assertAlmostEqual(p[0],0.00192894859045236, 6)
+        self.assertAlmostEqual(p[1],0.00192894859045238, 6)
+        self.assertAlmostEqual(p[2],0.01279618890373667, 6)
+        self.assertAlmostEqual(p[3],0.00014137665143845, 6)
+
+        self.assertAlmostEqual(spin[0],0.780275417780732 , 5)
+        self.assertAlmostEqual(spin[1],0.780275417780731 , 5)
+        self.assertAlmostEqual(spin[2],0.798396848726363 , 5)
+        self.assertAlmostEqual(spin[3],4.105017182578966 , 5)
+
 if __name__ == "__main__":
     print("EE calculations for different ADC methods for CN molecule")
     unittest.main()

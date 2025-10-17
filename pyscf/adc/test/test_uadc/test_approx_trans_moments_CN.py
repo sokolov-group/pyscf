@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 # Author: Terrence Stahl <terrencestahl1@@gmail.com>
+#         Ning-Yuan Chen <cny003@outlook.com>
 #         Alexander Sokolov <alexander.y.sokolov@gmail.com>
 #
 
@@ -43,7 +44,7 @@ def setUpModule():
     mf.scf()
 
     myadc = adc.ADC(mf)
-    myadc_fr = adc.ADC(mf,frozen=[1,1])
+    myadc_fr = adc.ADC(mf,frozen=(1,1))
 
 def tearDownModule():
     global mol, mf, myadc, myadc_fr
@@ -119,20 +120,20 @@ class KnownValues(unittest.TestCase):
         e,v,p,x = myadc_fr.kernel(nroots=5)
         spin = get_spin_square(myadc_fr._adc_es)[0]
 
-        self.assertAlmostEqual(e[0],0.0789393239, 6)
-        self.assertAlmostEqual(e[1],0.0789393239, 6)
-        self.assertAlmostEqual(e[2],0.1397085217, 6)
-        self.assertAlmostEqual(e[3],0.2552893678, 6)
+        self.assertAlmostEqual(e[0],0.0789265253865330, 6)
+        self.assertAlmostEqual(e[1],0.0789265253865334, 6)
+        self.assertAlmostEqual(e[2],0.1398248585903803, 6)
+        self.assertAlmostEqual(e[3],0.2553033553135535, 6)
 
-        self.assertAlmostEqual(p[0],0.00338362, 6)
-        self.assertAlmostEqual(p[1],0.00338362, 6)
-        self.assertAlmostEqual(p[2],0.01188668, 6)
-        self.assertAlmostEqual(p[3],0.00598859, 6)
+        self.assertAlmostEqual(p[0],0.0033823617034092, 6)
+        self.assertAlmostEqual(p[1],0.0033823617034092, 6)
+        self.assertAlmostEqual(p[2],0.0118973560460742, 6)
+        self.assertAlmostEqual(p[3],0.0059779519202508, 6)
 
-        self.assertAlmostEqual(spin[0],0.88753961, 5)
-        self.assertAlmostEqual(spin[1],0.88753961, 5)
-        self.assertAlmostEqual(spin[2],1.10172022, 5)
-        self.assertAlmostEqual(spin[3],2.66684999, 5)
+        self.assertAlmostEqual(spin[0],0.8875461145106943, 5)
+        self.assertAlmostEqual(spin[1],0.8875461145106965, 5)
+        self.assertAlmostEqual(spin[2],1.1017871591273392, 5)
+        self.assertAlmostEqual(spin[3],2.6668023038469877, 5)
 
     def test_ea_adc2_frozen(self):
         myadc_fr.method = "adc(2)"
@@ -141,15 +142,15 @@ class KnownValues(unittest.TestCase):
 
         e,v,p,x = myadc_fr.kernel(nroots=4)
 
-        self.assertAlmostEqual(e[0], -0.1123860177, 6)
-        self.assertAlmostEqual(e[1],  0.1309866865, 6)
-        self.assertAlmostEqual(e[2],  0.1309866865, 6)
-        self.assertAlmostEqual(e[3],  0.1652852298, 6)
+        self.assertAlmostEqual(e[0], -0.112374942397122, 6)
+        self.assertAlmostEqual(e[1],  0.131058880478625, 6)
+        self.assertAlmostEqual(e[2],  0.131058880478626, 6)
+        self.assertAlmostEqual(e[3],  0.165291577248025, 6)
 
-        self.assertAlmostEqual(p[0], 0.91914237, 6)
-        self.assertAlmostEqual(p[1], 0.92740352, 6)
-        self.assertAlmostEqual(p[2], 0.92740352, 6)
-        self.assertAlmostEqual(p[3], 0.93979624, 6)
+        self.assertAlmostEqual(p[0], 0.919146532081888, 6)
+        self.assertAlmostEqual(p[1], 0.927421334087213, 6)
+        self.assertAlmostEqual(p[2], 0.927421334087215, 6)
+        self.assertAlmostEqual(p[3], 0.939804864487713, 6)
 
     def test_ip_adc2_frozen(self):
         myadc_fr.method = "adc(2)"
@@ -158,15 +159,15 @@ class KnownValues(unittest.TestCase):
 
         e,v,p,x = myadc_fr.kernel(nroots=4)
 
-        self.assertAlmostEqual(e[0], 0.4963840022, 6)
-        self.assertAlmostEqual(e[1], 0.4963840022, 6)
-        self.assertAlmostEqual(e[2], 0.5237162997, 6)
-        self.assertAlmostEqual(e[3], 0.5237162997, 6)
+        self.assertAlmostEqual(e[0], 0.4963773005814748, 6)
+        self.assertAlmostEqual(e[1], 0.4963773005814786, 6)
+        self.assertAlmostEqual(e[2], 0.5237016998217207, 6)
+        self.assertAlmostEqual(e[3], 0.5237016998217289, 6)
 
-        self.assertAlmostEqual(p[0], 0.89871663, 6)
-        self.assertAlmostEqual(p[1], 0.89871663, 6)
-        self.assertAlmostEqual(p[2], 0.93748642, 6)
-        self.assertAlmostEqual(p[3], 0.93748642, 6)
+        self.assertAlmostEqual(p[0], 0.8987400674417594, 6)
+        self.assertAlmostEqual(p[1], 0.8987400674417607, 6)
+        self.assertAlmostEqual(p[2], 0.9374966427361372, 6)
+        self.assertAlmostEqual(p[3], 0.9374966427361376, 6)
 
 if __name__ == "__main__":
     print("EE calculations for different ADC methods for CN molecule")

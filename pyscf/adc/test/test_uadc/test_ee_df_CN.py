@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 # Author: Terrence Stahl <terrencestahl1@@gmail.com>
+#         Ning-Yuan Chen <cny003@outlook.com>
 #         Alexander Sokolov <alexander.y.sokolov@gmail.com>
 #
 
@@ -24,7 +25,7 @@ from pyscf import adc
 from pyscf.adc.uadc_ee import get_spin_square
 
 def setUpModule():
-    global mol, mf, myadc
+    global mol, mf, myadc, myadc_fr
 
     basis = 'cc-pVDZ'
     mol = gto.Mole()
@@ -45,10 +46,11 @@ def setUpModule():
     mf.scf()
 
     myadc = adc.ADC(mf).density_fit('cc-pvdz-ri')
+    myadc_fr = adc.ADC(mf,frozen=(1,1)).density_fit('cc-pvdz-ri')
 
 def tearDownModule():
-    global mol, mf, myadc
-    del mol, mf, myadc
+    global mol, mf, myadc, myadc_fr
+    del mol, mf, myadc, myadc_fr
 
 class KnownValues(unittest.TestCase):
 
@@ -115,6 +117,28 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(spin[1],0.78026235 , 5)
         self.assertAlmostEqual(spin[2],0.79814541 , 5)
         self.assertAlmostEqual(spin[3],4.10490908 , 5)
+
+    def test_ee_adc3_frozen(self):
+        myadc_fr.method = "adc(3)"
+
+        myadc_fr.method_type = "ee"
+        e,v,p,x = myadc_fr.kernel(nroots=4)
+        spin = get_spin_square(myadc_fr._adc_es)[0]
+
+        self.assertAlmostEqual(e[0],0.0431161470227286, 6)
+        self.assertAlmostEqual(e[1],0.0431161470227291, 6)
+        self.assertAlmostEqual(e[2],0.1276887701715607, 6)
+        self.assertAlmostEqual(e[3],0.1848923370493608, 6)
+
+        self.assertAlmostEqual(p[0],0.0019260668350998, 6)
+        self.assertAlmostEqual(p[1],0.0019260668350999 , 6)
+        self.assertAlmostEqual(p[2],0.0127933842950454 , 6)
+        self.assertAlmostEqual(p[3],0.0001395544959637 , 6)
+
+        self.assertAlmostEqual(spin[0],0.780295683904329 , 5)
+        self.assertAlmostEqual(spin[1],0.780295683904327 , 5)
+        self.assertAlmostEqual(spin[2],0.798279630625708 , 5)
+        self.assertAlmostEqual(spin[3],4.104839234050192 , 5)
 
 if __name__ == "__main__":
     print("EE calculations for different ADC methods for CN molecule")
