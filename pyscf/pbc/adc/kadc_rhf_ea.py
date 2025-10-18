@@ -1156,7 +1156,6 @@ def renormalize_eigenvectors(adc, kshift, U, nroots=1):
 
 def make_rdm1(adc):
     nkpts = adc.nkpts
-    nmo = adc.nmo
     cput0 = (logger.process_clock(), logger.perf_counter())
     log = logger.Logger(adc.stdout, adc.verbose)
 
@@ -1485,7 +1484,8 @@ class RADCEA(kadc_rhf.RADC):
             g[idx] = guess.copy()
         guess = []
         for p in range(g.shape[1]):
-            if (self.frozen is not None) or (not np.all([x.shape[1] == self.nmo for x in self.mo_coeff])) or (type=="read"):
+            if (self.frozen is not None) or (not np.all([x.shape[1] == self.nmo for x in self.mo_coeff])) \
+                    or (type=="read"):
                 guess_norm = np.linalg.norm(g[:,p])
                 guess_norm_tol = LOOSE_ZERO_TOL
                 if guess_norm < guess_norm_tol:

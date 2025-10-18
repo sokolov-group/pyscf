@@ -193,20 +193,20 @@ def make_ref_rdm1(adc):
                     kb = adc.khelper.kconserv[ki, ka, kj]
                     #### OCC-OCC ###
                     OPDM[ki][:nocc, :nocc] -= 2 * lib.einsum('Iiab,Jiab->IJ', t1_ccee[ki]
-                                                             [kj][ka], t2_ccee[ki][kj][ka].conj(), optimize = einsum_type)
+                                                            [kj][ka], t2_ccee[ki][kj][ka].conj(), optimize = einsum_type)
                     OPDM[ki][:nocc, :nocc] += lib.einsum('Iiab,Jiba->IJ', t1_ccee[ki]
                                                          [kj][ka], t2_ccee[ki][kj][kb].conj(), optimize = einsum_type)
                     OPDM[ki][:nocc, :nocc] -= 2 * lib.einsum('Jiab,Iiab->IJ', t1_ccee[ki]
-                                                             [kj][ka].conj(), t2_ccee[ki][kj][ka], optimize = einsum_type)
+                                                            [kj][ka].conj(), t2_ccee[ki][kj][ka], optimize = einsum_type)
                     OPDM[ki][:nocc, :nocc] += lib.einsum('Jiab,Iiba->IJ', t1_ccee[ki]
                                                          [kj][ka].conj(), t2_ccee[ki][kj][kb], optimize = einsum_type)
                     ##### VIR-VIR ###
                     OPDM[ka][nocc:, nocc:] += 2 * lib.einsum('ijBa,ijAa->AB', t1_ccee[ki]
-                                                             [kj][ka], t2_ccee[ki][kj][ka].conj(), optimize = einsum_type)
+                                                            [kj][ka], t2_ccee[ki][kj][ka].conj(), optimize = einsum_type)
                     OPDM[ka][nocc:, nocc:] -= lib.einsum('ijBa,ijaA->AB', t1_ccee[ki]
                                                          [kj][ka], t2_ccee[ki][kj][kb].conj(), optimize = einsum_type)
                     OPDM[ka][nocc:, nocc:] += 2 * lib.einsum('ijAa,ijBa->AB', t1_ccee[ki]
-                                                             [kj][ka].conj(), t2_ccee[ki][kj][ka], optimize = einsum_type)
+                                                            [kj][ka].conj(), t2_ccee[ki][kj][ka], optimize = einsum_type)
                     OPDM[ka][nocc:, nocc:] -= lib.einsum('ijAa,ijaB->AB', t1_ccee[ki]
                                                          [kj][ka].conj(), t2_ccee[ki][kj][kb], optimize = einsum_type)
 
@@ -241,7 +241,8 @@ def mo_splitter(myadc):
     return masks
 
 def get_fno_ref(myadc,nroots,ref_state,guess):
-    adc2_ref = RADC(myadc._scf).set(verbose = 0,method_type = myadc.method_type,approx_trans_moments = myadc.approx_trans_moments,
+    adc2_ref = RADC(myadc._scf).set(verbose = 0,method_type = myadc.method_type,
+                                    approx_trans_moments = myadc.approx_trans_moments,
                                     with_df = myadc.with_df,if_naf = myadc.if_naf,thresh_naf = myadc.thresh_naf)
     myadc.e2_ref,myadc.v2_ref,_,_ = adc2_ref.kernel(nroots,guess=guess)
     rdm1_gs = adc2_ref.make_ref_rdm1()
@@ -543,7 +544,8 @@ class RFNOADC(RADC):
 
     def compute_correction(self, mf, frozen, nroots, eris=None, guess=None, kptlist=None):
         adc2_ssfno = RADC(mf, frozen, self.mo_coeff).set(verbose = 0,method_type = self.method_type,
-                                                         with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,naux = self.naux,
+                                                         with_df = self.with_df,if_naf = self.if_naf,
+                                                         thresh_naf = self.thresh_naf,naux = self.naux,
                                                          approx_trans_moments = self.approx_trans_moments)
         e2_ssfno,v2_ssfno,p2_ssfno,x2_ssfno = adc2_ssfno.kernel(nroots, eris = eris, guess=guess, kptlist=kptlist)
         self.delta_e = self.e2_ref - e2_ssfno
@@ -559,7 +561,7 @@ class RFNOADC(RADC):
             self.if_naf = False
         elif isinstance(ref_state, int) and 0<ref_state<=nroots:
             print(f"Do ss-fno kadc calculation, the specic state is {ref_state}")
-            if self.with_df == None:
+            if self.with_df is None:
                 self.if_naf = False
         else:
             raise ValueError("ref_state should be an int type and in (0,nroots]")
@@ -567,8 +569,10 @@ class RFNOADC(RADC):
         print(f"number of origin orbital is {get_nmo(self,True)}")
         get_fno_ref(self, nroots, self.ref_state, guess)
         self.mo_coeff,self.frozen = make_fno(self, self.rdm1_ss, self._scf, thresh)
-        adc3_ssfno = RADC(self._scf, self.frozen, self.mo_coeff).set(verbose = self.verbose,method_type = self.method_type,method = "adc(3)",
-                                                            with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,
+        adc3_ssfno = RADC(self._scf, self.frozen, self.mo_coeff).set(verbose = self.verbose,
+                                                            method_type = self.method_type,method = "adc(3)",
+                                                            with_df = self.with_df,if_naf = self.if_naf,
+                                                            thresh_naf = self.thresh_naf,
                                                             if_heri_eris = self.if_heri_eris,approx_trans_moments = True)
         print(self.frozen)
         print(f"number of new orbital is {get_nmo(adc3_ssfno,True)}")
