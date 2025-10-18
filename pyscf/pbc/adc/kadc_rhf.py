@@ -97,7 +97,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
         if guess_type is None:
             guess = adc.get_init_guess(nroots, diag, ascending = True)
         elif guess_type == "read":
-            guess = adc.get_init_guess(nroots, diag, ascending = True, type = guess_type, ini = guess_k[k], kshift = kshift)
+            guess = adc.get_init_guess(nroots, diag, ascending = True, type = guess_type,
+                                       ini = guess_k[k], kshift = kshift)
         else:
             raise NotImplementedError("Guess type not implemented")
 
@@ -166,18 +167,22 @@ def make_ref_rdm1(adc):
             for ka in range(nkpts):
                 kb = adc.khelper.kconserv[ki, ka, kj]
                 ### OCC-OCC ###
-                OPDM[ki][:nocc, :nocc] -= 2 * lib.einsum('Iiab,Jiab->IJ', t1_ccee[ki][kj][ka], t1_ccee[ki][kj][ka].conj(), optimize = einsum_type)
-                OPDM[ki][:nocc, :nocc] += lib.einsum('Iiab,Jiba->IJ', t1_ccee[ki][kj][ka], t1_ccee[ki][kj][kb].conj(), optimize = einsum_type)
+                OPDM[ki][:nocc, :nocc] -= 2 * lib.einsum('Iiab,Jiab->IJ', t1_ccee[ki]
+                                                         [kj][ka], t1_ccee[ki][kj][ka].conj(), optimize = einsum_type)
+                OPDM[ki][:nocc, :nocc] += lib.einsum('Iiab,Jiba->IJ', t1_ccee[ki]
+                                                     [kj][ka], t1_ccee[ki][kj][kb].conj(), optimize = einsum_type)
                 ### VIR-VIR ###
-                OPDM[ka][nocc:, nocc:] += 2 * lib.einsum('ijBa,ijAa->AB', t1_ccee[ki][kj][ka], t1_ccee[ki][kj][ka].conj(), optimize = einsum_type)
-                OPDM[ka][nocc:, nocc:] -= lib.einsum('ijBa,ijaA->AB', t1_ccee[ki][kj][ka], t1_ccee[ki][kj][kb].conj(), optimize = einsum_type) 
+                OPDM[ka][nocc:, nocc:] += 2 * lib.einsum('ijBa,ijAa->AB', t1_ccee[ki]
+                                                         [kj][ka], t1_ccee[ki][kj][ka].conj(), optimize = einsum_type)
+                OPDM[ka][nocc:, nocc:] -= lib.einsum('ijBa,ijaA->AB', t1_ccee[ki]
+                                                     [kj][ka], t1_ccee[ki][kj][kb].conj(), optimize = einsum_type)
     if adc.approx_trans_moments is False or adc.method == "adc(3)":
         for ki in range(nkpts):
             ### OCC-VIR ###
             OPDM[ki][:nocc, nocc:] += lib.einsum('IA->IA', t2_ce[ki], optimize = einsum_type).copy()
             ### VIR-OCC ###
             OPDM[ki][nocc:, :nocc] = OPDM[ki][:nocc, nocc:].conj().T
-    
+
     ####### ADC(3) SPIN ADAPTED REF OPDM WITH SQA ################
     if adc.method == "adc(3)":
         t2_ccee = t2[1]
@@ -187,21 +192,31 @@ def make_ref_rdm1(adc):
                 for ka in range(nkpts):
                     kb = adc.khelper.kconserv[ki, ka, kj]
                     #### OCC-OCC ###
-                    OPDM[ki][:nocc, :nocc] -= 2 * lib.einsum('Iiab,Jiab->IJ', t1_ccee[ki][kj][ka], t2_ccee[ki][kj][ka].conj(), optimize = einsum_type)
-                    OPDM[ki][:nocc, :nocc] += lib.einsum('Iiab,Jiba->IJ', t1_ccee[ki][kj][ka], t2_ccee[ki][kj][kb].conj(), optimize = einsum_type)
-                    OPDM[ki][:nocc, :nocc] -= 2 * lib.einsum('Jiab,Iiab->IJ', t1_ccee[ki][kj][ka].conj(), t2_ccee[ki][kj][ka], optimize = einsum_type)
-                    OPDM[ki][:nocc, :nocc] += lib.einsum('Jiab,Iiba->IJ', t1_ccee[ki][kj][ka].conj(), t2_ccee[ki][kj][kb], optimize = einsum_type)
+                    OPDM[ki][:nocc, :nocc] -= 2 * lib.einsum('Iiab,Jiab->IJ', t1_ccee[ki]
+                                                             [kj][ka], t2_ccee[ki][kj][ka].conj(), optimize = einsum_type)
+                    OPDM[ki][:nocc, :nocc] += lib.einsum('Iiab,Jiba->IJ', t1_ccee[ki]
+                                                         [kj][ka], t2_ccee[ki][kj][kb].conj(), optimize = einsum_type)
+                    OPDM[ki][:nocc, :nocc] -= 2 * lib.einsum('Jiab,Iiab->IJ', t1_ccee[ki]
+                                                             [kj][ka].conj(), t2_ccee[ki][kj][ka], optimize = einsum_type)
+                    OPDM[ki][:nocc, :nocc] += lib.einsum('Jiab,Iiba->IJ', t1_ccee[ki]
+                                                         [kj][ka].conj(), t2_ccee[ki][kj][kb], optimize = einsum_type)
                     ##### VIR-VIR ###
-                    OPDM[ka][nocc:, nocc:] += 2 * lib.einsum('ijBa,ijAa->AB', t1_ccee[ki][kj][ka], t2_ccee[ki][kj][ka].conj(), optimize = einsum_type)
-                    OPDM[ka][nocc:, nocc:] -= lib.einsum('ijBa,ijaA->AB', t1_ccee[ki][kj][ka], t2_ccee[ki][kj][kb].conj(), optimize = einsum_type)
-                    OPDM[ka][nocc:, nocc:] += 2 * lib.einsum('ijAa,ijBa->AB', t1_ccee[ki][kj][ka].conj(), t2_ccee[ki][kj][ka], optimize = einsum_type)
-                    OPDM[ka][nocc:, nocc:] -= lib.einsum('ijAa,ijaB->AB', t1_ccee[ki][kj][ka].conj(), t2_ccee[ki][kj][kb], optimize = einsum_type)
+                    OPDM[ka][nocc:, nocc:] += 2 * lib.einsum('ijBa,ijAa->AB', t1_ccee[ki]
+                                                             [kj][ka], t2_ccee[ki][kj][ka].conj(), optimize = einsum_type)
+                    OPDM[ka][nocc:, nocc:] -= lib.einsum('ijBa,ijaA->AB', t1_ccee[ki]
+                                                         [kj][ka], t2_ccee[ki][kj][kb].conj(), optimize = einsum_type)
+                    OPDM[ka][nocc:, nocc:] += 2 * lib.einsum('ijAa,ijBa->AB', t1_ccee[ki]
+                                                             [kj][ka].conj(), t2_ccee[ki][kj][ka], optimize = einsum_type)
+                    OPDM[ka][nocc:, nocc:] -= lib.einsum('ijAa,ijaB->AB', t1_ccee[ki]
+                                                         [kj][ka].conj(), t2_ccee[ki][kj][kb], optimize = einsum_type)
 
                 ka = ki
                 kb = kj
                 ##### OCC-VIR ### ####
-                OPDM[ki][:nocc, nocc:] += lib.einsum('IiAa,ia->IA', t1_ccee[ki][kj][ka], t2_ce[kj].conj(), optimize = einsum_type)
-                OPDM[ki][:nocc, nocc:] -= 1/2 * lib.einsum('IiaA,ia->IA', t1_ccee[ki][kj][kb], t2_ce[kj].conj(), optimize = einsum_type)
+                OPDM[ki][:nocc, nocc:] += lib.einsum('IiAa,ia->IA', t1_ccee[ki][kj]
+                                                     [ka], t2_ce[kj].conj(), optimize = einsum_type)
+                OPDM[ki][:nocc, nocc:] -= 1/2 * \
+                    lib.einsum('IiaA,ia->IA', t1_ccee[ki][kj][kb], t2_ce[kj].conj(), optimize = einsum_type)
             ###### VIR-OCC ###
             OPDM[ki][nocc:, :nocc] = OPDM[ki][:nocc, nocc:].conj().T
 
@@ -226,12 +241,22 @@ def mo_splitter(myadc):
     return masks
 
 def get_fno_ref(myadc,nroots,ref_state,guess):
-    adc2_ref = RADC(myadc._scf).set(verbose = 0,method_type = myadc.method_type,approx_trans_moments = myadc.approx_trans_moments,\
+    adc2_ref = RADC(myadc._scf).set(verbose = 0,method_type = myadc.method_type,approx_trans_moments = myadc.approx_trans_moments,
                                     with_df = myadc.with_df,if_naf = myadc.if_naf,thresh_naf = myadc.thresh_naf)
     myadc.e2_ref,myadc.v2_ref,_,_ = adc2_ref.kernel(nroots,guess=guess)
     rdm1_gs = adc2_ref.make_ref_rdm1()
     if ref_state is not None:
-        rdm1_ref = adc2_ref.make_rdm1()[ref_state - 1]
+        if isinstance(ref_state,(int, np.integer)):
+            idx = np.argsort(myadc.e2_ref.ravel())
+            sidx = idx[ref_state - 1]% myadc.nkpts
+            kidx = idx[ref_state - 1]// myadc.nkpts
+        elif hasattr(ref_state, '__len__'):
+            if len(ref_state) != 2:
+                raise ValueError
+            else:
+                (sidx,kidx) = (ref_state[0],ref_state[1])
+
+        rdm1_ref = adc2_ref.make_rdm1()[sidx][kidx]
         myadc.rdm1_ss = rdm1_ref + rdm1_gs
     else:
         myadc.rdm1_ss = rdm1_gs
@@ -240,13 +265,14 @@ def make_fno(myadc, rdm1_ss, mf, thresh):
     from pyscf.mp import mp2
     nocc = mf.mol.nelectron//2
     masks = mo_splitter(myadc)
-    
+
     no_coeff=[]
     no_frozen=[]
     for kpt in range(myadc.nkpts):
         n,V = np.linalg.eigh(rdm1_ss[kpt][nocc:,nocc:])
         idx = np.argsort(n)[::-1]
         n,V = n[idx], V[:,idx]
+        print(n)
         T = n > thresh
         n_fro_vir = np.sum(T == 0)
         T = np.diag(T)
@@ -259,7 +285,7 @@ def make_fno(myadc, rdm1_ss, mf, thresh):
         F_na_trunc = V_trunc.T.dot(F_can).dot(V_trunc)
         _,Z_na_trunc = np.linalg.eigh(F_na_trunc[:n_keep,:n_keep])
         U_vir_act = orbvir.dot(V_trunc[:,:n_keep]).dot(Z_na_trunc)
-        U_vir_fro = orbvir.dot(V_trunc[:,n_keep:]) 
+        U_vir_fro = orbvir.dot(V_trunc[:,n_keep:])
         no_comp = (orboccfrz0,orbocc,U_vir_act,U_vir_fro,orbvirfrz0)
         no_coeff_k = np.hstack(no_comp)
         nocc_loc = np.cumsum([0]+[x.shape[1] for x in no_comp]).astype(int)
@@ -346,7 +372,7 @@ class RADC(pyscf.adc.radc.RADC):
             self.mo_energy = np.vstack(vecs)
             self.scf_energy = self._scf.energy_tot(dm=dm, vhf=vhf)
 
-    
+
     make_ref_rdm1 = make_ref_rdm1
     transform_integrals = kadc_ao2mo.transform_integrals_incore
     compute_amplitudes = kadc_rhf_amplitudes.compute_amplitudes
@@ -516,8 +542,8 @@ class RFNOADC(RADC):
         self.with_df = None
 
     def compute_correction(self, mf, frozen, nroots, eris=None, guess=None, kptlist=None):
-        adc2_ssfno = RADC(mf, frozen, self.mo_coeff).set(verbose = 0,method_type = self.method_type,\
-                                                         with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,naux = self.naux,\
+        adc2_ssfno = RADC(mf, frozen, self.mo_coeff).set(verbose = 0,method_type = self.method_type,
+                                                         with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,naux = self.naux,
                                                          approx_trans_moments = self.approx_trans_moments)
         e2_ssfno,v2_ssfno,p2_ssfno,x2_ssfno = adc2_ssfno.kernel(nroots, eris = eris, guess=guess, kptlist=kptlist)
         self.delta_e = self.e2_ref - e2_ssfno
@@ -537,12 +563,12 @@ class RFNOADC(RADC):
                 self.if_naf = False
         else:
             raise ValueError("ref_state should be an int type and in (0,nroots]")
-        
+
         print(f"number of origin orbital is {get_nmo(self,True)}")
         get_fno_ref(self, nroots, self.ref_state, guess)
         self.mo_coeff,self.frozen = make_fno(self, self.rdm1_ss, self._scf, thresh)
-        adc3_ssfno = RADC(self._scf, self.frozen, self.mo_coeff).set(verbose = self.verbose,method_type = self.method_type,method = "adc(3)",\
-                                                            with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,\
+        adc3_ssfno = RADC(self._scf, self.frozen, self.mo_coeff).set(verbose = self.verbose,method_type = self.method_type,method = "adc(3)",
+                                                            with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,
                                                             if_heri_eris = self.if_heri_eris,approx_trans_moments = True)
         print(self.frozen)
         print(f"number of new orbital is {get_nmo(adc3_ssfno,True)}")
