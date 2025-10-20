@@ -280,7 +280,6 @@ class PolEmbed(lib.StreamObject):
         if not (isinstance(dm, numpy.ndarray) and dm.ndim == 2):
             # spin-traced DM for UHF or ROHF
             dm = dm[0] + dm[1]
-
         e, v = self._exec_cppe(dm, elec_only)
         logger.info(self, 'Polarizable embedding energy = %.15g', e)
 
