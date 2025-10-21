@@ -401,8 +401,6 @@ def davidson1(aop, x0, precond, tol=1e-12, max_cycle=50, max_space=12,
     fresh_start = True
     e = None
     v = None
-    print('this is the function for unrestricted ref.')
-    #exit()
     conv = numpy.zeros(nroots, dtype=bool)
     emin = None
 
@@ -566,6 +564,64 @@ def davidson1(aop, x0, precond, tol=1e-12, max_cycle=50, max_space=12,
         log.warn(f'Not enough eigenvectors (len(x0)={len(x0)}, nroots={nroots})')
 
     return numpy.asarray(conv), e, x0
+
+def lanczos_no_sym(aop, x0, precond, tol=1e-12, max_cycle=50, max_space=12,
+              lindep=DAVIDSON_LINDEP, max_memory=MAX_MEMORY,
+              dot=numpy.dot, callback=None,
+              nroots=1, lessio=False, pick=None, verbose=logger.WARN,
+              follow_state=FOLLOW_STATE, tol_residual=None,
+              fill_heff=_fill_heff_hermitian):
+    
+    if isinstance(verbose, logger.Logger):
+        log = verbose
+    else:
+        log = logger.Logger(misc.StreamObject.stdout, verbose)
+
+    if tol_residual is None:
+        toloose = numpy.sqrt(tol)
+    else:
+        toloose = tol_residual
+    log.debug1('tol %g  toloose %g', tol, toloose)
+
+    if not callable(precond):
+        precond = make_diag_precond(precond)
+
+    if callable(x0):  # lazy initialization to reduce memory footprint
+        x0 = x0()
+    if isinstance(x0, numpy.ndarray) and x0.ndim == 1:
+        x0 = [x0]
+    #max_cycle = min(max_cycle, x0[0].size)
+    max_space = max_space + (nroots-1) * 4
+    # max_space*2 for holding ax and xs, nroots*2 for holding axt and xt
+    _incore = max_memory*1e6/x0[0].nbytes > max_space*2+nroots*3
+    lessio = lessio and not _incore
+    log.debug1('max_cycle %d  max_space %d  max_memory %d  incore %s',
+               max_cycle, max_space, max_memory, _incore)
+    dtype = None
+    #heff = None
+    fresh_start = True
+    e = None
+    v = None
+    conv = numpy.zeros(nroots, dtype=bool)
+    emin = None   
+    
+
+    heff = numpy.asarray(heff, dtype=dtype)
+        
+    print(heff)
+    exit()
+
+    norm_evecs = []
+    for i in range(nroots):
+        Q = numpy.zeros((nroots, max_space + 1), dtype = numpy.complex128)
+        Q[:, 0] = x0[i] / numpy.linalg.norm(x0[i])
+        norm_evecs.append(Q) 
+        
+    T = numpy.zeros((max_space, max_space + nroots), dtype = numpy.complex128)
+    
+    #for i in range(max_space):
+    
+    return None
 
 
 def make_diag_precond(diag, level_shift=1e-3):
