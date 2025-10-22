@@ -2370,8 +2370,6 @@ def make_rdm1_eigenvectors(adc, L, R):
     t2_1_a_xvee = t2_1_a[:ncvs,ncvs:nocc_a,:,:].copy()
     t2_1_b_xvee = t2_1_b[:ncvs,ncvs:nocc_b,:,:].copy()
     t2_1_ab_xvee = t2_1_ab[:ncvs,ncvs:nocc_b,:,:].copy()
-    t2_1_a_vxee = t2_1_a[ncvs:nocc_a,:ncvs,:,:].copy()
-    t2_1_b_vxee = t2_1_b[ncvs:nocc_b,:ncvs,:,:].copy()
     t2_1_ab_vxee = t2_1_ab[ncvs:nocc_a,:ncvs,:,:].copy()
     t2_1_a_vvee = t2_1_a[ncvs:nocc_a,ncvs:nocc_a,:,:].copy()
     t2_1_b_vvee = t2_1_b[ncvs:nocc_b,ncvs:nocc_b,:,:].copy()
