@@ -458,18 +458,19 @@ class RADC(pyscf.adc.radc.RADC):
         mem_incore *= 16 /1e6
         mem_now = lib.current_memory()[0]
 
-        if isinstance(self._scf.with_df, df.GDF):
-            self.chnk_size = self.get_chnk_size()
-            self.with_df = self._scf.with_df
-            def df_transform():
-                return kadc_ao2mo.transform_integrals_df(self)
-            self.transform_integrals = df_transform
-        elif (mem_incore+mem_now >= self.max_memory and not self.incore_complete):
-            def outcore_transform():
-                return kadc_ao2mo.transform_integrals_outcore(self)
-            self.transform_integrals = outcore_transform
+        if eris is None:
+            if isinstance(self._scf.with_df, df.GDF):
+                self.chnk_size = self.get_chnk_size()
+                self.with_df = self._scf.with_df
+                def df_transform():
+                    return kadc_ao2mo.transform_integrals_df(self)
+                self.transform_integrals = df_transform
+            elif (mem_incore+mem_now >= self.max_memory and not self.incore_complete):
+                def outcore_transform():
+                    return kadc_ao2mo.transform_integrals_outcore(self)
+                self.transform_integrals = outcore_transform
 
-        eris = self.transform_integrals()
+            eris = self.transform_integrals()
 
         self.e_corr, self.t1, self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
             self, eris=eris, verbose=self.verbose)
@@ -489,7 +490,10 @@ class RADC(pyscf.adc.radc.RADC):
             raise NotImplementedError(self.method_type)
         self._adc_es = adc_es
         if self.if_heri_eris:
-            return e_exc, v_exc, spec_fac, x, eris
+            if self.if_naf:
+                return e_exc, v_exc, spec_fac, x, eris, self.naux
+            else:
+                return e_exc, v_exc, spec_fac, x, eris
         else:
             return e_exc, v_exc, spec_fac, x
 
@@ -546,12 +550,16 @@ class RFNOADC(RADC):
         adc2_ssfno = RADC(mf, frozen, self.mo_coeff).set(verbose = 0,method_type = self.method_type,
                                                          with_df = self.with_df,if_naf = self.if_naf,
                                                          thresh_naf = self.thresh_naf,naux = self.naux,
-                                                         approx_trans_moments = self.approx_trans_moments)
+                                                         approx_trans_moments = self.approx_trans_moments,
+                                                         chnk_size = self.chnk_size)
         e2_ssfno,v2_ssfno,p2_ssfno,x2_ssfno = adc2_ssfno.kernel(nroots, eris = eris, guess=guess, kptlist=kptlist)
         self.delta_e = self.e2_ref - e2_ssfno
 
     def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, ref_state = None, kptlist = None):
         import copy
+        if isinstance(self._scf.with_df, df.GDF):
+            self.with_df = self._scf.with_df
+            self.chnk_size = self.get_chnk_size()
         self.frozen = copy.deepcopy(self.frozen_core)
         self.ref_state = ref_state
         self.naux = None

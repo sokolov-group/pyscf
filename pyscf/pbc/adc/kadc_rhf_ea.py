@@ -1432,6 +1432,8 @@ class RADCEA(kadc_rhf.RADC):
         self.imds = adc.imds
         self.chnk_size = adc.chnk_size
         self.U = adc.U
+        self.if_naf = adc.if_naf
+        self.naux = adc.naux
 
     kernel = kadc_rhf.kernel
     get_imds = get_imds

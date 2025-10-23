@@ -253,6 +253,28 @@ def transform_integrals_df(myadc):
                 Lvo[ki,kj] = Lpq_mo[ki,kj][:,nocc:,:nocc]
                 eris.Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:]
 
+    if myadc.if_naf:
+        Loo = Loo.reshape(nkpts,nkpts,naux,nocc*nocc)
+        eris.Lov = eris.Lov.reshape(nkpts,nkpts,naux,nocc*nvir)
+        Lvo = Lvo.reshape(nkpts,nkpts,naux,nvir*nocc)
+        eris.Lvv = eris.Lvv.reshape(nkpts,nkpts,naux,nvir*nvir)
+        W_0 = lib.ddot(Loo[0][0], Loo[0][0].T) + lib.ddot(eris.Lov[0][0],eris.Lov[0][0].T)\
+              + lib.ddot(Lvo[0][0],Lvo[0][0].T) + lib.ddot(eris.Lvv[0][0],eris.Lvv[0][0].T)
+        n,N = np.linalg.eigh(W_0)
+        N_trunc = N[:,n>myadc.thresh_naf].T
+        myadc.naux = N_trunc.shape[0]
+        print(f"origin naux is {naux}")
+        print(f"naux is {myadc.naux}")
+        Loo = lib.einsum('rL,mnLs->mnrs', N_trunc,Loo)
+        eris.Lov = lib.einsum('rL,mnLs->mnrs', N_trunc,eris.Lov)
+        Lvo = lib.einsum('rL,mnLs->mnrs', N_trunc,Lvo)
+        eris.Lvv = lib.einsum('rL,mnLs->mnrs', N_trunc,eris.Lvv)
+
+        Loo = Loo.reshape(nkpts,nkpts,myadc.naux,nocc,nocc)
+        eris.Lov = eris.Lov.reshape(nkpts,nkpts,myadc.naux,nocc,nvir)
+        Lvo = Lvo.reshape(nkpts,nkpts,myadc.naux,nvir,nocc)
+        eris.Lvv = eris.Lvv.reshape(nkpts,nkpts,myadc.naux,nvir,nvir)
+
     eris.feri = feri = lib.H5TmpFile()
 
     eris.oooo = feri.create_dataset('oooo', (nkpts,nkpts,nkpts,nocc,nocc,nocc,nocc), dtype=dtype)
