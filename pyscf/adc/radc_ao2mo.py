@@ -44,7 +44,7 @@ def transform_integrals_incore(myadc):
     eris.ovvv = ao2mo.general(myadc._scf._eri, (occ, vir, vir, vir), compact=True).reshape(nocc, nvir, -1).copy()  # noqa: E501
     eris.vvvv = None
 
-    if ((myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False)
+    if ((myadc.method == "adc(2)" and myadc.approx_trans_moments is False) or (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False)
         or (myadc.method == "adc(2)-x" and myadc.method_type == "ee")
         or (myadc.method == "adc(3)")):
         eris.vvvv = ao2mo.general(myadc._scf._eri, (vir, vir, vir, vir),

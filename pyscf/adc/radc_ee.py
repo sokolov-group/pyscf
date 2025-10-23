@@ -1214,19 +1214,135 @@ def renormalize_eigenvectors(adc, nroots=1):
     return U
 
 
+def get_X(adc):
+    
+    U = renormalize_eigenvectors(adc)
+
+    U = U.T.copy()
+
+    nroots = U.shape[0]
+
+    dip_ints = -adc.mol.intor('int1e_r',comp=3)
+    dm = np.zeros_like((dip_ints))
+    for i in range(dip_ints.shape[0]):
+        dip = dip_ints[i,:,:]
+        dm[i,:,:] = np.dot(adc.mo_coeff.T,np.dot(dip,adc.mo_coeff))
+
+   
+
+    x = np.array([])
+    
+    nocc = adc._nocc
+    nvir = adc._nvir
+
+    nmo = nocc + nvir
+
+    n_singles = nocc * nvir
+    n_doubles = nocc * nocc * nvir * nvir
+    
+    s1 = 0
+    f1 = n_singles
+    s2 = f1
+    f2 = s2 + n_doubles
+
+    t1 = adc.t1
+    t2 = adc.t2
+
+    t1_ccee = t2[0][:]
+    t2_ccee = t2[1][:]
+
+    t2_ce = t1[0]
+
+
+    einsum = lib.einsum
+    einsum_type = True
+
+    TY = np.zeros((nmo, nmo))
+
+    TY_ = []
+
+    for r in range(U.shape[0]):
+
+
+        r1 = U[r][s1:f1]
+
+        Y = r1.reshape(nocc, nvir).copy()
+        r2 = U[r][s2:f2].reshape(nocc,nocc,nvir,nvir).copy()
+        
+        TY[:nocc, nocc:]  = einsum('IC->IC', Y, optimize = einsum_type).copy()
+
+        TY[nocc:,:nocc]  = einsum('ia,LiAa->AL', Y, t1_ccee, optimize = einsum_type)
+        TY[nocc:,:nocc] -= einsum('ia,iLAa->AL', Y, t1_ccee, optimize = einsum_type)
+
+        TY[nocc:,:nocc] += einsum('ia,LiAa->AL', Y, t1_ccee, optimize = einsum_type)
+
+        TY[:nocc, :nocc] =- einsum('Ia,La->IL', Y, t2_ce, optimize = einsum_type)
+        TY[nocc:,nocc:]  = einsum('iC,iA->AC', Y, t2_ce, optimize = einsum_type)
+        
+        TY[:nocc,nocc:] +=- einsum('Ia,ijab,ijCb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] += 1/2 * einsum('Ia,ijab,jiCb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] -= einsum('iC,ijab,Ijab->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] += 1/2 * einsum('iC,ijab,Ijba->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] += einsum('ia,ijab,IjCb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] -= 1/2 * einsum('ia,ijab,jICb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] -= 1/2 * einsum('ia,ijba,IjCb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] += 1/2 * einsum('ia,ijba,jICb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        
+        
+        TY[nocc:,:nocc] += einsum('ia,LiAa->AL', Y, t2_ccee, optimize = einsum_type)
+        TY[nocc:,:nocc] -= einsum('ia,iLAa->AL', Y, t2_ccee, optimize = einsum_type)
+
+        TY[:nocc,nocc:] += einsum('ia,ijab,IjCb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] -= 1/2 * einsum('ia,ijab,jICb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] -= 1/2 * einsum('ia,ijba,IjCb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+                
+        TY[nocc:,:nocc]  += einsum('ia,LiAa->AL', Y, t2_ccee, optimize = einsum_type)
+        
+        TY[:nocc,:nocc] +=- 2 * einsum('Iiab,Liab->IL', r2, t1_ccee, optimize = einsum_type)
+        TY[:nocc,:nocc] += einsum('Iiab,Liba->IL', r2, t1_ccee, optimize = einsum_type)
+        
+        TY[nocc:,nocc:] += 2 * einsum('ijCa,ijAa->AC', r2, t1_ccee, optimize = einsum_type)
+        TY[nocc:,nocc:] -=   einsum('ijCa,jiAa->AC', r2, t1_ccee, optimize = einsum_type)
+        dx = lib.einsum("rqp,qp->r", dm, TY, optimize = True)
+
+
+        TY_ = np.append(TY_,TY)
+
+    return TY_
+
+
+
 def get_properties(adc, nroots=1):
 
+    TY  = adc.get_X()
+    
+    nocc = adc._nocc
+    nvir = adc._nvir
+
+    nmo = nocc + nvir
+
+    dm = adc.dip_mom
+
+    X = TY.reshape(nroots, nmo, nmo)
+    DX = lib.einsum("xqp,nqp->xn", dm, X, optimize=True)
+
+    spec_intensity = np.conj(DX[0]) * DX[0]
+    spec_intensity += np.conj(DX[1]) * DX[1]
+    spec_intensity += np.conj(DX[2]) * DX[2]
+    
+    P = 2*spec_intensity*adc.E*(2.0/3.0)
+    
     #Transition moments
     #T = adc.get_trans_moments()
 
     #Spectroscopic amplitudes
     #U = adc.renormalize_eigenvectors(nroots)
     #X = np.dot(T, U).reshape(-1, nroots)
-    X = None
+    #X = None
 
     #Spectroscopic factors
     #P = 2.0*lib.einsum("pi,pi->i", X, X)
-    P = None
+    #P = None
 
     return P,X
 
@@ -1659,7 +1775,7 @@ class RADCEE(radc.RADC):
         'method_type', 'mo_coeff', 'mo_energy', 'max_memory',
         't1', 't2', 'max_space', 'max_cycle',
         'nocc', 'nvir', 'nmo', 'mol', 'transform_integrals',
-        'with_df', 'spec_factor_print_tol', 'evec_print_tol',
+        'with_df', 'dip_mom','spec_factor_print_tol', 'evec_print_tol',
         'compute_properties', 'approx_trans_moments', 'E', 'U', 'P', 'X',
     }
 
@@ -1685,6 +1801,7 @@ class RADCEE(radc.RADC):
         self.mo_coeff = adc.mo_coeff
         self.mo_energy = adc.mo_energy
         self.nmo = adc._nmo
+        self.dip_mom = adc.dip_mom
         self.transform_integrals = adc.transform_integrals
         self.with_df = adc.with_df
         self.compute_properties = adc.compute_properties
@@ -1707,6 +1824,7 @@ class RADCEE(radc.RADC):
     make_rdm1 = make_rdm1
     analyze_eigenvector = analyze_eigenvector
     analyze_spec_factor = analyze_spec_factor
+    get_X = get_X
     get_properties = get_properties
 
     def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, eris=None, ini=None):

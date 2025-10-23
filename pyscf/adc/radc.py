@@ -106,6 +106,9 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
                         (adc.method, n, adc.E[n], adc.E[n]*27.2114))
         if adc.compute_properties and adc.method_type != "ee":
             print_string += ("|  Spec. factor = %10.8f  " % adc.P[n])
+
+        if adc.compute_properties and adc.method_type == "ee":
+            print_string += ("|  Osc. strength = %10.8f  " % adc.P[n])
         print_string += ("|  conv = %s" % conv[n])
         logger.info(adc, print_string)
 
