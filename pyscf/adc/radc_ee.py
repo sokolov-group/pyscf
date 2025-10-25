@@ -1303,6 +1303,127 @@ def get_X(adc):
         
         TY[nocc:,nocc:] += 2 * einsum('ijCa,ijAa->AC', r2, t1_ccee, optimize = einsum_type)
         TY[nocc:,nocc:] -=   einsum('ijCa,jiAa->AC', r2, t1_ccee, optimize = einsum_type)
+
+
+        if (adc.method == "adc(2)-x") or (adc.method == "adc(3)"):
+
+            TY[:nocc, :nocc] +=- 2 * einsum('Iiab,Jiab->IJ', r2, t2_ccee, optimize = einsum_type)
+            TY[:nocc, :nocc] += einsum('Iiab,Jiba->IJ', r2, t2_ccee, optimize = einsum_type)
+
+            TY[nocc:, nocc:] += 2 * einsum('ijBa,ijAa->AB', r2, t2_ccee, optimize = einsum_type)
+            TY[nocc:, nocc:] -= einsum('ijBa,jiAa->AB', r2, t2_ccee, optimize = einsum_type)
+
+
+        if (adc.method == "adc(3)"):
+            #TY[:nocc,:nocc] +=- einsum('Ia,La->IL', Y, t3, optimize = einsum_type)
+            TY[:nocc,:nocc] -= einsum('Ia,Liab,ib->IL', Y, t1_ccee, t2_ce, optimize = einsum_type)
+            TY[:nocc,:nocc] += 1/2 * einsum('Ia,Liba,ib->IL', Y, t1_ccee, t2_ce, optimize = einsum_type)
+            TY[:nocc,:nocc] += einsum('ia,Liab,Ib->IL', Y, t1_ccee, t2_ce, optimize = einsum_type)
+            TY[:nocc,:nocc] -= einsum('ia,Liba,Ib->IL', Y, t1_ccee, t2_ce, optimize = einsum_type)
+            
+            
+            #TY[nocc:,nocc:] + = einsum('iC,iA->AC', Y, t3, optimize = einsum_type)
+            TY[nocc:,nocc:] += einsum('iC,ijAa,ja->AC', Y, t1_ccee, t2_ce, optimize = einsum_type)
+            TY[nocc:,nocc:] -= 1/2 * einsum('iC,jiAa,ja->AC', Y, t1_ccee, t2_ce, optimize = einsum_type)
+            TY[nocc:,nocc:] -= einsum('ia,ijAa,jC->AC', Y, t1_ccee, t2_ce, optimize = einsum_type)
+            TY[nocc:,nocc:] += einsum('ia,jiAa,jC->AC', Y, t1_ccee, t2_ce, optimize = einsum_type)
+            
+            
+            TY[:nocc,nocc:] +=- einsum('Ia,ijCb,ijab->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] += 1/2 * einsum('Ia,ijCb,jiab->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= einsum('Ia,ijab,ijCb->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] += 1/2 * einsum('Ia,ijab,jiCb->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= einsum('iC,Ijab,ijab->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] += 1/2 * einsum('iC,Ijab,ijba->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= einsum('iC,ijab,Ijab->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] += 1/2 * einsum('iC,ijab,Ijba->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] += einsum('ia,IjCb,ijab->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= 1/2 * einsum('ia,IjCb,ijba->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] += einsum('ia,ijab,IjCb->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= 1/2 * einsum('ia,ijab,jICb->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= 1/2 * einsum('ia,ijba,IjCb->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] += 1/2 * einsum('ia,ijba,jICb->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= 1/2 * einsum('ia,jICb,ijab->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] += 1/2 * einsum('ia,jICb,ijba->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+
+
+            TY[:nocc,:nocc] +=- einsum('ia,Liba,Ib->IL', Y, t1_ccee, t2_ce, optimize = einsum_type)
+
+            TY[nocc:,nocc:] += einsum('ia,jiAa,jC->AC', Y, t1_ccee, t2_ce, optimize = einsum_type)
+            
+            
+            TY[:nocc,nocc:] += einsum('ia,IjCb,ijab->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= 1/2 * einsum('ia,IjCb,ijba->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] += einsum('ia,ijab,IjCb->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= 1/2 * einsum('ia,ijab,jICb->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= 1/2 * einsum('ia,ijba,IjCb->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= 1/2 * einsum('ia,jICb,ijab->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            
+            
+            #TY[nocc:,:nocc] += einsum('ia,LiAa->AL', Y, t3, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 0.333333334 * einsum('ia,LiAb,jkac,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.166666667 * einsum('ia,LiAb,jkac,kjbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 1.333333336 * einsum('ia,Liba,jkAc,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.666666668 * einsum('ia,Liba,jkAc,kjbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.666666668 * einsum('ia,Libc,jkAa,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.666666668 * einsum('ia,ijab,LkAc,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 0.333333334 * einsum('ia,ijab,LkAc,jkcb->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 0.333333334 * einsum('ia,ijab,kLAc,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.166666667 * einsum('ia,ijab,kLAc,jkcb->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 0.333333334 * einsum('ia,ijba,LkAc,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.166666667 * einsum('ia,ijba,LkAc,jkcb->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.166666667 * einsum('ia,ijba,kLAc,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.166666667 * einsum('ia,ijbc,LkAa,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 0.333333334 * einsum('ia,ijbc,LkAa,jkcb->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 1.333333336 * einsum('ia,jiAa,Lkbc,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.666666668 * einsum('ia,jiAa,Lkbc,jkcb->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.666666668 * einsum('ia,jiAb,Lkca,kjbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+
+
+
+
+            
+            #TY[nocc:,:nocc] += einsum('ia,LiAa->AL', Y, t3, optimize = einsum_type)
+            #TY[nocc:,:nocc] -= einsum('ia,LiaA->AL', Y, t3, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 0.333333334 * einsum('ia,LiAb,jkac,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.166666667 * einsum('ia,LiAb,jkac,kjbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 1.333333336 * einsum('ia,Liab,jkAc,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 0.666666668 * einsum('ia,Liab,jkAc,kjbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 1.333333336 * einsum('ia,Liba,jkAc,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.666666668 * einsum('ia,Liba,jkAc,kjbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.666666668 * einsum('ia,Libc,jkAa,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 0.666666668 * einsum('ia,Libc,jkAa,kjbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.333333334 * einsum('ia,iLAb,jkac,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 0.166666667 * einsum('ia,iLAb,jkac,kjbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 1.333333336 * einsum('ia,ijAa,Lkbc,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 0.666666668 * einsum('ia,ijAa,Lkbc,jkcb->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 2.666666672 * einsum('ia,ijAb,Lkac,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 1.333333336 * einsum('ia,ijAb,Lkac,kjbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 1.333333336 * einsum('ia,ijAb,Lkca,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 0.666666668 * einsum('ia,ijAb,Lkca,kjbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.666666668 * einsum('ia,ijab,LkAc,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 0.333333334 * einsum('ia,ijab,LkAc,jkcb->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 0.333333334 * einsum('ia,ijab,kLAc,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.166666667 * einsum('ia,ijab,kLAc,jkcb->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 0.333333334 * einsum('ia,ijba,LkAc,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.166666667 * einsum('ia,ijba,LkAc,jkcb->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.166666667 * einsum('ia,ijba,kLAc,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 0.166666667 * einsum('ia,ijba,kLAc,jkcb->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.166666667 * einsum('ia,ijbc,LkAa,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 0.333333334 * einsum('ia,ijbc,LkAa,jkcb->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 0.166666667 * einsum('ia,ijbc,kLAa,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.333333334 * einsum('ia,ijbc,kLAa,jkcb->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 1.333333336 * einsum('ia,jiAa,Lkbc,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.666666668 * einsum('ia,jiAa,Lkbc,jkcb->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 1.333333336 * einsum('ia,jiAb,Lkac,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 0.666666668 * einsum('ia,jiAb,Lkac,kjbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 0.666666668 * einsum('ia,jiAb,Lkca,jkbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 0.666666668 * einsum('ia,jiAb,Lkca,kjbc->AL', Y, t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+
+
+
+
+
         dx = lib.einsum("rqp,qp->r", dm, TY, optimize = True)
 
 
