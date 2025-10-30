@@ -1223,7 +1223,7 @@ def get_X(adc):
     nroots = U.shape[0]
 
     dip_ints = -adc.mol.intor('int1e_r',comp=3)
-    dm = np.zeros_like((dip_ints))
+    dm = np.zeros((dip_ints.shape[0], adc.mo_coeff.shape[1], adc.mo_coeff.shape[1]))
     for i in range(dip_ints.shape[0]):
         dip = dip_ints[i,:,:]
         dm[i,:,:] = np.dot(adc.mo_coeff.T,np.dot(dip,adc.mo_coeff))

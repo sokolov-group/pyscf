@@ -155,7 +155,7 @@ def transform_integrals_outcore(myadc):
 
     ############### forming eris_vvvv ########################################
 
-    if ((myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False)
+    if ((myadc.method == "adc(2)" and myadc.approx_trans_moments is False) or (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False)
         or (myadc.method == "adc(2)-x" and myadc.method_type == "ee")
         or (myadc.method == "adc(3)")):
 

@@ -73,6 +73,11 @@ class KnownValues(unittest.TestCase):
         myadc.method_type = "ee"
         e,v,p,x = myadc.kernel(nroots=4)
 
+        self.assertAlmostEqual(p[0], 0.02774680081092312, 6)
+        self.assertAlmostEqual(p[1], 8.90646730745011e-29, 6)
+        self.assertAlmostEqual(p[2], 0.09770117474911057, 6)
+        self.assertAlmostEqual(p[3], 0.07375673165508137, 6)
+
         self.assertAlmostEqual(e[0],0.2971167095 , 6)
         self.assertAlmostEqual(e[1],0.3724791374 , 6)
         self.assertAlmostEqual(e[2],0.3935563988 , 6)
@@ -88,6 +93,11 @@ class KnownValues(unittest.TestCase):
 
         myadcee = adc.radc_ee.RADCEE(myadc)
         e,v,p,x = myadcee.kernel(nroots=4)
+
+        self.assertAlmostEqual(p[0], 0.0254619534304077, 6)
+        self.assertAlmostEqual(p[1], 5.067710484943722e-29, 6)
+        self.assertAlmostEqual(p[2], 0.0917847064014669, 6)
+        self.assertAlmostEqual(p[3], 0.0674078023930496, 6)
 
         self.assertAlmostEqual(e[0],0.2794713515, 6)
         self.assertAlmostEqual(e[1],0.3563942404, 6)
@@ -110,6 +120,11 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[2],0.4019531805, 6)
         self.assertAlmostEqual(e[3],0.4772033490, 6)
 
+        self.assertAlmostEqual(p[0], 0.0271468630832521, 6)
+        self.assertAlmostEqual(p[1], 1.6987033627092957e-29, 6)
+        self.assertAlmostEqual(p[2], 0.0973617346919307, 6)
+        self.assertAlmostEqual(p[3], 0.0766143565065027, 6)
+
     def test_ee_adc3_frozen(self):
         myadc_fr.method = "adc(3)"
         myadc_fr.method_type = "ee"
@@ -125,6 +140,11 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[1],0.3789606827167341, 6)
         self.assertAlmostEqual(e[2],0.4018990744972834, 6)
         self.assertAlmostEqual(e[3],0.4771607225277996, 6)
+
+        self.assertAlmostEqual(p[0], 0.0271313630382541, 6)
+        self.assertAlmostEqual(p[1], 1.8212836642722982e-29, 6)
+        self.assertAlmostEqual(p[2], 0.0973611435624510, 6)
+        self.assertAlmostEqual(p[3], 0.0767012485854986, 6)
 
 if __name__ == "__main__":
     print("EE calculations for different ADC methods for water molecule")
