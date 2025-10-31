@@ -50,6 +50,20 @@ def tearDownModule():
     global mol, mf, myadc, myadc_fr
     del mol, mf, myadc, myadc_fr
 
+def rdms_test(dm_a,dm_b):
+    r2_int = mol.intor('int1e_r2')
+    dm_ao_a = np.einsum('pi,ij,qj->pq', mf.mo_coeff[0], dm_a, mf.mo_coeff[0].conj())
+    dm_ao_b = np.einsum('pi,ij,qj->pq', mf.mo_coeff[1], dm_b, mf.mo_coeff[1].conj())
+    r2 = np.einsum('pq,pq->',r2_int,dm_ao_a+dm_ao_b)
+    return r2
+
+def rdms_test_fr(dm_a,dm_b):
+    r2_int = mol.intor('int1e_r2')
+    dm_ao_a = np.einsum('pi,ij,qj->pq', myadc_fr.mo_coeff[0], dm_a, myadc_fr.mo_coeff[0].conj())
+    dm_ao_b = np.einsum('pi,ij,qj->pq', myadc_fr.mo_coeff[1], dm_b, myadc_fr.mo_coeff[1].conj())
+    r2 = np.einsum('pq,pq->',r2_int,dm_ao_a+dm_ao_b)
+    return r2
+
 class KnownValues(unittest.TestCase):
 
     def test_ip_adc2(self):
@@ -67,6 +81,11 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.8987660491377468, 6)
         self.assertAlmostEqual(p[2], 0.9119655964285802, 6)
 
+        dm1_exc = np.array(myadc.make_rdm1())
+        self.assertAlmostEqual(rdms_test(dm1_exc[0][0],dm1_exc[1][0]), 16.34333109687462, 6)
+        self.assertAlmostEqual(rdms_test(dm1_exc[0][1],dm1_exc[1][1]), 16.42353478294355, 6)
+        self.assertAlmostEqual(rdms_test(dm1_exc[0][2],dm1_exc[1][2]), 16.11844180343718, 6)
+
     def test_ip_adc2x(self):
 
         myadc.method = "adc(2)-x"
@@ -82,6 +101,11 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[0], 0.9169548953028459, 6)
         self.assertAlmostEqual(p[1], 0.6997121885268642, 6)
         self.assertAlmostEqual(p[2], 0.212879313736106, 6)
+
+        dm1_exc = np.array(myadc.make_rdm1())
+        self.assertAlmostEqual(rdms_test(dm1_exc[0][0],dm1_exc[1][0]), 16.44106224314214, 6)
+        self.assertAlmostEqual(rdms_test(dm1_exc[0][1],dm1_exc[1][1]), 16.70743635068417, 6)
+        self.assertAlmostEqual(rdms_test(dm1_exc[0][2],dm1_exc[1][2]), 17.23999948606712, 6)
 
     def test_ip_adc3(self):
 
@@ -101,6 +125,11 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.5188529241094367, 6)
         self.assertAlmostEqual(p[2], 0.40655844616580944, 6)
 
+        dm1_exc = np.array(myadc.make_rdm1())
+        self.assertAlmostEqual(rdms_test(dm1_exc[0][0],dm1_exc[1][0]), 16.404206243396008, 6)
+        self.assertAlmostEqual(rdms_test(dm1_exc[0][1],dm1_exc[1][1]), 16.848816049838934, 6)
+        self.assertAlmostEqual(rdms_test(dm1_exc[0][2],dm1_exc[1][2]), 17.063649873323694, 6)
+
     def test_ip_adc3_frozen(self):
 
         myadc_fr.method = "adc(3)"
@@ -119,6 +148,11 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.520023087174258, 6)
         self.assertAlmostEqual(p[2], 0.405384799660555, 6)
 
+        dm1_exc = np.array(myadc_fr.make_rdm1())
+        self.assertAlmostEqual(rdms_test_fr(dm1_exc[0][0],dm1_exc[1][0]), 14.620933180874367, 6)
+        self.assertAlmostEqual(rdms_test_fr(dm1_exc[0][1],dm1_exc[1][1]), 15.064529871033164, 6)
+        self.assertAlmostEqual(rdms_test_fr(dm1_exc[0][2],dm1_exc[1][2]), 15.281615912121806, 6)
+
     def test_ip_adc3_oneroot(self):
 
         myadc.method = "adc(3)"
@@ -127,6 +161,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[0], 0.4794423247368058, 6)
 
         self.assertAlmostEqual(p[0], 0.9282869467221032, 6)
+
+        dm1_exc = np.array(myadc.make_rdm1())
+        self.assertAlmostEqual(rdms_test(dm1_exc[0][0],dm1_exc[1][0]), 16.404206243395997, 6)
 
 if __name__ == "__main__":
     print("IP calculations for different ADC methods for open-shell molecule")
