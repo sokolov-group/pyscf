@@ -177,7 +177,7 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e, -0.21936553835290462, 6)
 
         dm1_gs = myadc_fr.make_ref_rdm1()
-        r2_gs = rdms_test_fr(myadc_fr,dm1_gs)
+        r2_gs = rdms_test_fr(dm1_gs)
         self.assertAlmostEqual(r2_gs, 20.2484571569487, 6)
 
         myadcea_fr = adc.radc_ea.RADCEA(myadc_fr)
@@ -203,7 +203,7 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e, -0.2241204658960519, 6)
 
         dm1_gs = myadc_fr.make_ref_rdm1()
-        r2_gs = rdms_test_fr(myadc_fr,dm1_gs)
+        r2_gs = rdms_test_fr(dm1_gs)
         self.assertAlmostEqual(r2_gs, 19.965315744449295, 6)
 
         myadcea_fr = adc.radc_ea.RADCEA(myadc_fr)
