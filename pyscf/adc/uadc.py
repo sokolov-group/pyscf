@@ -674,10 +674,11 @@ class UADC(lib.StreamObject):
             logger.info(self, 'Number of Active Virtual Alpha Orbitals: %d', self.nvir_a)
             logger.info(self, 'Number of Active Virtual Beta Orbitals: %d', self.nvir_b)
 
-            if hasattr(self.frozen[0], '__len__'):
-                logger.info(self, 'Frozen Orbital List (Alpha): %s', self.frozen[0])
-            if hasattr(self.frozen[1], '__len__'):
-                logger.info(self, 'Frozen Orbital List (Beta): %s', self.frozen[1])
+            if hasattr(self.frozen, '__len__'):
+                if hasattr(self.frozen[0], '__len__'):
+                    logger.info(self, 'Frozen Orbital List (Alpha): %s', self.frozen[0])
+                if hasattr(self.frozen[1], '__len__'):
+                    logger.info(self, 'Frozen Orbital List (Beta): %s', self.frozen[1])
 
         if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
             if getattr(self, 'with_df', None):

@@ -801,7 +801,6 @@ def make_rdm1_eigenvectors(adc, L, R):
     L = np.array(L).ravel()
     R = np.array(R).ravel()
 
-    t2_ce = adc.t1[0][:]
     t1_ccee = adc.t2[0][:]
 
     einsum = lib.einsum
@@ -811,6 +810,11 @@ def make_rdm1_eigenvectors(adc, L, R):
     nmo = nocc + nvir
     n_singles = nocc
     n_doubles = nvir * nocc * nocc
+
+    if adc.t1[0] is not None:
+        t2_ce = adc.t1[0]
+    else:
+        t2_ce = np.zeros((nocc, nvir))
 
     occ_list = range(nocc)
 
@@ -886,8 +890,12 @@ def make_rdm1_eigenvectors(adc, L, R):
     if adc.method == "adc(3)":
         ### Redudant Variables used for names from SQA
         einsum_type = True
-        t3 = adc.t1[1][:]
         t2_ccee = adc.t2[1][:]
+
+        if adc.t1[1] is not None:
+            t3 = adc.t1[1]
+        else:
+            t3 = np.zeros((nocc, nvir))
         ###################################################
 
 ############# block- ij

@@ -1118,7 +1118,11 @@ def get_trans_moments(adc):
     t2 = adc.t2
 
     t1_ccee = t2[0][:]
-    t2_ce = t1[0]
+
+    if adc.t1[0] is not None:
+        t2_ce = t1[0]
+    else:
+        t2_ce = np.zeros((nocc, nvir))
 
     if adc.t2[1] is not None:
         t2_ccee = t2[1][:]
@@ -1414,19 +1418,24 @@ def analyze_eigenvector(adc):
 def analyze_spec_factor(adc):
 
     X = adc.X
+    nroots = X.shape[0]
+    X = X.reshape(nroots, -1)
+
     X_2 = (X.copy()**2)*2
     thresh = adc.spec_factor_print_tol
 
+    nmo = adc._nmo
+
     logger.info(adc, "Print spectroscopic factors > %E\n", adc.spec_factor_print_tol)
 
-    for i in range(X_2.shape[1]):
+    for i in range(X_2.shape[0]):
 
-        sort = np.argsort(-X_2[:,i])
-        X_2_row = X_2[:,i]
+        sort = np.argsort(-X_2[i,:])
+        X_2_row = X_2[i,:]
         X_2_row = X_2_row[sort]
 
         if not adc.mol.symmetry:
-            sym = np.repeat(['A'], X_2_row.shape[0])
+            sym = np.repeat(['A'], nmo)
         else:
             sym = [symm.irrep_id2name(adc.mol.groupname, x) for x in adc._scf.mo_coeff.orbsym]
             sym = np.array(sym)
@@ -1434,19 +1443,21 @@ def analyze_spec_factor(adc):
             sym = sym[sort]
 
         spec_Contribution = X_2_row[X_2_row > thresh]
-        index_mo = sort[X_2_row > thresh]+1
 
         if np.sum(spec_Contribution) == 0.0:
             continue
 
         logger.info(adc, '%s | root %d | Energy (eV) = %12.8f \n',
                 adc.method, i, adc.E[i]*27.2114)
-        logger.info(adc, "     HF MO     Spec. Contribution     Orbital symmetry")
+        logger.info(adc, "     Hole_MO     Particle_MO     Spec. Contribution     Orbital symmetry")
         logger.info(adc, "-----------------------------------------------------------")
 
-        for c in range(index_mo.shape[0]):
-            logger.info(adc, '     %3.d          %10.8f                %s',
-                        index_mo[c], spec_Contribution[c], sym[c])
+        for hp in range(spec_Contribution.shape[0]):
+            P = ((sort[hp]) % nmo)
+            H = ((sort[hp]) // nmo)
+
+            logger.info(adc, '     %3.d             %3.d          %10.8f                %s -> %s',
+                        (H+1), (P+1), spec_Contribution[hp], sym[H], sym[P])
 
         logger.info(adc, '\nPartial spec. factor sum = %10.8f', np.sum(spec_Contribution))
         logger.info(adc,
@@ -1537,7 +1548,6 @@ def make_rdm1_eigenvectors(adc, L, R):
     L = np.array(L).ravel()
     R = np.array(R).ravel()
 
-    t2_ce = adc.t1[0][:]
     t1_ccee = adc.t2[0][:]
 
     einsum = lib.einsum
@@ -1548,6 +1558,11 @@ def make_rdm1_eigenvectors(adc, L, R):
     nmo = nocc + nvir
     n_singles = nocc * nvir
     n_doubles = nocc * nocc * nvir * nvir
+
+    if adc.t1[0] is not None:
+        t2_ce = adc.t1[0]
+    else:
+        t2_ce = np.zeros((nocc, nvir))
 
     occ_list = range(nocc)
 
@@ -1668,8 +1683,12 @@ def make_rdm1_eigenvectors(adc, L, R):
     if adc.method == "adc(3)":
         ### Redudant Variables used for names from SQA
         einsum_type = True
-        t3_ce = adc.t1[1][:]
         t2_ccee = adc.t2[1][:]
+
+        if adc.t1[1] is not None:
+            t3_ce = adc.t1[1]
+        else:
+            t3_ce = np.zeros((nocc, nvir))
         ###################################################
 
 ############# block- ij
