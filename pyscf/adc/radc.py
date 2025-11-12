@@ -250,6 +250,7 @@ class RADC(lib.StreamObject):
         self.max_cycle = getattr(__config__, 'adc_radc_RADC_max_cycle', 50)
         self.conv_tol = getattr(__config__, 'adc_radc_RADC_conv_tol', 1e-8)
         self.tol_residual = getattr(__config__, 'adc_radc_RADC_tol_residual', 1e-5)
+        self.scf_energy = mf.e_tot
 
         self.frozen = frozen
         self.incore_complete = self.incore_complete or self.mol.incore_anyway
@@ -282,7 +283,6 @@ class RADC(lib.StreamObject):
                 raise ValueError("No occupied orbitals found")
             if mo_coeff is self._scf.mo_coeff and self._scf.converged:
                 self.mo_energy = self.mo_energy[mask]
-                self.scf_energy = self._scf.e_tot
             else:
                 dm = self._scf.make_rdm1(mo_coeff, self.mo_occ)
                 vhf = self._scf.get_veff(self.mol, dm)
