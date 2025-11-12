@@ -1557,7 +1557,6 @@ def make_rdm1_eigenvectors(adc, L, R):
     f2 = s2 + n_doubles
 
     rdm1  = np.zeros((nmo,nmo))
-    ncore = nocc
 
     L1 = L[s1:f1]
     L2 = L[s2:f2]
