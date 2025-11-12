@@ -120,10 +120,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[2],0.4019531805, 6)
         self.assertAlmostEqual(e[3],0.4772033490, 6)
 
-        self.assertAlmostEqual(p[0], 0.0271468630832521, 6)
-        self.assertAlmostEqual(p[1], 1.6987033627092957e-29, 6)
-        self.assertAlmostEqual(p[2], 0.0973617346919307, 6)
-        self.assertAlmostEqual(p[3], 0.0766143565065027, 6)
+        self.assertAlmostEqual(p[0], 0.02702943, 6)
+        self.assertAlmostEqual(p[1], 0.00000000, 6)
+        self.assertAlmostEqual(p[2], 0.09696533, 6)
+        self.assertAlmostEqual(p[3], 0.07673359, 6)
 
     def test_ee_adc3_frozen(self):
         myadc_fr.method = "adc(3)"
@@ -141,10 +141,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[2],0.4018990744972834, 6)
         self.assertAlmostEqual(e[3],0.4771607225277996, 6)
 
-        self.assertAlmostEqual(p[0], 0.0271313630382541, 6)
-        self.assertAlmostEqual(p[1], 1.8212836642722982e-29, 6)
-        self.assertAlmostEqual(p[2], 0.0973611435624510, 6)
-        self.assertAlmostEqual(p[3], 0.0767012485854986, 6)
+        self.assertAlmostEqual(p[0], 0.02702067, 6)
+        self.assertAlmostEqual(p[1], 0.00000000, 6)
+        self.assertAlmostEqual(p[2], 0.09699817, 6)
+        self.assertAlmostEqual(p[3], 0.07684783, 6)
 
 if __name__ == "__main__":
     print("EE calculations for different ADC methods for water molecule")

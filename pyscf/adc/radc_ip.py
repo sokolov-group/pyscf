@@ -860,7 +860,6 @@ def make_rdm1_eigenvectors(adc, L, R):
     rdm1[nocc:,nocc:] = 2*einsum('atu,btu->ab', L2,R2,optimize=True)
     rdm1[nocc:,nocc:] -= einsum('aut,btu->ab', L2,R2,optimize=True)
 
-
     rdm1[nocc:, nocc:] += 4 * einsum('i,i,jkAa,jkBa->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
     rdm1[nocc:, nocc:] -= 2 * einsum('i,i,jkAa,kjBa->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
     rdm1[nocc:, nocc:] -= 2 * einsum('i,j,ikBa,jkAa->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)

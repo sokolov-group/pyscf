@@ -21050,12 +21050,6 @@ def get_trans_moments(adc):
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
 
-    if adc.method == "adc(3)" and not adc.approx_trans_moments:
-        logger.warn(
-            adc,
-            "EE-ADC(3) oscillator strengths do not include"
-            + " contributions from third-order amplitudes...")
-
     method = adc.method
 
     t1 = adc.t1
@@ -21547,6 +21541,13 @@ def get_trans_moments(adc):
             t2_ce_bb = t1[0][1][:]
             einsum_type = True
 
+            if adc.t1[1][0] is not None:
+                t3_aa = adc.t1[1][0][:]
+                t3_bb = adc.t1[1][1][:]
+            else:
+                t3_aa = np.zeros((nocc_a, nvir_a))
+                t3_bb = np.zeros((nocc_b, nvir_b))
+
             t1_ccee_aaaa = t2[0][0][:]
             t1_ccee_bbbb = t2[0][2][:]
             t1_ccee_abab = t2[0][1][:]
@@ -21565,7 +21566,7 @@ def get_trans_moments(adc):
                 t1_ce_aa = t1[2][0][:]
                 t1_ce_bb = t1[2][1][:]
 
-            #            TY_a[:nocc_a,:nocc_a] -= lib.einsum('Ia,La->IL', Y_a, t3_aa, optimize = einsum_type)
+            TY_a[:nocc_a,:nocc_a] -= lib.einsum('Ia,La->IL', Y_a, t3_aa, optimize = einsum_type)
             TY_a[:nocc_a,
                  :nocc_a] -= 1 / 2 * lib.einsum('Ia,Liab,ib->IL',
                                                 Y_a,
@@ -21791,7 +21792,7 @@ def get_trans_moments(adc):
                                                       t1_ce_aa,
                                                       optimize=einsum_type)
 
-#            TY_a[nocc_a:,nocc_a:] += lib.einsum('iC,iA->AC', Y_a, t3_aa, optimize = einsum_type)
+            TY_a[nocc_a:,nocc_a:] += lib.einsum('iC,iA->AC', Y_a, t3_aa, optimize = einsum_type)
             TY_a[nocc_a:,
                  nocc_a:] += 1 / 2 * lib.einsum('iC,ijAa,ja->AC',
                                                 Y_a,
@@ -22597,7 +22598,7 @@ def get_trans_moments(adc):
                                                       t1_ce_bb,
                                                       optimize=einsum_type)
 
-#            TY_b[:nocc_b,:nocc_b] -= lib.einsum('ia,la->il', Y_b, t3_bb, optimize = einsum_type)
+            TY_b[:nocc_b,:nocc_b] -= lib.einsum('ia,la->il', Y_b, t3_bb, optimize = einsum_type)
             TY_b[:nocc_b,
                  :nocc_b] -= 1 / 2 * lib.einsum('ia,ljab,jb->il',
                                                 Y_b,
@@ -22823,7 +22824,7 @@ def get_trans_moments(adc):
                                                       t1_ccee_abab,
                                                       optimize=einsum_type)
 
-#            TY_b[nocc_b:,nocc_b:] += lib.einsum('ic,ia->ac', Y_b, t3_bb, optimize = einsum_type)
+            TY_b[nocc_b:,nocc_b:] += lib.einsum('ic,ia->ac', Y_b, t3_bb, optimize = einsum_type)
             TY_b[nocc_b:,
                  nocc_b:] += 1 / 2 * lib.einsum('ic,ijab,jb->ac',
                                                 Y_b,

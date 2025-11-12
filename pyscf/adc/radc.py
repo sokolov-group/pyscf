@@ -179,7 +179,7 @@ def make_ref_rdm1(adc):
         OPDM[nocc:, :nocc]  -= 1/2 * \
             lib.einsum('iIAa,ia->AI', t1_ccee, t2_ce, optimize = einsum_type)
 
-        ##### VIR=VIR ###
+        ##### VIR-VIR ###
         OPDM[nocc:, nocc:] += 2 * lib.einsum('ijAa,ijBa->AB',
                                              t1_ccee, t2_ccee, optimize = einsum_type)
         OPDM[nocc:, nocc:] -= lib.einsum('ijAa,jiBa->AB', t1_ccee, t2_ccee, optimize = einsum_type)
@@ -372,6 +372,7 @@ class RADC(lib.StreamObject):
         logger.info(self, 'Number of Active Virtual Orbitals: %d', self._nvir)
         if hasattr(self.frozen, '__len__'):
             logger.info(self, 'Frozen Orbital List: %s', self.frozen)
+        logger.info(self, '*****************************************')
 
         if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
             if getattr(self, 'with_df', None):
@@ -424,6 +425,7 @@ class RADC(lib.StreamObject):
         logger.info(self, 'Number of Active Virtual Orbitals: %d', self._nvir)
         if hasattr(self.frozen, '__len__'):
             logger.info(self, 'Frozen Orbital List: %s', self.frozen)
+        logger.info(self, '*****************************************')
 
         if eris is None:
             if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):

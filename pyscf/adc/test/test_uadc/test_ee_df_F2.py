@@ -132,8 +132,8 @@ class KnownValues(unittest.TestCase):
 
         self.assertAlmostEqual(p[0],0.00000000, 6)
         self.assertAlmostEqual(p[1],0.00000000, 6)
-        self.assertAlmostEqual(p[2],0.00107400, 6)
-        self.assertAlmostEqual(p[3],0.00107400, 6)
+        self.assertAlmostEqual(p[2],0.00110716, 6)
+        self.assertAlmostEqual(p[3],0.00110716, 6)
 
         dm1_exc = np.array(myadc.make_rdm1())
         self.assertAlmostEqual(rdms_test(dm1_exc[0][0],dm1_exc[1][0]), 40.27503915560749, 6)

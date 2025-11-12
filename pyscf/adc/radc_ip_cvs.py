@@ -1018,6 +1018,9 @@ def make_rdm1(adc):
     cput0 = (logger.process_clock(), logger.perf_counter())
     log = logger.Logger(adc.stdout, adc.verbose)
 
+    if (adc.method_type == "adc(3)"):
+        logger.warn(adc,"CVS-ip-RADC(3) 1-rdm includes contributions up to ADC(2)-X only...")
+
     nroots = adc.U.shape[1]
     U = adc.renormalize_eigenvectors(nroots)
 

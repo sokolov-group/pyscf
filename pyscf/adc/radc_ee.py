@@ -1186,13 +1186,19 @@ def get_trans_moments(adc):
             TY[nocc:, nocc:] -= einsum('ijBa,jiAa->AB', r2, t2_ccee, optimize = einsum_type)
 
         if (adc.method == "adc(3)"):
-            #TY[:nocc,:nocc] +=- einsum('Ia,La->IL', Y, t3, optimize = einsum_type)
+
+            if adc.t1[1] is not None:
+                t3_ce = adc.t1[1]
+            else:
+                t3_ce = np.zeros((nocc, nvir))
+
+            TY[:nocc,:nocc] -= einsum('Ia,La->IL', Y, t3_ce, optimize = einsum_type)
             TY[:nocc,:nocc] -= einsum('Ia,Liab,ib->IL', Y, t1_ccee, t2_ce, optimize = einsum_type)
             TY[:nocc,:nocc] += 1/2 * einsum('Ia,Liba,ib->IL', Y, t1_ccee, t2_ce, optimize = einsum_type)
             TY[:nocc,:nocc] += einsum('ia,Liab,Ib->IL', Y, t1_ccee, t2_ce, optimize = einsum_type)
             TY[:nocc,:nocc] -= einsum('ia,Liba,Ib->IL', Y, t1_ccee, t2_ce, optimize = einsum_type)
 
-            #TY[nocc:,nocc:] + = einsum('iC,iA->AC', Y, t3, optimize = einsum_type)
+            TY[nocc:,nocc:] += einsum('iC,iA->AC', Y, t3_ce, optimize = einsum_type)
             TY[nocc:,nocc:] += einsum('iC,ijAa,ja->AC', Y, t1_ccee, t2_ce, optimize = einsum_type)
             TY[nocc:,nocc:] -= 1/2 * einsum('iC,jiAa,ja->AC', Y, t1_ccee, t2_ce, optimize = einsum_type)
             TY[nocc:,nocc:] -= einsum('ia,ijAa,jC->AC', Y, t1_ccee, t2_ce, optimize = einsum_type)
@@ -1530,7 +1536,6 @@ def make_rdm1(adc):
     log = logger.Logger(adc.stdout, adc.verbose)
 
     nroots = adc.U.shape[1]
-    #U = adc.U
     U = adc.renormalize_eigenvectors(nroots)
 
     list_rdm1 = []

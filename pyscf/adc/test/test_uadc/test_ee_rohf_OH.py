@@ -127,9 +127,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[3], 0.3187665826, 6)
 
         self.assertAlmostEqual(p[0],-0.00000000, 6)
-        self.assertAlmostEqual(p[1],0.00239679 , 6)
-        self.assertAlmostEqual(p[2],0.00000001 , 6)
-        self.assertAlmostEqual(p[3],0.01492111 , 6)
+        self.assertAlmostEqual(p[1],0.00239567 , 6)
+        self.assertAlmostEqual(p[2],0.00000000 , 6)
+        self.assertAlmostEqual(p[3],0.01485308 , 6)
 
         self.assertAlmostEqual(spin[0], 0.75027556 , 5)
         self.assertAlmostEqual(spin[1],0.75009053  , 5)

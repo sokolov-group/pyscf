@@ -657,6 +657,7 @@ class UADC(lib.StreamObject):
             logger.info(self, 'Number of Active Virtual Orbitals: %d', nvir)
             if hasattr(self.frozen, '__len__'):
                 logger.info(self, 'Frozen Orbital List: %s', self.frozen)
+            logger.info(self, '*****************************************')
 
         else:
             nocc_fr_a = self._scf.nelec[0] - self.nocc_a
@@ -679,6 +680,7 @@ class UADC(lib.StreamObject):
                     logger.info(self, 'Frozen Orbital List (Alpha): %s', self.frozen[0])
                 if hasattr(self.frozen[1], '__len__'):
                     logger.info(self, 'Frozen Orbital List (Beta): %s', self.frozen[1])
+            logger.info(self, '*****************************************')
 
         if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
             if getattr(self, 'with_df', None):
@@ -735,6 +737,7 @@ class UADC(lib.StreamObject):
             logger.info(self, 'Number of Active Virtual Orbitals: %d', nvir)
             if hasattr(self.frozen, '__len__'):
                 logger.info(self, 'Frozen Orbital List: %s', self.frozen)
+            logger.info(self, '*****************************************')
 
         else:
             nocc_fr_a = self._scf.nelec[0] - self.nocc_a
@@ -757,6 +760,7 @@ class UADC(lib.StreamObject):
                     logger.info(self, 'Frozen Orbital List (Alpha): %s', self.frozen[0])
                 if hasattr(self.frozen[1], '__len__'):
                     logger.info(self, 'Frozen Orbital List (Beta): %s', self.frozen[1])
+            logger.info(self, '*****************************************')
 
         if eris is None:
             if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
