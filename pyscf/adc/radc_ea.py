@@ -932,13 +932,14 @@ def make_rdm1_eigenvectors(adc, L, R):
     n_singles = nvir
     n_doubles = nvir * nvir * nocc
 
+    occ_list = range(nocc)
+
     s1 = 0
     f1 = n_singles
     s2 = f1
     f2 = s2 + n_doubles
 
     rdm1  = np.zeros((nmo,nmo))
-    kd_oc = np.identity(nocc)
 
     L1 = L[s1:f1]
     L2 = L[s2:f2]
@@ -953,13 +954,13 @@ def make_rdm1_eigenvectors(adc, L, R):
 
 ############# block- ij
     ### 000 ###
-    rdm1[:nocc, :nocc] += 2 * einsum('a,a,IJ->IJ', L1, R1, kd_oc, optimize = einsum_type)
+    rdm1[occ_list, occ_list] += 2 * einsum('a,a->', L1, R1, optimize = einsum_type)
 
     ### 101 ###
     rdm1[:nocc, :nocc] -= 2 * einsum('Jab,Iab->IJ', L2, R2, optimize = einsum_type)
     rdm1[:nocc, :nocc] += 1 * einsum('Jab,Iba->IJ', L2, R2, optimize = einsum_type)
-    rdm1[:nocc, :nocc] += 4 * einsum('iab,iab,IJ->IJ', L2, R2, kd_oc, optimize = einsum_type)
-    rdm1[:nocc, :nocc] -= 2 * einsum('iab,iba,IJ->IJ', L2, R2, kd_oc, optimize = einsum_type)
+    rdm1[occ_list, occ_list] += 4 * einsum('iab,iab->', L2, R2, optimize = einsum_type)
+    rdm1[occ_list, occ_list] -= 2 * einsum('iab,iba->', L2, R2, optimize = einsum_type)
 
     ### 020 ###
     rdm1[:nocc, :nocc] -= 2 * einsum('a,a,Iibc,Jibc->IJ', L1, R1,
@@ -1526,7 +1527,7 @@ class RADCEA(radc.RADC):
 
     def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None):
         if (type=="read"):
-            print("obtain initial guess from input variable")
+            logger.info(self, "obtain initial guess from input variable")
             ncore = self._nocc
             nextern = self._nvir
             n_singles = nextern

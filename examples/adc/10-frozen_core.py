@@ -16,22 +16,6 @@ mol.basis = {'H': 'aug-cc-pVDZ',
 mol.build()
 mf = scf.RHF(mol).run()
 
-import math
-from pyscf import gto, scf, adc
-
-mol = gto.Mole()
-r = 0.957492
-x = r * math.sin(104.468205 * math.pi/(2 * 180.0))
-y = r * math.cos(104.468205* math.pi/(2 * 180.0))
-mol.atom = [
-    ['O', (0., 0.    , 0)],
-    ['H', (0., -x, y)],
-    ['H', (0., x , y)],]
-mol.basis = {'H': 'aug-cc-pVDZ',
-                'O': 'aug-cc-pVDZ',}
-mol.build()
-mf = scf.RHF(mol).run()
-
 #
 # In RADC, frozen orbitals can be specified by setting the frozen parameter when instantiating an RADC class.
 # It can be an integer, a list of orbital indices, or 'chemcore' to automatically freeze the chemical core orbitals.

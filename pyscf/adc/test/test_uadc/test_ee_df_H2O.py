@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 # Author: Terrence Stahl <terrencestahl1@@gmail.com>
+#         Ning-Yuan Chen <cny003@outlook.com>
 #         Alexander Sokolov <alexander.y.sokolov@gmail.com>
 #
 
@@ -86,6 +87,21 @@ class KnownValues(unittest.TestCase):
 
         self.assertAlmostEqual(p[0],0.00000000, 6)
         self.assertAlmostEqual(p[1],0.02542338, 6)
+        self.assertAlmostEqual(p[2],0.00000000, 6)
+        self.assertAlmostEqual(p[3],0.00000000, 6)
+
+    def test_ee_adc2x_cis(self):
+        myadc.method = "adc(2)-x"
+
+        e,v,p,x = myadc.kernel(nroots=4, guess="cis")
+
+        self.assertAlmostEqual(e[0],0.2558563365, 6)
+        self.assertAlmostEqual(e[1],0.2787834140, 6)
+        self.assertAlmostEqual(e[2],0.3428343617, 6)
+        self.assertAlmostEqual(e[3],0.3560598866, 6)
+
+        self.assertAlmostEqual(p[0],0.00000000, 6)
+        self.assertAlmostEqual(p[1],0.02542337, 6)
         self.assertAlmostEqual(p[2],0.00000000, 6)
         self.assertAlmostEqual(p[3],0.00000000, 6)
 

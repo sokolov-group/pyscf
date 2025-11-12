@@ -1591,6 +1591,9 @@ def make_rdm1_eigenvectors(adc, L, R):
     nmo_a = nocc_a + nvir_a
     nmo_b = nocc_b + nvir_b
 
+    occ_list_a = range(nocc_a)
+    occ_list_b = range(nocc_b)
+
     t2_1_a = adc.t2[0][0][:]
     t2_1_ab = adc.t2[0][1][:]
     t2_1_b = adc.t2[0][2][:]
@@ -1625,8 +1628,6 @@ def make_rdm1_eigenvectors(adc, L, R):
 
     rdm1_a  = np.zeros((nmo_a,nmo_a))
     rdm1_b  = np.zeros((nmo_b,nmo_b))
-    kd_oc_a = np.identity(nocc_a)
-    kd_oc_b = np.identity(nocc_b)
 
     L_a = L[s_a:f_a]
     L_b = L[s_b:f_b]
@@ -1674,26 +1675,26 @@ def make_rdm1_eigenvectors(adc, L, R):
     R_bab = R_bab.reshape(nvir_b,nocc_b,nocc_a)
 
 ######### block- ij
-    rdm1_a[:nocc_a,:nocc_a] =  np.einsum('ij,m,m->ij',kd_oc_a,L_a,R_a,optimize=True)
+    rdm1_a[occ_list_a,occ_list_a] =  np.einsum('m,m->',L_a,R_a,optimize=True)
     rdm1_a[:nocc_a,:nocc_a] -= np.einsum('i,j->ij',L_a,R_a,optimize=True)
-    rdm1_a[:nocc_a,:nocc_a] +=  np.einsum('ij,m,m->ij',kd_oc_a,L_b,R_b,optimize=True)
+    rdm1_a[occ_list_a,occ_list_a] += np.einsum('m,m->',L_b,R_b,optimize=True)
 
-    rdm1_b[:nocc_b,:nocc_b] =  np.einsum('ij,m,m->ij',kd_oc_b,L_b,R_b,optimize=True)
+    rdm1_b[occ_list_b,occ_list_b] =  np.einsum('m,m->',L_b,R_b,optimize=True)
     rdm1_b[:nocc_b,:nocc_b] -= np.einsum('i,j->ij',L_b,R_b,optimize=True)
-    rdm1_b[:nocc_b,:nocc_b] += np.einsum('ij,m,m->ij',kd_oc_b,L_a,R_a,optimize=True)
+    rdm1_b[occ_list_b,occ_list_b] += np.einsum('m,m->',L_a,R_a,optimize=True)
 
-    rdm1_a[:nocc_a,:nocc_a] += 0.5*np.einsum('ij,etu,etu->ij',kd_oc_a,L_aaa_u,R_aaa_u,optimize=True)
-    rdm1_a[:nocc_a,:nocc_a] += np.einsum('ij,etu,etu->ij',kd_oc_a,L_bab,R_bab,optimize=True)
-    rdm1_a[:nocc_a,:nocc_a] += np.einsum('ij,etu,etu->ij',kd_oc_a,L_aba,R_aba,optimize=True)
-    rdm1_a[:nocc_a,:nocc_a] += 0.5*np.einsum('ij,etu,etu->ij',kd_oc_a,L_bbb_u,R_bbb_u,optimize=True)
+    rdm1_a[occ_list_a,occ_list_a] += 0.5*np.einsum('etu,etu->',L_aaa_u,R_aaa_u,optimize=True)
+    rdm1_a[occ_list_a,occ_list_a] += np.einsum('etu,etu->',L_bab,R_bab,optimize=True)
+    rdm1_a[occ_list_a,occ_list_a] += np.einsum('etu,etu->',L_aba,R_aba,optimize=True)
+    rdm1_a[occ_list_a,occ_list_a] += 0.5*np.einsum('etu,etu->',L_bbb_u,R_bbb_u,optimize=True)
     rdm1_a[:nocc_a,:nocc_a] -= np.einsum('eti,etj->ij',L_aaa_u,R_aaa_u,optimize=True)
     rdm1_a[:nocc_a,:nocc_a] -= np.einsum('eti,etj->ij',L_bab,R_bab,optimize=True)
     rdm1_a[:nocc_a,:nocc_a] -= np.einsum('eit,ejt->ij',L_aba,R_aba,optimize=True)
 
-    rdm1_b[:nocc_b,:nocc_b] += 0.5*np.einsum('ij,etu,etu->ij',kd_oc_b,L_aaa_u,R_aaa_u,optimize=True)
-    rdm1_b[:nocc_b,:nocc_b] += np.einsum('ij,etu,etu->ij',kd_oc_b,L_bab,R_bab,optimize=True)
-    rdm1_b[:nocc_b,:nocc_b] += np.einsum('ij,etu,etu->ij',kd_oc_b,L_aba,R_aba,optimize=True)
-    rdm1_b[:nocc_b,:nocc_b] += 0.5*np.einsum('ij,etu,etu->ij',kd_oc_b,L_bbb_u,R_bbb_u,optimize=True)
+    rdm1_b[occ_list_b,occ_list_b] += 0.5*np.einsum('etu,etu->',L_aaa_u,R_aaa_u,optimize=True)
+    rdm1_b[occ_list_b,occ_list_b] += np.einsum('etu,etu->',L_bab,R_bab,optimize=True)
+    rdm1_b[occ_list_b,occ_list_b] += np.einsum('etu,etu->',L_aba,R_aba,optimize=True)
+    rdm1_b[occ_list_b,occ_list_b] += 0.5*np.einsum('etu,etu->',L_bbb_u,R_bbb_u,optimize=True)
     rdm1_b[:nocc_b,:nocc_b] -= np.einsum('eti,etj->ij',L_bbb_u,R_bbb_u,optimize=True)
     rdm1_b[:nocc_b,:nocc_b] -= np.einsum('eti,etj->ij',L_aba,R_aba,optimize=True)
     rdm1_b[:nocc_b,:nocc_b] -= np.einsum('eit,ejt->ij',L_bab,R_bab,optimize=True)
@@ -2161,7 +2162,7 @@ class UADCIP(uadc.UADC):
 
     def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None):
         if (type=="read"):
-            print("obtain initial guess from input variable")
+            logger.info(self,"obtain initial guess from input variable")
             nocc_a = self.nocc_a
             nocc_b = self.nocc_b
             nvir_a = self.nvir_a

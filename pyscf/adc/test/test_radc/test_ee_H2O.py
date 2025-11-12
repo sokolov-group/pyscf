@@ -121,6 +121,29 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(rdms_test(dm1_exc[3]), 28.32089579339714, 6)
 
 
+    def test_ee_adc2x_cis(self):
+        myadc.method = "adc(2)-x"
+
+        myadcee = adc.radc_ee.RADCEE(myadc)
+        e,v,p,x = myadcee.kernel(nroots=4,guess="cis")
+
+        self.assertAlmostEqual(e[0],0.2794713392807772, 6)
+        self.assertAlmostEqual(e[1],0.3563942213877533, 6)
+        self.assertAlmostEqual(e[2],0.3757584608609318, 6)
+        self.assertAlmostEqual(e[3],0.4551913577148157, 6)
+
+        self.assertAlmostEqual(p[0], 0.02546195958442777, 6)
+        self.assertAlmostEqual(p[1], 4.826092110600379e-29, 6)
+        self.assertAlmostEqual(p[2], 0.09178486868079525, 6)
+        self.assertAlmostEqual(p[3], 0.06740788256412324, 6)
+
+        dm1_exc = np.array(myadcee.make_rdm1())
+        self.assertAlmostEqual(rdms_test(dm1_exc[0]), 26.641918320632794, 6)
+        self.assertAlmostEqual(rdms_test(dm1_exc[1]), 28.080142156392775, 6)
+        self.assertAlmostEqual(rdms_test(dm1_exc[2]), 26.561930246817084, 6)
+        self.assertAlmostEqual(rdms_test(dm1_exc[3]), 28.320896647965775, 6)
+
+
     def test_ee_adc3(self):
         myadc.method = "adc(3)"
         e, t_amp1, t_amp2 = myadc.kernel_gs()

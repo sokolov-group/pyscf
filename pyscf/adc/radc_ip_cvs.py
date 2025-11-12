@@ -1041,10 +1041,12 @@ def make_rdm1_eigenvectors(adc, L, R):
     ncvs = adc.ncvs
     nval = nocc - ncvs
     nmo = nocc + nvir
-
     n_singles = ncvs
     n_doubles_ecc = nvir * ncvs * ncvs
     n_doubles_ecv =  nvir * ncvs * nval
+
+    cvs_list = range(ncvs)
+    val_list = range(ncvs,nocc)
 
     f1 = n_singles
     s2_ecc = f1
@@ -1084,7 +1086,7 @@ def make_rdm1_eigenvectors(adc, L, R):
 
 ########### block- ij
     rdm1[:ncvs, :ncvs] =- einsum('J,I->IJ', L1, R1, optimize = einsum_type)
-    rdm1[:ncvs, :ncvs] += 2 * einsum('i,i,IJ->IJ', L1, R1, np.identity(ncvs), optimize = einsum_type)
+    rdm1[cvs_list, cvs_list] += 2 * einsum('i,i->', L1, R1, optimize = einsum_type)
 
     rdm1[:ncvs, :ncvs] += einsum('J,i,ijab,Ijab->IJ', L1, R1, t1_xxee, t1_xxee, optimize = einsum_type)
     rdm1[:ncvs, :ncvs] -= 1/2 * einsum('J,i,ijab,Ijba->IJ', L1, R1, t1_xxee, t1_xxee, optimize = einsum_type)
@@ -1109,15 +1111,15 @@ def make_rdm1_eigenvectors(adc, L, R):
     rdm1[:ncvs, :ncvs] += einsum('aJi,aiI->IJ', L2_ecv, R2_evc, optimize = einsum_type)
     rdm1[:ncvs, :ncvs] += einsum('aiJ,aIi->IJ', L2_evc, R2_ecv, optimize = einsum_type)
     rdm1[:ncvs, :ncvs] -= 2 * einsum('aiJ,aiI->IJ', L2_evc, R2_evc, optimize = einsum_type)
-    rdm1[:ncvs, :ncvs] += 4 * einsum('aij,aij,IJ->IJ', L2_ecc, R2_ecc, np.identity(ncvs), optimize = einsum_type)
-    rdm1[:ncvs, :ncvs] -= 2 * einsum('aij,aji,IJ->IJ', L2_ecc, R2_ecc, np.identity(ncvs), optimize = einsum_type)
-    rdm1[:ncvs, :ncvs] += 4 * einsum('aij,aij,IJ->IJ', L2_ecv, R2_ecv, np.identity(ncvs), optimize = einsum_type)
-    rdm1[:ncvs, :ncvs] -= 2 * einsum('aij,aji,IJ->IJ', L2_ecv, R2_evc, np.identity(ncvs), optimize = einsum_type)
-    rdm1[:ncvs, :ncvs] -= 2 * einsum('aij,aji,IJ->IJ', L2_evc, R2_ecv, np.identity(ncvs), optimize = einsum_type)
-    rdm1[:ncvs, :ncvs] += 4 * einsum('aij,aij,IJ->IJ', L2_evc, R2_evc, np.identity(ncvs), optimize = einsum_type)
+    rdm1[cvs_list, cvs_list] += 4 * einsum('aij,aij->', L2_ecc, R2_ecc, optimize = einsum_type)
+    rdm1[cvs_list, cvs_list] -= 2 * einsum('aij,aji->', L2_ecc, R2_ecc, optimize = einsum_type)
+    rdm1[cvs_list, cvs_list] += 4 * einsum('aij,aij->', L2_ecv, R2_ecv, optimize = einsum_type)
+    rdm1[cvs_list, cvs_list] -= 2 * einsum('aij,aji->', L2_ecv, R2_evc, optimize = einsum_type)
+    rdm1[cvs_list, cvs_list] -= 2 * einsum('aij,aji->', L2_evc, R2_ecv, optimize = einsum_type)
+    rdm1[cvs_list, cvs_list] += 4 * einsum('aij,aij->', L2_evc, R2_evc, optimize = einsum_type)
 
 ########### block- kl
-    rdm1[ncvs:nocc, ncvs:nocc]  = 2 * einsum('i,i,KL->KL', L1, R1, np.identity(nval), optimize = einsum_type)
+    rdm1[val_list, val_list]  = 2 * einsum('i,i->', L1, R1, optimize = einsum_type)
 
     rdm1[ncvs:nocc, ncvs:nocc] -= 4 * einsum('i,i,Kjab,Ljab->KL', L1, R1, t1_vxee, t1_vxee, optimize = einsum_type)
     rdm1[ncvs:nocc, ncvs:nocc] += 2 * einsum('i,i,Kjab,Ljba->KL', L1, R1, t1_vxee, t1_vxee, optimize = einsum_type)
@@ -1130,18 +1132,12 @@ def make_rdm1_eigenvectors(adc, L, R):
     rdm1[ncvs:nocc, ncvs:nocc] += einsum('aiL,aKi->KL', L2_ecv, R2_evc, optimize = einsum_type)
     rdm1[ncvs:nocc, ncvs:nocc] += einsum('aLi,aiK->KL', L2_evc, R2_ecv, optimize = einsum_type)
     rdm1[ncvs:nocc, ncvs:nocc] -= 2 * einsum('aLi,aKi->KL', L2_evc, R2_evc, optimize = einsum_type)
-    rdm1[ncvs:nocc, ncvs:nocc] += 4 * einsum('aij,aij,KL->KL', L2_ecc, R2_ecc,
-                                             np.identity(nval), optimize = einsum_type)
-    rdm1[ncvs:nocc, ncvs:nocc] -= 2 * einsum('aij,aji,KL->KL', L2_ecc, R2_ecc,
-                                             np.identity(nval), optimize = einsum_type)
-    rdm1[ncvs:nocc, ncvs:nocc] += 4 * einsum('aij,aij,KL->KL', L2_ecv, R2_ecv,
-                                             np.identity(nval), optimize = einsum_type)
-    rdm1[ncvs:nocc, ncvs:nocc] -= 2 * einsum('aij,aji,KL->KL', L2_ecv, R2_evc,
-                                             np.identity(nval), optimize = einsum_type)
-    rdm1[ncvs:nocc, ncvs:nocc] -= 2 * einsum('aij,aji,KL->KL', L2_evc, R2_ecv,
-                                             np.identity(nval), optimize = einsum_type)
-    rdm1[ncvs:nocc, ncvs:nocc] += 4 * einsum('aij,aij,KL->KL', L2_evc, R2_evc,
-                                             np.identity(nval), optimize = einsum_type)
+    rdm1[val_list, val_list] += 4 * einsum('aij,aij->', L2_ecc, R2_ecc, optimize = einsum_type)
+    rdm1[val_list, val_list] -= 2 * einsum('aij,aji->', L2_ecc, R2_ecc, optimize = einsum_type)
+    rdm1[val_list, val_list] += 4 * einsum('aij,aij->', L2_ecv, R2_ecv, optimize = einsum_type)
+    rdm1[val_list, val_list] -= 2 * einsum('aij,aji->', L2_ecv, R2_evc, optimize = einsum_type)
+    rdm1[val_list, val_list] -= 2 * einsum('aij,aji->', L2_evc, R2_ecv, optimize = einsum_type)
+    rdm1[val_list, val_list] += 4 * einsum('aij,aij->', L2_evc, R2_evc, optimize = einsum_type)
 
 ########### block- ik
     rdm1[:ncvs, ncvs:nocc]  = einsum('i,I,ijab,Kjab->IK', L1, R1, t1_xxee, t1_vxee, optimize = einsum_type)
@@ -1330,7 +1326,7 @@ class RADCIPCVS(radc.RADC):
 
     def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None):
         if (type=="read"):
-            print("obtain initial guess from input variable")
+            logger.info(self, "obtain initial guess from input variable")
             nocc = self._nocc
             nvir = self._nvir
             ncvs = self.ncvs

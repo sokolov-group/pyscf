@@ -362,6 +362,16 @@ class RADC(lib.StreamObject):
         nao_pair = nao * (nao+1) // 2
         mem_incore = (max(nao_pair**2, nmo**4) + nmo_pair**2) * 8/1e6
         mem_now = lib.current_memory()[0]
+        nocc_fr = self._scf.mol.nelectron//2 - self._nocc
+        nvir_fr = self._scf.mo_coeff.shape[1] - self._nmo - nocc_fr
+
+        logger.info(self, '******** ADC Orbital Information ********')
+        logger.info(self, 'Number of Frozen Occupied Orbitals: %d', nocc_fr)
+        logger.info(self, 'Number of Frozen Virtual Orbitals: %d', nvir_fr)
+        logger.info(self, 'Number of Active Occupied Orbitals: %d', self._nocc)
+        logger.info(self, 'Number of Active Virtual Orbitals: %d', self._nvir)
+        if hasattr(self.frozen, '__len__'):
+            logger.info(self, 'Frozen Orbital List: %s', self.frozen)
 
         if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
             if getattr(self, 'with_df', None):
@@ -404,6 +414,16 @@ class RADC(lib.StreamObject):
         nao_pair = nao * (nao+1) // 2
         mem_incore = (max(nao_pair**2, nmo**4) + nmo_pair**2) * 8/1e6
         mem_now = lib.current_memory()[0]
+        nocc_fr = self._scf.mol.nelectron//2 - self._nocc
+        nvir_fr = self._scf.mo_coeff.shape[1] - self._nmo - nocc_fr
+
+        logger.info(self, '******** ADC Orbital Information ********')
+        logger.info(self, 'Number of Frozen Occupied Orbitals: %d', nocc_fr)
+        logger.info(self, 'Number of Frozen Virtual Orbitals: %d', nvir_fr)
+        logger.info(self, 'Number of Active Occupied Orbitals: %d', self._nocc)
+        logger.info(self, 'Number of Active Virtual Orbitals: %d', self._nvir)
+        if hasattr(self.frozen, '__len__'):
+            logger.info(self, 'Frozen Orbital List: %s', self.frozen)
 
         if eris is None:
             if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):

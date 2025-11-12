@@ -644,6 +644,41 @@ class UADC(lib.StreamObject):
         mem_incore = (max(nao_pair**2, nmo_a**4) + nmo_pair**2) * 2 * 8/1e6
         mem_now = lib.current_memory()[0]
 
+        if isinstance(self._scf, scf.rohf.ROHF):
+            nocc = max(self.nocc_a, self.nocc_b)
+            nvir = min(self.nvir_a, self.nvir_b)
+            nocc_fr = max(self._scf.mol.nelec[0], self._scf.mol.nelec[1]) - nocc
+            nvir_fr = self._scf.mo_coeff.shape[1] - nmo_a - nocc_fr
+
+            logger.info(self, '******** ADC Orbital Information ********')
+            logger.info(self, 'Number of Frozen Occupied Orbitals: %d', nocc_fr)
+            logger.info(self, 'Number of Frozen Virtual Orbitals: %d', nvir_fr)
+            logger.info(self, 'Number of Active Occupied Orbitals: %d', nocc)
+            logger.info(self, 'Number of Active Virtual Orbitals: %d', nvir)
+            if hasattr(self.frozen, '__len__'):
+                logger.info(self, 'Frozen Orbital List: %s', self.frozen)
+
+        else:
+            nocc_fr_a = self._scf.nelec[0] - self.nocc_a
+            nocc_fr_b = self._scf.nelec[1] - self.nocc_b
+            nvir_fr_a = self._scf.mo_coeff[0].shape[1] - nmo_a - nocc_fr_a
+            nvir_fr_b = self._scf.mo_coeff[1].shape[1] - nmo_b - nocc_fr_b
+
+            logger.info(self, '******** ADC Orbital Information ********')
+            logger.info(self, 'Number of Frozen Occupied Alpha Orbitals: %d', nocc_fr_a)
+            logger.info(self, 'Number of Frozen Occupied Beta Orbitals: %d', nocc_fr_b)
+            logger.info(self, 'Number of Frozen Virtual Alpha Orbitals: %d', nvir_fr_a)
+            logger.info(self, 'Number of Frozen Virtual Beta Orbitals: %d', nvir_fr_b)
+            logger.info(self, 'Number of Active Occupied Alpha Orbitals: %d', self.nocc_a)
+            logger.info(self, 'Number of Active Occupied Beta Orbitals: %d', self.nocc_b)
+            logger.info(self, 'Number of Active Virtual Alpha Orbitals: %d', self.nvir_a)
+            logger.info(self, 'Number of Active Virtual Beta Orbitals: %d', self.nvir_b)
+
+            if hasattr(self.frozen[0], '__len__'):
+                logger.info(self, 'Frozen Orbital List (Alpha): %s', self.frozen[0])
+            if hasattr(self.frozen[1], '__len__'):
+                logger.info(self, 'Frozen Orbital List (Beta): %s', self.frozen[1])
+
         if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
             if getattr(self, 'with_df', None):
                 self.with_df = self.with_df
@@ -685,6 +720,41 @@ class UADC(lib.StreamObject):
         nao_pair = nao * (nao+1) // 2
         mem_incore = (max(nao_pair**2, nmo_a**4) + nmo_pair**2) * 2 * 8/1e6
         mem_now = lib.current_memory()[0]
+
+        if isinstance(self._scf, scf.rohf.ROHF):
+            nocc = max(self.nocc_a, self.nocc_b)
+            nvir = min(self.nvir_a, self.nvir_b)
+            nocc_fr = max(self._scf.mol.nelec[0], self._scf.mol.nelec[1]) - nocc
+            nvir_fr = self._scf.mo_coeff.shape[1] - nmo_a - nocc_fr
+
+            logger.info(self, '******** ADC Orbital Information ********')
+            logger.info(self, 'Number of Frozen Occupied Orbitals: %d', nocc_fr)
+            logger.info(self, 'Number of Frozen Virtual Orbitals: %d', nvir_fr)
+            logger.info(self, 'Number of Active Occupied Orbitals: %d', nocc)
+            logger.info(self, 'Number of Active Virtual Orbitals: %d', nvir)
+            if hasattr(self.frozen, '__len__'):
+                logger.info(self, 'Frozen Orbital List: %s', self.frozen)
+
+        else:
+            nocc_fr_a = self._scf.nelec[0] - self.nocc_a
+            nocc_fr_b = self._scf.nelec[1] - self.nocc_b
+            nvir_fr_a = self._scf.mo_coeff[0].shape[1] - nmo_a - nocc_fr_a
+            nvir_fr_b = self._scf.mo_coeff[1].shape[1] - nmo_b - nocc_fr_b
+
+            logger.info(self, '******** ADC Orbital Information ********')
+            logger.info(self, 'Number of Frozen Occupied Alpha Orbitals: %d', nocc_fr_a)
+            logger.info(self, 'Number of Frozen Occupied Beta Orbitals: %d', nocc_fr_b)
+            logger.info(self, 'Number of Frozen Virtual Alpha Orbitals: %d', nvir_fr_a)
+            logger.info(self, 'Number of Frozen Virtual Beta Orbitals: %d', nvir_fr_b)
+            logger.info(self, 'Number of Active Occupied Alpha Orbitals: %d', self.nocc_a)
+            logger.info(self, 'Number of Active Occupied Beta Orbitals: %d', self.nocc_b)
+            logger.info(self, 'Number of Active Virtual Alpha Orbitals: %d', self.nvir_a)
+            logger.info(self, 'Number of Active Virtual Beta Orbitals: %d', self.nvir_b)
+
+            if hasattr(self.frozen[0], '__len__'):
+                logger.info(self, 'Frozen Orbital List (Alpha): %s', self.frozen[0])
+            if hasattr(self.frozen[1], '__len__'):
+                logger.info(self, 'Frozen Orbital List (Beta): %s', self.frozen[1])
 
         if eris is None:
             if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):

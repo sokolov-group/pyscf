@@ -1890,6 +1890,9 @@ def make_rdm1_eigenvectors(adc, L, R):
     nmo_a = nocc_a + nvir_a
     nmo_b = nocc_b + nvir_b
 
+    occ_list_a = range(nocc_a)
+    occ_list_b = range(nocc_b)
+
     t2_1_a = adc.t2[0][0][:]
     t2_1_ab = adc.t2[0][1][:]
     t2_1_b = adc.t2[0][2][:]
@@ -1924,8 +1927,6 @@ def make_rdm1_eigenvectors(adc, L, R):
 
     rdm1_a  = np.zeros((nmo_a,nmo_a))
     rdm1_b  = np.zeros((nmo_b,nmo_b))
-    kd_oc_a = np.identity(nocc_a)
-    kd_oc_b = np.identity(nocc_b)
 
     L_a = L[s_a:f_a]
     L_b = L[s_b:f_b]
@@ -1973,11 +1974,11 @@ def make_rdm1_eigenvectors(adc, L, R):
     R_bab = R_bab.reshape(nocc_b,nvir_a,nvir_b)
 
 ######### block- ij
-    rdm1_a[:nocc_a, :nocc_a]  = np.einsum('a,a,IJ->IJ', L_a, R_a, kd_oc_a, optimize = True)
-    rdm1_a[:nocc_a, :nocc_a] += np.einsum('a,a,IJ->IJ', L_b, R_b, kd_oc_a, optimize = True)
+    rdm1_a[occ_list_a, occ_list_a]  = np.einsum('a,a->', L_a, R_a, optimize = True)
+    rdm1_a[occ_list_a, occ_list_a] += np.einsum('a,a->', L_b, R_b, optimize = True)
 
-    rdm1_b[:nocc_b, :nocc_b]  = np.einsum('a,a,IJ->IJ', L_a, R_a, kd_oc_b, optimize = True)
-    rdm1_b[:nocc_b, :nocc_b] += np.einsum('a,a,IJ->IJ', L_b, R_b, kd_oc_b, optimize = True)
+    rdm1_b[occ_list_b, occ_list_b]  = np.einsum('a,a->', L_a, R_a, optimize = True)
+    rdm1_b[occ_list_b, occ_list_b] += np.einsum('a,a->', L_b, R_b, optimize = True)
 
     rdm1_a[:nocc_a, :nocc_a] -= 1/2 * np.einsum('a,a,Iibc,Jibc->IJ', L_a, R_a, t2_1_a, t2_1_a, optimize = True)
     rdm1_a[:nocc_a, :nocc_a] += np.einsum('a,b,Iiac,Jibc->IJ', L_a, R_a, t2_1_a, t2_1_a, optimize = True)
@@ -1997,17 +1998,17 @@ def make_rdm1_eigenvectors(adc, L, R):
 
     rdm1_a[:nocc_a, :nocc_a] -= 1/2 * np.einsum('Jab,Iab->IJ', L_aaa_u, R_aaa_u, optimize = True)
     rdm1_a[:nocc_a, :nocc_a] -= np.einsum('Jab,Iab->IJ', L_aba, R_aba, optimize = True)
-    rdm1_a[:nocc_a, :nocc_a] += 1/2 * np.einsum('iab,iab,IJ->IJ', L_aaa_u, R_aaa_u, kd_oc_a, optimize = True)
-    rdm1_a[:nocc_a, :nocc_a] += np.einsum('iab,iab,IJ->IJ', L_aba, R_aba, kd_oc_a, optimize = True)
-    rdm1_a[:nocc_a, :nocc_a] += np.einsum('iab,iab,IJ->IJ', L_bab, R_bab, kd_oc_a, optimize = True)
-    rdm1_a[:nocc_a, :nocc_a] += 1/2 * np.einsum('iab,iab,IJ->IJ', L_bbb_u, R_bbb_u, kd_oc_a, optimize = True)
+    rdm1_a[occ_list_a, occ_list_a] += 1/2 * np.einsum('iab,iab->', L_aaa_u, R_aaa_u, optimize = True)
+    rdm1_a[occ_list_a, occ_list_a] += np.einsum('iab,iab->', L_aba, R_aba, optimize = True)
+    rdm1_a[occ_list_a, occ_list_a] += np.einsum('iab,iab->', L_bab, R_bab, optimize = True)
+    rdm1_a[occ_list_a, occ_list_a] += 1/2 * np.einsum('iab,iab->', L_bbb_u, R_bbb_u, optimize = True)
 
     rdm1_b[:nocc_b, :nocc_b] -= np.einsum('Jab,Iab->IJ', L_bab, R_bab, optimize = True)
     rdm1_b[:nocc_b, :nocc_b] -= 1/2 * np.einsum('Jab,Iab->IJ', L_bbb_u, R_bbb_u, optimize = True)
-    rdm1_b[:nocc_b, :nocc_b] += 1/2 * np.einsum('iab,iab,IJ->IJ', L_aaa_u, R_aaa_u, kd_oc_b, optimize = True)
-    rdm1_b[:nocc_b, :nocc_b] += np.einsum('iab,iab,IJ->IJ', L_aba, R_aba, kd_oc_b, optimize = True)
-    rdm1_b[:nocc_b, :nocc_b] += np.einsum('iab,iab,IJ->IJ', L_bab, R_bab, kd_oc_b, optimize = True)
-    rdm1_b[:nocc_b, :nocc_b] += 1/2 * np.einsum('iab,iab,IJ->IJ', L_bbb_u, R_bbb_u, kd_oc_b, optimize = True)
+    rdm1_b[occ_list_b, occ_list_b] += 1/2 * np.einsum('iab,iab->', L_aaa_u, R_aaa_u, optimize = True)
+    rdm1_b[occ_list_b, occ_list_b] += np.einsum('iab,iab->', L_aba, R_aba, optimize = True)
+    rdm1_b[occ_list_b, occ_list_b] += np.einsum('iab,iab->', L_bab, R_bab, optimize = True)
+    rdm1_b[occ_list_b, occ_list_b] += 1/2 * np.einsum('iab,iab->', L_bbb_u, R_bbb_u, optimize = True)
 
 ########## block- ab
     rdm1_a[nocc_a:, nocc_a:]  = np.einsum('A,B->AB', L_a, R_a, optimize = True)
@@ -2493,7 +2494,7 @@ class UADCEA(uadc.UADC):
 
     def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None):
         if (type=="read"):
-            print("obtain initial guess from input variable")
+            logger.info(self,"obtain initial guess from input variable")
             nocc_a = self.nocc_a
             nocc_b = self.nocc_b
             nvir_a = self.nvir_a
