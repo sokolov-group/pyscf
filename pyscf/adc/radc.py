@@ -31,7 +31,6 @@ from pyscf.adc import radc_amplitudes
 from pyscf import __config__
 from pyscf import df
 from pyscf.mp import mp2
-from pyscf.data.nist import HARTREE2EV
 
 
 # Excited-state kernel
@@ -83,7 +82,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     adc.U = np.array(U).T.copy()
 
-    if adc.compute_properties and adc.method_type != "ee":
+    if adc.compute_properties:
         adc.P,adc.X = adc.get_properties(nroots)
     else:
         adc.P = None
@@ -104,7 +103,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     for n in range(nroots):
         print_string = ('%s root %d  |  Energy (Eh) = %14.10f  |  Energy (eV) = %12.8f  ' %
-                        (adc.method, n, adc.E[n], adc.E[n]*HARTREE2EV))
+                        (adc.method, n, adc.E[n], adc.E[n]*27.2114))
         if adc.compute_properties and adc.method_type != "ee":
             print_string += ("|  Spec. factor = %10.8f  " % adc.P[n])
 
@@ -121,24 +120,20 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     return adc.E, adc.U, adc.P, adc.X
 
 
-def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
+def make_ref_rdm1(adc):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
 
     t1 = adc.t1
     t2 = adc.t2
+    t2_ce = t1[0][:]
     t1_ccee = t2[0][:]
 
     ######################
     einsum_type = True
     nocc = adc._nocc
     nvir = adc._nvir
-
-    if t1[0] is not None:
-        t2_ce = t1[0][:]
-    else:
-        t2_ce = np.zeros((nocc, nvir))
 
     nmo = nocc + nvir
 
@@ -162,12 +157,8 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
 
     ####### ADC(3) SPIN ADAPTED REF OPDM WITH SQA ################
     if adc.method == "adc(3)":
+        t3_ce = adc.t1[1][:]
         t2_ccee = t2[1][:]
-
-        if t1[1] is not None:
-            t3_ce = t1[1][:]
-        else:
-            t3_ce = np.zeros((nocc, nvir))
 
         #### OCC-OCC ###
         OPDM[:nocc, :nocc] -= 2 * lib.einsum('Iiab,Jiab->IJ',
@@ -196,37 +187,7 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
                                              t1_ccee, t2_ccee, optimize = einsum_type)
         OPDM[nocc:, nocc:] -= lib.einsum('ijBa,jiAa->AB', t1_ccee, t2_ccee, optimize = einsum_type)
 
-    if with_frozen and adc.frozen is not None:
-        nmo = adc.mo_occ.size
-        nocc = np.count_nonzero(adc.mo_occ > 0)
-        dm = np.zeros((nmo,nmo))
-        dm[np.diag_indices(nocc)] = 1
-        moidx = np.where(adc.get_frozen_mask())[0]
-        dm[moidx[:,None],moidx] = OPDM
-        OPDM = dm
-        if ao_repr:
-            mo = adc.mo_coeff_hf
-            OPDM = lib.einsum('pi,ij,qj->pq', mo, OPDM, mo)
-
-    elif ao_repr:
-        mo = adc.mo_coeff
-        OPDM = lib.einsum('pi,ij,qj->pq', mo, OPDM, mo)
-
     return 2 * OPDM
-
-
-def get_frozen_mask(adc):
-
-    moidx = np.ones(adc.mo_occ.size, dtype=bool)
-    if adc.frozen is None:
-        pass
-    elif isinstance(adc.frozen, (int, np.integer)):
-        moidx[:adc.frozen] = False
-    elif hasattr(adc.frozen, '__len__'):
-        moidx[list(adc.frozen)] = False
-    else:
-        raise NotImplementedError
-    return moidx
 
 
 class RADC(lib.StreamObject):
@@ -241,13 +202,10 @@ class RADC(lib.StreamObject):
             Avoid all I/O. Default is False.
         method : string
             nth-order ADC method. Options are : ADC(2), ADC(2)-X, ADC(3). Default is ADC(2).
-        frozen : None, int or iterables
-            Specifies frozen orbitals.
-            If an integer is provided, the lowest-energy orbitals are frozen.
-            If an iterable is provided, the specified (0-based) orbital indices
-            are excluded from the calculation.
-            Note, the `frozen` attribute is immutable and cannot be modified
-            after object instantiation.
+
+            >>> mol = gto.M(atom = 'H 0 0 0; F 0 0 1.1', basis = 'ccpvdz')
+            >>> mf = scf.RHF(mol).run()
+            >>> myadc = adc.RADC(mf).run()
 
     Saved results
 
@@ -257,11 +215,6 @@ class RADC(lib.StreamObject):
             Total energy (HF + correlation)
         t1, t2 :
             T amplitudes t1[i,a], t2[i,j,a,b]  (i,j in occ, a,b in virt)
-
-    Examples:
-        >>> mol = gto.M(atom = 'H 0 0 0; F 0 0 1.1', basis = 'ccpvdz')
-        >>> mf = scf.RHF(mol).run()
-        >>> myadc = adc.RADC(mf).run()
     '''
     incore_complete = getattr(__config__, 'adc_radc_RADC_incore_complete', False)
     async_io = getattr(__config__, 'adc_radc_RADC_async_io', True)
@@ -270,7 +223,7 @@ class RADC(lib.StreamObject):
 
     _keys = {
         'tol_residual','conv_tol', 'e_corr', 'method', 'method_type', 'mo_coeff',
-        'mo_coeff_hf', 'mol', 'mo_energy', 'incore_complete',
+        'mol', 'mo_energy', 'incore_complete',
         'scf_energy', 'e_tot', 't1', 't2', 'frozen', 'chkfile',
         'max_space', 'mo_occ', 'max_cycle', 'imds', 'with_df', 'compute_properties',
         'approx_trans_moments', 'evec_print_tol', 'spec_factor_print_tol',
@@ -299,7 +252,6 @@ class RADC(lib.StreamObject):
         self.tol_residual = getattr(__config__, 'adc_radc_RADC_tol_residual', 1e-5)
         self.scf_energy = mf.e_tot
 
-        # The frozen attribute cannot be modified after instantiating ADC object
         self.frozen = frozen
         self.incore_complete = self.incore_complete or self.mol.incore_anyway
 
@@ -310,7 +262,6 @@ class RADC(lib.StreamObject):
         self.imds = lambda:None
         self._nocc = mf.mol.nelectron//2
         self.mo_coeff = mo_coeff
-        self.mo_coeff_hf = mo_coeff
         self.mo_energy = mf.mo_energy
         self.if_heri_eris = False
         self._nmo = None
@@ -368,13 +319,13 @@ class RADC(lib.StreamObject):
 
         charges = self.mol.atom_charges()
         coords  = self.mol.atom_coords()
-        self.dip_mom_nuc = np.einsum('i,ix->x', charges, coords)
+        self.dip_mom_nuc = lib.einsum('i,ix->x', charges, coords)
 
     compute_amplitudes = radc_amplitudes.compute_amplitudes
     compute_energy = radc_amplitudes.compute_energy
     transform_integrals = radc_ao2mo.transform_integrals_incore
     make_ref_rdm1 = make_ref_rdm1
-    get_frozen_mask = get_frozen_mask
+    get_frozen_mask = mp2.get_frozen_mask
 
     def dump_flags(self, verbose=None):
         logger.info(self, '')
@@ -506,7 +457,7 @@ class RADC(lib.StreamObject):
             e_exc, v_exc, spec_fac, x, adc_es = self.ee_adc(nroots=nroots, guess=guess, eris=eris)
 
         elif(self.method_type == "ip"):
-            if self.ncvs is not None and self.ncvs > 0:
+            if not isinstance(self.ncvs, type(None)) and self.ncvs > 0:
                 e_exc, v_exc, spec_fac, x, adc_es = self.ip_cvs_adc(
                     nroots=nroots, guess=guess, eris=eris)
             else:
@@ -570,32 +521,8 @@ class RADC(lib.StreamObject):
     def compute_dyson_mo(self):
         return self._adc_es.compute_dyson_mo()
 
-    def make_rdm1(self, with_frozen=True, ao_repr=False):
-        list_rdm1 = self._adc_es._make_rdm1()
-
-        if with_frozen and self.frozen is not None:
-            nmo = self.mo_occ.size
-            nocc = np.count_nonzero(self.mo_occ > 0)
-            moidx = np.where(self.get_frozen_mask())[0]
-            for i in range(self._adc_es.U.shape[1]):
-                rdm1 = list_rdm1[i]
-                dm = np.zeros((nmo,nmo))
-                dm[np.diag_indices(nocc)] = 2
-                dm[moidx[:,None],moidx] = rdm1
-                rdm1 = dm
-                if ao_repr:
-                    mo = self.mo_coeff_hf
-                    rdm1 = lib.einsum('pi,ij,qj->pq', mo, rdm1, mo)
-                list_rdm1[i] = rdm1
-
-        elif ao_repr:
-            mo = self.mo_coeff
-            for i in range(self._adc_es.U.shape[1]):
-                rdm1 = list_rdm1[i]
-                rdm1 = lib.einsum('pi,ij,qj->pq', mo, rdm1, mo)
-                list_rdm1[i] = rdm1
-
-        return list_rdm1
+    def make_rdm1(self):
+        return self._adc_es.make_rdm1()
 
 
 if __name__ == '__main__':

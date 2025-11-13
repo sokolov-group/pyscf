@@ -31,7 +31,6 @@ from pyscf.adc import uadc
 from pyscf.adc import uadc_ao2mo
 from pyscf.adc import radc_ao2mo
 from pyscf.adc import dfadc
-from pyscf.data.nist import HARTREE2EV
 
 
 def get_imds(adc, eris=None):
@@ -113,7 +112,7 @@ def get_imds(adc, eris=None):
         eris_OVvo = eris.OVvo
         eris_ovVO = eris.ovVO
 
-        if eris.ovvv is None:
+        if isinstance(eris.ovvv, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
             for a,b in lib.prange(0,nocc_a,chnk_size):
                 eris_ovvv = dfadc.get_ovvv_spin_df(
@@ -133,7 +132,7 @@ def get_imds(adc, eris=None):
             M_ab_a -= lib.einsum('ld,ladb->ab',t1_2_a, eris_ovvv,optimize=True)
             del eris_ovvv
 
-        if eris.OVvv is None:
+        if isinstance(eris.OVvv, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
             for a,b in lib.prange(0,nocc_b,chnk_size):
                 eris_OVvv = dfadc.get_ovvv_spin_df(
@@ -147,7 +146,7 @@ def get_imds(adc, eris=None):
             M_ab_a += lib.einsum('ld,ldab->ab',t1_2_b, eris_OVvv,optimize=True)
             del eris_OVvv
 
-        if eris.OVVV is None:
+        if isinstance(eris.OVVV, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
             for a,b in lib.prange(0,nocc_b,chnk_size):
                 eris_OVVV = dfadc.get_ovvv_spin_df(
@@ -165,7 +164,7 @@ def get_imds(adc, eris=None):
             M_ab_b -= lib.einsum('ld,ladb->ab',t1_2_b, eris_OVVV,optimize=True)
             del eris_OVVV
 
-        if eris.ovVV is None:
+        if isinstance(eris.ovVV, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
             for a,b in lib.prange(0,nocc_a,chnk_size):
                 eris_ovVV = dfadc.get_ovvv_spin_df(
@@ -317,7 +316,7 @@ def get_imds(adc, eris=None):
                 a += k
             M_ab_b  += temp
 
-        elif eris.vvvv_p is None:
+        elif isinstance(eris.vvvv_p, type(None)):
 
             temp = np.zeros((nvir_a,nvir_a))
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
@@ -426,7 +425,7 @@ def get_imds(adc, eris=None):
                 a += k
             M_ab_a  += temp
 
-        elif eris.vvvv_p is None:
+        elif isinstance(eris.vvvv_p, type(None)):
 
             temp = np.zeros((nvir_b,nvir_b))
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
@@ -743,7 +742,7 @@ def matvec(adc, M_ab=None, eris=None):
 ############ ADC(2) a - ibc and ibc - a coupling blocks #########################
 
         temp = np.zeros((nocc_a, nvir_a, nvir_a))
-        if eris.ovvv is None:
+        if isinstance(eris.ovvv, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
             for a,b in lib.prange(0,nocc_a,chnk_size):
                 eris_ovvv = dfadc.get_ovvv_spin_df(
@@ -765,7 +764,7 @@ def matvec(adc, M_ab=None, eris=None):
         del temp
 
         temp = np.zeros((nocc_b, nvir_a, nvir_b))
-        if eris.OVvv is None:
+        if isinstance(eris.OVvv, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
             for a,b in lib.prange(0,nocc_b,chnk_size):
                 eris_OVvv = dfadc.get_ovvv_spin_df(
@@ -783,7 +782,7 @@ def matvec(adc, M_ab=None, eris=None):
         del temp
 
         temp = np.zeros((nocc_b, nvir_b, nvir_b))
-        if eris.OVVV is None:
+        if isinstance(eris.OVVV, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
             for a,b in lib.prange(0,nocc_b,chnk_size):
                 eris_OVVV = dfadc.get_ovvv_spin_df(
@@ -805,7 +804,7 @@ def matvec(adc, M_ab=None, eris=None):
         del temp
 
         temp = np.zeros((nocc_a, nvir_b, nvir_a))
-        if eris.ovVV is None:
+        if isinstance(eris.ovVV, type(None)):
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
             for a,b in lib.prange(0,nocc_a,chnk_size):
                 eris_ovVV = dfadc.get_ovvv_spin_df(
@@ -1028,7 +1027,7 @@ def matvec(adc, M_ab=None, eris=None):
 
             temp_1_1 = np.zeros((nocc_a,nvir_a,nvir_a))
             temp_1_2 = np.zeros((nocc_a,nvir_a,nvir_a))
-            if eris.ovvv is None:
+            if isinstance(eris.ovvv, type(None)):
                 chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
                 for a,b in lib.prange(0,nocc_a,chnk_size):
                     eris_ovvv = dfadc.get_ovvv_spin_df(
@@ -1086,7 +1085,7 @@ def matvec(adc, M_ab=None, eris=None):
             temp_2_4 = np.zeros((nocc_a,nvir_b,nvir_a))
 
             temp = np.zeros((nocc_a,nvir_b,nvir_b))
-            if eris.ovVV is None:
+            if isinstance(eris.ovVV, type(None)):
                 chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
                 for a,b in lib.prange(0,nocc_a,chnk_size):
                     eris_ovVV = dfadc.get_ovvv_spin_df(
@@ -1170,7 +1169,7 @@ def matvec(adc, M_ab=None, eris=None):
             temp_1_3 = np.zeros((nocc_b,nvir_b,nvir_b))
             temp_1_4 = np.zeros((nocc_b,nvir_b,nvir_b))
 
-            if eris.OVVV is None:
+            if isinstance(eris.OVVV, type(None)):
                 chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
                 for a,b in lib.prange(0,nocc_b,chnk_size):
                     eris_OVVV = dfadc.get_ovvv_spin_df(
@@ -1219,7 +1218,7 @@ def matvec(adc, M_ab=None, eris=None):
             temp_2_2 = np.zeros((nocc_b,nvir_a,nvir_b))
             temp = np.zeros((nocc_b,nvir_a,nvir_a))
 
-            if eris.OVvv is None:
+            if isinstance(eris.OVvv, type(None)):
                 chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
                 for a,b in lib.prange(0,nocc_b,chnk_size):
                     eris_OVvv = dfadc.get_ovvv_spin_df(
@@ -1687,7 +1686,7 @@ def analyze_eigenvector(adc):
         doubles_bbb_val = list(U_sorted_bbb)
 
         logger.info(adc, '%s | root %d | Energy (eV) = %12.8f | norm(1p)  = %6.4f | norm(1h2p) = %6.4f ',
-                    adc.method, I, adc.E[I]*HARTREE2EV, U1dotU1, U2dotU2)
+                    adc.method, I, adc.E[I]*27.2114, U1dotU1, U2dotU2)
 
         if singles_a_val:
             logger.info(adc, "\n1p(alpha) block: ")
@@ -1786,7 +1785,7 @@ def analyze_spec_factor(adc):
                 continue
 
             logger.info(adc, '%s | root %d | Energy (eV) = %12.8f | %s\n',
-                    adc.method, i, adc.E[i]*HARTREE2EV, spin)
+                    adc.method, i, adc.E[i]*27.2114, spin)
             logger.info(adc, "     HF MO     Spec. Contribution     Orbital symmetry")
             logger.info(adc, "-----------------------------------------------------------")
 
@@ -2428,12 +2427,13 @@ class UADCEA(uadc.UADC):
 
     _keys = {
         'tol_residual','conv_tol', 'e_corr', 'method',
-        'method_type', 'mo_coeff', 'mo_coeff_hf', 'mo_energy_b', 'max_memory',
+        'method_type', 'mo_coeff', 'mo_energy_b', 'max_memory',
         't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle',
-        'nocc_a', 'nocc_b', 'nvir_a', 'nvir_b', 'nmo_a', 'nmo_b', 'mol', 'transform_integrals',
+        'nocc_a', 'nocc_b', 'nvir_a', 'nvir_b', 'mo_coeff', 'mo_energy_a',
+        'mo_energy_b', 'nmo_a', 'nmo_b', 'mol', 'transform_integrals',
         'with_df', 'spec_factor_print_tol', 'evec_print_tol',
         'compute_properties', 'approx_trans_moments', 'E', 'U', 'P', 'X',
-        'compute_spin_square', '_make_rdm1', 'frozen', 'mo_occ'
+        'compute_spin_square'
     }
 
     def __init__(self, adc):
@@ -2460,7 +2460,6 @@ class UADCEA(uadc.UADC):
         self.nvir_a = adc.nvir_a
         self.nvir_b = adc.nvir_b
         self.mo_coeff = adc.mo_coeff
-        self.mo_coeff_hf = adc.mo_coeff_hf
         self.mo_energy_a = adc.mo_energy_a
         self.mo_energy_b = adc.mo_energy_b
         self.nmo_a = adc._nmo[0]
@@ -2469,8 +2468,6 @@ class UADCEA(uadc.UADC):
         self.with_df = adc.with_df
         self.compute_properties = adc.compute_properties
         self.approx_trans_moments = adc.approx_trans_moments
-        self.frozen = adc.frozen
-        self.mo_occ = adc.mo_occ
 
         self.spec_factor_print_tol = adc.spec_factor_print_tol
         self.evec_print_tol = adc.evec_print_tol
@@ -2481,8 +2478,6 @@ class UADCEA(uadc.UADC):
         self.U = adc.U
         self.P = adc.P
         self.X = adc.X
-
-        self._adc_es = self
 
     kernel = uadc.kernel
     get_imds = get_imds
@@ -2495,7 +2490,7 @@ class UADCEA(uadc.UADC):
     analyze_spec_factor = analyze_spec_factor
     analyze_eigenvector = analyze_eigenvector
     compute_dyson_mo = compute_dyson_mo
-    _make_rdm1 = make_rdm1
+    make_rdm1 = make_rdm1
 
     def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None):
         if (type=="read"):

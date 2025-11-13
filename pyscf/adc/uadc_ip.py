@@ -31,7 +31,6 @@ from pyscf.adc import uadc
 from pyscf.adc import uadc_ao2mo
 from pyscf.adc import radc_ao2mo
 from pyscf.adc import dfadc
-from pyscf.data.nist import HARTREE2EV
 
 
 def get_imds(adc, eris=None):
@@ -735,7 +734,7 @@ def matvec(adc, M_ij=None, eris=None):
             r_aaa = r_aaa.reshape(nvir_a,-1)
             t2_1_a_t = t2_1_a[ij_ind_a[0],ij_ind_a[1],:,:]
             temp_1 = lib.einsum('pbc,ap->abc',t2_1_a_t,r_aaa, optimize=True)
-            if eris.ovvv is None:
+            if isinstance(eris.ovvv, type(None)):
                 chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
                 for a,b in lib.prange(0,nocc_a,chnk_size):
                     eris_ovvv = dfadc.get_ovvv_spin_df(
@@ -808,7 +807,7 @@ def matvec(adc, M_ij=None, eris=None):
             r_bbb = r_bbb.reshape(nvir_b,-1)
             t2_1_b_t = t2_1_b[ij_ind_b[0],ij_ind_b[1],:,:]
             temp_1 = lib.einsum('pbc,ap->abc',t2_1_b_t,r_bbb, optimize=True)
-            if eris.OVVV is None:
+            if isinstance(eris.OVVV, type(None)):
                 chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
                 a = 0
                 for a,b in lib.prange(0,nocc_b,chnk_size):
@@ -877,7 +876,7 @@ def matvec(adc, M_ij=None, eris=None):
 
             temp_1 = lib.einsum('kjcb,ajk->abc',t2_1_ab,r_bab, optimize=True)
             temp_2 = np.zeros((nvir_a, nvir_b, nvir_b))
-            if eris.ovVV is None:
+            if isinstance(eris.ovVV, type(None)):
                 chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
                 for a,b in lib.prange(0,nocc_a,chnk_size):
                     eris_ovVV = dfadc.get_ovvv_spin_df(
@@ -899,7 +898,7 @@ def matvec(adc, M_ij=None, eris=None):
 
             temp_1 = lib.einsum('jkbc,ajk->abc',t2_1_ab,r_aba, optimize=True)
             temp_2 = np.zeros((nvir_a, nvir_b, nvir_a))
-            if eris.OVvv is None:
+            if isinstance(eris.OVvv, type(None)):
                 chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
                 a = 0
                 for a,b in lib.prange(0,nocc_b,chnk_size):
@@ -1388,7 +1387,7 @@ def analyze_eigenvector(adc):
         doubles_bbb_val = list(U_sorted_bbb)
 
         logger.info(adc,'%s | root %d | Energy (eV) = %12.8f | norm(1h)  = %6.4f | norm(2h1p) = %6.4f ',
-                    adc.method, I, adc.E[I]*HARTREE2EV, U1dotU1, U2dotU2)
+                    adc.method, I, adc.E[I]*27.2114, U1dotU1, U2dotU2)
 
         if singles_a_val:
             logger.info(adc, "\n1h(alpha) block: ")
@@ -1487,7 +1486,7 @@ def analyze_spec_factor(adc):
                 continue
 
             logger.info(adc, '%s | root %d | Energy (eV) = %12.8f | %s\n',
-                    adc.method, i, adc.E[i]*HARTREE2EV, spin)
+                    adc.method, i, adc.E[i]*27.2114, spin)
             logger.info(adc, "     HF MO     Spec. Contribution     Orbital symmetry")
             logger.info(adc, "-----------------------------------------------------------")
 
@@ -2097,11 +2096,11 @@ class UADCIP(uadc.UADC):
         'tol_residual','conv_tol', 'e_corr', 'method',
         'method_type', 'mo_coeff', 'mo_energy_b', 'max_memory',
         't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle',
-        'nocc_a', 'nocc_b', 'nvir_a', 'nvir_b', 'mo_coeff_hf',
+        'nocc_a', 'nocc_b', 'nvir_a', 'nvir_b', 'mo_coeff',
         'nmo_a', 'nmo_b', 'mol', 'transform_integrals',
         'with_df', 'spec_factor_print_tol', 'evec_print_tol',
         'compute_properties', 'approx_trans_moments', 'E', 'U', 'P', 'X',
-        'compute_spin_square', '_make_rdm1', 'mo_occ'
+        'compute_spin_square'
     }
 
     def __init__(self, adc):
@@ -2128,7 +2127,6 @@ class UADCIP(uadc.UADC):
         self.nvir_a = adc.nvir_a
         self.nvir_b = adc.nvir_b
         self.mo_coeff = adc.mo_coeff
-        self.mo_coeff_hf = adc.mo_coeff_hf
         self.mo_energy_a = adc.mo_energy_a
         self.mo_energy_b = adc.mo_energy_b
         self.nmo_a = adc._nmo[0]
@@ -2137,7 +2135,6 @@ class UADCIP(uadc.UADC):
         self.with_df = adc.with_df
         self.compute_properties = adc.compute_properties
         self.approx_trans_moments = adc.approx_trans_moments
-        self.mo_occ = adc.mo_occ
 
         self.spec_factor_print_tol = adc.spec_factor_print_tol
         self.evec_print_tol = adc.evec_print_tol
@@ -2150,8 +2147,6 @@ class UADCIP(uadc.UADC):
         self.X = adc.X
         self.frozen = adc.frozen
 
-        self._adc_es = self
-
     kernel = uadc.kernel
     get_imds = get_imds
     get_diag = get_diag
@@ -2163,7 +2158,7 @@ class UADCIP(uadc.UADC):
     analyze_eigenvector = analyze_eigenvector
     analyze = analyze
     compute_dyson_mo = compute_dyson_mo
-    _make_rdm1 = make_rdm1
+    make_rdm1 = make_rdm1
 
     def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None):
         if (type=="read"):
