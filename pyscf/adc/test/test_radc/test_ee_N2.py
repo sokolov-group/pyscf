@@ -39,7 +39,11 @@ def setUpModule():
     mf.conv_tol = 1e-12
     mf.kernel()
     myadc = adc.ADC(mf)
+    myadc.conv_tol = 1e-12
+    myadc.tol_residual = 1e-6
     myadc_fr = adc.ADC(mf,frozen=1)
+    myadc_fr.conv_tol = 1e-12
+    myadc_fr.tol_residual = 1e-6
 
 def tearDownModule():
     global mol, mf, myadc, myadc_fr
