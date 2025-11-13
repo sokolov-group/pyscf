@@ -13,7 +13,10 @@
 # limitations under the License.
 #
 # Author: Samragni Banerjee <samragnibanerjee4@gmail.com>
+<<<<<<< HEAD
 #         Ning-Yuan Chen <cny003@outlook.com>
+=======
+>>>>>>> master
 #         Alexander Sokolov <alexander.y.sokolov@gmail.com>
 #
 
@@ -25,7 +28,11 @@ from pyscf import scf
 from pyscf import adc
 
 def setUpModule():
+<<<<<<< HEAD
     global mol, mf, myadc, myadc_fr
+=======
+    global mol, mf, myadc
+>>>>>>> master
     mol = gto.Mole()
     r = 0.957492
     x = r * math.sin(104.468205 * math.pi/(2 * 180.0))
@@ -45,6 +52,7 @@ def setUpModule():
     myadc = adc.ADC(mf)
     myadc.conv_tol = 1e-12
     myadc.tol_residual = 1e-6
+<<<<<<< HEAD
     myadc_fr = adc.ADC(mf,frozen=1)
     myadc_fr.conv_tol = 1e-12
     myadc_fr.tol_residual = 1e-6
@@ -52,6 +60,12 @@ def setUpModule():
 def tearDownModule():
     global mol, mf, myadc, myadc_fr
     del mol, mf, myadc, myadc_fr
+=======
+
+def tearDownModule():
+    global mol, mf, myadc
+    del mol, mf, myadc
+>>>>>>> master
 
 class KnownValues(unittest.TestCase):
 
@@ -81,6 +95,10 @@ class KnownValues(unittest.TestCase):
         myadcip = adc.radc_ip.RADCIP(myadc)
         myadcip.approx_trans_moments = True
         e,v,p,x = myadcip.kernel(nroots=4)
+<<<<<<< HEAD
+=======
+        myadcip.analyze()
+>>>>>>> master
 
         self.assertAlmostEqual(e[0], 0.4133257511, 6)
         self.assertAlmostEqual(e[1], 0.4978545288, 6)
@@ -93,6 +111,7 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[3], 0.00396362, 6)
 
 
+<<<<<<< HEAD
     def test_ea_adc2_frozen(self):
         myadc_fr.method = "adc(2)"
         e, t_amp1, t_amp2 = myadc_fr.kernel_gs()
@@ -130,6 +149,8 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2], 1.80357389, 6)
         self.assertAlmostEqual(p[3], 0.00393261, 6)
 
+=======
+>>>>>>> master
 if __name__ == "__main__":
     print("Approximate transition moments calculations for different RADC methods for water molecule")
     unittest.main()

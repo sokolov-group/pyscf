@@ -239,7 +239,7 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(ecc, cc_311, 6)
 
     def test_211_n3(self):
-        cell = make_test_cell.test_cell_n3_diffuse()
+        cell = make_test_cell.test_cell_n3_diffuse(precision=1e-9)
         nk = (2, 1, 1)
 
         abs_kpts = cell.make_kpts(nk, wrap_around=True)
@@ -248,7 +248,7 @@ class KnownValues(unittest.TestCase):
         kmf = pbcscf.KGHF(cell, abs_kpts, exxdiv=None)
         kmf.conv_tol = 1e-14
         escf = kmf.scf()
-        self.assertAlmostEqual(escf, -6.1870676561726574, 7)
+        self.assertAlmostEqual(escf, -6.1870676561726574, 6)
 
         # GCCSD calculation
         cc = pbcc.kccsd.CCSD(kmf)
@@ -348,10 +348,10 @@ class KnownValues(unittest.TestCase):
 
     def test_cu_metallic_high_cost(self):
         mesh = 7
-        cell = make_test_cell.test_cell_cu_metallic([mesh]*3)
+        cell = make_test_cell.test_cell_cu_metallic([mesh]*3, precision=1e-9)
         nk = [1,1,2]
 
-        ehf_bench = -52.5393701339723
+        ehf_bench = -52.57191968827088
 
         # KRHF calculation
         kmf = pbcscf.KRHF(cell, exxdiv=None)

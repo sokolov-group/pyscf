@@ -98,6 +98,10 @@ class UniformGrids(lib.StreamObject):
     def weights(self, x):
         self._weights = x
 
+    @property
+    def size(self):
+        return np.prod(self.mesh)
+
     def build(self, cell=None, with_non0tab=False):
         if cell is None:
             cell = self.cell
@@ -113,6 +117,9 @@ class UniformGrids(lib.StreamObject):
     def reset(self, cell=None):
         if cell is not None:
             self.cell = cell
+        self.non0tab = None
+        self._coords = None
+        self._weights = None
         return self
 
     def dump_flags(self, verbose=None):

@@ -58,7 +58,7 @@ def get_veff(ks, cell=None, dm=None, dm_last=0, vhf_last=0, hermi=1,
         raise NotImplementedError
 
     # TODO GKS with multigrid method
-    if isinstance(ks.with_df, multigrid.MultiGridFFTDF):
+    if isinstance(ks._numint, multigrid.MultiGridNumInt):
         raise NotImplementedError
 
     # ndim = 2, dm.shape = (2*nao, 2*nao)
@@ -116,7 +116,7 @@ def get_veff(ks, cell=None, dm=None, dm_last=0, vhf_last=0, hermi=1,
     return vxc
 
 class GKS(rks.KohnShamDFT, pbcghf.GHF):
-    '''GKS class adapted for PBCs at a single k-point.
+    '''GKS class adapted for PBCs at a single k-point (default: gamma point).
 
     This is a literal duplication of the molecular GKS class with some `mol`
     variables replaced by `cell`.
@@ -127,7 +127,7 @@ class GKS(rks.KohnShamDFT, pbcghf.GHF):
     get_veff = get_veff
     energy_elec = mol_ks.energy_elec
 
-    def __init__(self, cell, kpt=numpy.zeros(3), xc='LDA,VWN',
+    def __init__(self, cell, kpt=None, xc='LDA,VWN',
                  exxdiv=getattr(__config__, 'pbc_scf_SCF_exxdiv', 'ewald')):
         pbcghf.GHF.__init__(self, cell, kpt, exxdiv=exxdiv)
         rks.KohnShamDFT.__init__(self, xc)

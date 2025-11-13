@@ -63,6 +63,20 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
                 + adc.method
                 + " transition properties will neglect third-order amplitudes...")
 
+    if adc.approx_trans_moments:
+        if adc.method in ("adc(2)", "adc(2)-x"):
+            logger.warn(
+                adc,
+                "Approximations for transition moments are requested...\n"
+                + adc.method
+                + " transition properties will neglect second-order amplitudes...")
+        else:
+            logger.warn(
+                adc,
+                "Approximations for transition moments are requested...\n"
+                + adc.method
+                + " transition properties will neglect third-order amplitudes...")
+
     imds = adc.get_imds(eris)
     matvec, diag = adc.gen_matvec(imds, eris)
 
@@ -78,12 +92,17 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     conv, adc.E, U = lib.linalg_helper.davidson_nosym1(
         lambda xs : [matvec(x) for x in xs],
         guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_memory=adc.max_memory,
+        guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_memory=adc.max_memory,
         max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual=adc.tol_residual)
 
     adc.U = np.array(U).T.copy()
 
-    if adc.compute_properties:
+    if adc.compute_properties and adc.method_type != "ee":
         adc.P,adc.X = adc.get_properties(nroots)
+    else:
+        adc.P = None
+        adc.X = None
+
     else:
         adc.P = None
         adc.X = None
@@ -96,7 +115,14 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     else:
         spin_mult = "singlet"
 
+    spin_mult = None
+    if adc.method_type in ("ip", "ea"):
+        spin_mult = "doublet"
+    else:
+        spin_mult = "singlet"
+
     header = ("\n*************************************************************"
+              "\n        ADC calculation summary (" + spin_mult + " states only)"
               "\n        ADC calculation summary (" + spin_mult + " states only)"
               "\n*************************************************************")
     logger.info(adc, header)
@@ -104,6 +130,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     for n in range(nroots):
         print_string = ('%s root %d  |  Energy (Eh) = %14.10f  |  Energy (eV) = %12.8f  ' %
                         (adc.method, n, adc.E[n], adc.E[n]*27.2114))
+        if adc.compute_properties and adc.method_type != "ee":
         if adc.compute_properties and adc.method_type != "ee":
             print_string += ("|  Spec. factor = %10.8f  " % adc.P[n])
 
@@ -248,6 +275,8 @@ class RADC(lib.StreamObject):
 
         self.max_space = getattr(__config__, 'adc_radc_RADC_max_space', 12)
         self.max_cycle = getattr(__config__, 'adc_radc_RADC_max_cycle', 50)
+        self.conv_tol = getattr(__config__, 'adc_radc_RADC_conv_tol', 1e-8)
+        self.tol_residual = getattr(__config__, 'adc_radc_RADC_tol_residual', 1e-5)
         self.conv_tol = getattr(__config__, 'adc_radc_RADC_conv_tol', 1e-8)
         self.tol_residual = getattr(__config__, 'adc_radc_RADC_tol_residual', 1e-5)
         self.scf_energy = mf.e_tot
@@ -456,6 +485,9 @@ class RADC(lib.StreamObject):
         elif (self.method_type == "ee"):
             e_exc, v_exc, spec_fac, x, adc_es = self.ee_adc(nroots=nroots, guess=guess, eris=eris)
 
+        elif (self.method_type == "ee"):
+            e_exc, v_exc, spec_fac, x, adc_es = self.ee_adc(nroots=nroots, guess=guess, eris=eris)
+
         elif(self.method_type == "ip"):
             if not isinstance(self.ncvs, type(None)) and self.ncvs > 0:
                 e_exc, v_exc, spec_fac, x, adc_es = self.ip_cvs_adc(
@@ -480,6 +512,12 @@ class RADC(lib.StreamObject):
     def ea_adc(self, nroots=1, guess=None, eris=None):
         from pyscf.adc import radc_ea
         adc_es = radc_ea.RADCEA(self)
+        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
+        return e_exc, v_exc, spec_fac, x, adc_es
+
+    def ee_adc(self, nroots=1, guess=None, eris=None):
+        from pyscf.adc import radc_ee
+        adc_es = radc_ee.RADCEE(self)
         e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris)
         return e_exc, v_exc, spec_fac, x, adc_es
 
