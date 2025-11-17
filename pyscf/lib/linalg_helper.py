@@ -586,12 +586,12 @@ def lanczos_no_sym(aop, x0, precond, tol=1e-12, max_cycle=50, max_space=12,
     if not callable(precond):
         precond = make_diag_precond(precond)
 
-    if callable(x0):  # lazy initialization to reduce memory footprint
+    if callable(x0):
         x0 = x0()
     if isinstance(x0, numpy.ndarray) and x0.ndim == 1:
         x0 = [x0]
     #max_cycle = min(max_cycle, x0[0].size)
-    max_space = max_space + (nroots-1) * 4
+    max_space = max_space + (nroots-1) * 6
     # max_space*2 for holding ax and xs, nroots*2 for holding axt and xt
     _incore = max_memory*1e6/x0[0].nbytes > max_space*2+nroots*3
     lessio = lessio and not _incore
@@ -603,77 +603,46 @@ def lanczos_no_sym(aop, x0, precond, tol=1e-12, max_cycle=50, max_space=12,
     e = None
     v = None
     conv = numpy.zeros(nroots, dtype=bool)
-    emin = None   
+    emin = None
     
-    if heff is None:  # Lazy initialize heff to determine the dtype
-        heff = numpy.empty((max_space,max_space), dtype=dtype)
-    else:
-        heff = numpy.asarray(heff, dtype=dtype)
+    print('this is the function for restricted ref.')
 
     for icyc in range(max_cycle):
-        
-        if fresh_start:
-            if _incore:
-                xs = []
-                ax = []
-            else:
-                xs = _Xlist()
-                ax = _Xlist()
-            space = 0
-# Orthogonalize xt space because the basis of subspace xs must be orthogonal
-# but the eigenvectors x0 might not be strictly orthogonal
-            xt = None
-            print(len(x0))
-            x0len = len(x0)
-            xt = _qr(x0, dot, lindep)[0]
-            if len(xt) != x0len:
-                log.warn('QR decomposition removed %d vectors.', x0len - len(xt))
-                if callable(pick):
-                    log.warn('Check to see if `pick` function %s is providing '
-                             'linear dependent vectors', pick.__name__)
-                if len(xt) == 0:
-                    if icyc == 0:
-                        msg = 'Initial guess is empty or zero'
-                    else:
-                        msg = ('No more linearly independent basis were found. '
-                               'Unless loosen the lindep tolerance (current value '
-                               f'{lindep}), the diagonalization solver is not able '
-                               'to find eigenvectors.')
-                    raise LinearDependenceError(msg)
-            x0 = None
-            max_dx_last = 1e9
-            if SORT_EIG_BY_SIMILARITY:
-                conv = numpy.zeros(nroots, dtype=bool)
-        elif len(xt) > 1:
-            xt = _qr(xt, dot, lindep)[0]
-            xt = xt[:40]  # 40 trial vectors at most
 
-        axt = aop(xt)
-        for k, xi in enumerate(xt):
+        if heff is None:  # Lazy initialize heff to determine the dtype
+            heff = numpy.empty((max_space+nroots,max_space+nroots), dtype=dtype)
+        else:
+            heff = numpy.asarray(heff, dtype=dtype)
+
+        X = _qr(x0, dot, lindep)[0]   # <-- Orthonormal block
+        block_size = len(X)    
+
+        xt = X
+        axt = aop(xt) 
+        xs = []
+        ax = []
+        
+        for k in range(block_size):
             xs.append(xt[k])
             ax.append(axt[k])
-        rnow = len(xt)
-        head, space = space, space+rnow   
-            
-    fill_heff(heff, xs, ax, xt, axt, dot)
-    
-    norm_evecs = []
-    for i in range(nroots):
-        Q = numpy.zeros((nroots, len(x0[i]) ,max_space), dtype = numpy.complex128)
-        Q[i,:,0] = x0[i] / numpy.linalg.norm(x0[i])
-        norm_evecs.append(Q) 
+        
+        fill_heff(heff, xs, ax, xt, axt, dot)
+        
+        norm_evecs = []
+        for i in range(nroots):
+            Q = numpy.zeros((nroots, len(x0[i]) ,max_space), dtype = dtype)
+            Q[i,:,0] = x0[i] / numpy.linalg.norm(x0[i])
+            norm_evecs.append(Q) 
 
-    T = numpy.zeros((nroots, max_space, max_space), dtype = numpy.complex128)
-    
-    for r in range(nroots):
-        for i in range(len(x0)):
-            v = Q[r,i,:].T @ heff @ Q[r,i,:]
-            print(v)
-            T[r, i, i] = v
-            
-    print(T[1])
-            
-            
+        T = numpy.zeros((nroots, max_space, max_space), dtype = dtype)
+        
+        for r in range(nroots):
+            for i in range(len(x0)):
+                v = Q[r,i,:].T @ heff @ Q[r,i,:]
+                print(v)
+                T[r, i, i] = v
+           
+    exit()  
     #for i in range(max_space):
     
     return None
