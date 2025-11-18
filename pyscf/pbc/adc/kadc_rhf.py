@@ -262,38 +262,75 @@ def get_fno_ref(myadc,nroots,ref_state,guess):
     else:
         myadc.rdm1_ss = rdm1_gs
 
-def make_fno(myadc, rdm1_ss, mf, thresh):
+def make_fno(myadc, rdm1_ss, mf, thresh, mode="MIN"):
     from pyscf.mp import mp2
     nocc = mf.mol.nelectron//2
     masks = mo_splitter(myadc)
 
     no_coeff=[]
     no_frozen=[]
-    for kpt in range(myadc.nkpts):
-        n,V = np.linalg.eigh(rdm1_ss[kpt][nocc:,nocc:])
-        idx = np.argsort(n)[::-1]
-        n,V = n[idx], V[:,idx]
-        print(n)
-        T = n > thresh
-        n_fro_vir = np.sum(T == 0)
-        T = np.diag(T)
-        V_trunc = V.dot(T)
-        n_keep = V_trunc.shape[0]-n_fro_vir
+    if mode =="MIN":
+        V = []
+        T = []
 
-        moeoccfrz0, moeocc, moevir, moevirfrz0 = [mf.mo_energy[kpt][m] for m in masks[kpt]]
-        orboccfrz0, orbocc, orbvir, orbvirfrz0 = [mf.mo_coeff[kpt][:,m] for m in masks[kpt]]
-        F_can =  np.diag(moevir)
-        F_na_trunc = V_trunc.T.dot(F_can).dot(V_trunc)
-        _,Z_na_trunc = np.linalg.eigh(F_na_trunc[:n_keep,:n_keep])
-        U_vir_act = orbvir.dot(V_trunc[:,:n_keep]).dot(Z_na_trunc)
-        U_vir_fro = orbvir.dot(V_trunc[:,n_keep:])
-        no_comp = (orboccfrz0,orbocc,U_vir_act,U_vir_fro,orbvirfrz0)
-        no_coeff_k = np.hstack(no_comp)
-        nocc_loc = np.cumsum([0]+[x.shape[1] for x in no_comp]).astype(int)
-        no_frozen_k = np.hstack((np.arange(nocc_loc[0], nocc_loc[1]),
-                                np.arange(nocc_loc[3], nocc_loc[5]))).astype(int)
-        no_coeff.append(no_coeff_k)
-        no_frozen.append(no_frozen_k)
+        for kpt in range(myadc.nkpts):
+            n,V_k = np.linalg.eigh(rdm1_ss[kpt][nocc:,nocc:])
+            idx = np.argsort(n)[::-1]
+            n,V_k = n[idx], V_k[:,idx]
+            T_k = n > thresh
+            V.append(V_k)
+            T.append(T_k)
+
+        T_min = np.stack(T)
+        T_min = np.logical_or.reduce(T_min,axis=0)
+        n_fro_vir = np.sum(T_min == 0)
+        T_min = np.diag(T_min)
+
+        for kpt in range(myadc.nkpts):
+            V_trunc = V[kpt].dot(T_min)
+            n_keep = V_trunc.shape[0]-n_fro_vir
+
+            moeoccfrz0, moeocc, moevir, moevirfrz0 = [mf.mo_energy[kpt][m] for m in masks[kpt]]
+            orboccfrz0, orbocc, orbvir, orbvirfrz0 = [mf.mo_coeff[kpt][:,m] for m in masks[kpt]]
+            F_can =  np.diag(moevir)
+            F_na_trunc = V_trunc.T.dot(F_can).dot(V_trunc)
+            _,Z_na_trunc = np.linalg.eigh(F_na_trunc[:n_keep,:n_keep])
+            U_vir_act = orbvir.dot(V_trunc[:,:n_keep]).dot(Z_na_trunc)
+            U_vir_fro = orbvir.dot(V_trunc[:,n_keep:])
+            no_comp = (orboccfrz0,orbocc,U_vir_act,U_vir_fro,orbvirfrz0)
+            no_coeff_k = np.hstack(no_comp)
+            nocc_loc = np.cumsum([0]+[x.shape[1] for x in no_comp]).astype(int)
+            no_frozen_k = np.hstack((np.arange(nocc_loc[0], nocc_loc[1]),
+                                    np.arange(nocc_loc[3], nocc_loc[5]))).astype(int)
+            no_coeff.append(no_coeff_k)
+            no_frozen.append(no_frozen_k)
+
+    else:
+        for kpt in range(myadc.nkpts):
+            n,V = np.linalg.eigh(rdm1_ss[kpt][nocc:,nocc:])
+            idx = np.argsort(n)[::-1]
+            n,V = n[idx], V[:,idx]
+            print(n)
+            T = n > thresh
+            n_fro_vir = np.sum(T == 0)
+            T = np.diag(T)
+            V_trunc = V.dot(T)
+            n_keep = V_trunc.shape[0]-n_fro_vir
+
+            moeoccfrz0, moeocc, moevir, moevirfrz0 = [mf.mo_energy[kpt][m] for m in masks[kpt]]
+            orboccfrz0, orbocc, orbvir, orbvirfrz0 = [mf.mo_coeff[kpt][:,m] for m in masks[kpt]]
+            F_can =  np.diag(moevir)
+            F_na_trunc = V_trunc.T.dot(F_can).dot(V_trunc)
+            _,Z_na_trunc = np.linalg.eigh(F_na_trunc[:n_keep,:n_keep])
+            U_vir_act = orbvir.dot(V_trunc[:,:n_keep]).dot(Z_na_trunc).astype(np.float64)
+            U_vir_fro = orbvir.dot(V_trunc[:,n_keep:]).astype(np.float64)
+            no_comp = (orboccfrz0,orbocc,U_vir_act,U_vir_fro,orbvirfrz0)
+            no_coeff_k = np.hstack(no_comp)
+            nocc_loc = np.cumsum([0]+[x.shape[1] for x in no_comp]).astype(int)
+            no_frozen_k = np.hstack((np.arange(nocc_loc[0], nocc_loc[1]),
+                                    np.arange(nocc_loc[3], nocc_loc[5]))).astype(int)
+            no_coeff.append(no_coeff_k)
+            no_frozen.append(no_frozen_k)
     return no_coeff,no_frozen
 
 
@@ -569,7 +606,7 @@ class RFNOADC(RADC):
             self.if_naf = False
         elif isinstance(ref_state, int) and 0<ref_state<=nroots:
             print(f"Do ss-fno kadc calculation, the specic state is {ref_state}")
-            if self.with_df is None:
+            if self.with_df is None and self._scf.with_df is None:
                 self.if_naf = False
         else:
             raise ValueError("ref_state should be an int type and in (0,nroots]")
