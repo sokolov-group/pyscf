@@ -2273,6 +2273,693 @@ def compute_dyson_mo(myadc):
     return dyson_mo
 
 
+def make_rdm1(adc):
+
+    cput0 = (logger.process_clock(), logger.perf_counter())
+    log = logger.Logger(adc.stdout, adc.verbose)
+
+    U = adc.U
+
+    list_rdm1_a = []
+    list_rdm1_b = []
+
+    for i in range(U.shape[1]):
+        rdm1_a, rdm1_b = make_rdm1_eigenvectors(adc, U[:,i], U[:,i])
+        list_rdm1_a.append(rdm1_a)
+        list_rdm1_b.append(rdm1_b)
+
+    cput0 = log.timer_debug1("completed OPDM calculation", *cput0)
+    return (list_rdm1_a, list_rdm1_b)
+
+
+def make_rdm1_eigenvectors(adc, L, R):
+
+    L = np.array(L).ravel()
+    R = np.array(R).ravel()
+
+    nocc_a = adc.nocc_a
+    nocc_b = adc.nocc_b
+    nvir_a = adc.nvir_a
+    nvir_b = adc.nvir_b
+    nmo_a = nocc_a + nvir_a
+    nmo_b = nocc_b + nvir_b
+    ncvs = adc.ncvs
+    nval_a = nocc_a - ncvs
+    nval_b = nocc_b - ncvs
+
+    ij_ind_ncvs = np.tril_indices(ncvs, k=-1)
+
+    n_singles_a = ncvs
+    n_singles_b = ncvs
+    n_doubles_aaa_ecc = nvir_a * ncvs * (ncvs - 1) // 2
+    n_doubles_aaa_ecv = nvir_a * ncvs * nval_a
+    n_doubles_bba_ecc = nvir_b * ncvs * ncvs
+    n_doubles_bba_ecv = nvir_b * ncvs * nval_a
+    n_doubles_bba_evc = nvir_b * nval_b * ncvs
+    n_doubles_aab_ecc = nvir_a * ncvs * ncvs
+    n_doubles_aab_ecv = nvir_a * ncvs * nval_b
+    n_doubles_aab_evc = nvir_a * nval_a * ncvs
+    n_doubles_bbb_ecc = nvir_b * ncvs * (ncvs - 1) // 2
+    n_doubles_bbb_ecv = nvir_b * ncvs * nval_b
+
+    s_a = 0
+    f_a = n_singles_a
+    s_b = f_a
+    f_b = s_b + n_singles_b
+    s_aaa_ecc = f_b
+    f_aaa_ecc = s_aaa_ecc + n_doubles_aaa_ecc
+    s_aaa_ecv = f_aaa_ecc
+    f_aaa_ecv = s_aaa_ecv + n_doubles_aaa_ecv
+    s_bba_ecc = f_aaa_ecv
+    f_bba_ecc = s_bba_ecc + n_doubles_bba_ecc
+    s_bba_ecv = f_bba_ecc
+    f_bba_ecv = s_bba_ecv + n_doubles_bba_ecv
+    s_bba_evc = f_bba_ecv
+    f_bba_evc = s_bba_evc + n_doubles_bba_evc
+    s_aab_ecc = f_bba_evc
+    f_aab_ecc = s_aab_ecc + n_doubles_aab_ecc
+    s_aab_ecv = f_aab_ecc
+    f_aab_ecv = s_aab_ecv + n_doubles_aab_ecv
+    s_aab_evc = f_aab_ecv
+    f_aab_evc = s_aab_evc + n_doubles_aab_evc
+    s_bbb_ecc = f_aab_evc
+    f_bbb_ecc = s_bbb_ecc + n_doubles_bbb_ecc
+    s_bbb_ecv = f_bbb_ecc
+    f_bbb_ecv = s_bbb_ecv + n_doubles_bbb_ecv
+
+    t2_1_a = adc.t2[0][0][:]
+    t2_1_ab = adc.t2[0][1][:]
+    t2_1_b = adc.t2[0][2][:]
+    if (adc.approx_trans_moments is False or adc.method == "adc(3)"):
+        t1_2_a = adc.t1[0][0][:]
+        t1_2_b = adc.t1[0][1][:]
+        t1_2_a_xe = t1_2_a[:ncvs,:].copy()
+        t1_2_b_xe = t1_2_b[:ncvs,:].copy()
+        t1_2_a_ve = t1_2_a[ncvs:nocc_a,:].copy()
+        t1_2_b_ve = t1_2_b[ncvs:nocc_b,:].copy()
+    else:
+        t1_2_a_xe = np.zeros((ncvs,nvir_a))
+        t1_2_b_xe = np.zeros((ncvs,nvir_b))
+        t1_2_a_ve = np.zeros((nval_a,nvir_a))
+        t1_2_b_ve = np.zeros((nval_b,nvir_b))
+
+    t2_1_a_xxee = t2_1_a[:ncvs,:ncvs,:,:].copy()
+    t2_1_b_xxee = t2_1_b[:ncvs,:ncvs,:,:].copy()
+    t2_1_ab_xxee = t2_1_ab[:ncvs,:ncvs,:,:].copy()
+    t2_1_a_xvee = t2_1_a[:ncvs,ncvs:nocc_a,:,:].copy()
+    t2_1_b_xvee = t2_1_b[:ncvs,ncvs:nocc_b,:,:].copy()
+    t2_1_ab_xvee = t2_1_ab[:ncvs,ncvs:nocc_b,:,:].copy()
+    t2_1_a_vxee = t2_1_a[ncvs:nocc_a,:ncvs,:,:].copy()
+    t2_1_b_vxee = t2_1_b[ncvs:nocc_b,:ncvs,:,:].copy()
+    t2_1_ab_vxee = t2_1_ab[ncvs:nocc_a,:ncvs,:,:].copy()
+    t2_1_a_vvee = t2_1_a[ncvs:nocc_a,ncvs:nocc_a,:,:].copy()
+    t2_1_b_vvee = t2_1_b[ncvs:nocc_b,ncvs:nocc_b,:,:].copy()
+    t2_1_ab_vvee = t2_1_ab[ncvs:nocc_a,ncvs:nocc_b,:,:].copy()
+
+    einsum = lib.einsum
+
+    rdm1_a  = np.zeros((nmo_a,nmo_a))
+    rdm1_b  = np.zeros((nmo_b,nmo_b))
+
+    L_a = L[s_a:f_a]
+    L_b = L[s_b:f_b]
+    L_aaa_ecc = L[s_aaa_ecc:f_aaa_ecc].reshape(nvir_a,-1)
+    L_aaa_ecv = L[s_aaa_ecv:f_aaa_ecv].reshape(nvir_a,ncvs,nval_a)
+    L_bba_ecc = L[s_bba_ecc:f_bba_ecc].reshape(nvir_b,ncvs,ncvs)
+    L_bba_ecv = L[s_bba_ecv:f_bba_ecv].reshape(nvir_b,ncvs,nval_a)
+    L_bba_evc = L[s_bba_evc:f_bba_evc].reshape(nvir_b,nval_b,ncvs)
+    L_aab_ecc = L[s_aab_ecc:f_aab_ecc].reshape(nvir_a,ncvs,ncvs)
+    L_aab_ecv = L[s_aab_ecv:f_aab_ecv].reshape(nvir_a,ncvs,nval_b)
+    L_aab_evc = L[s_aab_evc:f_aab_evc].reshape(nvir_a,nval_a,ncvs)
+    L_bbb_ecc = L[s_bbb_ecc:f_bbb_ecc].reshape(nvir_b,-1)
+    L_bbb_ecv = L[s_bbb_ecv:f_bbb_ecv].reshape(nvir_b,ncvs,nval_b)
+
+    L_aaa_ecc_u = np.zeros((nvir_a,ncvs,ncvs))
+    L_aaa_ecc_u[:,ij_ind_ncvs[0],ij_ind_ncvs[1]]= L_aaa_ecc.copy()
+    L_aaa_ecc_u[:,ij_ind_ncvs[1],ij_ind_ncvs[0]]= -L_aaa_ecc.copy()
+
+    L_bbb_ecc_u = np.zeros((nvir_b,ncvs,ncvs))
+    L_bbb_ecc_u[:,ij_ind_ncvs[0],ij_ind_ncvs[1]]= L_bbb_ecc.copy()
+    L_bbb_ecc_u[:,ij_ind_ncvs[1],ij_ind_ncvs[0]]= -L_bbb_ecc.copy()
+
+    R_a = R[s_a:f_a]
+    R_b = R[s_b:f_b]
+    R_aaa_ecc = R[s_aaa_ecc:f_aaa_ecc].reshape(nvir_a,-1)
+    R_aaa_ecv = R[s_aaa_ecv:f_aaa_ecv].reshape(nvir_a,ncvs,nval_a)
+    R_bba_ecc = R[s_bba_ecc:f_bba_ecc].reshape(nvir_b,ncvs,ncvs)
+    R_bba_ecv = R[s_bba_ecv:f_bba_ecv].reshape(nvir_b,ncvs,nval_a)
+    R_bba_evc = R[s_bba_evc:f_bba_evc].reshape(nvir_b,nval_b,ncvs)
+    R_aab_ecc = R[s_aab_ecc:f_aab_ecc].reshape(nvir_a,ncvs,ncvs)
+    R_aab_ecv = R[s_aab_ecv:f_aab_ecv].reshape(nvir_a,ncvs,nval_b)
+    R_aab_evc = R[s_aab_evc:f_aab_evc].reshape(nvir_a,nval_a,ncvs)
+    R_bbb_ecc = R[s_bbb_ecc:f_bbb_ecc].reshape(nvir_b,-1)
+    R_bbb_ecv = R[s_bbb_ecv:f_bbb_ecv].reshape(nvir_b,ncvs,nval_b)
+
+    R_aaa_ecc_u = np.zeros((nvir_a,ncvs,ncvs))
+    R_aaa_ecc_u[:,ij_ind_ncvs[0],ij_ind_ncvs[1]]= R_aaa_ecc.copy()
+    R_aaa_ecc_u[:,ij_ind_ncvs[1],ij_ind_ncvs[0]]= -R_aaa_ecc.copy()
+
+    R_bbb_ecc_u = np.zeros((nvir_b,ncvs,ncvs))
+    R_bbb_ecc_u[:,ij_ind_ncvs[0],ij_ind_ncvs[1]]= R_bbb_ecc.copy()
+    R_bbb_ecc_u[:,ij_ind_ncvs[1],ij_ind_ncvs[0]]= -R_bbb_ecc.copy()
+
+    einsum_type = True
+
+########### block- ij
+    rdm1_a[:ncvs, :ncvs] =- einsum('J,I->IJ', L_a, R_a, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += einsum('i,i,IJ->IJ', L_a, R_a, np.identity(ncvs), optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += einsum('i,i,IJ->IJ', L_b, R_b, np.identity(ncvs), optimize = einsum_type)
+
+    rdm1_b[:ncvs, :ncvs] =- einsum('J,I->IJ', L_b, R_b, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += einsum('i,i,IJ->IJ', L_a, R_a, np.identity(ncvs), optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += einsum('i,i,IJ->IJ', L_b, R_b, np.identity(ncvs), optimize = einsum_type)
+
+    rdm1_a[:ncvs, :ncvs] += 1/4 * einsum('J,i,ijab,Ijab->IJ', L_a, R_a, t2_1_a_xxee,
+                                         t2_1_a_xxee, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += 1/8 * einsum('J,i,ijab,Ijab->IJ', L_a, R_a, t2_1_a_xvee,
+                                         t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] -= 1/8 * einsum('J,i,ijab,Ijba->IJ', L_a, R_a, t2_1_a_xvee,
+                                         t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += 1/4 * einsum('i,I,ijab,Jjab->IJ', L_a, R_a, t2_1_a_xxee,
+                                         t2_1_a_xxee, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += 1/8 * einsum('i,I,ijab,Jjab->IJ', L_a, R_a, t2_1_a_xvee,
+                                         t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] -= 1/8 * einsum('i,I,ijab,Jjba->IJ', L_a, R_a, t2_1_a_xvee,
+                                         t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] -= 1/2 * einsum('i,i,Ijab,Jjab->IJ', L_a, R_a, t2_1_a_xxee,
+                                         t2_1_a_xxee, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] -= 1/4 * einsum('i,i,Ijab,Jjab->IJ', L_a, R_a, t2_1_a_xvee,
+                                         t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += 1/4 * einsum('i,i,Ijab,Jjba->IJ', L_a, R_a, t2_1_a_xvee,
+                                         t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += 1/2 * einsum('i,j,Iiab,Jjab->IJ', L_a, R_a, t2_1_a_xxee,
+                                         t2_1_a_xxee, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += 1/2 * einsum('J,i,ijab,Ijab->IJ', L_a, R_a, t2_1_ab_xxee,
+                                         t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += 1/2 * einsum('J,i,ijab,Ijab->IJ', L_a, R_a, t2_1_ab_xvee,
+                                         t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += 1/2 * einsum('i,I,ijab,Jjab->IJ', L_a, R_a, t2_1_ab_xxee,
+                                         t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += 1/2 * einsum('i,I,ijab,Jjab->IJ', L_a, R_a, t2_1_ab_xvee,
+                                         t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] -= einsum('i,i,Ijab,Jjab->IJ', L_a, R_a, t2_1_ab_xxee, t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] -= einsum('i,i,Ijab,Jjab->IJ', L_a, R_a, t2_1_ab_xvee, t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] -= 1/2 * einsum('i,i,Ijab,Jjab->IJ', L_b, R_b, t2_1_a_xxee,
+                                         t2_1_a_xxee, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] -= 1/4 * einsum('i,i,Ijab,Jjab->IJ', L_b, R_b, t2_1_a_xvee,
+                                         t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += 1/4 * einsum('i,i,Ijab,Jjba->IJ', L_b, R_b, t2_1_a_xvee,
+                                         t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] -= einsum('i,i,Ijab,Jjab->IJ', L_b, R_b, t2_1_ab_xxee, t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] -= einsum('i,i,Ijab,Jjab->IJ', L_b, R_b, t2_1_ab_xvee, t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += einsum('i,j,Iiab,Jjab->IJ', L_b, R_b, t2_1_ab_xxee, t2_1_ab_xxee, optimize = einsum_type)
+
+    rdm1_b[:ncvs, :ncvs] -= einsum('i,i,jIab,jJab->IJ', L_a, R_a, t2_1_ab_xxee, t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] -= einsum('i,i,jIab,jJab->IJ', L_a, R_a, t2_1_ab_vxee, t2_1_ab_vxee, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += einsum('i,j,iIab,jJab->IJ', L_a, R_a, t2_1_ab_xxee, t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] -= 1/2 * einsum('i,i,Ijab,Jjab->IJ', L_a, R_a, t2_1_b_xxee,
+                                         t2_1_b_xxee, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] -= 1/4 * einsum('i,i,Ijab,Jjab->IJ', L_a, R_a, t2_1_b_xvee,
+                                         t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += 1/4 * einsum('i,i,Ijab,Jjba->IJ', L_a, R_a, t2_1_b_xvee,
+                                         t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += 1/2 * einsum('J,i,jiab,jIab->IJ', L_b, R_b, t2_1_ab_xxee,
+                                         t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += 1/2 * einsum('J,i,jiab,jIab->IJ', L_b, R_b, t2_1_ab_vxee,
+                                         t2_1_ab_vxee, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += 1/2 * einsum('i,I,jiab,jJab->IJ', L_b, R_b, t2_1_ab_xxee,
+                                         t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += 1/2 * einsum('i,I,jiab,jJab->IJ', L_b, R_b, t2_1_ab_vxee,
+                                         t2_1_ab_vxee, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] -= einsum('i,i,jIab,jJab->IJ', L_b, R_b, t2_1_ab_xxee, t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] -= einsum('i,i,jIab,jJab->IJ', L_b, R_b, t2_1_ab_vxee, t2_1_ab_vxee, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += 1/4 * einsum('J,i,ijab,Ijab->IJ', L_b, R_b, t2_1_b_xxee,
+                                         t2_1_b_xxee, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += 1/8 * einsum('J,i,ijab,Ijab->IJ', L_b, R_b, t2_1_b_xvee,
+                                         t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] -= 1/8 * einsum('J,i,ijab,Ijba->IJ', L_b, R_b, t2_1_b_xvee,
+                                         t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += 1/4 * einsum('i,I,ijab,Jjab->IJ', L_b, R_b, t2_1_b_xxee,
+                                         t2_1_b_xxee, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += 1/8 * einsum('i,I,ijab,Jjab->IJ', L_b, R_b, t2_1_b_xvee,
+                                         t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] -= 1/8 * einsum('i,I,ijab,Jjba->IJ', L_b, R_b, t2_1_b_xvee,
+                                         t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] -= 1/2 * einsum('i,i,Ijab,Jjab->IJ', L_b, R_b, t2_1_b_xxee,
+                                         t2_1_b_xxee, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] -= 1/4 * einsum('i,i,Ijab,Jjab->IJ', L_b, R_b, t2_1_b_xvee,
+                                         t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += 1/4 * einsum('i,i,Ijab,Jjba->IJ', L_b, R_b, t2_1_b_xvee,
+                                         t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += 1/2 * einsum('i,j,Iiab,Jjab->IJ', L_b, R_b, t2_1_b_xxee,
+                                         t2_1_b_xxee, optimize = einsum_type)
+
+    rdm1_a[:ncvs, :ncvs] -= einsum('aJi,aIi->IJ', L_aaa_ecc_u, R_aaa_ecc_u, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] -= einsum('aJi,aIi->IJ', L_aaa_ecv, R_aaa_ecv, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] -= einsum('aJi,aIi->IJ', L_aab_ecc, R_aab_ecc, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] -= einsum('aJi,aIi->IJ', L_aab_ecv, R_aab_ecv, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] -= einsum('aiJ,aiI->IJ', L_bba_ecc, R_bba_ecc, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] -= einsum('aiJ,aiI->IJ', L_bba_evc, R_bba_evc, optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += 1/2 * einsum('aij,aij,IJ->IJ', L_aaa_ecc_u, R_aaa_ecc_u,
+                                         np.identity(ncvs), optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += einsum('aij,aij,IJ->IJ', L_aaa_ecv, R_aaa_ecv, np.identity(ncvs), optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += einsum('aij,aij,IJ->IJ', L_aab_ecc, R_aab_ecc, np.identity(ncvs), optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += einsum('aij,aij,IJ->IJ', L_aab_ecv, R_aab_ecv, np.identity(ncvs), optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += einsum('aij,aij,IJ->IJ', L_aab_evc, R_aab_evc, np.identity(ncvs), optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += einsum('aij,aij,IJ->IJ', L_bba_ecc, R_bba_ecc, np.identity(ncvs), optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += einsum('aij,aij,IJ->IJ', L_bba_ecv, R_bba_ecv, np.identity(ncvs), optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += einsum('aij,aij,IJ->IJ', L_bba_evc, R_bba_evc, np.identity(ncvs), optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += 1/2 * einsum('aij,aij,IJ->IJ', L_bbb_ecc_u, R_bbb_ecc_u,
+                                         np.identity(ncvs), optimize = einsum_type)
+    rdm1_a[:ncvs, :ncvs] += einsum('aij,aij,IJ->IJ', L_bbb_ecv, R_bbb_ecv, np.identity(ncvs), optimize = einsum_type)
+
+    rdm1_b[:ncvs, :ncvs] -= einsum('aiJ,aiI->IJ', L_aab_ecc, R_aab_ecc, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] -= einsum('aiJ,aiI->IJ', L_aab_evc, R_aab_evc, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] -= einsum('aJi,aIi->IJ', L_bba_ecc, R_bba_ecc, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] -= einsum('aJi,aIi->IJ', L_bba_ecv, R_bba_ecv, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] -= einsum('aJi,aIi->IJ', L_bbb_ecc_u, R_bbb_ecc_u, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] -= einsum('aJi,aIi->IJ', L_bbb_ecv, R_bbb_ecv, optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += 1/2 * einsum('aij,aij,IJ->IJ', L_aaa_ecc_u, R_aaa_ecc_u,
+                                         np.identity(ncvs), optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += einsum('aij,aij,IJ->IJ', L_aaa_ecv, R_aaa_ecv, np.identity(ncvs), optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += einsum('aij,aij,IJ->IJ', L_aab_ecc, R_aab_ecc, np.identity(ncvs), optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += einsum('aij,aij,IJ->IJ', L_aab_ecv, R_aab_ecv, np.identity(ncvs), optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += einsum('aij,aij,IJ->IJ', L_aab_evc, R_aab_evc, np.identity(ncvs), optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += einsum('aij,aij,IJ->IJ', L_bba_ecc, R_bba_ecc, np.identity(ncvs), optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += einsum('aij,aij,IJ->IJ', L_bba_ecv, R_bba_ecv, np.identity(ncvs), optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += einsum('aij,aij,IJ->IJ', L_bba_evc, R_bba_evc, np.identity(ncvs), optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += 1/2 * einsum('aij,aij,IJ->IJ', L_bbb_ecc_u, R_bbb_ecc_u,
+                                         np.identity(ncvs), optimize = einsum_type)
+    rdm1_b[:ncvs, :ncvs] += einsum('aij,aij,IJ->IJ', L_bbb_ecv, R_bbb_ecv, np.identity(ncvs), optimize = einsum_type)
+
+########### block- kl
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a]  = einsum('i,i,KL->KL', L_a, R_a, np.identity(nval_a), optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] += einsum('i,i,KL->KL', L_b, R_b, np.identity(nval_a), optimize = einsum_type)
+
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] -= 1/2 * \
+        einsum('i,i,Kjab,Ljab->KL', L_a, R_a, t2_1_a_vvee, t2_1_a_vvee, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] -= 1/4 * \
+        einsum('i,i,jKab,jLab->KL', L_a, R_a, t2_1_a_xvee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] += 1/4 * \
+        einsum('i,i,jKab,jLba->KL', L_a, R_a, t2_1_a_xvee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] += 1/4 * \
+        einsum('i,j,iKab,jLab->KL', L_a, R_a, t2_1_a_xvee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] -= 1/4 * \
+        einsum('i,j,iKab,jLba->KL', L_a, R_a, t2_1_a_xvee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] -= einsum('i,i,Kjab,Ljab->KL', L_a, R_a,
+                                               t2_1_ab_vxee, t2_1_ab_vxee, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] -= einsum('i,i,Kjab,Ljab->KL', L_a, R_a,
+                                               t2_1_ab_vvee, t2_1_ab_vvee, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] -= 1/2 * \
+        einsum('i,i,Kjab,Ljab->KL', L_b, R_b, t2_1_a_vvee, t2_1_a_vvee, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] -= 1/4 * \
+        einsum('i,i,jKab,jLab->KL', L_b, R_b, t2_1_a_xvee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] += 1/4 * \
+        einsum('i,i,jKab,jLba->KL', L_b, R_b, t2_1_a_xvee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] -= einsum('i,i,Kjab,Ljab->KL', L_b, R_b,
+                                               t2_1_ab_vxee, t2_1_ab_vxee, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] -= einsum('i,i,Kjab,Ljab->KL', L_b, R_b,
+                                               t2_1_ab_vvee, t2_1_ab_vvee, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] += einsum('i,j,Kiab,Ljab->KL', L_b, R_b,
+                                               t2_1_ab_vxee, t2_1_ab_vxee, optimize = einsum_type)
+
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b]  = einsum('i,i,KL->KL', L_a, R_a, np.identity(nval_b), optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] += einsum('i,i,KL->KL', L_b, R_b, np.identity(nval_b), optimize = einsum_type)
+
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] -= einsum('i,i,jKab,jLab->KL', L_a, R_a,
+                                               t2_1_ab_xvee, t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] -= einsum('i,i,jKab,jLab->KL', L_a, R_a,
+                                               t2_1_ab_vvee, t2_1_ab_vvee, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] += einsum('i,j,iKab,jLab->KL', L_a, R_a,
+                                               t2_1_ab_xvee, t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] -= 1/2 * \
+        einsum('i,i,Kjab,Ljab->KL', L_a, R_a, t2_1_b_vvee, t2_1_b_vvee, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] -= 1/4 * \
+        einsum('i,i,jKab,jLab->KL', L_a, R_a, t2_1_b_xvee, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] += 1/4 * \
+        einsum('i,i,jKab,jLba->KL', L_a, R_a, t2_1_b_xvee, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] -= einsum('i,i,jKab,jLab->KL', L_b, R_b,
+                                               t2_1_ab_xvee, t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] -= einsum('i,i,jKab,jLab->KL', L_b, R_b,
+                                               t2_1_ab_vvee, t2_1_ab_vvee, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] -= 1/2 * \
+        einsum('i,i,Kjab,Ljab->KL', L_b, R_b, t2_1_b_vvee, t2_1_b_vvee, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] -= 1/4 * \
+        einsum('i,i,jKab,jLab->KL', L_b, R_b, t2_1_b_xvee, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] += 1/4 * \
+        einsum('i,i,jKab,jLba->KL', L_b, R_b, t2_1_b_xvee, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] += 1/4 * \
+        einsum('i,j,iKab,jLab->KL', L_b, R_b, t2_1_b_xvee, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] -= 1/4 * \
+        einsum('i,j,iKab,jLba->KL', L_b, R_b, t2_1_b_xvee, t2_1_b_xvee, optimize = einsum_type)
+
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] -= einsum('aiL,aiK->KL', L_aaa_ecv, R_aaa_ecv, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] -= einsum('aLi,aKi->KL', L_aab_evc, R_aab_evc, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] -= einsum('aiL,aiK->KL', L_bba_ecv, R_bba_ecv, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] += 1/2 * \
+        einsum('aij,aij,KL->KL', L_aaa_ecc_u, R_aaa_ecc_u, np.identity(nval_a), optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] += einsum('aij,aij,KL->KL', L_aaa_ecv,
+                                               R_aaa_ecv, np.identity(nval_a), optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] += einsum('aij,aij,KL->KL', L_aab_ecc,
+                                               R_aab_ecc, np.identity(nval_a), optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] += einsum('aij,aij,KL->KL', L_aab_ecv,
+                                               R_aab_ecv, np.identity(nval_a), optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] += einsum('aij,aij,KL->KL', L_aab_evc,
+                                               R_aab_evc, np.identity(nval_a), optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] += einsum('aij,aij,KL->KL', L_bba_ecc,
+                                               R_bba_ecc, np.identity(nval_a), optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] += einsum('aij,aij,KL->KL', L_bba_ecv,
+                                               R_bba_ecv, np.identity(nval_a), optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] += einsum('aij,aij,KL->KL', L_bba_evc,
+                                               R_bba_evc, np.identity(nval_a), optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] += 1/2 * \
+        einsum('aij,aij,KL->KL', L_bbb_ecc_u, R_bbb_ecc_u, np.identity(nval_a), optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, ncvs:nocc_a] += einsum('aij,aij,KL->KL', L_bbb_ecv,
+                                               R_bbb_ecv, np.identity(nval_a), optimize = einsum_type)
+
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] -= einsum('aiL,aiK->KL', L_aab_ecv, R_aab_ecv, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] -= einsum('aLi,aKi->KL', L_bba_evc, R_bba_evc, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] -= einsum('aiL,aiK->KL', L_bbb_ecv, R_bbb_ecv, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] += 1/2 * \
+        einsum('aij,aij,KL->KL', L_aaa_ecc_u, R_aaa_ecc_u, np.identity(nval_b), optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] += einsum('aij,aij,KL->KL', L_aaa_ecv,
+                                               R_aaa_ecv, np.identity(nval_b), optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] += einsum('aij,aij,KL->KL', L_aab_ecc,
+                                               R_aab_ecc, np.identity(nval_b), optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] += einsum('aij,aij,KL->KL', L_aab_ecv,
+                                               R_aab_ecv, np.identity(nval_b), optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] += einsum('aij,aij,KL->KL', L_aab_evc,
+                                               R_aab_evc, np.identity(nval_b), optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] += einsum('aij,aij,KL->KL', L_bba_ecc,
+                                               R_bba_ecc, np.identity(nval_b), optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] += einsum('aij,aij,KL->KL', L_bba_ecv,
+                                               R_bba_ecv, np.identity(nval_b), optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] += einsum('aij,aij,KL->KL', L_bba_evc,
+                                               R_bba_evc, np.identity(nval_b), optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] += 1/2 * \
+        einsum('aij,aij,KL->KL', L_bbb_ecc_u, R_bbb_ecc_u, np.identity(nval_b), optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, ncvs:nocc_b] += einsum('aij,aij,KL->KL', L_bbb_ecv,
+                                               R_bbb_ecv, np.identity(nval_b), optimize = einsum_type)
+
+########### block- ik
+    rdm1_a[:ncvs, ncvs:nocc_a] =- 1/4 * einsum('i,I,ijab,jKab->IK', L_a, R_a,
+                                               t2_1_a_xxee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, ncvs:nocc_a] += 1/4 * einsum('i,I,ijab,Kjab->IK', L_a, R_a,
+                                               t2_1_a_xvee, t2_1_a_vvee, optimize = einsum_type)
+    rdm1_a[:ncvs, ncvs:nocc_a] += 1/2 * einsum('i,i,Ijab,jKab->IK', L_a, R_a,
+                                               t2_1_a_xxee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, ncvs:nocc_a] -= 1/2 * einsum('i,i,Ijab,Kjab->IK', L_a, R_a,
+                                               t2_1_a_xvee, t2_1_a_vvee, optimize = einsum_type)
+    rdm1_a[:ncvs, ncvs:nocc_a] -= 1/2 * einsum('i,j,Iiab,jKab->IK', L_a, R_a,
+                                               t2_1_a_xxee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, ncvs:nocc_a] += 1/2 * einsum('i,I,ijab,Kjab->IK', L_a, R_a,
+                                               t2_1_ab_xxee, t2_1_ab_vxee, optimize = einsum_type)
+    rdm1_a[:ncvs, ncvs:nocc_a] += 1/2 * einsum('i,I,ijab,Kjab->IK', L_a, R_a,
+                                               t2_1_ab_xvee, t2_1_ab_vvee, optimize = einsum_type)
+    rdm1_a[:ncvs, ncvs:nocc_a] -= einsum('i,i,Ijab,Kjab->IK', L_a, R_a, t2_1_ab_xxee,
+                                         t2_1_ab_vxee, optimize = einsum_type)
+    rdm1_a[:ncvs, ncvs:nocc_a] -= einsum('i,i,Ijab,Kjab->IK', L_a, R_a, t2_1_ab_xvee,
+                                         t2_1_ab_vvee, optimize = einsum_type)
+    rdm1_a[:ncvs, ncvs:nocc_a] += 1/2 * einsum('i,i,Ijab,jKab->IK', L_b, R_b,
+                                               t2_1_a_xxee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, ncvs:nocc_a] -= 1/2 * einsum('i,i,Ijab,Kjab->IK', L_b, R_b,
+                                               t2_1_a_xvee, t2_1_a_vvee, optimize = einsum_type)
+    rdm1_a[:ncvs, ncvs:nocc_a] -= einsum('i,i,Ijab,Kjab->IK', L_b, R_b, t2_1_ab_xxee,
+                                         t2_1_ab_vxee, optimize = einsum_type)
+    rdm1_a[:ncvs, ncvs:nocc_a] -= einsum('i,i,Ijab,Kjab->IK', L_b, R_b, t2_1_ab_xvee,
+                                         t2_1_ab_vvee, optimize = einsum_type)
+    rdm1_a[:ncvs, ncvs:nocc_a] += einsum('i,j,Iiab,Kjab->IK', L_b, R_b, t2_1_ab_xxee,
+                                         t2_1_ab_vxee, optimize = einsum_type)
+
+    rdm1_b[:ncvs, ncvs:nocc_b] =- einsum('i,i,jIab,jKab->IK', L_a, R_a, t2_1_ab_xxee,
+                                         t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_b[:ncvs, ncvs:nocc_b] -= einsum('i,i,jIab,jKab->IK', L_a, R_a, t2_1_ab_vxee,
+                                         t2_1_ab_vvee, optimize = einsum_type)
+    rdm1_b[:ncvs, ncvs:nocc_b] += einsum('i,j,iIab,jKab->IK', L_a, R_a, t2_1_ab_xxee,
+                                         t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_b[:ncvs, ncvs:nocc_b] += 1/2 * einsum('i,i,Ijab,jKab->IK', L_a, R_a,
+                                               t2_1_b_xxee, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[:ncvs, ncvs:nocc_b] -= 1/2 * einsum('i,i,Ijab,Kjab->IK', L_a, R_a,
+                                               t2_1_b_xvee, t2_1_b_vvee, optimize = einsum_type)
+    rdm1_b[:ncvs, ncvs:nocc_b] += 1/2 * einsum('i,I,jiab,jKab->IK', L_b, R_b,
+                                               t2_1_ab_xxee, t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_b[:ncvs, ncvs:nocc_b] += 1/2 * einsum('i,I,jiab,jKab->IK', L_b, R_b,
+                                               t2_1_ab_vxee, t2_1_ab_vvee, optimize = einsum_type)
+    rdm1_b[:ncvs, ncvs:nocc_b] -= einsum('i,i,jIab,jKab->IK', L_b, R_b, t2_1_ab_xxee,
+                                         t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_b[:ncvs, ncvs:nocc_b] -= einsum('i,i,jIab,jKab->IK', L_b, R_b, t2_1_ab_vxee,
+                                         t2_1_ab_vvee, optimize = einsum_type)
+    rdm1_b[:ncvs, ncvs:nocc_b] -= 1/4 * einsum('i,I,ijab,jKab->IK', L_b, R_b,
+                                               t2_1_b_xxee, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[:ncvs, ncvs:nocc_b] += 1/4 * einsum('i,I,ijab,Kjab->IK', L_b, R_b,
+                                               t2_1_b_xvee, t2_1_b_vvee, optimize = einsum_type)
+    rdm1_b[:ncvs, ncvs:nocc_b] += 1/2 * einsum('i,i,Ijab,jKab->IK', L_b, R_b,
+                                               t2_1_b_xxee, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[:ncvs, ncvs:nocc_b] -= 1/2 * einsum('i,i,Ijab,Kjab->IK', L_b, R_b,
+                                               t2_1_b_xvee, t2_1_b_vvee, optimize = einsum_type)
+    rdm1_b[:ncvs, ncvs:nocc_b] -= 1/2 * einsum('i,j,Iiab,jKab->IK', L_b, R_b,
+                                               t2_1_b_xxee, t2_1_b_xvee, optimize = einsum_type)
+
+    rdm1_a[:ncvs, ncvs:nocc_a] += einsum('aiK,aIi->IK', L_aaa_ecv, R_aaa_ecc_u, optimize = einsum_type)
+    rdm1_a[:ncvs, ncvs:nocc_a] -= einsum('aKi,aIi->IK', L_aab_evc, R_aab_ecc, optimize = einsum_type)
+    rdm1_a[:ncvs, ncvs:nocc_a] -= einsum('aiK,aiI->IK', L_bba_ecv, R_bba_ecc, optimize = einsum_type)
+
+    rdm1_b[:ncvs, ncvs:nocc_b] -= einsum('aiK,aiI->IK', L_aab_ecv, R_aab_ecc, optimize = einsum_type)
+    rdm1_b[:ncvs, ncvs:nocc_b] -= einsum('aKi,aIi->IK', L_bba_evc, R_bba_ecc, optimize = einsum_type)
+    rdm1_b[:ncvs, ncvs:nocc_b] += einsum('aiK,aIi->IK', L_bbb_ecv, R_bbb_ecc_u, optimize = einsum_type)
+
+########### block- ki
+    rdm1_a[ncvs:nocc_a, :ncvs] = rdm1_a[:ncvs, ncvs:nocc_a].T
+    rdm1_b[ncvs:nocc_b, :ncvs] = rdm1_b[:ncvs, ncvs:nocc_b].T
+
+########### block- ab
+    rdm1_a[nocc_a:, nocc_a:]  = 1/2 * einsum('i,i,jkAa,jkBa->AB', L_a, R_a,
+                                             t2_1_a_xxee, t2_1_a_xxee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] += 1/4 * einsum('i,i,jkAa,jkBa->AB', L_a, R_a,
+                                             t2_1_a_xvee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] -= 1/4 * einsum('i,i,jkAa,jkaB->AB', L_a, R_a,
+                                             t2_1_a_xvee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] -= 1/4 * einsum('i,i,jkBa,jkaA->AB', L_a, R_a,
+                                             t2_1_a_xvee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] += 1/4 * einsum('i,i,jkaA,jkaB->AB', L_a, R_a,
+                                             t2_1_a_xvee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] += 1/2 * einsum('i,i,jkAa,jkBa->AB', L_a, R_a,
+                                             t2_1_a_vvee, t2_1_a_vvee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] -= einsum('i,j,ikBa,jkAa->AB', L_a, R_a, t2_1_a_xxee, t2_1_a_xxee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] -= 1/4 * einsum('i,j,ikBa,jkAa->AB', L_a, R_a,
+                                             t2_1_a_xvee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] += 1/4 * einsum('i,j,ikBa,jkaA->AB', L_a, R_a,
+                                             t2_1_a_xvee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] += 1/4 * einsum('i,j,ikaB,jkAa->AB', L_a, R_a,
+                                             t2_1_a_xvee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] -= 1/4 * einsum('i,j,ikaB,jkaA->AB', L_a, R_a,
+                                             t2_1_a_xvee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] += einsum('i,i,jkAa,jkBa->AB', L_a, R_a, t2_1_ab_xxee,
+                                       t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] += einsum('i,i,jkAa,jkBa->AB', L_a, R_a, t2_1_ab_xvee,
+                                       t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] += einsum('i,i,jkAa,jkBa->AB', L_a, R_a, t2_1_ab_vxee,
+                                       t2_1_ab_vxee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] += einsum('i,i,jkAa,jkBa->AB', L_a, R_a, t2_1_ab_vvee,
+                                       t2_1_ab_vvee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] -= einsum('i,j,ikBa,jkAa->AB', L_a, R_a, t2_1_ab_xxee,
+                                       t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] -= einsum('i,j,ikBa,jkAa->AB', L_a, R_a, t2_1_ab_xvee,
+                                       t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] += 1/2 * einsum('i,i,jkAa,jkBa->AB', L_b, R_b,
+                                             t2_1_a_xxee, t2_1_a_xxee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] += 1/4 * einsum('i,i,jkAa,jkBa->AB', L_b, R_b,
+                                             t2_1_a_xvee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] -= 1/4 * einsum('i,i,jkAa,jkaB->AB', L_b, R_b,
+                                             t2_1_a_xvee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] -= 1/4 * einsum('i,i,jkBa,jkaA->AB', L_b, R_b,
+                                             t2_1_a_xvee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] += 1/4 * einsum('i,i,jkaA,jkaB->AB', L_b, R_b,
+                                             t2_1_a_xvee, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] += 1/2 * einsum('i,i,jkAa,jkBa->AB', L_b, R_b,
+                                             t2_1_a_vvee, t2_1_a_vvee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] += einsum('i,i,jkAa,jkBa->AB', L_b, R_b, t2_1_ab_xxee,
+                                       t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] += einsum('i,i,jkAa,jkBa->AB', L_b, R_b, t2_1_ab_xvee,
+                                       t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] += einsum('i,i,jkAa,jkBa->AB', L_b, R_b, t2_1_ab_vxee,
+                                       t2_1_ab_vxee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] += einsum('i,i,jkAa,jkBa->AB', L_b, R_b, t2_1_ab_vvee,
+                                       t2_1_ab_vvee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] -= einsum('i,j,kiBa,kjAa->AB', L_b, R_b, t2_1_ab_xxee,
+                                       t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] -= einsum('i,j,kiBa,kjAa->AB', L_b, R_b, t2_1_ab_vxee,
+                                       t2_1_ab_vxee, optimize = einsum_type)
+
+    rdm1_b[nocc_b:, nocc_b:]  = einsum('i,i,jkaA,jkaB->AB', L_a, R_a, t2_1_ab_xxee,
+                                       t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += einsum('i,i,jkaA,jkaB->AB', L_a, R_a, t2_1_ab_xvee,
+                                       t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += einsum('i,i,jkaA,jkaB->AB', L_a, R_a, t2_1_ab_vxee,
+                                       t2_1_ab_vxee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += einsum('i,i,jkaA,jkaB->AB', L_a, R_a, t2_1_ab_vvee,
+                                       t2_1_ab_vvee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] -= einsum('i,j,ikaB,jkaA->AB', L_a, R_a, t2_1_ab_xxee,
+                                       t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] -= einsum('i,j,ikaB,jkaA->AB', L_a, R_a, t2_1_ab_xvee,
+                                       t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += 1/2 * einsum('i,i,jkAa,jkBa->AB', L_a, R_a,
+                                             t2_1_b_xxee, t2_1_b_xxee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += 1/4 * einsum('i,i,jkAa,jkBa->AB', L_a, R_a,
+                                             t2_1_b_xvee, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] -= 1/4 * einsum('i,i,jkAa,jkaB->AB', L_a, R_a,
+                                             t2_1_b_xvee, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] -= 1/4 * einsum('i,i,jkBa,jkaA->AB', L_a, R_a,
+                                             t2_1_b_xvee, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += 1/4 * einsum('i,i,jkaA,jkaB->AB', L_a, R_a,
+                                             t2_1_b_xvee, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += 1/2 * einsum('i,i,jkAa,jkBa->AB', L_a, R_a,
+                                             t2_1_b_vvee, t2_1_b_vvee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += einsum('i,i,jkaA,jkaB->AB', L_b, R_b, t2_1_ab_xxee,
+                                       t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += einsum('i,i,jkaA,jkaB->AB', L_b, R_b, t2_1_ab_xvee,
+                                       t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += einsum('i,i,jkaA,jkaB->AB', L_b, R_b, t2_1_ab_vxee,
+                                       t2_1_ab_vxee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += einsum('i,i,jkaA,jkaB->AB', L_b, R_b, t2_1_ab_vvee,
+                                       t2_1_ab_vvee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] -= einsum('i,j,kiaB,kjaA->AB', L_b, R_b, t2_1_ab_xxee,
+                                       t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] -= einsum('i,j,kiaB,kjaA->AB', L_b, R_b, t2_1_ab_vxee,
+                                       t2_1_ab_vxee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += 1/2 * einsum('i,i,jkAa,jkBa->AB', L_b, R_b,
+                                             t2_1_b_xxee, t2_1_b_xxee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += 1/4 * einsum('i,i,jkAa,jkBa->AB', L_b, R_b,
+                                             t2_1_b_xvee, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] -= 1/4 * einsum('i,i,jkAa,jkaB->AB', L_b, R_b,
+                                             t2_1_b_xvee, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] -= 1/4 * einsum('i,i,jkBa,jkaA->AB', L_b, R_b,
+                                             t2_1_b_xvee, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += 1/4 * einsum('i,i,jkaA,jkaB->AB', L_b, R_b,
+                                             t2_1_b_xvee, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += 1/2 * einsum('i,i,jkAa,jkBa->AB', L_b, R_b,
+                                             t2_1_b_vvee, t2_1_b_vvee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] -= einsum('i,j,ikBa,jkAa->AB', L_b, R_b, t2_1_b_xxee, t2_1_b_xxee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] -= 1/4 * einsum('i,j,ikBa,jkAa->AB', L_b, R_b,
+                                             t2_1_b_xvee, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += 1/4 * einsum('i,j,ikBa,jkaA->AB', L_b, R_b,
+                                             t2_1_b_xvee, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += 1/4 * einsum('i,j,ikaB,jkAa->AB', L_b, R_b,
+                                             t2_1_b_xvee, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] -= 1/4 * einsum('i,j,ikaB,jkaA->AB', L_b, R_b,
+                                             t2_1_b_xvee, t2_1_b_xvee, optimize = einsum_type)
+
+    rdm1_a[nocc_a:, nocc_a:] += 1/2 * einsum('Aij,Bij->AB', L_aaa_ecc_u, R_aaa_ecc_u, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] += einsum('Aij,Bij->AB', L_aaa_ecv, R_aaa_ecv, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] += einsum('Aij,Bij->AB', L_aab_ecc, R_aab_ecc, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] += einsum('Aij,Bij->AB', L_aab_ecv, R_aab_ecv, optimize = einsum_type)
+    rdm1_a[nocc_a:, nocc_a:] += einsum('Aij,Bij->AB', L_aab_evc, R_aab_evc, optimize = einsum_type)
+
+    rdm1_b[nocc_b:, nocc_b:] += einsum('Aij,Bij->AB', L_bba_ecc, R_bba_ecc, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += einsum('Aij,Bij->AB', L_bba_ecv, R_bba_ecv, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += einsum('Aij,Bij->AB', L_bba_evc, R_bba_evc, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += 1/2 * einsum('Aij,Bij->AB', L_bbb_ecc_u, R_bbb_ecc_u, optimize = einsum_type)
+    rdm1_b[nocc_b:, nocc_b:] += einsum('Aij,Bij->AB', L_bbb_ecv, R_bbb_ecv, optimize = einsum_type)
+
+########### block- ia
+    rdm1_a[:ncvs, nocc_a:] =- einsum('i,I,iA->IA', L_a, R_a, t1_2_a_xe, optimize = einsum_type)
+    rdm1_a[:ncvs, nocc_a:] += einsum('i,i,IA->IA', L_a, R_a, t1_2_a_xe, optimize = einsum_type)
+    rdm1_a[:ncvs, nocc_a:] += einsum('i,i,IA->IA', L_b, R_b, t1_2_a_xe, optimize = einsum_type)
+
+    rdm1_b[:ncvs, nocc_b:]  = einsum('i,i,IA->IA', L_a, R_a, t1_2_b_xe, optimize = einsum_type)
+    rdm1_b[:ncvs, nocc_b:] -= einsum('i,I,iA->IA', L_b, R_b, t1_2_b_xe, optimize = einsum_type)
+    rdm1_b[:ncvs, nocc_b:] += einsum('i,i,IA->IA', L_b, R_b, t1_2_b_xe, optimize = einsum_type)
+
+    rdm1_a[:ncvs, nocc_a:] += einsum('i,AIi->IA', L_a, R_aaa_ecc_u, optimize = einsum_type)
+    rdm1_a[:ncvs, nocc_a:] += einsum('i,AIi->IA', L_b, R_aab_ecc, optimize = einsum_type)
+
+    rdm1_b[:ncvs, nocc_b:] += einsum('i,AIi->IA', L_a, R_bba_ecc, optimize = einsum_type)
+    rdm1_b[:ncvs, nocc_b:] += einsum('i,AIi->IA', L_b, R_bbb_ecc_u, optimize = einsum_type)
+
+    rdm1_a[:ncvs, nocc_a:] += 1/2 * einsum('aij,I,ijAa->IA', L_aaa_ecc_u, R_a, t2_1_a_xxee, optimize = einsum_type)
+    rdm1_a[:ncvs, nocc_a:] -= einsum('aij,i,IjAa->IA', L_aaa_ecc_u, R_a, t2_1_a_xxee, optimize = einsum_type)
+    rdm1_a[:ncvs, nocc_a:] += 1/2 * einsum('aij,I,ijAa->IA', L_aaa_ecv, R_a, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, nocc_a:] -= 1/2 * einsum('aij,I,ijaA->IA', L_aaa_ecv, R_a, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, nocc_a:] -= 1/2 * einsum('aij,i,IjAa->IA', L_aaa_ecv, R_a, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, nocc_a:] += 1/2 * einsum('aij,i,IjaA->IA', L_aaa_ecv, R_a, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, nocc_a:] += einsum('aij,j,IiAa->IA', L_aab_ecc, R_b, t2_1_a_xxee, optimize = einsum_type)
+    rdm1_a[:ncvs, nocc_a:] += 1/2 * einsum('aij,j,IiAa->IA', L_aab_evc, R_b, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, nocc_a:] -= 1/2 * einsum('aij,j,IiaA->IA', L_aab_evc, R_b, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, nocc_a:] -= einsum('aij,I,jiAa->IA', L_bba_ecc, R_a, t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_a[:ncvs, nocc_a:] += einsum('aij,j,IiAa->IA', L_bba_ecc, R_a, t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_a[:ncvs, nocc_a:] -= einsum('aij,I,jiAa->IA', L_bba_ecv, R_a, t2_1_ab_vxee, optimize = einsum_type)
+    rdm1_a[:ncvs, nocc_a:] -= einsum('aij,I,jiAa->IA', L_bba_evc, R_a, t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, nocc_a:] += einsum('aij,j,IiAa->IA', L_bba_evc, R_a, t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_a[:ncvs, nocc_a:] -= einsum('aij,i,IjAa->IA', L_bbb_ecc_u, R_b, t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_a[:ncvs, nocc_a:] -= einsum('aij,i,IjAa->IA', L_bbb_ecv, R_b, t2_1_ab_xvee, optimize = einsum_type)
+
+    rdm1_b[:ncvs, nocc_b:] -= einsum('aij,i,jIaA->IA', L_aaa_ecc_u, R_a, t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_b[:ncvs, nocc_b:] -= einsum('aij,i,jIaA->IA', L_aaa_ecv, R_a, t2_1_ab_vxee, optimize = einsum_type)
+    rdm1_b[:ncvs, nocc_b:] -= einsum('aij,I,ijaA->IA', L_aab_ecc, R_b, t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_b[:ncvs, nocc_b:] += einsum('aij,j,iIaA->IA', L_aab_ecc, R_b, t2_1_ab_xxee, optimize = einsum_type)
+    rdm1_b[:ncvs, nocc_b:] -= einsum('aij,I,ijaA->IA', L_aab_ecv, R_b, t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_b[:ncvs, nocc_b:] -= einsum('aij,I,ijaA->IA', L_aab_evc, R_b, t2_1_ab_vxee, optimize = einsum_type)
+    rdm1_b[:ncvs, nocc_b:] += einsum('aij,j,iIaA->IA', L_aab_evc, R_b, t2_1_ab_vxee, optimize = einsum_type)
+    rdm1_b[:ncvs, nocc_b:] += einsum('aij,j,IiAa->IA', L_bba_ecc, R_a, t2_1_b_xxee, optimize = einsum_type)
+    rdm1_b[:ncvs, nocc_b:] += 1/2 * einsum('aij,j,IiAa->IA', L_bba_evc, R_a, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[:ncvs, nocc_b:] -= 1/2 * einsum('aij,j,IiaA->IA', L_bba_evc, R_a, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[:ncvs, nocc_b:] += 1/2 * einsum('aij,I,ijAa->IA', L_bbb_ecc_u, R_b, t2_1_b_xxee, optimize = einsum_type)
+    rdm1_b[:ncvs, nocc_b:] -= einsum('aij,i,IjAa->IA', L_bbb_ecc_u, R_b, t2_1_b_xxee, optimize = einsum_type)
+    rdm1_b[:ncvs, nocc_b:] += 1/2 * einsum('aij,I,ijAa->IA', L_bbb_ecv, R_b, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[:ncvs, nocc_b:] -= 1/2 * einsum('aij,I,ijaA->IA', L_bbb_ecv, R_b, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[:ncvs, nocc_b:] -= 1/2 * einsum('aij,i,IjAa->IA', L_bbb_ecv, R_b, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[:ncvs, nocc_b:] += 1/2 * einsum('aij,i,IjaA->IA', L_bbb_ecv, R_b, t2_1_b_xvee, optimize = einsum_type)
+
+########### block- ai
+    rdm1_a[nocc_a:, :ncvs] = rdm1_a[:ncvs, nocc_a:].T
+    rdm1_b[nocc_b:, :ncvs] = rdm1_b[:ncvs, nocc_b:].T
+
+########### block- ka
+    rdm1_a[ncvs:nocc_a, nocc_a:]  = einsum('i,i,KA->KA', L_a, R_a, t1_2_a_ve, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, nocc_a:] += einsum('i,i,KA->KA', L_b, R_b, t1_2_a_ve, optimize = einsum_type)
+
+    rdm1_b[ncvs:nocc_b, nocc_b:]  = einsum('i,i,KA->KA', L_a, R_a, t1_2_b_ve, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, nocc_b:] += einsum('i,i,KA->KA', L_b, R_b, t1_2_b_ve, optimize = einsum_type)
+
+    rdm1_a[ncvs:nocc_a, nocc_a:] -= einsum('i,AiK->KA', L_a, R_aaa_ecv, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, nocc_a:] += einsum('i,AKi->KA', L_b, R_aab_evc, optimize = einsum_type)
+
+    rdm1_b[ncvs:nocc_b, nocc_b:] += einsum('i,AKi->KA', L_a, R_bba_evc, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, nocc_b:] -= einsum('i,AiK->KA', L_b, R_bbb_ecv, optimize = einsum_type)
+
+    rdm1_a[ncvs:nocc_a, nocc_a:] += 1/2 * \
+        einsum('aij,i,jKAa->KA', L_aaa_ecc_u, R_a, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, nocc_a:] -= 1/2 * \
+        einsum('aij,i,jKaA->KA', L_aaa_ecc_u, R_a, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, nocc_a:] -= einsum('aij,i,KjAa->KA', L_aaa_ecv, R_a, t2_1_a_vvee, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, nocc_a:] -= 1/2 * einsum('aij,j,iKAa->KA', L_aab_ecc, R_b, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, nocc_a:] += 1/2 * einsum('aij,j,iKaA->KA', L_aab_ecc, R_b, t2_1_a_xvee, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, nocc_a:] += einsum('aij,j,KiAa->KA', L_aab_evc, R_b, t2_1_a_vvee, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, nocc_a:] += einsum('aij,j,KiAa->KA', L_bba_ecc, R_a, t2_1_ab_vxee, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, nocc_a:] += einsum('aij,j,KiAa->KA', L_bba_evc, R_a, t2_1_ab_vvee, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, nocc_a:] -= einsum('aij,i,KjAa->KA', L_bbb_ecc_u, R_b, t2_1_ab_vxee, optimize = einsum_type)
+    rdm1_a[ncvs:nocc_a, nocc_a:] -= einsum('aij,i,KjAa->KA', L_bbb_ecv, R_b, t2_1_ab_vvee, optimize = einsum_type)
+
+    rdm1_b[ncvs:nocc_b, nocc_b:] -= einsum('aij,i,jKaA->KA', L_aaa_ecc_u, R_a, t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, nocc_b:] -= einsum('aij,i,jKaA->KA', L_aaa_ecv, R_a, t2_1_ab_vvee, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, nocc_b:] += einsum('aij,j,iKaA->KA', L_aab_ecc, R_b, t2_1_ab_xvee, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, nocc_b:] += einsum('aij,j,iKaA->KA', L_aab_evc, R_b, t2_1_ab_vvee, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, nocc_b:] -= 1/2 * einsum('aij,j,iKAa->KA', L_bba_ecc, R_a, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, nocc_b:] += 1/2 * einsum('aij,j,iKaA->KA', L_bba_ecc, R_a, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, nocc_b:] += einsum('aij,j,KiAa->KA', L_bba_evc, R_a, t2_1_b_vvee, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, nocc_b:] += 1/2 * \
+        einsum('aij,i,jKAa->KA', L_bbb_ecc_u, R_b, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, nocc_b:] -= 1/2 * \
+        einsum('aij,i,jKaA->KA', L_bbb_ecc_u, R_b, t2_1_b_xvee, optimize = einsum_type)
+    rdm1_b[ncvs:nocc_b, nocc_b:] -= einsum('aij,i,KjAa->KA', L_bbb_ecv, R_b, t2_1_b_vvee, optimize = einsum_type)
+
+########### block- ak
+    rdm1_a[nocc_a:, ncvs:nocc_a] = rdm1_a[ncvs:nocc_a, nocc_a:].T
+    rdm1_b[nocc_b:, ncvs:nocc_b] = rdm1_b[ncvs:nocc_b, nocc_b:].T
+
+    return (rdm1_a, rdm1_b)
+
+
 class UADCIPCVS(uadc.UADC):
     '''unrestricted ADC for IP-CVS energies and spectroscopic amplitudes
 
@@ -2376,6 +3063,7 @@ class UADCIPCVS(uadc.UADC):
     analyze_eigenvector = analyze_eigenvector
     analyze = analyze
     compute_dyson_mo = compute_dyson_mo
+    make_rdm1 = make_rdm1
 
     def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None):
         if (type=="read"):

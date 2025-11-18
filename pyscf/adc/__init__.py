@@ -76,7 +76,7 @@ def FNOADC(mf, frozen=None, mo_coeff=None, mo_occ=None, correction=True):
     if mf.istype('UHF'):
         return uadc.UFNOADC(mf, frozen, mo_coeff, mo_occ, correction)
     elif mf.istype('ROHF'):
-        raise NotImplementedError
+        return uadc.UFNOADC(mf, frozen, mo_coeff, mo_occ, correction)
     elif mf.istype('RHF'):
         return radc.RFNOADC(mf, frozen, mo_coeff, mo_occ, correction)
     else :

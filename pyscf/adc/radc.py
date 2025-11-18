@@ -198,7 +198,6 @@ def get_fno_ref(myadc,nroots,ref_state,guess):
         myadc.rdm1_ss = rdm1_gs
 
 def make_fno(myadc, rdm1_ss, mf, thresh):
-    import numpy
     from pyscf.mp import mp2
     nocc = mf.mol.nelectron//2
     nmo = myadc._nmo
@@ -206,27 +205,28 @@ def make_fno(myadc, rdm1_ss, mf, thresh):
     masks = mp2._mo_splitter(myadc)
     myadc._nmo = nmo
 
-    n,V = numpy.linalg.eigh(rdm1_ss[nocc:,nocc:])
-    idx = numpy.argsort(n)[::-1]
+    n,V = np.linalg.eigh(rdm1_ss[nocc:,nocc:])
+    idx = np.argsort(n)[::-1]
     n,V = n[idx], V[:,idx]
+    print(n)
     T = n > thresh
-    n_fro_vir = numpy.sum(T == 0)
-    T = numpy.diag(T)
+    n_fro_vir = np.sum(T == 0)
+    T = np.diag(T)
     V_trunc = V.dot(T)
     n_keep = V_trunc.shape[0]-n_fro_vir
 
     moeoccfrz0, moeocc, moevir, moevirfrz0 = [mf.mo_energy[m] for m in masks]
     orboccfrz0, orbocc, orbvir, orbvirfrz0 = [mf.mo_coeff[:,m] for m in masks]
-    F_can =  numpy.diag(moevir)
+    F_can =  np.diag(moevir)
     F_na_trunc = V_trunc.T.dot(F_can).dot(V_trunc)
-    _,Z_na_trunc = numpy.linalg.eigh(F_na_trunc[:n_keep,:n_keep])
+    _,Z_na_trunc = np.linalg.eigh(F_na_trunc[:n_keep,:n_keep])
     U_vir_act = orbvir.dot(V_trunc[:,:n_keep]).dot(Z_na_trunc)
     U_vir_fro = orbvir.dot(V_trunc[:,n_keep:])
     no_comp = (orboccfrz0,orbocc,U_vir_act,U_vir_fro,orbvirfrz0)
-    no_coeff = numpy.hstack(no_comp)
-    nocc_loc = numpy.cumsum([0]+[x.shape[1] for x in no_comp]).astype(int)
-    no_frozen = numpy.hstack((numpy.arange(nocc_loc[0], nocc_loc[1]),
-                              numpy.arange(nocc_loc[3], nocc_loc[5]))).astype(int)
+    no_coeff = np.hstack(no_comp)
+    nocc_loc = np.cumsum([0]+[x.shape[1] for x in no_comp]).astype(int)
+    no_frozen = np.hstack((np.arange(nocc_loc[0], nocc_loc[1]),
+                              np.arange(nocc_loc[3], nocc_loc[5]))).astype(int)
     return no_coeff,no_frozen
 
 
@@ -272,7 +272,6 @@ class RADC(lib.StreamObject):
     }
 
     def __init__(self, mf, frozen=None, mo_coeff=None, mo_occ=None):
-        import numpy
 
         if 'dft' in str(mf.__module__):
             raise NotImplementedError('DFT reference for UADC')
@@ -314,7 +313,7 @@ class RADC(lib.StreamObject):
         mask = self.get_frozen_mask()
         if frozen is None:
             self._nmo = mo_coeff.shape[1]
-        elif isinstance(frozen, (int, numpy.integer)):
+        elif isinstance(frozen, (int, np.integer)):
             self._nmo = mo_coeff.shape[1]-frozen
         elif hasattr(frozen, '__len__'):
             self._nmo = mo_coeff.shape[1]-len(frozen)
@@ -597,7 +596,7 @@ class RFNOADC(RADC):
             self.if_naf = False
         elif isinstance(ref_state, int) and 0<ref_state<=nroots:
             print(f"Do ss-fno adc calculation, the specic state is {ref_state}")
-            if self.with_df is None:
+            if self.with_df is None and self._scf.with_df is None:
                 self.if_naf = False
         else:
             raise ValueError("ref_state should be an int type and in (0,nroots]")
@@ -606,7 +605,7 @@ class RFNOADC(RADC):
         get_fno_ref(self, nroots, self.ref_state, guess)
         self.mo_coeff,self.frozen = make_fno(self, self.rdm1_ss, self._scf, thresh)
         adc3_ssfno = RADC(self._scf, self.frozen, self.mo_coeff).set(verbose = self.verbose,
-                                                                     method_type = self.method_type,method = "adc(3)",
+                                                                     method_type = self.method_type,method = self.method,
                                                                      with_df = self.with_df,
                                                                      if_naf = self.if_naf,thresh_naf = self.thresh_naf,
                                                                      if_heri_eris = self.if_heri_eris,ncvs = self.ncvs)

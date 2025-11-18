@@ -508,8 +508,6 @@ def transform_integrals_df(myadc):
     else:
         eris.Lov = eris.Lov.reshape(myadc.naux,nocc_a,nvir_a)
         eris.LOV = eris.LOV.reshape(myadc.naux,nocc_b,nvir_b)
-        #eris.Lvv = eris.Lvv.reshape(naux,nvir_a,nvir_a)
-        #eris.LVV = eris.LVV.reshape(naux,nvir_b,nvir_b)
 
     log.timer('DF-ADC integral transformation', *cput0)
 
