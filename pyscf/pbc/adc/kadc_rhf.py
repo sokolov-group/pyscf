@@ -594,6 +594,8 @@ class RFNOADC(RADC):
 
     def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, ref_state = None, kptlist = None):
         import copy
+        cput0 = (logger.process_clock(), logger.perf_counter())
+        log = logger.Logger(self.stdout, self.verbose)
         if isinstance(self._scf.with_df, df.GDF):
             self.with_df = self._scf.with_df
             self.chnk_size = self.get_chnk_size()
@@ -614,6 +616,7 @@ class RFNOADC(RADC):
         print(f"number of origin orbital is {get_nmo(self,True)}")
         get_fno_ref(self, nroots, self.ref_state, guess)
         self.mo_coeff,self.frozen = make_fno(self, self.rdm1_ss, self._scf, thresh)
+        log.timer('get frozen info', *cput0)
         adc3_ssfno = RADC(self._scf, self.frozen, self.mo_coeff).set(verbose = self.verbose,
                                                             method_type = self.method_type,method = "adc(3)",
                                                             with_df = self.with_df,if_naf = self.if_naf,
@@ -625,8 +628,9 @@ class RFNOADC(RADC):
             e_exc, v_exc, spec_fac, x, eris, self.naux = adc3_ssfno.kernel(nroots, guess, eris, kptlist=kptlist)
         else:
             e_exc, v_exc, spec_fac, x, eris = adc3_ssfno.kernel(nroots, guess, eris, kptlist=kptlist)
+        log.timer('ADC3', *cput0)
         if self.correction:
             self.compute_correction(self._scf, self.frozen, nroots, eris, guess, kptlist=kptlist)
             e_exc = e_exc + self.delta_e
-
+        log.timer('RFNOADC', *cput0)
         return e_exc, v_exc, spec_fac, x
