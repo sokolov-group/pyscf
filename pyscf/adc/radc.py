@@ -16,6 +16,7 @@
 #         Samragni Banerjee <samragnibanerjee4@gmail.com>
 #         James Serna <jamcar456@gmail.com>
 #         Terrence Stahl <terrencestahl1@gmail.com>
+#         Ning-Yuan Chen <cny003@outlook.com>
 #         Alexander Sokolov <alexander.y.sokolov@gmail.com>
 #
 
@@ -105,6 +106,9 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
                         (adc.method, n, adc.E[n], adc.E[n]*27.2114))
         if adc.compute_properties and adc.method_type != "ee":
             print_string += ("|  Spec. factor = %10.8f  " % adc.P[n])
+
+        if adc.compute_properties and adc.method_type == "ee":
+            print_string += ("|  Osc. strength = %10.8f  " % adc.P[n])
         print_string += ("|  conv = %s" % conv[n])
         logger.info(adc, print_string)
 
@@ -123,13 +127,17 @@ def make_ref_rdm1(adc):
 
     t1 = adc.t1
     t2 = adc.t2
-    t2_ce = t1[0][:]
     t1_ccee = t2[0][:]
 
     ######################
     einsum_type = True
     nocc = adc._nocc
     nvir = adc._nvir
+
+    if adc.t1[0] is not None:
+        t2_ce = adc.t1[0][:]
+    else:
+        t2_ce = np.zeros((nocc, nvir))
 
     nmo = nocc + nvir
 
@@ -175,7 +183,7 @@ def make_ref_rdm1(adc):
         OPDM[nocc:, :nocc]  -= 1/2 * \
             lib.einsum('iIAa,ia->AI', t1_ccee, t2_ce, optimize = einsum_type)
 
-        ##### VIR=VIR ###
+        ##### VIR-VIR ###
         OPDM[nocc:, nocc:] += 2 * lib.einsum('ijAa,ijBa->AB',
                                              t1_ccee, t2_ccee, optimize = einsum_type)
         OPDM[nocc:, nocc:] -= lib.einsum('ijAa,jiBa->AB', t1_ccee, t2_ccee, optimize = einsum_type)
@@ -185,10 +193,11 @@ def make_ref_rdm1(adc):
 
     return 2 * OPDM
 
+
 def get_fno_ref(myadc,nroots,ref_state,guess):
     adc2_ref = RADC(myadc._scf).set(verbose = 0,method_type = myadc.method_type,
                                     with_df = myadc.with_df,if_naf = myadc.if_naf,thresh_naf = myadc.thresh_naf,
-                                    ncvs = myadc.ncvs)
+                                    ncvs = myadc.ncvs, approx_trans_moments = True)
     myadc.e2_ref,myadc.v2_ref,_,_ = adc2_ref.kernel(nroots,guess=guess)
     rdm1_gs = adc2_ref.make_ref_rdm1()
     if ref_state is not None:
@@ -196,6 +205,7 @@ def get_fno_ref(myadc,nroots,ref_state,guess):
         myadc.rdm1_ss = rdm1_ref + rdm1_gs
     else:
         myadc.rdm1_ss = rdm1_gs
+
 
 def make_fno(myadc, rdm1_ss, mf, thresh):
     from pyscf.mp import mp2
@@ -208,7 +218,6 @@ def make_fno(myadc, rdm1_ss, mf, thresh):
     n,V = np.linalg.eigh(rdm1_ss[nocc:,nocc:])
     idx = np.argsort(n)[::-1]
     n,V = n[idx], V[:,idx]
-    print(n)
     T = n > thresh
     n_fro_vir = np.sum(T == 0)
     T = np.diag(T)
@@ -291,6 +300,7 @@ class RADC(lib.StreamObject):
         self.max_cycle = getattr(__config__, 'adc_radc_RADC_max_cycle', 50)
         self.conv_tol = getattr(__config__, 'adc_radc_RADC_conv_tol', 1e-8)
         self.tol_residual = getattr(__config__, 'adc_radc_RADC_tol_residual', 1e-5)
+        self.scf_energy = mf.e_tot
 
         self.frozen = frozen
         self.incore_complete = self.incore_complete or self.mol.incore_anyway
@@ -303,13 +313,11 @@ class RADC(lib.StreamObject):
         self._nocc = mf.mol.nelectron//2
         self.mo_coeff = mo_coeff
         self.mo_energy = mf.mo_energy
-#NOTE:update_start
         self.naux = None
         self.if_naf = False
         self.thresh_naf = 1e-2
         self.if_heri_eris = False
         self._nmo = None
-        #fno modify
         mask = self.get_frozen_mask()
         if frozen is None:
             self._nmo = mo_coeff.shape[1]
@@ -328,7 +336,6 @@ class RADC(lib.StreamObject):
                 raise ValueError("No occupied orbitals found")
             if mo_coeff is self._scf.mo_coeff and self._scf.converged:
                 self.mo_energy = self.mo_energy[mask]
-                self.scf_energy = self._scf.e_tot
             else:
                 dm = self._scf.make_rdm1(mo_coeff, self.mo_occ)
                 vhf = self._scf.get_veff(self.mol, dm)
@@ -339,7 +346,6 @@ class RADC(lib.StreamObject):
         self._nvir = self._nmo - self._nocc
         if self._nvir == 0:
             raise ValueError("No virtual orbitals found")
-#NOTE:update_end
         self.chkfile = mf.chkfile
         self.method = "adc(2)"
         self.method_type = "ip"
@@ -355,7 +361,6 @@ class RADC(lib.StreamObject):
         self.P = None
         self.X = None
 
-#TODO:check if needs complete coefficient
         dip_ints = -self.mol.intor('int1e_r',comp=3)
         dip_mom = np.zeros((dip_ints.shape[0], self._nmo, self._nmo))
 
@@ -410,6 +415,17 @@ class RADC(lib.StreamObject):
         nao_pair = nao * (nao+1) // 2
         mem_incore = (max(nao_pair**2, nmo**4) + nmo_pair**2) * 8/1e6
         mem_now = lib.current_memory()[0]
+        nocc_fr = self._scf.mol.nelectron//2 - self._nocc
+        nvir_fr = self._scf.mo_coeff.shape[1] - self._nmo - nocc_fr
+
+        logger.info(self, '******** ADC Orbital Information ********')
+        logger.info(self, 'Number of Frozen Occupied Orbitals: %d', nocc_fr)
+        logger.info(self, 'Number of Frozen Virtual Orbitals: %d', nvir_fr)
+        logger.info(self, 'Number of Active Occupied Orbitals: %d', self._nocc)
+        logger.info(self, 'Number of Active Virtual Orbitals: %d', self._nvir)
+        if hasattr(self.frozen, '__len__'):
+            logger.info(self, 'Frozen Orbital List: %s', self.frozen)
+        logger.info(self, '*****************************************')
 
         if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
             if getattr(self, 'with_df', None):
@@ -452,6 +468,17 @@ class RADC(lib.StreamObject):
         nao_pair = nao * (nao+1) // 2
         mem_incore = (max(nao_pair**2, nmo**4) + nmo_pair**2) * 8/1e6
         mem_now = lib.current_memory()[0]
+        nocc_fr = self._scf.mol.nelectron//2 - self._nocc
+        nvir_fr = self._scf.mo_coeff.shape[1] - self._nmo - nocc_fr
+
+        logger.info(self, '******** ADC Orbital Information ********')
+        logger.info(self, 'Number of Frozen Occupied Orbitals: %d', nocc_fr)
+        logger.info(self, 'Number of Frozen Virtual Orbitals: %d', nvir_fr)
+        logger.info(self, 'Number of Active Occupied Orbitals: %d', self._nocc)
+        logger.info(self, 'Number of Active Virtual Orbitals: %d', self._nvir)
+        if hasattr(self.frozen, '__len__'):
+            logger.info(self, 'Frozen Orbital List: %s', self.frozen)
+        logger.info(self, '*****************************************')
 
         if eris is None:
             if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
@@ -496,7 +523,6 @@ class RADC(lib.StreamObject):
             if self.if_naf:
                 return e_exc, v_exc, spec_fac, x, eris, self.naux
             else:
-                eris.vvvv = None
                 return e_exc, v_exc, spec_fac, x, eris
         else:
             return e_exc, v_exc, spec_fac, x
@@ -554,6 +580,7 @@ class RADC(lib.StreamObject):
     def make_rdm1(self):
         return self._adc_es.make_rdm1()
 
+
 class RFNOADC(RADC):
     #J. Chem. Phys. 159, 084113 (2023)
     _keys = RADC._keys | {'delta_e','e2_ref','v2_ref'
@@ -581,27 +608,30 @@ class RFNOADC(RADC):
         adc2_ssfno = RADC(mf, frozen, self.mo_coeff).set(verbose = 0,method_type = self.method_type,
                                                          with_df = self.with_df,if_naf = self.if_naf,
                                                          thresh_naf = self.thresh_naf,naux = self.naux,
-                                                         ncvs = self.ncvs)
+                                                         ncvs = self.ncvs, approx_trans_moments = True)
         e2_ssfno,v2_ssfno,p2_ssfno,x2_ssfno = adc2_ssfno.kernel(nroots, eris = eris, guess=guess)
         self.delta_e = self.e2_ref - e2_ssfno
 
     def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, ref_state = None):
         import copy
+        cput0 = (logger.process_clock(), logger.perf_counter())
+        log = logger.Logger(self.stdout, self.verbose)
+
         self.frozen = copy.deepcopy(self.frozen_core)
         self.ref_state = ref_state
         self.naux = None
         self.if_heri_eris = True
+        
         if ref_state is None:
             print("Do fno adc calculation")
-            self.if_naf = False
         elif isinstance(ref_state, int) and 0<ref_state<=nroots:
             print(f"Do ss-fno adc calculation, the specic state is {ref_state}")
-            if self.with_df is None and self._scf.with_df is None:
-                self.if_naf = False
         else:
             raise ValueError("ref_state should be an int type and in (0,nroots]")
 
-        print(f"number of origin orbital is {self._nmo}")
+        if not getattr(self, 'with_df', None) and not getattr(self._scf, 'with_df', None):
+            self.if_naf = False
+
         get_fno_ref(self, nroots, self.ref_state, guess)
         self.mo_coeff,self.frozen = make_fno(self, self.rdm1_ss, self._scf, thresh)
         adc3_ssfno = RADC(self._scf, self.frozen, self.mo_coeff).set(verbose = self.verbose,
@@ -609,7 +639,9 @@ class RFNOADC(RADC):
                                                                      with_df = self.with_df,
                                                                      if_naf = self.if_naf,thresh_naf = self.thresh_naf,
                                                                      if_heri_eris = self.if_heri_eris,ncvs = self.ncvs)
-        print(f"number of new orbital is {adc3_ssfno._nmo}")
+
+        log.timer('get frozen info', *cput0)
+
         if self.if_naf:
             if self.trans_guess:
                 e_exc, v_exc, spec_fac, x, eris, self.naux = adc3_ssfno.kernel(nroots, guess=self.v2_ref, eris=eris)
@@ -620,9 +652,14 @@ class RFNOADC(RADC):
                 e_exc, v_exc, spec_fac, x, eris = adc3_ssfno.kernel(nroots, guess=self.v2_ref, eris=eris)
             else:
                 e_exc, v_exc, spec_fac, x, eris = adc3_ssfno.kernel(nroots, guess, eris)
+
+        log.timer('ADC3', *cput0)
+
         if self.correction:
             self.compute_correction(self._scf, self.frozen, nroots, eris, guess=v_exc)
             e_exc = e_exc + self.delta_e
+
+        log.timer('RFNOADC', *cput0)
 
         return e_exc, v_exc, spec_fac, x
 

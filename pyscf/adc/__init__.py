@@ -31,9 +31,11 @@ from pyscf.adc import uadc_amplitudes
 from pyscf.adc import radc_ip
 from pyscf.adc import radc_ip_cvs
 from pyscf.adc import radc_ea
+from pyscf.adc import radc_ee
 from pyscf.adc import uadc_ip
 from pyscf.adc import uadc_ip_cvs
 from pyscf.adc import uadc_ea
+from pyscf.adc import uadc_ee
 
 
 def ADC(mf, frozen=None, mo_coeff=None, mo_occ=None):

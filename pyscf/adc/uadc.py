@@ -16,6 +16,7 @@
 #         Samragni Banerjee <samragnibanerjee4@gmail.com>
 #         James Serna <jamcar456@gmail.com>
 #         Terrence Stahl <terrencestahl1@gmail.com>
+#         Ning-Yuan Chen <cny003@outlook.com>
 #         Alexander Sokolov <alexander.y.sokolov@gmail.com>
 
 '''
@@ -217,13 +218,13 @@ def make_ref_rdm1(adc):
         rdm1_a[:nocc_a, :nocc_a] -= 1/2 * einsum('Jiab,Iiab->IJ', t2_1_a, t2_2_a, optimize = einsum_type)
         rdm1_a[:nocc_a, :nocc_a] -= einsum('Iiab,Jiab->IJ', t2_1_ab, t2_2_ab, optimize = einsum_type)
         rdm1_a[:nocc_a, :nocc_a] -= einsum('Jiab,Iiab->IJ', t2_1_ab, t2_2_ab, optimize = einsum_type)
-        rdm1_a[:nocc_a, :nocc_a] -= 0.500000001 * \
+        rdm1_a[:nocc_a, :nocc_a] -= 1/2 * \
             einsum('Ia,ib,Jiab->IJ', t1_1_a, t1_1_b, t2_1_ab, optimize = einsum_type)
-        rdm1_a[:nocc_a, :nocc_a] -= 0.500000001 * \
+        rdm1_a[:nocc_a, :nocc_a] -= 1/2 * \
             einsum('Ja,ib,Iiab->IJ', t1_1_a, t1_1_b, t2_1_ab, optimize = einsum_type)
-        rdm1_a[:nocc_a, :nocc_a] += 0.500000001 * \
+        rdm1_a[:nocc_a, :nocc_a] += 1/2 * \
             einsum('Iiab,ia,Jb->IJ', t2_1_a, t1_1_a, t1_1_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, :nocc_a] += 0.500000001 * \
+        rdm1_a[:nocc_a, :nocc_a] += 1/2 * \
             einsum('Jiab,ia,Ib->IJ', t2_1_a, t1_1_a, t1_1_a, optimize = einsum_type)
 
 
@@ -233,13 +234,13 @@ def make_ref_rdm1(adc):
         rdm1_b[:nocc_b, :nocc_b] -= einsum('iJab,iIab->IJ', t2_1_ab, t2_2_ab, optimize = einsum_type)
         rdm1_b[:nocc_b, :nocc_b] -= 1/2 * einsum('Iiab,Jiab->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
         rdm1_b[:nocc_b, :nocc_b] -= 1/2 * einsum('Jiab,Iiab->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] -= 0.500000001 * \
+        rdm1_b[:nocc_b, :nocc_b] -= 1/2 * \
             einsum('ia,Ib,iJab->IJ', t1_1_a, t1_1_b, t2_1_ab, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] -= 0.500000001 * \
+        rdm1_b[:nocc_b, :nocc_b] -= 1/2 * \
             einsum('ia,Jb,iIab->IJ', t1_1_a, t1_1_b, t2_1_ab, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] += 0.500000001 * \
+        rdm1_b[:nocc_b, :nocc_b] += 1/2 * \
             einsum('Iiab,ia,Jb->IJ', t2_1_b, t1_1_b, t1_1_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] += 0.500000001 * \
+        rdm1_b[:nocc_b, :nocc_b] += 1/2 * \
             einsum('Jiab,ia,Ib->IJ', t2_1_b, t1_1_b, t1_1_b, optimize = einsum_type)
 
         ##### OCC-VIR ### ####
@@ -248,22 +249,22 @@ def make_ref_rdm1(adc):
         rdm1_a[:nocc_a, nocc_a:] += 1/2 * einsum('ia,IiAa->IA', t1_2_b, t2_1_ab, optimize = einsum_type)
         rdm1_a[:nocc_a, nocc_a:] += 1/2 * einsum('ia,IiAa->IA', t1_1_a, t2_2_a, optimize = einsum_type)
         rdm1_a[:nocc_a, nocc_a:] += 1/2 * einsum('ia,IiAa->IA', t1_1_b, t2_2_ab, optimize = einsum_type)
-        rdm1_a[:nocc_a, nocc_a:] -= 0.666666668 * einsum('Ia,iA,ia->IA', t1_1_a, t1_1_a, t1_1_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, nocc_a:] -= 0.333333334 * \
+        rdm1_a[:nocc_a, nocc_a:] -= 2/3 * einsum('Ia,iA,ia->IA', t1_1_a, t1_1_a, t1_1_a, optimize = einsum_type)
+        rdm1_a[:nocc_a, nocc_a:] -= 1/3 * \
             einsum('Ia,ijab,ijAb->IA', t1_1_a, t2_1_a, t2_1_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, nocc_a:] -= 0.333333334 * \
+        rdm1_a[:nocc_a, nocc_a:] -= 1/3 * \
             einsum('iA,ijab,Ijab->IA', t1_1_a, t2_1_a, t2_1_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, nocc_a:] += 0.166666667 * \
+        rdm1_a[:nocc_a, nocc_a:] += 1/6 * \
             einsum('ia,ijab,IjAb->IA', t1_1_a, t2_1_a, t2_1_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, nocc_a:] -= 0.666666668 * \
+        rdm1_a[:nocc_a, nocc_a:] -= 2/3 * \
             einsum('Ia,ijab,ijAb->IA', t1_1_a, t2_1_ab, t2_1_ab, optimize = einsum_type)
-        rdm1_a[:nocc_a, nocc_a:] -= 0.666666668 * \
+        rdm1_a[:nocc_a, nocc_a:] -= 2/3 * \
             einsum('iA,ijab,Ijab->IA', t1_1_a, t2_1_ab, t2_1_ab, optimize = einsum_type)
-        rdm1_a[:nocc_a, nocc_a:] += 0.166666667 * \
+        rdm1_a[:nocc_a, nocc_a:] += 1/6 * \
             einsum('ia,ijab,IjAb->IA', t1_1_a, t2_1_ab, t2_1_ab, optimize = einsum_type)
-        rdm1_a[:nocc_a, nocc_a:] += 0.166666667 * \
+        rdm1_a[:nocc_a, nocc_a:] += 1/6 * \
             einsum('ia,IjAb,jiba->IA', t1_1_b, t2_1_a, t2_1_ab, optimize = einsum_type)
-        rdm1_a[:nocc_a, nocc_a:] += 0.166666667 * \
+        rdm1_a[:nocc_a, nocc_a:] += 1/6 * \
             einsum('ia,IjAb,ijab->IA', t1_1_b, t2_1_ab, t2_1_b, optimize = einsum_type)
 
         rdm1_b[:nocc_b, nocc_b:] += einsum('IA->IA', t1_3_b, optimize = einsum_type).copy()
@@ -271,22 +272,22 @@ def make_ref_rdm1(adc):
         rdm1_b[:nocc_b, nocc_b:] += 1/2 * einsum('ia,IiAa->IA', t1_2_b, t2_1_b, optimize = einsum_type)
         rdm1_b[:nocc_b, nocc_b:] += 1/2 * einsum('ia,iIaA->IA', t1_1_a, t2_2_ab, optimize = einsum_type)
         rdm1_b[:nocc_b, nocc_b:] += 1/2 * einsum('ia,IiAa->IA', t1_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, nocc_b:] += 0.166666667 * \
+        rdm1_b[:nocc_b, nocc_b:] += 1/6 * \
             einsum('ia,ijab,jIbA->IA', t1_1_a, t2_1_a, t2_1_ab, optimize = einsum_type)
-        rdm1_b[:nocc_b, nocc_b:] += 0.166666667 * \
+        rdm1_b[:nocc_b, nocc_b:] += 1/6 * \
             einsum('ia,ijab,IjAb->IA', t1_1_a, t2_1_ab, t2_1_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, nocc_b:] -= 0.666666668 * einsum('Ia,iA,ia->IA', t1_1_b, t1_1_b, t1_1_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, nocc_b:] -= 0.666666668 * \
+        rdm1_b[:nocc_b, nocc_b:] -= 2/3 * einsum('Ia,iA,ia->IA', t1_1_b, t1_1_b, t1_1_b, optimize = einsum_type)
+        rdm1_b[:nocc_b, nocc_b:] -= 2/3 * \
             einsum('Ia,ijba,ijbA->IA', t1_1_b, t2_1_ab, t2_1_ab, optimize = einsum_type)
-        rdm1_b[:nocc_b, nocc_b:] -= 0.666666668 * \
+        rdm1_b[:nocc_b, nocc_b:] -= 2/3 * \
             einsum('iA,jiab,jIab->IA', t1_1_b, t2_1_ab, t2_1_ab, optimize = einsum_type)
-        rdm1_b[:nocc_b, nocc_b:] += 0.166666667 * \
+        rdm1_b[:nocc_b, nocc_b:] += 1/6 * \
             einsum('ia,jiba,jIbA->IA', t1_1_b, t2_1_ab, t2_1_ab, optimize = einsum_type)
-        rdm1_b[:nocc_b, nocc_b:] -= 0.333333334 * \
+        rdm1_b[:nocc_b, nocc_b:] -= 1/3 * \
             einsum('Ia,ijab,ijAb->IA', t1_1_b, t2_1_b, t2_1_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, nocc_b:] -= 0.333333334 * \
+        rdm1_b[:nocc_b, nocc_b:] -= 1/3 * \
             einsum('iA,ijab,Ijab->IA', t1_1_b, t2_1_b, t2_1_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, nocc_b:] += 0.166666667 * \
+        rdm1_b[:nocc_b, nocc_b:] += 1/6 * \
             einsum('ia,ijab,IjAb->IA', t1_1_b, t2_1_b, t2_1_b, optimize = einsum_type)
 
         ###### VIR-OCC ###
@@ -301,13 +302,13 @@ def make_ref_rdm1(adc):
         rdm1_a[nocc_a:, nocc_a:] += einsum('ijBa,ijAa->AB', t2_1_ab, t2_2_ab, optimize = einsum_type)
         rdm1_a[nocc_a:, nocc_a:] += einsum('iA,iB->AB', t1_1_a, t1_2_a, optimize = einsum_type)
         rdm1_a[nocc_a:, nocc_a:] += einsum('iB,iA->AB', t1_1_a, t1_2_a, optimize = einsum_type)
-        rdm1_a[nocc_a:, nocc_a:] += 0.500000001 * \
+        rdm1_a[nocc_a:, nocc_a:] += 1/2 * \
             einsum('iA,ja,ijBa->AB', t1_1_a, t1_1_b, t2_1_ab, optimize = einsum_type)
-        rdm1_a[nocc_a:, nocc_a:] += 0.500000001 * \
+        rdm1_a[nocc_a:, nocc_a:] += 1/2 * \
             einsum('iB,ja,ijAa->AB', t1_1_a, t1_1_b, t2_1_ab, optimize = einsum_type)
-        rdm1_a[nocc_a:, nocc_a:] += 0.500000001 * \
+        rdm1_a[nocc_a:, nocc_a:] += 1/2 * \
             einsum('ijAa,iB,ja->AB', t2_1_a, t1_1_a, t1_1_a, optimize = einsum_type)
-        rdm1_a[nocc_a:, nocc_a:] += 0.500000001 * \
+        rdm1_a[nocc_a:, nocc_a:] += 1/2 * \
             einsum('ijBa,iA,ja->AB', t2_1_a, t1_1_a, t1_1_a, optimize = einsum_type)
 
         rdm1_b[nocc_b:, nocc_b:] += einsum('ijaA,ijaB->AB', t2_1_ab, t2_2_ab, optimize = einsum_type)
@@ -316,20 +317,21 @@ def make_ref_rdm1(adc):
         rdm1_b[nocc_b:, nocc_b:] += 1/2 * einsum('ijBa,ijAa->AB', t2_1_b, t2_2_b, optimize = einsum_type)
         rdm1_b[nocc_b:, nocc_b:] += einsum('iA,iB->AB', t1_1_b, t1_2_b, optimize = einsum_type)
         rdm1_b[nocc_b:, nocc_b:] += einsum('iB,iA->AB', t1_1_b, t1_2_b, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] += 0.500000001 * \
+        rdm1_b[nocc_b:, nocc_b:] += 1/2 * \
             einsum('ia,jA,ijaB->AB', t1_1_a, t1_1_b, t2_1_ab, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] += 0.500000001 * \
+        rdm1_b[nocc_b:, nocc_b:] += 1/2 * \
             einsum('ia,jB,ijaA->AB', t1_1_a, t1_1_b, t2_1_ab, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] += 0.500000001 * \
+        rdm1_b[nocc_b:, nocc_b:] += 1/2 * \
             einsum('ijAa,iB,ja->AB', t2_1_b, t1_1_b, t1_1_b, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] += 0.500000001 * \
+        rdm1_b[nocc_b:, nocc_b:] += 1/2 * \
             einsum('ijBa,iA,ja->AB', t2_1_b, t1_1_b, t1_1_b, optimize = einsum_type)
 
     return (rdm1_a, rdm1_b)
 
 def get_fno_ref(myadc,nroots,ref_state,guess):
     adc2_ref = UADC(myadc._scf,myadc.frozen).set(verbose = 0,method_type = myadc.method_type,
-                    with_df = myadc.with_df,if_naf = myadc.if_naf,thresh_naf = myadc.thresh_naf)
+                    with_df = myadc.with_df,if_naf = myadc.if_naf,thresh_naf = myadc.thresh_naf,
+                    ncvs = myadc.ncvs, approx_trans_moments = True)
     myadc.e2_ref,myadc.v2_ref,_,_ = adc2_ref.kernel(nroots,guess)
     rdm1_gs = adc2_ref.make_ref_rdm1()
     if ref_state is not None:
@@ -365,7 +367,6 @@ def make_fno(myadc, rdm1_ss, mf, thresh):
         n,V = np.linalg.eigh(rdm1_ss_ro[nocc:,nocc:])
         idx = np.argsort(n)[::-1]
         n,V = n[idx], V[:,idx]
-        print(n)
         T = n > thresh
         n_fro_vir = np.sum(T == 0)
         T = np.diag(T)
@@ -375,7 +376,6 @@ def make_fno(myadc, rdm1_ss, mf, thresh):
         moeoccfrz0, moeocc, moevir, moevirfrz0 = [mf.mo_energy[m] for m in masks]
         orboccfrz0, orbocc, orbvir, orbvirfrz0 = [mf.mo_coeff[:,m] for m in masks]
         F_can =  np.diag(moevir)
-        print(F_can)
         F_na_trunc = V_trunc.T.dot(F_can).dot(V_trunc)
         _,Z_na_trunc = np.linalg.eigh(F_na_trunc[:n_keep,:n_keep])
         U_vir_act = orbvir.dot(V_trunc[:,:n_keep]).dot(Z_na_trunc)
@@ -802,6 +802,44 @@ class UADC(lib.StreamObject):
         mem_incore = (max(nao_pair**2, nmo_a**4) + nmo_pair**2) * 2 * 8/1e6
         mem_now = lib.current_memory()[0]
 
+        if isinstance(self._scf, scf.rohf.ROHF):
+            nocc = max(self.nocc_a, self.nocc_b)
+            nvir = min(self.nvir_a, self.nvir_b)
+            nocc_fr = max(self._scf.mol.nelec[0], self._scf.mol.nelec[1]) - nocc
+            nvir_fr = self._scf.mo_coeff.shape[1] - nmo_a - nocc_fr
+
+            logger.info(self, '******** ADC Orbital Information ********')
+            logger.info(self, 'Number of Frozen Occupied Orbitals: %d', nocc_fr)
+            logger.info(self, 'Number of Frozen Virtual Orbitals: %d', nvir_fr)
+            logger.info(self, 'Number of Active Occupied Orbitals: %d', nocc)
+            logger.info(self, 'Number of Active Virtual Orbitals: %d', nvir)
+            if hasattr(self.frozen, '__len__'):
+                logger.info(self, 'Frozen Orbital List: %s', self.frozen)
+            logger.info(self, '*****************************************')
+
+        else:
+            nocc_fr_a = self._scf.nelec[0] - self.nocc_a
+            nocc_fr_b = self._scf.nelec[1] - self.nocc_b
+            nvir_fr_a = self._scf.mo_coeff[0].shape[1] - nmo_a - nocc_fr_a
+            nvir_fr_b = self._scf.mo_coeff[1].shape[1] - nmo_b - nocc_fr_b
+
+            logger.info(self, '******** ADC Orbital Information ********')
+            logger.info(self, 'Number of Frozen Occupied Alpha Orbitals: %d', nocc_fr_a)
+            logger.info(self, 'Number of Frozen Occupied Beta Orbitals: %d', nocc_fr_b)
+            logger.info(self, 'Number of Frozen Virtual Alpha Orbitals: %d', nvir_fr_a)
+            logger.info(self, 'Number of Frozen Virtual Beta Orbitals: %d', nvir_fr_b)
+            logger.info(self, 'Number of Active Occupied Alpha Orbitals: %d', self.nocc_a)
+            logger.info(self, 'Number of Active Occupied Beta Orbitals: %d', self.nocc_b)
+            logger.info(self, 'Number of Active Virtual Alpha Orbitals: %d', self.nvir_a)
+            logger.info(self, 'Number of Active Virtual Beta Orbitals: %d', self.nvir_b)
+
+            if hasattr(self.frozen, '__len__'):
+                if hasattr(self.frozen[0], '__len__'):
+                    logger.info(self, 'Frozen Orbital List (Alpha): %s', self.frozen[0])
+                if hasattr(self.frozen[1], '__len__'):
+                    logger.info(self, 'Frozen Orbital List (Beta): %s', self.frozen[1])
+            logger.info(self, '*****************************************')
+
         if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
             if getattr(self, 'with_df', None):
                 self.with_df = self.with_df
@@ -843,6 +881,44 @@ class UADC(lib.StreamObject):
         nao_pair = nao * (nao+1) // 2
         mem_incore = (max(nao_pair**2, nmo_a**4) + nmo_pair**2) * 2 * 8/1e6
         mem_now = lib.current_memory()[0]
+
+        if isinstance(self._scf, scf.rohf.ROHF):
+            nocc = max(self.nocc_a, self.nocc_b)
+            nvir = min(self.nvir_a, self.nvir_b)
+            nocc_fr = max(self._scf.mol.nelec[0], self._scf.mol.nelec[1]) - nocc
+            nvir_fr = self._scf.mo_coeff.shape[1] - nmo_a - nocc_fr
+
+            logger.info(self, '******** ADC Orbital Information ********')
+            logger.info(self, 'Number of Frozen Occupied Orbitals: %d', nocc_fr)
+            logger.info(self, 'Number of Frozen Virtual Orbitals: %d', nvir_fr)
+            logger.info(self, 'Number of Active Occupied Orbitals: %d', nocc)
+            logger.info(self, 'Number of Active Virtual Orbitals: %d', nvir)
+            if hasattr(self.frozen, '__len__'):
+                logger.info(self, 'Frozen Orbital List: %s', self.frozen)
+            logger.info(self, '*****************************************')
+
+        else:
+            nocc_fr_a = self._scf.nelec[0] - self.nocc_a
+            nocc_fr_b = self._scf.nelec[1] - self.nocc_b
+            nvir_fr_a = self._scf.mo_coeff[0].shape[1] - nmo_a - nocc_fr_a
+            nvir_fr_b = self._scf.mo_coeff[1].shape[1] - nmo_b - nocc_fr_b
+
+            logger.info(self, '******** ADC Orbital Information ********')
+            logger.info(self, 'Number of Frozen Occupied Alpha Orbitals: %d', nocc_fr_a)
+            logger.info(self, 'Number of Frozen Occupied Beta Orbitals: %d', nocc_fr_b)
+            logger.info(self, 'Number of Frozen Virtual Alpha Orbitals: %d', nvir_fr_a)
+            logger.info(self, 'Number of Frozen Virtual Beta Orbitals: %d', nvir_fr_b)
+            logger.info(self, 'Number of Active Occupied Alpha Orbitals: %d', self.nocc_a)
+            logger.info(self, 'Number of Active Occupied Beta Orbitals: %d', self.nocc_b)
+            logger.info(self, 'Number of Active Virtual Alpha Orbitals: %d', self.nvir_a)
+            logger.info(self, 'Number of Active Virtual Beta Orbitals: %d', self.nvir_b)
+
+            if hasattr(self.frozen, '__len__'):
+                if hasattr(self.frozen[0], '__len__'):
+                    logger.info(self, 'Frozen Orbital List (Alpha): %s', self.frozen[0])
+                if hasattr(self.frozen[1], '__len__'):
+                    logger.info(self, 'Frozen Orbital List (Beta): %s', self.frozen[1])
+            logger.info(self, '*****************************************')
 
         if eris is None:
             if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
@@ -889,7 +965,6 @@ class UADC(lib.StreamObject):
             if self.if_naf:
                 return e_exc, v_exc, spec_fac, X, eris, self.naux
             else:
-                eris.vvvv = None
                 return e_exc, v_exc, spec_fac, X, eris
         else:
             return e_exc, v_exc, spec_fac, X
@@ -947,6 +1022,7 @@ class UADC(lib.StreamObject):
     def make_rdm1(self):
         return self._adc_es.make_rdm1()
 
+
 class UFNOADC(UADC):
     #J. Chem. Phys. 159, 084113 (2023)
     _keys = UADC._keys | {'delta_e','e2_ref', 'v2_ref'
@@ -974,35 +1050,41 @@ class UFNOADC(UADC):
                 self.with_df = self._scf.with_df
         adc2_ssfno = UADC(mf, frozen, self.mo_coeff).set(verbose = 0,method_type = self.method_type,
                                                          with_df = self.with_df,if_naf = self.if_naf,
-                                                         thresh_naf = self.thresh_naf,naux = self.naux)
+                                                         thresh_naf = self.thresh_naf,naux = self.naux,
+                                                         ncvs = self.ncvs, approx_trans_moments = True)
         e2_ssfno,v2_ssfno,p2_ssfno,x2_ssfno = adc2_ssfno.kernel(nroots, eris = eris, guess = guess)
         self.delta_e = self.e2_ref - e2_ssfno
 
     def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, ref_state = None):
         import copy
+        cput0 = (logger.process_clock(), logger.perf_counter())
+        log = logger.Logger(self.stdout, self.verbose)
+
         self.frozen = copy.deepcopy(self.frozen_core)
         self.ref_state = ref_state
         self.naux = None
         self.if_heri_eris = True
+
         if ref_state is None:
             print("Do fno adc calculation")
-            self.if_naf = False
         elif isinstance(ref_state, int) and 0<ref_state<=nroots:
             print(f"Do ss-fno adc calculation, the specic state is {ref_state}")
-            if self.with_df is None:
-                self.if_naf = False
         else:
             raise ValueError("ref_state should be an int type and in (0,nroots]")
 
-        print(f"number of origin orbital is {self._nmo}")
+        if not getattr(self, 'with_df', None) and not getattr(self._scf, 'with_df', None):
+                self.if_naf = False
+
         get_fno_ref(self, nroots, self.ref_state, guess)
         self.mo_coeff,self.frozen = make_fno(self, self.rdm1_ss, self._scf, thresh)
         adc3_ssfno = UADC(self._scf, self.frozen, self.mo_coeff).set(verbose = self.verbose,
-                                                                     method_type = self.method_type,method = "adc(3)",
+                                                                     method_type = self.method_type,method = self.method,
                                                                      with_df = self.with_df,
                                                                      if_naf = self.if_naf,thresh_naf = self.thresh_naf,
-                                                                     if_heri_eris = self.if_heri_eris)
-        print(f"number of new orbital is {adc3_ssfno._nmo}")
+                                                                     if_heri_eris = self.if_heri_eris,ncvs = self.ncvs)
+
+        log.timer('get frozen info', *cput0)
+
         if self.if_naf:
             if self.trans_guess:
                 e_exc, v_exc, spec_fac, x, eris, self.naux = adc3_ssfno.kernel(nroots, guess=self.v2_ref, eris=eris)
@@ -1013,9 +1095,14 @@ class UFNOADC(UADC):
                 e_exc, v_exc, spec_fac, x, eris = adc3_ssfno.kernel(nroots, guess=self.v2_ref, eris=eris)
             else:
                 e_exc, v_exc, spec_fac, x, eris = adc3_ssfno.kernel(nroots, guess, eris)
+
+        log.timer('ADC3', *cput0)
+
         if self.correction:
             self.compute_correction(self._scf, self.frozen, nroots, eris, guess=v_exc)
             e_exc = e_exc + self.delta_e
+
+        log.timer('RFNOADC', *cput0)
 
         return e_exc, v_exc, spec_fac, x
 

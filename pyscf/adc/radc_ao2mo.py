@@ -44,8 +44,9 @@ def transform_integrals_incore(myadc):
     eris.ovvv = ao2mo.general(myadc._scf._eri, (occ, vir, vir, vir), compact=True).reshape(nocc, nvir, -1).copy()  # noqa: E501
     eris.vvvv = None
 
-    if ((myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False)
-        or (myadc.method == "adc(2)-x" and myadc.method_type == "ee")
+    if ((myadc.method == "adc(2)" and myadc.method_type == "ee" and myadc.approx_trans_moments is False)
+        or (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False)
+        or (myadc.method == "adc(2)-x" and myadc.method_type != "ip")
         or (myadc.method == "adc(3)")):
         eris.vvvv = ao2mo.general(myadc._scf._eri, (vir, vir, vir, vir),
                                 compact=False).reshape(nvir, nvir, nvir, nvir)
@@ -155,8 +156,9 @@ def transform_integrals_outcore(myadc):
 
     ############### forming eris_vvvv ########################################
 
-    if ((myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False)
-        or (myadc.method == "adc(2)-x" and myadc.method_type == "ee")
+    if ((myadc.method == "adc(2)" and myadc.method_type == "ee" and myadc.approx_trans_moments is False)
+        or (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False)
+        or (myadc.method == "adc(2)-x" and myadc.method_type != "ip")
         or (myadc.method == "adc(3)")):
 
         eris.vvvv = []
@@ -277,10 +279,7 @@ def calculate_chunk_size(myadc):
     avail_mem = (myadc.max_memory - lib.current_memory()[0]) * 0.5
     vvv_mem = (myadc._nvir**3) * 8/1e6
 
-    if vvv_mem == 0:
-        chnk_size = 1
-    else:
-        chnk_size =  int(avail_mem/vvv_mem)
+    chnk_size =  int(avail_mem/vvv_mem)
 
     if chnk_size <= 0 :
         chnk_size = 1

@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 # Author: Terrence Stahl <terrencestahl@gmail.com>
+#         Ning-Yuan Chen <cny003@outlook.com>
 #         Alexander Sokolov <alexander.y.sokolov@gmail.com>
 #
 
@@ -25,6 +26,7 @@ from pyscf.lib import logger
 from pyscf.adc import radc
 from pyscf.adc import radc_ao2mo, radc_amplitudes
 from pyscf.adc import dfadc
+from pyscf import symm
 
 def get_imds(adc, eris=None):
 
@@ -1095,22 +1097,251 @@ def matvec(adc, M_ab=None, eris=None):
 
 def get_trans_moments(adc):
 
-    '''
-    nmo  = adc.nmo
-    T = []
-    for orb in range(nmo):
+    U = renormalize_eigenvectors(adc)
 
-        T_a = get_trans_moments_orbital(adc,orb)
-        T.append(T_a)
+    U = U.T.copy()
 
-    T = np.array(T)
-    '''
-    return None
+    nocc = adc._nocc
+    nvir = adc._nvir
 
+    nmo = nocc + nvir
 
-def get_trans_moments_orbital(adc, orb):
+    n_singles = nocc * nvir
+    n_doubles = nocc * nocc * nvir * nvir
 
-    return None
+    s1 = 0
+    f1 = n_singles
+    s2 = f1
+    f2 = s2 + n_doubles
+
+    t1 = adc.t1
+    t2 = adc.t2
+
+    t1_ccee = t2[0][:]
+
+    if adc.t1[0] is not None:
+        t2_ce = t1[0]
+    else:
+        t2_ce = np.zeros((nocc, nvir))
+
+    if adc.t2[1] is not None:
+        t2_ccee = t2[1][:]
+    else:
+        t2_ccee = np.zeros((nocc, nocc, nvir, nvir))
+
+    einsum = lib.einsum
+    einsum_type = True
+
+    TY = np.zeros((nmo, nmo))
+
+    TY_ = []
+
+    for r in range(U.shape[0]):
+
+        r1 = U[r][s1:f1]
+
+        Y = r1.reshape(nocc, nvir).copy()
+        r2 = U[r][s2:f2].reshape(nocc,nocc,nvir,nvir).copy()
+
+        TY[:nocc, nocc:]  = einsum('IC->IC', Y, optimize = einsum_type).copy()
+
+        TY[nocc:,:nocc]  = einsum('ia,LiAa->AL', Y, t1_ccee, optimize = einsum_type)
+        TY[nocc:,:nocc] -= einsum('ia,iLAa->AL', Y, t1_ccee, optimize = einsum_type)
+
+        TY[nocc:,:nocc] += einsum('ia,LiAa->AL', Y, t1_ccee, optimize = einsum_type)
+
+        TY[:nocc, :nocc] =- einsum('Ia,La->IL', Y, t2_ce, optimize = einsum_type)
+        TY[nocc:,nocc:]  = einsum('iC,iA->AC', Y, t2_ce, optimize = einsum_type)
+
+        TY[:nocc,nocc:] +=- einsum('Ia,ijab,ijCb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] += 1/2 * einsum('Ia,ijab,jiCb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] -= einsum('iC,ijab,Ijab->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] += 1/2 * einsum('iC,ijab,Ijba->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] += einsum('ia,ijab,IjCb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] -= 1/2 * einsum('ia,ijab,jICb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] -= 1/2 * einsum('ia,ijba,IjCb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] += 1/2 * einsum('ia,ijba,jICb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+
+        TY[nocc:,:nocc] += einsum('ia,LiAa->AL', Y, t2_ccee, optimize = einsum_type)
+        TY[nocc:,:nocc] -= einsum('ia,iLAa->AL', Y, t2_ccee, optimize = einsum_type)
+
+        TY[:nocc,nocc:] += einsum('ia,ijab,IjCb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] -= 1/2 * einsum('ia,ijab,jICb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+        TY[:nocc,nocc:] -= 1/2 * einsum('ia,ijba,IjCb->IC', Y, t1_ccee, t1_ccee, optimize = einsum_type)
+
+        TY[nocc:,:nocc]  += einsum('ia,LiAa->AL', Y, t2_ccee, optimize = einsum_type)
+
+        TY[:nocc,:nocc] +=- 2 * einsum('Iiab,Liab->IL', r2, t1_ccee, optimize = einsum_type)
+        TY[:nocc,:nocc] += einsum('Iiab,Liba->IL', r2, t1_ccee, optimize = einsum_type)
+
+        TY[nocc:,nocc:] += 2 * einsum('ijCa,ijAa->AC', r2, t1_ccee, optimize = einsum_type)
+        TY[nocc:,nocc:] -=   einsum('ijCa,jiAa->AC', r2, t1_ccee, optimize = einsum_type)
+
+        if (adc.method == "adc(2)-x") or (adc.method == "adc(3)"):
+
+            TY[:nocc, :nocc] +=- 2 * einsum('Iiab,Jiab->IJ', r2, t2_ccee, optimize = einsum_type)
+            TY[:nocc, :nocc] += einsum('Iiab,Jiba->IJ', r2, t2_ccee, optimize = einsum_type)
+
+            TY[nocc:, nocc:] += 2 * einsum('ijBa,ijAa->AB', r2, t2_ccee, optimize = einsum_type)
+            TY[nocc:, nocc:] -= einsum('ijBa,jiAa->AB', r2, t2_ccee, optimize = einsum_type)
+
+        if (adc.method == "adc(3)"):
+
+            if adc.t1[1] is not None:
+                t3_ce = adc.t1[1]
+            else:
+                t3_ce = np.zeros((nocc, nvir))
+
+            TY[:nocc,:nocc] -= einsum('Ia,La->IL', Y, t3_ce, optimize = einsum_type)
+            TY[:nocc,:nocc] -= einsum('Ia,Liab,ib->IL', Y, t1_ccee, t2_ce, optimize = einsum_type)
+            TY[:nocc,:nocc] += 1/2 * einsum('Ia,Liba,ib->IL', Y, t1_ccee, t2_ce, optimize = einsum_type)
+            TY[:nocc,:nocc] += einsum('ia,Liab,Ib->IL', Y, t1_ccee, t2_ce, optimize = einsum_type)
+            TY[:nocc,:nocc] -= einsum('ia,Liba,Ib->IL', Y, t1_ccee, t2_ce, optimize = einsum_type)
+
+            TY[nocc:,nocc:] += einsum('iC,iA->AC', Y, t3_ce, optimize = einsum_type)
+            TY[nocc:,nocc:] += einsum('iC,ijAa,ja->AC', Y, t1_ccee, t2_ce, optimize = einsum_type)
+            TY[nocc:,nocc:] -= 1/2 * einsum('iC,jiAa,ja->AC', Y, t1_ccee, t2_ce, optimize = einsum_type)
+            TY[nocc:,nocc:] -= einsum('ia,ijAa,jC->AC', Y, t1_ccee, t2_ce, optimize = einsum_type)
+            TY[nocc:,nocc:] += einsum('ia,jiAa,jC->AC', Y, t1_ccee, t2_ce, optimize = einsum_type)
+
+            TY[:nocc,nocc:] +=- einsum('Ia,ijCb,ijab->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] += 1/2 * einsum('Ia,ijCb,jiab->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= einsum('Ia,ijab,ijCb->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] += 1/2 * einsum('Ia,ijab,jiCb->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= einsum('iC,Ijab,ijab->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] += 1/2 * einsum('iC,Ijab,ijba->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= einsum('iC,ijab,Ijab->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] += 1/2 * einsum('iC,ijab,Ijba->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] += einsum('ia,IjCb,ijab->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= 1/2 * einsum('ia,IjCb,ijba->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] += einsum('ia,ijab,IjCb->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= 1/2 * einsum('ia,ijab,jICb->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= 1/2 * einsum('ia,ijba,IjCb->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] += 1/2 * einsum('ia,ijba,jICb->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= 1/2 * einsum('ia,jICb,ijab->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] += 1/2 * einsum('ia,jICb,ijba->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+
+            TY[:nocc,:nocc] +=- einsum('ia,Liba,Ib->IL', Y, t1_ccee, t2_ce, optimize = einsum_type)
+
+            TY[nocc:,nocc:] += einsum('ia,jiAa,jC->AC', Y, t1_ccee, t2_ce, optimize = einsum_type)
+
+            TY[:nocc,nocc:] += einsum('ia,IjCb,ijab->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= 1/2 * einsum('ia,IjCb,ijba->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] += einsum('ia,ijab,IjCb->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= 1/2 * einsum('ia,ijab,jICb->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= 1/2 * einsum('ia,ijba,IjCb->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+            TY[:nocc,nocc:] -= 1/2 * einsum('ia,jICb,ijab->IC', Y, t1_ccee, t2_ccee, optimize = einsum_type)
+
+            #TY[nocc:,:nocc] += einsum('ia,LiAa->AL', Y, t3, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 1/3 * einsum('ia,LiAb,jkac,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 1/6 * einsum('ia,LiAb,jkac,kjbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 4/3 * einsum('ia,Liba,jkAc,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 2/3 * einsum('ia,Liba,jkAc,kjbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 2/3 * einsum('ia,Libc,jkAa,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 2/3 * einsum('ia,ijab,LkAc,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 1/3 * einsum('ia,ijab,LkAc,jkcb->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 1/3 * einsum('ia,ijab,kLAc,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 1/6 * einsum('ia,ijab,kLAc,jkcb->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 1/3 * einsum('ia,ijba,LkAc,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 1/6 * einsum('ia,ijba,LkAc,jkcb->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 1/6 * einsum('ia,ijba,kLAc,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 1/6 * einsum('ia,ijbc,LkAa,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 1/3 * einsum('ia,ijbc,LkAa,jkcb->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 4/3 * einsum('ia,jiAa,Lkbc,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 2/3 * einsum('ia,jiAa,Lkbc,jkcb->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 2/3 * einsum('ia,jiAb,Lkca,kjbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+
+            #TY[nocc:,:nocc] += einsum('ia,LiAa->AL', Y, t3, optimize = einsum_type)
+            #TY[nocc:,:nocc] -= einsum('ia,LiaA->AL', Y, t3, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 1/3 * einsum('ia,LiAb,jkac,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 1/6 * einsum('ia,LiAb,jkac,kjbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 4/3 * einsum('ia,Liab,jkAc,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 2/3 * einsum('ia,Liab,jkAc,kjbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 4/3 * einsum('ia,Liba,jkAc,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 2/3 * einsum('ia,Liba,jkAc,kjbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 2/3 * einsum('ia,Libc,jkAa,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 2/3 * einsum('ia,Libc,jkAa,kjbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 1/3 * einsum('ia,iLAb,jkac,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 1/6 * einsum('ia,iLAb,jkac,kjbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 4/3 * einsum('ia,ijAa,Lkbc,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 2/3 * einsum('ia,ijAa,Lkbc,jkcb->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 8/3 * einsum('ia,ijAb,Lkac,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 4/3 * einsum('ia,ijAb,Lkac,kjbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 4/3 * einsum('ia,ijAb,Lkca,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 2/3 * einsum('ia,ijAb,Lkca,kjbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 2/3 * einsum('ia,ijab,LkAc,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 1/3 * einsum('ia,ijab,LkAc,jkcb->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 1/3 * einsum('ia,ijab,kLAc,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 1/6 * einsum('ia,ijab,kLAc,jkcb->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 1/3 * einsum('ia,ijba,LkAc,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 1/6 * einsum('ia,ijba,LkAc,jkcb->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 1/6 * einsum('ia,ijba,kLAc,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 1/6 * einsum('ia,ijba,kLAc,jkcb->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 1/6 * einsum('ia,ijbc,LkAa,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 1/3 * einsum('ia,ijbc,LkAa,jkcb->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 1/6 * einsum('ia,ijbc,kLAa,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 1/3 * einsum('ia,ijbc,kLAa,jkcb->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 4/3 * einsum('ia,jiAa,Lkbc,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 2/3 * einsum('ia,jiAa,Lkbc,jkcb->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 4/3 * einsum('ia,jiAb,Lkac,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 2/3 * einsum('ia,jiAb,Lkac,kjbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] -= 2/3 * einsum('ia,jiAb,Lkca,jkbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+            TY[nocc:,:nocc] += 2/3 * einsum('ia,jiAb,Lkca,kjbc->AL', Y,
+                                                    t1_ccee, t1_ccee, t1_ccee, optimize = einsum_type)
+
+        TY_ = np.append(TY_,TY)
+
+    return TY_
 
 
 def analyze_eigenvector(adc):
@@ -1192,7 +1423,52 @@ def analyze_eigenvector(adc):
 
 def analyze_spec_factor(adc):
 
-    return None
+    X = adc.X
+    nroots = X.shape[0]
+    X = X.reshape(nroots, -1)
+
+    X_2 = (X.copy()**2)*2
+    thresh = adc.spec_factor_print_tol
+
+    nmo = adc._nmo
+
+    logger.info(adc, "Print spectroscopic factors > %E\n", adc.spec_factor_print_tol)
+
+    for i in range(X_2.shape[0]):
+
+        sort = np.argsort(-X_2[i,:])
+        X_2_row = X_2[i,:]
+        X_2_row = X_2_row[sort]
+
+        if not adc.mol.symmetry:
+            sym = np.repeat(['A'], nmo)
+        else:
+            sym = [symm.irrep_id2name(adc.mol.groupname, x) for x in adc._scf.mo_coeff.orbsym]
+            sym = np.array(sym)
+
+            sym = sym[sort]
+
+        spec_Contribution = X_2_row[X_2_row > thresh]
+
+        if np.sum(spec_Contribution) == 0.0:
+            continue
+
+        logger.info(adc, '%s | root %d | Energy (eV) = %12.8f \n',
+                adc.method, i, adc.E[i]*27.2114)
+        logger.info(adc, "     Hole_MO     Particle_MO     Spec. Contribution     Orbital symmetry")
+        logger.info(adc, "-----------------------------------------------------------")
+
+        for hp in range(spec_Contribution.shape[0]):
+            P = ((sort[hp]) % nmo)
+            H = ((sort[hp]) // nmo)
+
+            logger.info(adc, '     %3.d             %3.d          %10.8f                %s -> %s',
+                        (H+1), (P+1), spec_Contribution[hp], sym[H], sym[P])
+
+        logger.info(adc, '\nPartial spec. factor sum = %10.8f', np.sum(spec_Contribution))
+        logger.info(adc,
+        "***********************************************************\n")
+
 
 def renormalize_eigenvectors(adc, nroots=1):
 
@@ -1215,17 +1491,23 @@ def renormalize_eigenvectors(adc, nroots=1):
 
 def get_properties(adc, nroots=1):
 
-    #Transition moments
-    #T = adc.get_trans_moments()
+    TY  = adc.get_trans_moments()
 
-    #Spectroscopic amplitudes
-    #U = adc.renormalize_eigenvectors(nroots)
-    #X = np.dot(T, U).reshape(-1, nroots)
-    X = None
+    nocc = adc._nocc
+    nvir = adc._nvir
 
-    #Spectroscopic factors
-    #P = 2.0*lib.einsum("pi,pi->i", X, X)
-    P = None
+    nmo = nocc + nvir
+
+    dm = adc.dip_mom
+
+    X = TY.reshape(nroots, nmo, nmo)
+    DX = lib.einsum("xqp,nqp->xn", dm, X, optimize=True)
+
+    spec_intensity = np.conj(DX[0]) * DX[0]
+    spec_intensity += np.conj(DX[1]) * DX[1]
+    spec_intensity += np.conj(DX[2]) * DX[2]
+
+    P = 2*spec_intensity*adc.E*(2.0/3.0)
 
     return P,X
 
@@ -1247,14 +1529,13 @@ def analyze(myadc):
             "\n*************************************************************")
         logger.info(myadc, header)
 
-        #myadc.analyze_spec_factor()
+        myadc.analyze_spec_factor()
 
 def make_rdm1(adc):
     cput0 = (logger.process_clock(), logger.perf_counter())
     log = logger.Logger(adc.stdout, adc.verbose)
 
     nroots = adc.U.shape[1]
-    #U = adc.U
     U = adc.renormalize_eigenvectors(nroots)
 
     list_rdm1 = []
@@ -1272,7 +1553,6 @@ def make_rdm1_eigenvectors(adc, L, R):
     L = np.array(L).ravel()
     R = np.array(R).ravel()
 
-    t2_ce = adc.t1[0][:]
     t1_ccee = adc.t2[0][:]
 
     einsum = lib.einsum
@@ -1281,9 +1561,15 @@ def make_rdm1_eigenvectors(adc, L, R):
     nocc = adc._nocc
     nvir = adc._nvir
     nmo = nocc + nvir
-
     n_singles = nocc * nvir
     n_doubles = nocc * nocc * nvir * nvir
+
+    if adc.t1[0] is not None:
+        t2_ce = adc.t1[0]
+    else:
+        t2_ce = np.zeros((nocc, nvir))
+
+    occ_list = range(nocc)
 
     s1 = 0
     f1 = n_singles
@@ -1291,7 +1577,6 @@ def make_rdm1_eigenvectors(adc, L, R):
     f2 = s2 + n_doubles
 
     rdm1  = np.zeros((nmo,nmo))
-    ncore = nocc
 
     L1 = L[s1:f1]
     L2 = L[s2:f2]
@@ -1306,13 +1591,13 @@ def make_rdm1_eigenvectors(adc, L, R):
 ############# block- ij
     ### 000 ###
     rdm1[:nocc, :nocc] =- einsum('Ja,Ia->IJ', L1, R1, optimize = einsum_type)
-    rdm1[:nocc, :nocc] += 2 * einsum('ia,ia,IJ->IJ', L1, R1, np.identity(ncore), optimize = einsum_type)
+    rdm1[occ_list, occ_list] += 2 * einsum('ia,ia->', L1, R1, optimize = einsum_type)
 
     ### 101 ###
     rdm1[:nocc, :nocc] -= 2 * einsum('Jiab,Iiab->IJ', L2, R2, optimize = einsum_type)
     rdm1[:nocc, :nocc] += einsum('Jiab,Iiba->IJ', L2, R2, optimize = einsum_type)
-    rdm1[:nocc, :nocc] += 2 * einsum('ijab,ijab,IJ->IJ', L2, R2, np.identity(ncore), optimize = einsum_type)
-    rdm1[:nocc, :nocc] -= einsum('ijab,ijba,IJ->IJ', L2, R2, np.identity(ncore), optimize = einsum_type)
+    rdm1[occ_list, occ_list] += 2 * einsum('ijab,ijab->', L2, R2, optimize = einsum_type)
+    rdm1[occ_list, occ_list] -= einsum('ijab,ijba->', L2, R2, optimize = einsum_type)
 
     ### 020 ###
     rdm1[:nocc, :nocc] += einsum('Ja,ia,ijbc,Ijbc->IJ', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
@@ -1403,8 +1688,12 @@ def make_rdm1_eigenvectors(adc, L, R):
     if adc.method == "adc(3)":
         ### Redudant Variables used for names from SQA
         einsum_type = True
-        t3_ce = adc.t1[1][:]
         t2_ccee = adc.t2[1][:]
+
+        if adc.t1[1] is not None:
+            t3_ce = adc.t1[1]
+        else:
+            t3_ce = np.zeros((nocc, nvir))
         ###################################################
 
 ############# block- ij
@@ -1658,7 +1947,7 @@ class RADCEE(radc.RADC):
         'method_type', 'mo_coeff', 'mo_energy', 'max_memory',
         't1', 't2', 'max_space', 'max_cycle',
         'nocc', 'nvir', 'nmo', 'mol', 'transform_integrals',
-        'with_df', 'if_naf', 'naux', 'spec_factor_print_tol', 'evec_print_tol',
+        'with_df', 'if_naf', 'naux', 'dip_mom','spec_factor_print_tol', 'evec_print_tol',
         'compute_properties', 'approx_trans_moments', 'E', 'U', 'P', 'X',
     }
 
@@ -1684,6 +1973,7 @@ class RADCEE(radc.RADC):
         self.mo_coeff = adc.mo_coeff
         self.mo_energy = adc.mo_energy
         self.nmo = adc._nmo
+        self.dip_mom = adc.dip_mom
         self.transform_integrals = adc.transform_integrals
         self.with_df = adc.with_df
         self.compute_properties = adc.compute_properties
@@ -1694,6 +1984,7 @@ class RADCEE(radc.RADC):
         self.X = None
         self.evec_print_tol = adc.evec_print_tol
         self.spec_factor_print_tol = adc.spec_factor_print_tol
+        
         self.if_naf = adc.if_naf
         self.naux = adc.naux
 
@@ -1720,7 +2011,7 @@ class RADCEE(radc.RADC):
             return sigma_
 
         if (type=="cis"):
-            print("Generating CIS initial guess for eigenvector")
+            logger.info(self, "Generating CIS initial guess for eigenvector")
 
             ncore = self._nocc
             nextern = self._nvir
@@ -1757,12 +2048,12 @@ class RADCEE(radc.RADC):
                 max_cycle=self.max_cycle, max_space=self.max_space, tol_residual=self.tol_residual)
             nfalse = np.shape(conv)[0] - np.sum(conv)
             if nfalse >= 1:
-                print("ADC1 Davidson iterations for " + str(nfalse) + " root(s) did not converge!!!")
+                logger.warn(self, "ADC1 Davidson iterations for " + str(nfalse) + " root(s) did not converge!!!")
             g = np.array(g).T
             if not ascending:
                 g = g[:, ::-1]
         elif (type=="read"):
-            print("obtain initial guess from input variable")
+            logger.info(self, "obtain initial guess from input variable")
             ncore = self._nocc
             nextern = self._nvir
             n_singles = ncore * nextern
