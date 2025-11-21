@@ -127,13 +127,17 @@ def make_ref_rdm1(adc):
 
     t1 = adc.t1
     t2 = adc.t2
-    t2_ce = t1[0][:]
     t1_ccee = t2[0][:]
 
     ######################
     einsum_type = True
     nocc = adc._nocc
     nvir = adc._nvir
+
+    if adc.t1[0] is not None:
+        t2_ce = adc.t1[0][:]
+    else:
+        t2_ce = np.zeros((nocc, nvir))
 
     nmo = nocc + nvir
 
