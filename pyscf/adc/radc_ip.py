@@ -29,6 +29,7 @@ from pyscf.adc import radc
 from pyscf.adc import radc_ao2mo
 from pyscf.adc import dfadc
 from pyscf import symm
+from pyscf.data.nist import HARTREE2EV
 
 
 def get_imds(adc, eris=None):
@@ -649,7 +650,7 @@ def analyze_eigenvector(adc):
             iter_num += 1
 
         logger.info(adc,'%s | root %d | Energy (eV) = %12.8f | norm(1h)  = %6.4f | norm(2h1p) = %6.4f ',
-                    adc.method, I, adc.E[I]*27.2114, U1dotU1, U2dotU2)
+                    adc.method, I, adc.E[I]*HARTREE2EV, U1dotU1, U2dotU2)
 
         if singles_val:
             logger.info(adc, "\n1h block: ")
@@ -699,7 +700,7 @@ def analyze_spec_factor(adc):
             continue
 
         logger.info(adc, '%s | root %d | Energy (eV) = %12.8f \n',
-                adc.method, i, adc.E[i]*27.2114)
+                adc.method, i, adc.E[i]*HARTREE2EV)
         logger.info(adc, "     HF MO     Spec. Contribution     Orbital symmetry")
         logger.info(adc, "-----------------------------------------------------------")
 

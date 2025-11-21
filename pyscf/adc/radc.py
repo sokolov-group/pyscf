@@ -31,6 +31,7 @@ from pyscf.adc import radc_amplitudes
 from pyscf import __config__
 from pyscf import df
 from pyscf.mp import mp2
+from pyscf.data.nist import HARTREE2EV
 
 
 # Excited-state kernel
@@ -103,7 +104,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     for n in range(nroots):
         print_string = ('%s root %d  |  Energy (Eh) = %14.10f  |  Energy (eV) = %12.8f  ' %
-                        (adc.method, n, adc.E[n], adc.E[n]*27.2114))
+                        (adc.method, n, adc.E[n], adc.E[n]*HARTREE2EV))
         if adc.compute_properties and adc.method_type != "ee":
             print_string += ("|  Spec. factor = %10.8f  " % adc.P[n])
 
