@@ -617,11 +617,14 @@ class RFNOADC(RADC):
         get_fno_ref(self, nroots, self.ref_state, guess)
         self.mo_coeff,self.frozen = make_fno(self, self.rdm1_ss, self._scf, thresh)
         log.timer('get frozen info', *cput0)
+
         adc3_ssfno = RADC(self._scf, self.frozen, self.mo_coeff).set(verbose = self.verbose,
                                                             method_type = self.method_type,method = "adc(3)",
                                                             with_df = self.with_df,if_naf = self.if_naf,
                                                             thresh_naf = self.thresh_naf,
-                                                            if_heri_eris = self.if_heri_eris,approx_trans_moments = True)
+                                                            if_heri_eris = self.if_heri_eris,approx_trans_moments = True,
+                                                            conv_tol = self.conv_tol, tol_residual = self.tol_residual,
+                                                            max_space = self.max_space, max_cycle = self.max_cycle)
         print(self.frozen)
         print(f"number of new orbital is {get_nmo(adc3_ssfno,True)}")
         if self.if_naf:
@@ -629,8 +632,12 @@ class RFNOADC(RADC):
         else:
             e_exc, v_exc, spec_fac, x, eris = adc3_ssfno.kernel(nroots, guess, eris, kptlist=kptlist)
         log.timer('ADC3', *cput0)
+
         if self.correction:
             self.compute_correction(self._scf, self.frozen, nroots, eris, guess, kptlist=kptlist)
-            e_exc = e_exc + self.delta_e
+            if kptlist is not None:
+                e_exc = e_exc + self.delta_e[kptlist][:]
+            else:
+                e_exc = e_exc + self.delta_e
         log.timer('RFNOADC', *cput0)
         return e_exc, v_exc, spec_fac, x
