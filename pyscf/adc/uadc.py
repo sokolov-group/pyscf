@@ -453,7 +453,7 @@ class UADC(lib.StreamObject):
         if isinstance(mf, scf.rohf.ROHF):
 
             logger.info(mf, "\nROHF reference detected in ADC")
-            
+
             mo_occa = (mo_occ>1e-8).astype(np.double)
             mo_occb = mo_occ - mo_occa
             self.mo_occ = [mo_occa, mo_occb]
@@ -504,7 +504,7 @@ class UADC(lib.StreamObject):
                 self.f_ov = f_ov
                 self.mo_energy_a = mo_energy_a.copy()
                 self.mo_energy_b = mo_energy_b.copy()
-        
+
         elif isinstance(mf, scf.rohf.ROHF) and f_ov is None:
             raise ValueError("f_ov must be provided when mo_coeff is given for ROHF reference")
 
@@ -549,7 +549,7 @@ class UADC(lib.StreamObject):
             self._nocc = (int(occ_a.sum()), int(occ_b.sum()))
             self.mo_coeff = (self.mo_coeff[0][:,mask_a], self.mo_coeff[1][:,mask_b])
             if (self.mo_coeff_hf is self._scf.mo_coeff and self._scf.converged) or \
-                (isinstance(self._scf, scf.rohf.ROHF) and if_canonical):
+                    (isinstance(self._scf, scf.rohf.ROHF) and if_canonical):
                 self.mo_energy_a = self.mo_energy_a[mask_a]
                 self.mo_energy_b = self.mo_energy_b[mask_b]
                 if isinstance(self._scf, scf.rohf.ROHF):

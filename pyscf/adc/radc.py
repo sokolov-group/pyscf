@@ -563,7 +563,7 @@ class RADC(lib.StreamObject):
 
     def make_rdm1(self, with_frozen=True, ao_repr=False):
         list_rdm1 = self._adc_es.make_rdm1()
-        
+
         if with_frozen and self.frozen is not None:
             nmo = self.mo_occ.size
             nocc = np.count_nonzero(self.mo_occ > 0)
