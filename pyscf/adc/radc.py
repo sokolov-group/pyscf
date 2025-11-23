@@ -164,10 +164,10 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
     if adc.method == "adc(3)":
         t2_ccee = t2[1][:]
 
-    if t1[1] is not None:
-        t3_ce = t1[1][:]
-    else:
-        t3_ce = np.zeros((nocc, nvir))
+        if t1[1] is not None:
+            t3_ce = t1[1][:]
+        else:
+            t3_ce = np.zeros((nocc, nvir))
 
         #### OCC-OCC ###
         OPDM[:nocc, :nocc] -= 2 * lib.einsum('Iiab,Jiab->IJ',

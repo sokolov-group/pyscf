@@ -562,11 +562,13 @@ class UADC(lib.StreamObject):
                     f_ov_b = f_ov_b_tmp[:,vir_b[mf.nelec[1]:]]
                     self.f_ov = [f_ov_a, f_ov_b]
             else:
-                dm = self._scf.make_rdm1(mo_coeff, self.mo_occ)
-                vhf = self._scf.get_veff(self.mol, dm)
-                fockao_a, fockao_b = self._scf.get_fock(vhf=vhf, dm=dm)
-                fock_a = self.mo_coeff[0].conj().T.dot(fockao_a).dot(self.mo_coeff[0])
-                fock_b = self.mo_coeff[1].conj().T.dot(fockao_b).dot(self.mo_coeff[1])
+                h1e = mf.get_hcore()
+                dm = scf.uhf.make_rdm1(mo_coeff, self.mo_occ)
+                vhf = scf.uhf.get_veff(mf.mol, dm)
+                fock_a = h1e + vhf[0]
+                fock_b = h1e + vhf[1]
+                fock_a = self.mo_coeff[0].conj().T.dot(fock_a).dot(self.mo_coeff[0])
+                fock_b = self.mo_coeff[1].conj().T.dot(fock_b).dot(self.mo_coeff[1])
                 (self.mo_energy_a,self.mo_energy_b) = (fock_a.diagonal().real,fock_b.diagonal().real)
                 self.scf_energy = self._scf.energy_tot(dm=dm, vhf=vhf)
         else:
