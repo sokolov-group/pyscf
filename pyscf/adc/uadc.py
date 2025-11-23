@@ -867,7 +867,7 @@ class UADC(lib.StreamObject):
         return self._adc_es.compute_dyson_mo()
 
     def make_rdm1(self, with_frozen=True, ao_repr=False):
-        list_rdm1_a, list_rdm1_b = self._adc_es.make_rdm1()
+        list_rdm1_a, list_rdm1_b = self._adc_es._make_rdm1()
 
         if with_frozen and self.frozen is not None:
             nmo_a = self.mo_coeff_hf[0].shape[1]

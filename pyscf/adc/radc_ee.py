@@ -1946,11 +1946,12 @@ class RADCEE(radc.RADC):
 
     _keys = {
         'tol_residual', 'conv_tol', 'e_corr', 'method',
-        'method_type', 'mo_coeff', 'mo_energy', 'max_memory',
+        'method_type', 'mo_coeff', 'mo_coeff_hf', 'mo_energy', 'max_memory',
         't1', 't2', 'max_space', 'max_cycle',
         'nocc', 'nvir', 'nmo', 'mol', 'transform_integrals',
         'with_df', 'dip_mom','spec_factor_print_tol', 'evec_print_tol',
         'compute_properties', 'approx_trans_moments', 'E', 'U', 'P', 'X',
+        '_make_rdm1', 'frozen', 'mo_occ'
     }
 
     def __init__(self, adc):
@@ -1973,6 +1974,7 @@ class RADCEE(radc.RADC):
         self._nvir = adc._nvir
         self._nmo = adc._nmo
         self.mo_coeff = adc.mo_coeff
+        self.mo_coeff_hf = adc.mo_coeff_hf
         self.mo_energy = adc.mo_energy
         self.nmo = adc._nmo
         self.dip_mom = adc.dip_mom
@@ -1986,6 +1988,9 @@ class RADCEE(radc.RADC):
         self.X = None
         self.evec_print_tol = adc.evec_print_tol
         self.spec_factor_print_tol = adc.spec_factor_print_tol
+        self.frozen = adc.frozen
+        self.mo_occ = adc.mo_occ
+        self._adc_es = self
 
     kernel = radc.kernel
     get_imds = get_imds
@@ -1995,7 +2000,7 @@ class RADCEE(radc.RADC):
 
     renormalize_eigenvectors = renormalize_eigenvectors
     analyze = analyze
-    make_rdm1 = make_rdm1
+    _make_rdm1 = make_rdm1
     analyze_eigenvector = analyze_eigenvector
     analyze_spec_factor = analyze_spec_factor
     get_properties = get_properties

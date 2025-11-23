@@ -2097,11 +2097,11 @@ class UADCIP(uadc.UADC):
         'tol_residual','conv_tol', 'e_corr', 'method',
         'method_type', 'mo_coeff', 'mo_energy_b', 'max_memory',
         't1', 'mo_energy_a', 'max_space', 't2', 'max_cycle',
-        'nocc_a', 'nocc_b', 'nvir_a', 'nvir_b', 'mo_coeff',
+        'nocc_a', 'nocc_b', 'nvir_a', 'nvir_b', 'mo_coeff', 'mo_coeff_hf',
         'nmo_a', 'nmo_b', 'mol', 'transform_integrals',
         'with_df', 'spec_factor_print_tol', 'evec_print_tol',
         'compute_properties', 'approx_trans_moments', 'E', 'U', 'P', 'X',
-        'compute_spin_square'
+        'compute_spin_square', '_make_rdm1', 'mo_occ'
     }
 
     def __init__(self, adc):
@@ -2128,6 +2128,7 @@ class UADCIP(uadc.UADC):
         self.nvir_a = adc.nvir_a
         self.nvir_b = adc.nvir_b
         self.mo_coeff = adc.mo_coeff
+        self.mo_coeff_hf = adc.mo_coeff_hf
         self.mo_energy_a = adc.mo_energy_a
         self.mo_energy_b = adc.mo_energy_b
         self.nmo_a = adc._nmo[0]
@@ -2136,6 +2137,7 @@ class UADCIP(uadc.UADC):
         self.with_df = adc.with_df
         self.compute_properties = adc.compute_properties
         self.approx_trans_moments = adc.approx_trans_moments
+        self.mo_occ = adc.mo_occ
 
         self.spec_factor_print_tol = adc.spec_factor_print_tol
         self.evec_print_tol = adc.evec_print_tol
@@ -2148,6 +2150,8 @@ class UADCIP(uadc.UADC):
         self.X = adc.X
         self.frozen = adc.frozen
 
+        self._adc_es = self
+
     kernel = uadc.kernel
     get_imds = get_imds
     get_diag = get_diag
@@ -2159,7 +2163,7 @@ class UADCIP(uadc.UADC):
     analyze_eigenvector = analyze_eigenvector
     analyze = analyze
     compute_dyson_mo = compute_dyson_mo
-    make_rdm1 = make_rdm1
+    _make_rdm1 = make_rdm1
 
     def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None):
         if (type=="read"):

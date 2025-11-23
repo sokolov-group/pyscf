@@ -16791,7 +16791,7 @@ def get_spin_square(adc):
         raise NotImplementedError(adc.method)
 
     method = adc.method
-    dm_a, dm_b = adc.make_rdm1()
+    dm_a, dm_b = adc.make_rdm1(with_frozen=False)
 
     if adc.method == "adc(3)":
         logger.warn(
@@ -23931,12 +23931,13 @@ class UADCEE(uadc.UADC):
 
     _keys = {
         'tol_residual', 'conv_tol', 'e_corr', 'method',
-        'method_type', 'mo_coeff', 'mo_energy_a', 'mo_energy_b', 'max_memory',
+        'method_type', 'mo_coeff', 'mo_coeff_hf', 'mo_energy_a', 'mo_energy_b', 'max_memory',
         't1', 't2', 'max_space', 'max_cycle',
         'nocc_a', 'nocc_b', 'nvir_a', 'nvir_b', 'mo_energy_a',
         'mo_energy_b', 'nmo_a', 'nmo_b', 'mol', 'transform_integrals',
         'with_df', 'spec_factor_print_tol', 'evec_print_tol',
         'compute_properties', 'approx_trans_moments', 'E', 'U', 'P', 'X',
+        '_make_rdm1', 'frozen', 'mo_occ'
     }
 
     def __init__(self, adc):
@@ -23962,6 +23963,7 @@ class UADCEE(uadc.UADC):
         self.nvir_a = adc.nvir_a
         self.nvir_b = adc.nvir_b
         self.mo_coeff = adc.mo_coeff
+        self.mo_coeff_hf = adc.mo_coeff_hf
         self.mo_energy_a = adc.mo_energy_a
         self.mo_energy_b = adc.mo_energy_b
         self.nmo_a = adc._nmo[0]
@@ -23970,6 +23972,8 @@ class UADCEE(uadc.UADC):
         self.with_df = adc.with_df
         self.compute_properties = adc.compute_properties
         self.approx_trans_moments = adc.approx_trans_moments
+        self.frozen = adc.frozen
+        self.mo_occ = adc.mo_occ
 
         self.spec_factor_print_tol = adc.spec_factor_print_tol
         self.evec_print_tol = adc.evec_print_tol
@@ -23984,13 +23988,15 @@ class UADCEE(uadc.UADC):
         self.dip_mom = adc.dip_mom
         self.dip_mom_nuc = adc.dip_mom_nuc
 
+        self._adc_es = self
+
     kernel = uadc.kernel
     get_imds = get_imds
     get_diag = get_diag
     matvec = matvec
     get_trans_moments = get_trans_moments
     get_spin_square = get_spin_square
-    make_rdm1 = make_rdm1
+    _make_rdm1 = make_rdm1
     get_properties = get_properties
     analyze_eigenvector = analyze_eigenvector
 

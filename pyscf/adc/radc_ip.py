@@ -1354,11 +1354,12 @@ class RADCIP(radc.RADC):
 
     _keys = {
         'tol_residual','conv_tol', 'e_corr', 'method', 'mo_coeff',
-        'mo_energy_b', 't1', 'mo_energy_a',
+        'mo_coeff_hf', 'mo_energy_b', 't1', 'mo_energy_a',
         'max_space', 't2', 'max_cycle',
         'nmo', 'transform_integrals', 'with_df', 'compute_properties',
         'approx_trans_moments', 'E', 'U', 'P', 'X',
         'evec_print_tol', 'spec_factor_print_tol', 'frozen'
+        '_make_rdm1', 'mo_occ'
     }
 
     def __init__(self, adc):
@@ -1381,6 +1382,7 @@ class RADCIP(radc.RADC):
         self._nvir = adc._nvir
         self._nmo = adc._nmo
         self.mo_coeff = adc.mo_coeff
+        self.mo_coeff_hf = adc.mo_coeff_hf
         self.mo_energy = adc.mo_energy
         self.nmo = adc._nmo
         self.transform_integrals = adc.transform_integrals
@@ -1388,6 +1390,7 @@ class RADCIP(radc.RADC):
         self.compute_properties = adc.compute_properties
         self.approx_trans_moments = adc.approx_trans_moments
         self.frozen = adc.frozen
+        self.mo_occ = adc.mo_occ
 
         self.evec_print_tol = adc.evec_print_tol
         self.spec_factor_print_tol = adc.spec_factor_print_tol
@@ -1396,6 +1399,8 @@ class RADCIP(radc.RADC):
         self.U = adc.U
         self.P = adc.P
         self.X = adc.X
+
+        self._adc_es = self
 
     kernel = radc.kernel
     get_imds = get_imds
@@ -1409,7 +1414,7 @@ class RADCIP(radc.RADC):
     analyze_spec_factor = analyze_spec_factor
     analyze_eigenvector = analyze_eigenvector
     compute_dyson_mo = compute_dyson_mo
-    make_rdm1 = make_rdm1
+    _make_rdm1 = make_rdm1
 
     def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None):
         if (type=="read"):

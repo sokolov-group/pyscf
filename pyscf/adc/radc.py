@@ -196,21 +196,21 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
                                              t1_ccee, t2_ccee, optimize = einsum_type)
         OPDM[nocc:, nocc:] -= lib.einsum('ijBa,jiAa->AB', t1_ccee, t2_ccee, optimize = einsum_type)
 
-        if with_frozen and adc.frozen is not None:
-            nmo = adc.mo_occ.size
-            nocc = np.count_nonzero(adc.mo_occ > 0)
-            dm = np.zeros((nmo,nmo))
-            dm[np.diag_indices(nocc)] = 1
-            moidx = np.where(adc.get_frozen_mask())[0]
-            dm[moidx[:,None],moidx] = OPDM
-            OPDM = dm
-            if ao_repr:
-                mo = adc.mo_coeff_hf
-                OPDM = lib.einsum('pi,ij,qj->pq', mo, OPDM, mo)
-
-        elif ao_repr:
-            mo = adc.mo_coeff
+    if with_frozen and adc.frozen is not None:
+        nmo = adc.mo_occ.size
+        nocc = np.count_nonzero(adc.mo_occ > 0)
+        dm = np.zeros((nmo,nmo))
+        dm[np.diag_indices(nocc)] = 1
+        moidx = np.where(adc.get_frozen_mask())[0]
+        dm[moidx[:,None],moidx] = OPDM
+        OPDM = dm
+        if ao_repr:
+            mo = adc.mo_coeff_hf
             OPDM = lib.einsum('pi,ij,qj->pq', mo, OPDM, mo)
+
+    elif ao_repr:
+        mo = adc.mo_coeff
+        OPDM = lib.einsum('pi,ij,qj->pq', mo, OPDM, mo)
 
     return 2 * OPDM
 
@@ -562,7 +562,7 @@ class RADC(lib.StreamObject):
         return self._adc_es.compute_dyson_mo()
 
     def make_rdm1(self, with_frozen=True, ao_repr=False):
-        list_rdm1 = self._adc_es.make_rdm1()
+        list_rdm1 = self._adc_es._make_rdm1()
 
         if with_frozen and self.frozen is not None:
             nmo = self.mo_occ.size
