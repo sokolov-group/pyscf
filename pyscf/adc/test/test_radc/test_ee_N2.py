@@ -135,7 +135,7 @@ class KnownValues(unittest.TestCase):
 
         dm1_gs = myadc_fr.make_ref_rdm1()
         r2_gs = rdms_test(dm1_gs)
-        self.assertAlmostEqual(r2_gs, 37.18395861497578, 6)
+        self.assertAlmostEqual(r2_gs, 39.47517224542625, 6)
 
         myadcee_fr = adc.radc_ee.RADCEE(myadc_fr)
         e,v,p,x = myadcee_fr.kernel(nroots=4)
@@ -151,10 +151,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[3], 0.00000000, 6)
 
         dm1_exc = np.array(myadcee_fr.make_rdm1())
-        self.assertAlmostEqual(rdms_test(dm1_exc[0]), 37.8585663578158, 4)
-        self.assertAlmostEqual(rdms_test(dm1_exc[1]), 37.8585663578158, 4)
-        self.assertAlmostEqual(rdms_test(dm1_exc[2]), 38.7479102219316, 4)
-        self.assertAlmostEqual(rdms_test(dm1_exc[3]), 38.9362881553526, 4)
+        self.assertAlmostEqual(rdms_test(dm1_exc[0]), 40.14978032095179, 4)
+        self.assertAlmostEqual(rdms_test(dm1_exc[1]), 40.14978032095169, 4)
+        self.assertAlmostEqual(rdms_test(dm1_exc[2]), 41.03909647851530, 4)
+        self.assertAlmostEqual(rdms_test(dm1_exc[3]), 41.22750275223949, 4)
 
 if __name__ == "__main__":
     print("EE calculations for different ADC methods for nitrogen molecule")
