@@ -46,7 +46,7 @@ def setUpModule():
     mf.scf()
 
     myadc = adc.ADC(mf).density_fit('cc-pvdz-ri')
-    myadc_fr = adc.ADC(mf,frozen=[1]).density_fit('cc-pvdz-ri')
+    myadc_fr = adc.ADC(mf,frozen=[1,1]).density_fit('cc-pvdz-ri')
 
 def tearDownModule():
     global mol, mf, myadc, myadc_fr

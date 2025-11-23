@@ -46,7 +46,7 @@ def setUpModule():
     mf.scf()
 
     myadc = adc.ADC(mf)
-    myadc_fr = adc.ADC(mf,frozen=1)
+    myadc_fr = adc.ADC(mf,frozen=[1,1])
 
 def tearDownModule():
     global mol, mf, myadc, myadc_fr
