@@ -167,10 +167,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2],0.02122918, 6)
         self.assertAlmostEqual(p[3],0.00135661, 6)
 
-        self.assertAlmostEqual(spin[0],0.75778029 , 5)
-        self.assertAlmostEqual(spin[1],0.75778029 , 5)
-        self.assertAlmostEqual(spin[2],0.80003704 , 5)
-        self.assertAlmostEqual(spin[3],3.45059830 , 5)
+        self.assertAlmostEqual(spin[0],0.75778015 , 5)
+        self.assertAlmostEqual(spin[1],0.75778015 , 5)
+        self.assertAlmostEqual(spin[2],0.80003695 , 5)
+        self.assertAlmostEqual(spin[3],3.45059815 , 5)
 
         dm1_exc = np.array(myadc_fr.make_rdm1())
         self.assertAlmostEqual(rdms_test_fr(dm1_exc[0][0],dm1_exc[1][0]), 41.36395058407432, 4)
