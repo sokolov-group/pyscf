@@ -1154,19 +1154,25 @@ def renormalize_eigenvectors(adc, kshift, U, nroots=1):
     return U
 
 
-def make_rdm1(adc):
+def make_rdm1(adc,root=None,kptlist=None):
     nkpts = adc.nkpts
     cput0 = (logger.process_clock(), logger.perf_counter())
     log = logger.Logger(adc.stdout, adc.verbose)
 
     list_rdm1 = []
-    nroots = adc.U.shape[1]
+    if root == None:
+        nroots = adc.U.shape[1]
+    else:
+        nroots = root
 
-    for i in range(nroots):
+    if kptlist is None:
+        kptlist = range(adc.nkpts)
+
+    for i in nroots:
         rdm1 = []
-        for kshift in range(nkpts):
-            U = np.array(adc.U[kshift]).T.copy()
-            U = adc.renormalize_eigenvectors(kshift, U, nroots)
+        for k, kshift in enumerate(kptlist):
+            U = np.array(adc.U[k]).T.copy()
+            U = adc.renormalize_eigenvectors(kshift, U, adc.U.shape[1])
             rdm1.append(make_rdm1_eigenvectors(adc, U[:,i], U[:,i], kshift))
         rdm1_band = np.stack(rdm1,axis=0)
         list_rdm1.append(rdm1_band)

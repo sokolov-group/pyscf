@@ -197,6 +197,7 @@ def transform_integrals_outcore(myadc):
 
 def transform_integrals_df(myadc):
     from pyscf.ao2mo import _ao2mo
+    log = logger.Logger(myadc.stdout, myadc.verbose)
     cell = myadc.cell
     kpts = myadc.kpts
     nkpts = myadc.nkpts
@@ -258,13 +259,15 @@ def transform_integrals_df(myadc):
         eris.Lov = eris.Lov.reshape(nkpts,nkpts,naux,nocc*nvir)
         Lvo = Lvo.reshape(nkpts,nkpts,naux,nvir*nocc)
         eris.Lvv = eris.Lvv.reshape(nkpts,nkpts,naux,nvir*nvir)
-        W_0 = lib.ddot(Loo[0][0], Loo[0][0].T) + lib.ddot(eris.Lov[0][0],eris.Lov[0][0].T)\
-              + lib.ddot(Lvo[0][0],Lvo[0][0].T) + lib.ddot(eris.Lvv[0][0],eris.Lvv[0][0].T)
-        n,N = np.linalg.eigh(W_0)
+        W = np.zeros((naux,naux),dtype=dtype)
+        for ki in range(nkpts):
+            for kj in range(nkpts):
+                W += lib.ddot(Loo[ki][kj], Loo[ki][kj].T) + lib.ddot(eris.Lov[ki][kj],eris.Lov[ki][kj].T)\
+                    + lib.ddot(Lvo[ki][kj],Lvo[ki][kj].T) + lib.ddot(eris.Lvv[ki][kj],eris.Lvv[ki][kj].T)
+        n,N = np.linalg.eigh(W/nkpts**2)
         N_trunc = N[:,n>myadc.thresh_naf].T
         myadc.naux = N_trunc.shape[0]
-        print(f"origin naux is {naux}")
-        print(f"naux is {myadc.naux}")
+        log.info(f"origin naux is {naux}||naf naux is {myadc.naux}")
         Loo = lib.einsum('rL,mnLs->mnrs', N_trunc,Loo)
         eris.Lov = lib.einsum('rL,mnLs->mnrs', N_trunc,eris.Lov)
         Lvo = lib.einsum('rL,mnLs->mnrs', N_trunc,Lvo)
