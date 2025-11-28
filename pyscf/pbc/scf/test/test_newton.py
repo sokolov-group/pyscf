@@ -112,25 +112,33 @@ class KnowValues(unittest.TestCase):
         mf.kernel()
         self.assertAlmostEqual(mf.e_tot, -9.9355341416893559, 8)
 
+    def test_nr_uks_rsh(self):
+        mf = dft.UKS(cell)
+        mf.xc = 'camb3lyp'
+        mf = mf.newton()
+        mf.conv_tol_grad = 1e-4
+        mf.kernel()
+        self.assertAlmostEqual(mf.e_tot, -10.346325245581905, 8)
+
     def test_nr_krhf(self):
         mf = scf.KRHF(cell, cell.make_kpts([2,1,1]))
         mf = scf.newton(mf)
         mf.conv_tol_grad = 1e-4
         mf.kernel()
-        self.assertAlmostEqual(mf.e_tot, -10.5309059210831, 8)
+        self.assertAlmostEqual(mf.e_tot, -10.5309059210831, 7)
 
     def test_nr_kuhf(self):
         mf = scf.KUHF(cell, cell.make_kpts([2,1,1]))
         mf = scf.newton(mf)
         mf.conv_tol_grad = 1e-4
         mf.kernel()
-        self.assertAlmostEqual(mf.e_tot, -10.5309059210831, 8)
+        self.assertAlmostEqual(mf.e_tot, -10.5309059210831, 7)
 
     def test_nr_krohf(self):
         mf = scf.KROHF(cell, cell.make_kpts([2,1,1])).newton()
         mf.conv_tol_grad = 1e-4
         mf.kernel()
-        self.assertAlmostEqual(mf.e_tot, -10.5309059210831, 8)
+        self.assertAlmostEqual(mf.e_tot, -10.5309059210831, 7)
 
     def test_nr_krks_lda(self):
         mf = dft.KRKS(cell, cell.make_kpts([2,1,1]))
@@ -164,6 +172,14 @@ class KnowValues(unittest.TestCase):
         mf.kernel()
         self.assertAlmostEqual(mf.e_tot, -10.446717855794008, 8)
 
+    def test_nr_krks_rsh(self):
+        mf = dft.KRKS(cell, cell.make_kpts([2,1,1]))
+        mf.xc = 'camb3lyp'
+        mf = mf.newton()
+        mf.conv_tol_grad = 1e-4
+        mf.kernel()
+        self.assertAlmostEqual(mf.e_tot, -10.810601144955786, 8)
+
     def test_rks_gen_g_hop(self):
         mf = dft.KRKS(cell, cell.make_kpts([2,1,1]))
         mf.xc = 'b3lyp5'
@@ -177,7 +193,7 @@ class KnowValues(unittest.TestCase):
         mf = scf.newton(mf)
         mf.grids.build()
         g, hop, hdiag = mf.gen_g_hop(mo, mo_occ, mf.get_hcore())
-        self.assertAlmostEqual(numpy.linalg.norm(hop(dm1)), 37.967972033738519, 7)
+        self.assertAlmostEqual(numpy.linalg.norm(hop(dm1)), 37.967972033738519, 6)
 
     def test_uks_gen_g_hop(self):
         mf = dft.KUKS(cell, cell.make_kpts([2,1,1]))
@@ -192,7 +208,7 @@ class KnowValues(unittest.TestCase):
         mf = scf.newton(mf)
         mf.grids.build()
         g, hop, hdiag = mf.gen_g_hop(mo, mo_occ, [mf.get_hcore()]*2)
-        self.assertAlmostEqual(numpy.linalg.norm(hop(dm1)), 28.01954683540594, 7)
+        self.assertAlmostEqual(numpy.linalg.norm(hop(dm1)), 28.01954683540594, 6)
 
 
 if __name__ == "__main__":

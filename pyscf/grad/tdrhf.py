@@ -45,6 +45,8 @@ def grad_elec(td_grad, x_y, singlet=True, atmlst=None,
     log = logger.new_logger(td_grad, verbose)
     time0 = logger.process_clock(), logger.perf_counter()
 
+    assert td_grad.base.frozen is None
+
     mol = td_grad.mol
     mf = td_grad.base._scf
     mo_coeff = mf.mo_coeff
@@ -334,6 +336,3 @@ class Gradients(rhf_grad.GradientsBase):
     to_gpu = lib.to_gpu
 
 Grad = Gradients
-
-from pyscf import tdscf
-tdscf.rhf.TDA.Gradients = tdscf.rhf.TDHF.Gradients = lib.class_as_method(Gradients)

@@ -556,8 +556,7 @@ def get_Gv_weights(cell, mesh=None, **kwargs):
     b = cell.reciprocal_vectors()
     weights = abs(np.linalg.det(b))
 
-    if (cell.dimension < 2 or
-        (cell.dimension == 2 and cell.low_dim_ft_type == 'inf_vacuum')):
+    if cell.dimension <= 2 and cell.low_dim_ft_type == 'inf_vacuum':
         if cell.dimension == 0:
             rx, wx = _non_uniform_Gv_base(mesh[0]//2)
             ry, wy = _non_uniform_Gv_base(mesh[1]//2)
@@ -673,8 +672,11 @@ def get_ewald_params(cell, precision=None, mesh=None):
     if precision is None:
         precision = cell.precision
 
-    if (cell.dimension < 2 or
-          (cell.dimension == 2 and cell.low_dim_ft_type == 'inf_vacuum')):
+    if (cell.dimension == 3 or
+        (cell.dimension == 0 and cell.low_dim_ft_type != 'inf_vacuum')):
+        ew_eta = 1./cell.vol**(1./6)
+        ew_cut = _estimate_rcut(ew_eta**2, 0, 1., precision)
+    elif cell.dimension <= 2 and cell.low_dim_ft_type == 'inf_vacuum':
         # Non-uniform PW grids are used for low-dimensional ewald summation.  The cutoff
         # estimation for long range part based on exp(G^2/(4*eta^2)) does not work for
         # non-uniform grids.  Smooth model density is preferred.
@@ -686,9 +688,8 @@ def get_ewald_params(cell, precision=None, mesh=None):
         # ewovrl ~ erfc(eta*rcut) / rcut ~ e^{(-eta**2 rcut*2)} < precision
         log_precision = np.log(precision / (cell.atom_charges().sum()*16*np.pi**2))
         ew_eta = (-log_precision)**.5 / ew_cut
-    else:  # dimension == 3
-        ew_eta = 1./cell.vol**(1./6)
-        ew_cut = _estimate_rcut(ew_eta**2, 0, 1., precision)
+    else:
+        raise RuntimeError(f'dimension={cell.dimension} not supported')
     return ew_eta, ew_cut
 
 def ewald(cell, ew_eta=None, ew_cut=None):
@@ -714,6 +715,9 @@ def ewald(cell, ew_eta=None, ew_cut=None):
     if cell.dimension == 3 and cell.use_particle_mesh_ewald:
         from pyscf.pbc.gto import ewald_methods
         return ewald_methods.particle_mesh_ewald(cell, ew_eta, ew_cut)
+
+    if cell.dimension == 0 and cell.low_dim_ft_type != 'inf_vacuum':
+        return mole.classical_coulomb_energy(cell)
 
     chargs = cell.atom_charges()
 
@@ -747,16 +751,15 @@ def ewald(cell, ew_eta=None, ew_cut=None):
     # where
     #   ZS_I(G) = \sum_a Z_a exp (i G.R_a)
 
-    if cell.dimension != 2 or cell.low_dim_ft_type == 'inf_vacuum':
+    if cell.dimension == 3 or cell.low_dim_ft_type == 'inf_vacuum':
         Gv, Gvbase, weights = cell.get_Gv_weights(mesh)
         absG2 = np.einsum('gi,gi->g', Gv, Gv)
         absG2[absG2==0] = 1e200
-
         coulG = 4*np.pi / absG2
         coulG *= weights
 
         #:ZSI = np.einsum('i,ij->j', chargs, cell.get_SI(Gv))
-        basex, basey, basez = cell.get_Gv_weights(mesh)[1]
+        basex, basey, basez = Gvbase
         b = cell.reciprocal_vectors()
         rb = np.dot(coords, b.T)
         SIx = np.exp(-1j*np.einsum('z,g->zg', rb[:,0], basex))
@@ -801,6 +804,13 @@ def ewald(cell, ew_eta=None, ew_cut=None):
         # Performing the G == 0 summation.
         ewg += np.einsum('i,j,ij->', chargs, chargs, gn0(ew_eta,rij[:,:,2]))
         ewg *= inv_area*0.5
+
+    elif cell.dimension == 0:
+        # The truncted Coulomb kernel 4*pi/G^2(1-cos(G*Rc)) should work for the
+        # ewg term. However, large errors may be introduced in ewovrl or ewself.
+        # For dimesion=0 with truncated Coulomb, the nuclear energy can be
+        # computed directly using the mole.classical_coulomb_energy function.
+        raise RuntimeError('Ewald with truncated Coulomb')
 
     else:
         logger.warn(cell, 'No method for PBC dimension %s, dim-type %s.'
@@ -1324,47 +1334,74 @@ class Cell(mole.MoleBase):
         from pyscf.pbc import scf, dft
         from pyscf.dft import XC
 
-        for mod in (scf, dft):
-            method = getattr(mod, key, None)
-            if callable(method):
-                return method(self)
-
-        if key[0] == 'K':  # with k-point sampling
-            if 'TD' in key[:4]:
-                if key in ('KTDHF', 'KTDA'):
-                    mf = scf.KHF(self)
-                else:
-                    mf = dft.KKS(self)
-                    xc = key.split('TD', 1)[1]
-                    if xc in XC:
-                        mf.xc = xc
-                        key = 'KTDDFT'
-            elif 'CI' in key or 'CC' in key or 'MP' in key:
-                mf = scf.KHF(self)
-            else:
-                return object.__getattribute__(self, key)
-            # Remove prefix 'K' because methods are registered without the leading 'K'
-            key = key[1:]
+        attr_name = key
+        mf_xc = None
+        for mod in (dft, scf):
+            mf_method = getattr(mod, key, None)
+            if callable(mf_method):
+                key = None
+                break
         else:
-            if 'TD' in key[:3]:
-                if key in ('TDHF', 'TDA'):
-                    mf = scf.HF(self)
+            if key[0] == 'K':  # with k-point sampling
+                if 'TD' in key[:4]:
+                    if key in ('KTDHF', 'KTDA'):
+                        mf_method = scf.KHF
+                    else:
+                        mf_method = dft.KKS
+                        xc = key.split('TD', 1)[1]
+                        if xc in XC:
+                            mf_xc = xc
+                            key = 'KTDDFT'
+                elif 'CI' in key or 'CC' in key or 'MP' in key:
+                    mf_method = scf.KHF
                 else:
-                    mf = dft.KS(self)
-                    xc = key.split('TD', 1)[1]
-                    if xc in XC:
-                        mf.xc = xc
-                        key = 'TDDFT'
-            elif 'CI' in key or 'CC' in key or 'MP' in key:
-                mf = scf.HF(self)
+                    return object.__getattribute__(self, key)
+                # Remove prefix 'K' because methods are registered without the leading 'K'
+                key = key[1:]
             else:
-                return object.__getattribute__(self, key)
+                if 'TD' in key[:3]:
+                    if key in ('TDHF', 'TDA'):
+                        mf_method = scf.HF
+                    else:
+                        mf_method = dft.KS
+                        xc = key.split('TD', 1)[1]
+                        if xc in XC:
+                            mf_xc = xc
+                            key = 'TDDFT'
+                elif 'CI' in key or 'CC' in key or 'MP' in key:
+                    mf_method = scf.HF
+                else:
+                    return object.__getattribute__(self, key)
 
-        method = getattr(mf, key)
+        post_mf_key = key
+        SCF_KW = {'kpt', 'kpts', 'xc', 'exxdiv',
+                  'U_idx', 'U_val', 'C_ao_lo', 'minao_ref'}
 
-        if self.nelectron != 0:
-            mf.run()
-        return method
+        def fn(*args, **kwargs):
+            if mf_xc is not None:
+                assert 'xc' not in kwargs
+                kwargs['xc'] = mf_xc
+
+            mf_kw = {}
+            remaining_kw = {}
+            for k, v in kwargs.items():
+                if k in SCF_KW:
+                    mf_kw[k] = v
+                else:
+                    remaining_kw[k] = v
+            mf = mf_method(self, **mf_kw)
+
+            if post_mf_key is None:
+                if args:
+                    raise RuntimeError(
+                        f'cell.{attr_name} function does not support positional arguments')
+                return mf.set(**remaining_kw)
+
+            post_mf = getattr(mf, post_mf_key)
+            if self.nelectron != 0:
+                mf.run()
+            return post_mf(*args, **remaining_kw)
+        return mole._MoleLazyCallAdapter(fn, attr_name)
 
     tot_electrons = tot_electrons
 
@@ -1388,8 +1425,8 @@ class Cell(mole.MoleBase):
         if not self.space_group_symmetry:
             return mesh
 
-        _, mesh1 = self.lattice_symmetry.check_mesh_symmetry(mesh=mesh,
-                                                             return_mesh=True)
+        _, mesh1 = self.lattice_symmetry.check_mesh_symmetry(
+            cell=self, mesh=mesh, return_mesh=True)
         if np.prod(mesh1) != np.prod(mesh):
             logger.debug(self, 'mesh %s is symmetrized as %s', mesh, mesh1)
         m1size = np.prod(mesh1)
@@ -1429,6 +1466,10 @@ class Cell(mole.MoleBase):
             _mesh_from_build = self._mesh_from_build
             self.mesh = self.symmetrize_mesh()
             self._mesh_from_build = _mesh_from_build
+        # lattice_symmetry introduces circular dependency to cell
+        del self.lattice_symmetry.cell
+        if self.lattice_symmetry.spacegroup is not None:
+            del self.lattice_symmetry.spacegroup.cell
         return self
 
     @lib.with_doc(mole.format_atom.__doc__)
@@ -1515,17 +1556,13 @@ class Cell(mole.MoleBase):
         if self.a is None:
             raise RuntimeError('Lattice parameters not specified')
 
+        if self.dimension == 1 and self.low_dim_ft_type != 'inf_vacuum':
+            raise RuntimeError('Uniform grids for dimension=1 not supported')
+
         _built = self._built
         mole.MoleBase.build(self, False, parse_arg, *args, **kwargs)
 
-        exp_min = np.array([self.bas_exp(ib).min() for ib in range(self.nbas)])
-        if self.exp_to_discard is None:
-            if np.any(exp_min < 0.1):
-                sys.stderr.write('''WARNING!
-  Very diffused basis functions are found in the basis set. They may lead to severe
-  linear dependence and numerical instability.  You can set  cell.exp_to_discard=0.1
-  to remove the diffused Gaussians whose exponents are less than 0.1.\n\n''')
-        elif np.any(exp_min < self.exp_to_discard):
+        if self.exp_to_discard is not None:
             # Discard functions of small exponents in basis
             _basis = {}
             for symb, basis_now in self._basis.items():
@@ -1603,7 +1640,7 @@ class Cell(mole.MoleBase):
   Lattice are not in right-handed coordinate system. This can cause wrong value for some integrals.
   It's recommended to resort the lattice vectors to\na = %s\n\n''' % _a[[0,2,1]])
 
-        if self.dimension == 2 and self.low_dim_ft_type != 'inf_vacuum':
+        if self.dimension <= 2 and self.low_dim_ft_type != 'inf_vacuum':
             # check vacuum size. See Fig 1 of PRB, 73, 2015119
             #Lz_guess = self.rcut*(1+np.sqrt(2))
             Lz_guess = self.rcut * 2
@@ -1619,8 +1656,7 @@ class Cell(mole.MoleBase):
                 ke_cutoff = self.ke_cutoff
             self._mesh = pbctools.cutoff_to_mesh(_a, ke_cutoff)
 
-            if (self.dimension < 2 or
-                (self.dimension == 2 and self.low_dim_ft_type == 'inf_vacuum')):
+            if self.dimension <= 2 and self.low_dim_ft_type == 'inf_vacuum':
                 self._mesh[self.dimension:] = _mesh_inf_vaccum(self)
             self._mesh_from_build = True
 
@@ -1934,5 +1970,64 @@ class Cell(mole.MoleBase):
         if mol.symmetry:
             mol._build_symmetry()
         return mol
+
+    def set_geom_(self, atoms_or_coords=None, unit=None, symmetry=None,
+                  a=None, inplace=True):
+        '''Update geometry and lattice parameters
+
+        Kwargs:
+            atoms_or_coords : list, str, or numpy.ndarray
+                When specified in list or str, it is processed as the Mole.atom
+                attribute. If inputing a (N, 3) numpy array, this array
+                represents the coordinates of the atoms in the molecule.
+            a : list, str, or numpy.ndarray
+                If specified, it is assigned to the cell.a attribute. Its data
+                format should be the same to cell.a
+            unit : str
+                The unit for the input `atoms_or_coords` and `a`. If specified,
+                cell.unit will be updated to this value. If not provided, the
+                current cell.unit will be used for the two inputs.
+            symmetry : bool
+                Whether to enable space_group_symmetry. It is a reserved input
+                argument. This functionality is not supported yet.
+            inplace : bool
+                Whether to overwrite the existing Mole object.
+        '''
+        if inplace:
+            cell = self
+        else:
+            cell = self.copy(deep=False)
+            cell._env = cell._env.copy()
+
+        if unit is not None and cell.unit != unit:
+            if isinstance(unit, str):
+                if is_au(unit):
+                    _unit = 1.
+                else:
+                    _unit = param.BOHR
+            else:
+                _unit = unit
+            if a is None:
+                a = self.lattice_vectors() * _unit
+            if atoms_or_coords is None:
+                atoms_or_coords = self.atom_coords() * _unit
+
+        if a is not None:
+            logger.info(self, 'Set new lattice vectors')
+            logger.info(self, '%s', a)
+            cell.a = a
+            if self._mesh_from_build:
+                cell.mesh = None
+            if self._rcut_from_build:
+                cell.rcut = None
+            cell._built = False
+        cell.enuc = None
+
+        if atoms_or_coords is not None:
+            cell = mole.MoleBase.set_geom_(cell, atoms_or_coords, unit, symmetry)
+
+        if not cell._built:
+            cell.build(False, False)
+        return cell
 
 del (INTEGRAL_PRECISION, WRAP_AROUND, WITH_GAMMA, EXP_DELIMITER)

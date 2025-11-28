@@ -187,11 +187,11 @@ def _cast_mol_init_guess(fn):
     return fn_init_guess
 
 class KGHF(khf.KSCF):
-    '''GHF class for PBCs.
+    '''PBC GHF with k-point sampling (default: gamma point).
     '''
     _keys = {'with_soc'}
 
-    def __init__(self, cell, kpts=np.zeros((1,3)),
+    def __init__(self, cell, kpts=None,
                  exxdiv=getattr(__config__, 'pbc_scf_SCF_exxdiv', 'ewald')):
         khf.KSCF.__init__(self, cell, kpts, exxdiv)
         self.with_soc = None
@@ -204,6 +204,7 @@ class KGHF(khf.KSCF):
     get_occ = get_occ
     analyze = khf.analyze
     convert_from_ = pbcghf.GHF.convert_from_
+    gen_response = NotImplemented
 
     to_gpu = lib.to_gpu
 
