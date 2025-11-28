@@ -83,7 +83,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     adc.U = np.array(U).T.copy()
 
-    if adc.compute_properties and adc.method_type != "ee":
+    if adc.compute_properties:
         adc.P,adc.X = adc.get_properties(nroots)
     else:
         adc.P = None

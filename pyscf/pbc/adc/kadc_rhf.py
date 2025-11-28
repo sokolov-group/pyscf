@@ -244,7 +244,7 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
                 OPDM[k] = lib.einsum('pI,IJ,qJ->pq', mo[k], OPDM[k], mo[k].conj())
 
     elif ao_repr:
-        mo = adc.mo_coeff
+        mo = padded_mo_coeff(adc,adc.mo_coeff)
         for k in k_idx:
             OPDM[k] = lib.einsum('pI,IJ,qJ->pq', mo[k], OPDM[k], mo[k].conj())
 
@@ -519,8 +519,41 @@ class RADC(pyscf.adc.radc.RADC):
             self.with_df = with_df
         return self
 
-    def make_rdm1(self,root=None,kptlist=None):
-        return self._adc_es.make_rdm1(root,kptlist)
+    def make_rdm1(self,root=None,kptlist=None,with_frozen=True,ao_repr=False):
+
+        rdm1 = self._adc_es.make_rdm1(root,kptlist)
+        if root is None:
+            nroots = range(self._adc_es.U.shape[1])
+        else:
+            nroots = root
+
+        if with_frozen and self.frozen is not None:
+            nmo = self.mo_occ[0].size
+            nocc = np.count_nonzero(self.mo_occ[0] > 0)
+            mask = get_frozen_mask(self)
+            dm = np.zeros((len(rdm1), self.nkpts, self.nkpts, nmo, nmo), dtype=np.complex128)
+            occ_idx = np.arange(nocc)
+            k_idx = np.arange(self.nkpts)
+            p_k_idx = padding_k_idx(self, kind="joint")
+            s_idx = np.arange(len(rdm1))
+            S, K0, K1, O = np.meshgrid(s_idx, k_idx, k_idx, occ_idx, indexing='ij')
+            dm[S, K0, K1, O, O] = 1
+            for ki in k_idx:
+                moidx = np.where(mask[ki])[0]
+                for i in nroots:
+                    for kj in k_idx:
+                        dm[i][kj][ki][moidx[:,None],moidx] = rdm1[i][kj][ki][p_k_idx[ki][:,None],p_k_idx[ki]]
+            rdm1 = dm
+            if ao_repr:
+                mo = self.mo_coeff
+                mo_H = [c.conj() for c in mo]
+                rdm1 = lib.einsum('kpI,SKkIJ,kqJ->SKkpq', mo, rdm1, mo_H)
+        elif ao_repr:
+            mo = padded_mo_coeff(self,self.mo_coeff)
+            mo_H = [c.conj() for c in mo]
+            rdm1 = lib.einsum('kpI,SKkIJ,kqJ->SKkpq', mo, rdm1, mo_H)
+
+        return rdm1
 
 
 class RFNOADC(RADC):
