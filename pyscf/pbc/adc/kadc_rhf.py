@@ -520,12 +520,15 @@ class RADC(pyscf.adc.radc.RADC):
         return self
 
     def make_rdm1(self,root=None,kptlist=None,with_frozen=True,ao_repr=False):
-
-        rdm1 = self._adc_es.make_rdm1(root,kptlist)
         if root is None:
             nroots = range(self._adc_es.U.shape[1])
         else:
             nroots = root
+
+        if kptlist is None:
+            kptlist = range(self.nkpts)
+
+        rdm1 = self._adc_es.make_rdm1(root,kptlist)
 
         if with_frozen and self.frozen is not None:
             nmo = self.mo_occ[0].size
@@ -540,8 +543,8 @@ class RADC(pyscf.adc.radc.RADC):
             dm[S, K0, K1, O, O] = 1
             for ki in k_idx:
                 moidx = np.where(mask[ki])[0]
-                for i in nroots:
-                    for kj in k_idx:
+                for i in range(len(nroots)):
+                    for kj in kptlist:
                         dm[i][kj][ki][moidx[:,None],moidx] = rdm1[i][kj][ki][p_k_idx[ki][:,None],p_k_idx[ki]]
             rdm1 = dm
             if ao_repr:
@@ -626,7 +629,7 @@ class RFNOADC(RADC):
         else:
             e_exc, v_exc, spec_fac, x, eris = adc3_ssfno.kernel(nroots, guess, eris, kptlist=kptlist)
         self.e_corr = adc3_ssfno.e_corr
-        log.timer('ADC3', *cput0)
+        log.timer(f'ADC{self.method[4]}', *cput0)
 
         self.compute_correction(self._scf, frozen, nroots, eris, guess, kptlist=kptlist)
         e_exc = e_exc + self.delta_e
