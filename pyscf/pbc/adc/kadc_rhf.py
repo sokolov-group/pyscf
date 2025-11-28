@@ -193,23 +193,23 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
                 for ka in range(nkpts):
                     kb = adc.khelper.kconserv[ki, ka, kj]
                     #### OCC-OCC ###
-                    OPDM[ki][:nocc, :nocc] -= 2 * lib.einsum('Iiab,Jiab->IJ', t1_ccee[ki]
-                                                            [kj][ka], t2_ccee[ki][kj][ka].conj(), optimize = einsum_type)
-                    OPDM[ki][:nocc, :nocc] += lib.einsum('Iiab,Jiba->IJ', t1_ccee[ki]
-                                                         [kj][ka], t2_ccee[ki][kj][kb].conj(), optimize = einsum_type)
-                    OPDM[ki][:nocc, :nocc] -= 2 * lib.einsum('Jiab,Iiab->IJ', t1_ccee[ki]
-                                                            [kj][ka].conj(), t2_ccee[ki][kj][ka], optimize = einsum_type)
-                    OPDM[ki][:nocc, :nocc] += lib.einsum('Jiab,Iiba->IJ', t1_ccee[ki]
-                                                         [kj][ka].conj(), t2_ccee[ki][kj][kb], optimize = einsum_type)
+                    OPDM[ki][:nocc, :nocc] -= 2 * lib.einsum('Iiab,Jiab->IJ', t1_ccee[ki][kj][ka],
+                                                        t2_ccee[ki][kj][ka].conj(), optimize = einsum_type)
+                    OPDM[ki][:nocc, :nocc] += lib.einsum('Iiab,Jiba->IJ', t1_ccee[ki][kj][ka],
+                                                        t2_ccee[ki][kj][kb].conj(), optimize = einsum_type)
+                    OPDM[ki][:nocc, :nocc] -= 2 * lib.einsum('Jiab,Iiab->IJ', t1_ccee[ki][kj][ka].conj(),
+                                                        t2_ccee[ki][kj][ka], optimize = einsum_type)
+                    OPDM[ki][:nocc, :nocc] += lib.einsum('Jiab,Iiba->IJ', t1_ccee[ki][kj][ka].conj(),
+                                                        t2_ccee[ki][kj][kb], optimize = einsum_type)
                     ##### VIR-VIR ###
-                    OPDM[ka][nocc:, nocc:] += 2 * lib.einsum('ijBa,ijAa->AB', t1_ccee[ki]
-                                                            [kj][ka], t2_ccee[ki][kj][ka].conj(), optimize = einsum_type)
-                    OPDM[ka][nocc:, nocc:] -= lib.einsum('ijBa,ijaA->AB', t1_ccee[ki]
-                                                         [kj][ka], t2_ccee[ki][kj][kb].conj(), optimize = einsum_type)
-                    OPDM[ka][nocc:, nocc:] += 2 * lib.einsum('ijAa,ijBa->AB', t1_ccee[ki]
-                                                            [kj][ka].conj(), t2_ccee[ki][kj][ka], optimize = einsum_type)
-                    OPDM[ka][nocc:, nocc:] -= lib.einsum('ijAa,ijaB->AB', t1_ccee[ki]
-                                                         [kj][ka].conj(), t2_ccee[ki][kj][kb], optimize = einsum_type)
+                    OPDM[ka][nocc:, nocc:] += 2 * lib.einsum('ijBa,ijAa->AB', t1_ccee[ki][kj][ka],
+                                                        t2_ccee[ki][kj][ka].conj(), optimize = einsum_type)
+                    OPDM[ka][nocc:, nocc:] -= lib.einsum('ijBa,ijaA->AB', t1_ccee[ki][kj][ka],
+                                                        t2_ccee[ki][kj][kb].conj(), optimize = einsum_type)
+                    OPDM[ka][nocc:, nocc:] += 2 * lib.einsum('ijAa,ijBa->AB', t1_ccee[ki][kj][ka].conj(),
+                                                        t2_ccee[ki][kj][ka], optimize = einsum_type)
+                    OPDM[ka][nocc:, nocc:] -= lib.einsum('ijAa,ijaB->AB', t1_ccee[ki][kj][ka].conj(),
+                                                         t2_ccee[ki][kj][kb], optimize = einsum_type)
 
                 ka = ki
                 kb = kj
@@ -518,7 +518,7 @@ class RADC(pyscf.adc.radc.RADC):
         else:
             self.with_df = with_df
         return self
-    
+
     def make_rdm1(self,root=None,kptlist=None):
         return self._adc_es.make_rdm1(root,kptlist)
 
@@ -567,7 +567,8 @@ class RFNOADC(RADC):
         if ref_state is None:
             logger.info(self, "Do fno kadc calculation")
             self.if_naf = False
-        elif (isinstance(ref_state, int) and 0<ref_state<=nroots) or (hasattr(ref_state, '__len__') and len(ref_state) == 2) :
+        elif (isinstance(ref_state, int) and 0<ref_state<=nroots) or \
+                (hasattr(ref_state, '__len__') and len(ref_state) == 2) :
             logger.info(self, "Do ss-fno kadc calculation")
             if self.with_df is None and self._scf.with_df is None:
                 self.if_naf = False
@@ -582,8 +583,10 @@ class RFNOADC(RADC):
                                                             method_type = self.method_type,method = "adc(3)",
                                                             with_df = self.with_df,if_naf = self.if_naf,
                                                             thresh_naf = self.thresh_naf,
-                                                            if_heri_eris = self.if_heri_eris,approx_trans_moments = True,
-                                                            conv_tol = self.conv_tol, tol_residual = self.tol_residual,
+                                                            if_heri_eris = self.if_heri_eris,
+                                                            approx_trans_moments = True,
+                                                            conv_tol = self.conv_tol,
+                                                            tol_residual = self.tol_residual,
                                                             max_space = self.max_space, max_cycle = self.max_cycle)
         if self.if_naf:
             e_exc, v_exc, spec_fac, x, eris, self.naux = adc3_ssfno.kernel(nroots, guess, eris, kptlist=kptlist)
@@ -610,7 +613,7 @@ class RFNOADC(RADC):
                 logger.info(self, print_string)
         log.timer('RFNOADC', *cput0)
         return e_exc, v_exc, spec_fac, x
-    
+
     def make_ss_rdm1(self, nroots, ref_state, guess, kptlist):
         adc2_can = RADC(self._scf).set(verbose = 0,method_type = self.method_type,
                                         approx_trans_moments = self.approx_trans_moments,
