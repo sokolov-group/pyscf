@@ -1155,12 +1155,11 @@ def renormalize_eigenvectors(adc, kshift, U, nroots=1):
 
 
 def make_rdm1(adc,root=None,kptlist=None):
-    nkpts = adc.nkpts
     cput0 = (logger.process_clock(), logger.perf_counter())
     log = logger.Logger(adc.stdout, adc.verbose)
 
     list_rdm1 = []
-    if root == None:
+    if root is None:
         nroots = range(adc.U.shape[1])
     else:
         nroots = root
