@@ -143,7 +143,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
 
     return evals, evecs, P, X
 
-def make_ref_rdm1(adc):
+def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
@@ -224,6 +224,30 @@ def make_ref_rdm1(adc):
 
     for ki in range(nkpts):
         OPDM[ki] += OPDM[ki].conj().T
+
+    if with_frozen and adc.frozen is not None:
+        nmo = adc.mo_occ[0].size
+        nocc = np.count_nonzero(adc.mo_occ[0] > 0)
+        mask = get_frozen_mask(adc)
+        dm = np.zeros((nkpts, nmo, nmo), dtype=np.complex128)
+        occ_idx = np.arange(nocc)
+        k_idx = np.arange(nkpts)
+        p_k_idx = padding_k_idx(adc, kind="joint")
+        dm[k_idx[:, None], occ_idx, occ_idx] = 1
+        for k in k_idx:
+            moidx = np.where(mask[k])[0]
+            dm[k][moidx[:,None],moidx] = OPDM[k][p_k_idx[k][:,None],p_k_idx[k]]
+        OPDM = dm
+        if ao_repr:
+            mo = adc.mo_coeff
+            for k in k_idx:
+                OPDM[k] = lib.einsum('pI,IJ,qJ->pq', mo[k], OPDM[k], mo[k].conj())
+
+    elif ao_repr:
+        mo = adc.mo_coeff
+        for k in k_idx:
+            OPDM[k] = lib.einsum('pI,IJ,qJ->pq', mo[k], OPDM[k], mo[k].conj())
+
     return OPDM
 
 def mo_splitter(myadc):

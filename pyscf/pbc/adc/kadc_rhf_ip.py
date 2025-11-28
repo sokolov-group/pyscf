@@ -933,7 +933,7 @@ def make_rdm1(adc,root=None,kptlist=None):
 
     list_rdm1 = []
     if root == None:
-        nroots = adc.U.shape[1]
+        nroots = range(adc.U.shape[1])
     else:
         nroots = root
 
