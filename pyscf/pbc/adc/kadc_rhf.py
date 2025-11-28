@@ -648,7 +648,7 @@ class RFNOADC(RADC):
         return e_exc, v_exc, spec_fac, x
 
     def make_ss_rdm1(self, nroots, ref_state, guess, kptlist):
-        adc2_can = RADC(self._scf).set(verbose = 0,method_type = self.method_type,
+        adc2_can = RADC(self._scf,self.frozen).set(verbose = 0,method_type = self.method_type,
                                         approx_trans_moments = self.approx_trans_moments,
                                         with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf)
         self.e_can,self.v_can,_,_ = adc2_can.kernel(nroots,guess=guess,kptlist=kptlist)
