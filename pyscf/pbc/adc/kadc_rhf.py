@@ -584,7 +584,10 @@ class RFNOADC(RADC):
                                                          with_df = self.with_df,if_naf = self.if_naf,
                                                          thresh_naf = self.thresh_naf,naux = self.naux,
                                                          approx_trans_moments = self.approx_trans_moments,
-                                                         chnk_size = self.chnk_size)
+                                                         chnk_size = self.chnk_size,
+                                                         conv_tol = self.conv_tol,
+                                                         tol_residual = self.tol_residual,
+                                                         max_space = self.max_space, max_cycle = self.max_cycle)
         e2_ssfno,v2_ssfno,p2_ssfno,x2_ssfno = adc2_ssfno.kernel(nroots, eris = eris, guess=guess, kptlist=kptlist)
         self.delta_e = self.e_can - e2_ssfno
         self.delta_e_corr = self.e_corr_can - adc2_ssfno.e_corr
@@ -616,7 +619,7 @@ class RFNOADC(RADC):
         log.timer('get frozen info', *cput0)
 
         adc3_ssfno = RADC(self._scf, frozen, self.mo_coeff, mo_energy = self.mo_energy).set(verbose = self.verbose,
-                                                            method_type = self.method_type,method = "adc(3)",
+                                                            method_type = self.method_type,method = self.method,
                                                             with_df = self.with_df,if_naf = self.if_naf,
                                                             thresh_naf = self.thresh_naf,
                                                             if_heri_eris = self.if_heri_eris,
@@ -653,7 +656,9 @@ class RFNOADC(RADC):
     def make_ss_rdm1(self, nroots, ref_state, guess, kptlist):
         adc2_can = RADC(self._scf,self.frozen).set(verbose = 0,method_type = self.method_type,
                                         approx_trans_moments = self.approx_trans_moments,
-                                        with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf)
+                                        with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,
+                                        conv_tol = self.conv_tol,tol_residual = self.tol_residual,
+                                        max_space = self.max_space, max_cycle = self.max_cycle)
         self.e_can,self.v_can,_,_ = adc2_can.kernel(nroots,guess=guess,kptlist=kptlist)
         rdm1_gs = adc2_can.make_ref_rdm1()
         self.e_corr_can = adc2_can.e_corr
