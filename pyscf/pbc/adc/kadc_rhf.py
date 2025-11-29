@@ -148,6 +148,9 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
 
+    cput0 = (logger.process_clock(), logger.perf_counter())
+    log = logger.Logger(adc.stdout, adc.verbose)
+
     t1 = adc.t1
     t2 = adc.t2
     t2_ce = t1[0]
@@ -159,24 +162,31 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
     nmo = adc.nmo
     nkpts = adc.nkpts
 
+    t1_ccee_ijb = np.zeros_like(t1_ccee)
+    t1_ccee_np = np.array(t1_ccee)
+
+    ki, kj, ka = np.indices((nkpts, nkpts, nkpts))
+    kb = adc.khelper.kconserv[ki, ka, kj]
+
+    t1_ccee_ijb[ki, kj, ka] = t1_ccee_np[ki, kj, kb]
+    t1_ij_b = t1_ccee_ijb.reshape(-1, *t1_ccee_ijb.shape[2:])
+    t1_ij_a = t1_ccee_np.reshape(-1, *t1_ccee.shape[2:])
+    t1_jb = t1_ccee_ijb.reshape(nkpts, nkpts*nkpts, *t1_ccee_ijb.shape[3:])
+    t1_ja = t1_ccee_np.reshape(nkpts, nkpts*nkpts, *t1_ccee.shape[3:])
+    del(t1_ccee_np)
+
     OPDM = np.zeros((nkpts,nmo,nmo), dtype=np.complex128)
     OPDM[:, :nocc, :nocc] += np.identity(nocc)
 
     ####### ADC(2) SPIN ADAPTED REF OPDM with SQA ################
-    for ki in range(nkpts):
-        for kj in range(nkpts):
-            for ka in range(nkpts):
-                kb = adc.khelper.kconserv[ki, ka, kj]
-                ### OCC-OCC ###
-                OPDM[ki][:nocc, :nocc] -= 2 * lib.einsum('Iiab,Jiab->IJ', t1_ccee[ki]
-                                                         [kj][ka], t1_ccee[ki][kj][ka].conj(), optimize = einsum_type)
-                OPDM[ki][:nocc, :nocc] += lib.einsum('Iiab,Jiba->IJ', t1_ccee[ki]
-                                                     [kj][ka], t1_ccee[ki][kj][kb].conj(), optimize = einsum_type)
-                ### VIR-VIR ###
-                OPDM[ka][nocc:, nocc:] += 2 * lib.einsum('ijBa,ijAa->AB', t1_ccee[ki]
-                                                         [kj][ka], t1_ccee[ki][kj][ka].conj(), optimize = einsum_type)
-                OPDM[ka][nocc:, nocc:] -= lib.einsum('ijBa,ijaA->AB', t1_ccee[ki]
-                                                     [kj][ka], t1_ccee[ki][kj][kb].conj(), optimize = einsum_type)
+    ### OCC-OCC ###
+    OPDM[:, :nocc, :nocc] -= 2 * lib.einsum('KkIiab,KkJiab->KIJ', t1_ja, t1_ja.conj(), optimize = einsum_type)
+    OPDM[:, :nocc, :nocc] += lib.einsum('KkIiab,KkJiba->KIJ', t1_ja, t1_jb.conj(), optimize = einsum_type)
+    ### VIR-VIR ###
+    OPDM[:, nocc:, nocc:] += 2 * lib.einsum('kKijBa,kKijAa->KAB', t1_ij_a, t1_ij_a.conj(), optimize = einsum_type)
+    OPDM[:, nocc:, nocc:] -= lib.einsum('kKijBa,kKijaA->KAB', t1_ij_a, t1_ij_b.conj(), optimize = einsum_type)
+
+    log.timer('ref_rdm1 ADC2 contribution', *cput0)
     if adc.approx_trans_moments is False or adc.method == "adc(3)":
         for ki in range(nkpts):
             ### OCC-VIR ###
@@ -221,6 +231,11 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
             ###### VIR-OCC ###
             OPDM[ki][nocc:, :nocc] = OPDM[ki][:nocc, nocc:].conj().T
 
+    del(t1_ccee_ijb)
+    del(t1_ij_b)
+    del(t1_ij_a)
+    del(t1_jb)
+    del(t1_ja)
 
     for ki in range(nkpts):
         OPDM[ki] += OPDM[ki].conj().T
@@ -247,6 +262,7 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
         mo = padded_mo_coeff(adc,adc.mo_coeff)
         for k in k_idx:
             OPDM[k] = lib.einsum('pI,IJ,qJ->pq', mo[k], OPDM[k], mo[k].conj())
+    log.timer('ref_rdm1 complete', *cput0)
 
     return OPDM
 
@@ -528,7 +544,7 @@ class RADC(pyscf.adc.radc.RADC):
         if kptlist is None:
             kptlist = range(self.nkpts)
 
-        rdm1 = self._adc_es.make_rdm1(root,kptlist)
+        rdm1 = self._adc_es.make_rdm1(nroots,kptlist)
 
         if with_frozen and self.frozen is not None:
             nmo = self.mo_occ[0].size
@@ -579,7 +595,7 @@ class RFNOADC(RADC):
         self.with_df = None
 
     def compute_correction(self, mf, frozen, nroots, eris=None, guess=None, kptlist=None):
-        adc2_ssfno = RADC(mf, frozen, self.mo_coeff, mo_energy = self.mo_energy).set(verbose = 0,
+        adc2_ssfno = RADC(mf, frozen, self.mo_coeff, mo_energy = self.mo_energy).set(verbose = self.verbose,
                                                          method_type = self.method_type,
                                                          with_df = self.with_df,if_naf = self.if_naf,
                                                          thresh_naf = self.thresh_naf,naux = self.naux,
@@ -591,8 +607,6 @@ class RFNOADC(RADC):
         e2_ssfno,v2_ssfno,p2_ssfno,x2_ssfno = adc2_ssfno.kernel(nroots, eris = eris, guess=guess, kptlist=kptlist)
         self.delta_e = self.e_can - e2_ssfno
         self.delta_e_corr = self.e_corr_can - adc2_ssfno.e_corr
-        print(self.e_corr_can)
-        print(adc2_ssfno.e_corr)
 
     def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, ref_state = None, kptlist = None, mode = "MIN"):
         cput0 = (logger.process_clock(), logger.perf_counter())
@@ -614,7 +628,8 @@ class RFNOADC(RADC):
         else:
             raise ValueError("ref_state should be an int type or or a array-like object with two elements")
 
-        self.make_ss_rdm1(nroots, self.ref_state, guess, kptlist)
+        self.make_ss_rdm1(nroots, self.ref_state, guess, kptlist, log, cput0)
+        log.timer('make ss rdm1', *cput0)
         self.mo_coeff,self.mo_energy,frozen = self.make_fno(self.rdm1_ss, self._scf, thresh, mode=mode)
         log.timer('get frozen info', *cput0)
 
@@ -653,14 +668,16 @@ class RFNOADC(RADC):
         log.timer('RFNOADC', *cput0)
         return e_exc, v_exc, spec_fac, x
 
-    def make_ss_rdm1(self, nroots, ref_state, guess, kptlist):
-        adc2_can = RADC(self._scf,self.frozen).set(verbose = 0,method_type = self.method_type,
+    def make_ss_rdm1(self, nroots, ref_state, guess, kptlist, log, cput0):
+        adc2_can = RADC(self._scf,self.frozen).set(verbose = self.verbose,method_type = self.method_type,
                                         approx_trans_moments = self.approx_trans_moments,
                                         with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,
                                         conv_tol = self.conv_tol,tol_residual = self.tol_residual,
                                         max_space = self.max_space, max_cycle = self.max_cycle)
         self.e_can,self.v_can,_,_ = adc2_can.kernel(nroots,guess=guess,kptlist=kptlist)
+        log.timer('can adc2', *cput0)
         rdm1_gs = adc2_can.make_ref_rdm1()
+        log.timer('make gs rdm1', *cput0)
         self.e_corr_can = adc2_can.e_corr
         if ref_state is not None:
             if isinstance(ref_state,(int, np.integer)):
@@ -675,6 +692,7 @@ class RFNOADC(RADC):
 
             logger.info(self, f"the specific state is {sidx} with kidx {kidx}")
             rdm1 = adc2_can.make_rdm1(root=[sidx],kptlist=[kidx])[0][0]
+            log.timer('make es rdm1', *cput0)
             self.rdm1_ss = rdm1 + rdm1_gs
         else:
             self.rdm1_ss = rdm1_gs
