@@ -173,7 +173,6 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
     t1_ij_a = t1_ccee_np.reshape(-1, *t1_ccee.shape[2:])
     t1_jb = t1_ccee_ijb.reshape(nkpts, nkpts*nkpts, *t1_ccee_ijb.shape[3:])
     t1_ja = t1_ccee_np.reshape(nkpts, nkpts*nkpts, *t1_ccee.shape[3:])
-    del(t1_ccee_np)
 
     OPDM = np.zeros((nkpts,nmo,nmo), dtype=np.complex128)
     OPDM[:, :nocc, :nocc] += np.identity(nocc)
@@ -186,13 +185,11 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
     OPDM[:, nocc:, nocc:] += 2 * lib.einsum('kKijBa,kKijAa->KAB', t1_ij_a, t1_ij_a.conj(), optimize = einsum_type)
     OPDM[:, nocc:, nocc:] -= lib.einsum('kKijBa,kKijaA->KAB', t1_ij_a, t1_ij_b.conj(), optimize = einsum_type)
 
-    log.timer('ref_rdm1 ADC2 contribution', *cput0)
     if adc.approx_trans_moments is False or adc.method == "adc(3)":
-        for ki in range(nkpts):
-            ### OCC-VIR ###
-            OPDM[ki][:nocc, nocc:] += lib.einsum('IA->IA', t2_ce[ki], optimize = einsum_type).copy()
-            ### VIR-OCC ###
-            OPDM[ki][nocc:, :nocc] = OPDM[ki][:nocc, nocc:].conj().T
+        ### OCC-VIR ###
+        OPDM[:, :nocc, nocc:] += t2_ce
+        ### VIR-OCC ###
+        OPDM[:, nocc:, :nocc] = OPDM[:, :nocc, nocc:].conj().transpose(0,2,1)
 
     ####### ADC(3) SPIN ADAPTED REF OPDM WITH SQA ################
     if adc.method == "adc(3)":
@@ -231,6 +228,7 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
             ###### VIR-OCC ###
             OPDM[ki][nocc:, :nocc] = OPDM[ki][:nocc, nocc:].conj().T
 
+    del(t1_ccee_np)
     del(t1_ccee_ijb)
     del(t1_ij_b)
     del(t1_ij_a)
