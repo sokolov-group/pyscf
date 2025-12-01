@@ -255,28 +255,27 @@ def transform_integrals_df(myadc):
                 eris.Lvv[ki,kj] = Lpq_mo[ki,kj][:,nocc:,nocc:]
 
     if myadc.if_naf:
-        Loo = Loo.reshape(nkpts,nkpts,naux,nocc*nocc)
-        eris.Lov = eris.Lov.reshape(nkpts,nkpts,naux,nocc*nvir)
-        Lvo = Lvo.reshape(nkpts,nkpts,naux,nvir*nocc)
-        eris.Lvv = eris.Lvv.reshape(nkpts,nkpts,naux,nvir*nvir)
-        W = np.zeros((naux,naux),dtype=dtype)
-        for ki in range(nkpts):
-            for kj in range(nkpts):
-                W += lib.ddot(Loo[ki][kj], Loo[ki][kj].T) + lib.ddot(eris.Lov[ki][kj],eris.Lov[ki][kj].T)\
-                    + lib.ddot(Lvo[ki][kj],Lvo[ki][kj].T) + lib.ddot(eris.Lvv[ki][kj],eris.Lvv[ki][kj].T)
+        Loo_big = Loo.transpose(2,0,1,3,4).reshape(naux,-1)
+        Lov_big = eris.Lov.transpose(2,0,1,3,4).reshape(naux,-1)
+        Lvo_big = Lvo.transpose(2,0,1,3,4).reshape(naux,-1)
+        Lvv_big = eris.Lvv.transpose(2,0,1,3,4).reshape(naux,-1)
+        L_big = np.concatenate([Loo_big, Lov_big, Lvo_big, Lvv_big], axis=1)
+        W = L_big.dot(L_big.T.conj())
         n,N = np.linalg.eigh(W/nkpts**2)
         N_trunc = N[:,n>myadc.thresh_naf].T
         myadc.naux = N_trunc.shape[0]
         log.info(f"origin naux is {naux}||naf naux is {myadc.naux}")
-        Loo = lib.einsum('rL,mnLs->mnrs', N_trunc,Loo)
-        eris.Lov = lib.einsum('rL,mnLs->mnrs', N_trunc,eris.Lov)
-        Lvo = lib.einsum('rL,mnLs->mnrs', N_trunc,Lvo)
-        eris.Lvv = lib.einsum('rL,mnLs->mnrs', N_trunc,eris.Lvv)
+        Loo = lib.einsum('rL,mnLsj->mnrsj', N_trunc,Loo)
+        eris.Lov = lib.einsum('rL,mnLsj->mnrsj', N_trunc,eris.Lov)
+        Lvo = lib.einsum('rL,mnLsj->mnrsj', N_trunc,Lvo)
+        eris.Lvv = lib.einsum('rL,mnLsj->mnrsj', N_trunc,eris.Lvv)
 
-        Loo = Loo.reshape(nkpts,nkpts,myadc.naux,nocc,nocc)
-        eris.Lov = eris.Lov.reshape(nkpts,nkpts,myadc.naux,nocc,nvir)
-        Lvo = Lvo.reshape(nkpts,nkpts,myadc.naux,nvir,nocc)
-        eris.Lvv = eris.Lvv.reshape(nkpts,nkpts,myadc.naux,nvir,nvir)
+        del(Loo_big)
+        del(Lov_big)
+        del(Lvo_big)
+        del(Lvv_big)
+        del(L_big)
+        del(W)
 
     eris.feri = feri = lib.H5TmpFile()
 
