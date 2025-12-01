@@ -148,9 +148,6 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
 
-    cput0 = (logger.process_clock(), logger.perf_counter())
-    log = logger.Logger(adc.stdout, adc.verbose)
-
     t1 = adc.t1
     t2 = adc.t2
     t2_ce = t1[0]
@@ -260,7 +257,6 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
         mo = padded_mo_coeff(adc,adc.mo_coeff)
         for k in k_idx:
             OPDM[k] = lib.einsum('pI,IJ,qJ->pq', mo[k], OPDM[k], mo[k].conj())
-    log.timer('ref_rdm1 complete', *cput0)
 
     return OPDM
 
@@ -433,6 +429,8 @@ class RADC(pyscf.adc.radc.RADC):
         return self.e_corr, self.t1,self.t2
 
     def kernel(self, nroots=1, guess=None, eris=None, kptlist=None):
+        cput0 = (logger.process_clock(), logger.perf_counter())
+        log = logger.Logger(self.stdout, self.verbose)
         assert(self.mo_coeff is not None)
         assert(self.mo_occ is not None)
 
@@ -497,6 +495,7 @@ class RADC(pyscf.adc.radc.RADC):
         else:
             raise NotImplementedError(self.method_type)
         self._adc_es = adc_es
+        log.timer('complete kernel', *cput0)
         if self.if_heri_eris:
             if self.if_naf:
                 return e_exc, v_exc, spec_fac, x, eris, self.naux

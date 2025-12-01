@@ -1078,6 +1078,23 @@ def make_rdm1_eigenvectors(adc, L, R, kshift):
         rdm1[:, :nocc, nocc:] += 2 * einsum('i,i,KIA->KIA', L1, R1, t2_ce, optimize = True)
         rdm1[:, nocc:, :nocc] = rdm1[:, :nocc, nocc:].conj().transpose(0,2,1)
 
+    del(t1_ccee_ijb)
+    del(t1_ccee_sjb)
+    del(t1_ccee_np)
+    del(t1_ccee_sja)
+    del(t1_ccee_isa)
+    del(t1_ccee_ijs)
+    del(t1_ij_b)
+    del(t1_ij_a)
+    del(t1_i_jb)
+    del(t1_i_ja)
+    del(t1_ccee_isb)
+    del(t1_ccee_ijs_b)
+    del(R2_aji)
+    del(L2_aji)
+    del(L2_jia)
+    del(L2_asj)
+
     return rdm1
 
 
