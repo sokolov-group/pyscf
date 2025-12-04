@@ -674,7 +674,6 @@ class UADC(lib.StreamObject):
                 h1e = mf.get_hcore()
                 dm = scf.uhf.make_rdm1(mo_coeff, self.mo_occ)
                 vhf = scf.uhf.get_veff(mf.mol, dm)
-
                 fock_a = h1e + vhf[0]
                 fock_b = h1e + vhf[1]
                 fock_a = self.mo_coeff[0].conj().T.dot(fock_a).dot(self.mo_coeff[0])
