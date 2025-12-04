@@ -600,13 +600,15 @@ class RADC(lib.StreamObject):
 
 class RFNOADC(RADC):
     #J. Chem. Phys. 159, 084113 (2023)
-    _keys = RADC._keys | {'delta_e','e_can','v_can'
-                          'rdm1_ss','ref_state','trans_guess'
+    _keys = RADC._keys | {'delta_e','delta_e_corr','e_can','v_can','e_corr_can',
+                          'mo_energy','rdm1_ss','ref_state','trans_guess'
                           }
 
     def __init__(self, mf, frozen=0, mo_coeff=None, mo_occ=None):
         super().__init__(mf, frozen, mo_coeff, mo_occ)
         self.delta_e = None
+        self.delta_e_corr = None
+        self.mo_energy = None
         self.method = "adc(3)"
         self.e_can = None
         self.v_can = None
