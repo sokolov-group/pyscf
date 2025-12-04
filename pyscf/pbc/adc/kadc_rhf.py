@@ -334,23 +334,25 @@ class RADC(pyscf.adc.radc.RADC):
         self.if_naf = False
         self.thresh_naf = 1e-2
 
-        if self.mo_coeff is not self._scf.mo_coeff or not self._scf.converged and mo_energy is None:
-            masks = mo_splitter(self)
-            dm = self._scf.make_rdm1(self.mo_coeff, self.mo_occ)
-            vhf = self._scf.get_veff(self._scf.mol, dm)
-            fockao = self._scf.get_fock(vhf=vhf, dm=dm)
-            vecs = []
-            for k in range(self.nkpts):
-                moeoccfrz0, moeocc, moevir, moevirfrz0 = [self.mo_energy[k][m] for m in masks[k]]
-                orboccfrz0, orbocc, orbvir, orbvirfrz0 = [self.mo_coeff[k][:,m] for m in masks[k]]
-                mo_coeff_k = np.hstack((orbocc, orbvir))
-                fock_k = mo_coeff_k.conj().T.dot(fockao[k]).dot(mo_coeff_k)
-                moe = fock_k.diagonal().real
-                mo_energy_k = np.hstack((moeoccfrz0,moe,moevirfrz0))
-                vecs.append(mo_energy_k)
-            self.mo_energy = np.vstack(vecs)
-            self.scf_energy = self._scf.energy_tot(dm=dm, vhf=vhf)
-
+        if self.mo_coeff is not self._scf.mo_coeff or not self._scf.converged:
+            if mo_energy is None:
+                masks = mo_splitter(self)
+                dm = self._scf.make_rdm1(self.mo_coeff, self.mo_occ)
+                vhf = self._scf.get_veff(self._scf.mol, dm)
+                fockao = self._scf.get_fock(vhf=vhf, dm=dm)
+                vecs = []
+                for k in range(self.nkpts):
+                    moeoccfrz0, moeocc, moevir, moevirfrz0 = [self.mo_energy[k][m] for m in masks[k]]
+                    orboccfrz0, orbocc, orbvir, orbvirfrz0 = [self.mo_coeff[k][:,m] for m in masks[k]]
+                    mo_coeff_k = np.hstack((orbocc, orbvir))
+                    fock_k = mo_coeff_k.conj().T.dot(fockao[k]).dot(mo_coeff_k)
+                    moe = fock_k.diagonal().real
+                    mo_energy_k = np.hstack((moeoccfrz0,moe,moevirfrz0))
+                    vecs.append(mo_energy_k)
+                self.mo_energy = np.vstack(vecs)
+                self.scf_energy = self._scf.energy_tot(dm=dm, vhf=vhf)
+            else:
+                self.mo_energy = mo_energy
 
     make_ref_rdm1 = make_ref_rdm1
     transform_integrals = kadc_ao2mo.transform_integrals_incore
@@ -589,7 +591,6 @@ class RFNOADC(RADC):
         self.ref_state = None
         self.if_naf = True
         self.trans_guess = False
-        self.with_df = None
 
     def compute_correction(self, mf, frozen, nroots, eris=None, guess=None, kptlist=None):
         adc2_ssfno = RADC(mf, frozen, self.mo_coeff, mo_energy = self.mo_energy).set(verbose = self.verbose,
@@ -601,7 +602,7 @@ class RFNOADC(RADC):
                                                          conv_tol = self.conv_tol,
                                                          tol_residual = self.tol_residual,
                                                          max_space = self.max_space, max_cycle = self.max_cycle)
-        e2_ssfno,v2_ssfno,p2_ssfno,x2_ssfno = adc2_ssfno.kernel(nroots, eris = eris, guess=guess, kptlist=kptlist)
+        e2_ssfno,_,_,_ = adc2_ssfno.kernel(nroots, eris = eris, guess=guess, kptlist=kptlist)
         self.delta_e = self.e_can - e2_ssfno
         self.delta_e_corr = self.e_corr_can - adc2_ssfno.e_corr
 
@@ -616,14 +617,14 @@ class RFNOADC(RADC):
         self.if_heri_eris = True
         if ref_state is None:
             logger.info(self, "Do fno kadc calculation")
-            self.if_naf = False
         elif (isinstance(ref_state, int) and 0<ref_state<=nroots) or \
                 (hasattr(ref_state, '__len__') and len(ref_state) == 2) :
             logger.info(self, "Do ss-fno kadc calculation")
-            if self.with_df is None and self._scf.with_df is None:
-                self.if_naf = False
         else:
             raise ValueError("ref_state should be an int type or or a array-like object with two elements")
+
+        if self.with_df is None and self._scf.with_df is None:
+            self.if_naf = False
 
         self.make_ss_rdm1(nroots, self.ref_state, guess, kptlist, log, cput0)
         log.timer('make ss rdm1', *cput0)
@@ -635,7 +636,7 @@ class RFNOADC(RADC):
                                                             with_df = self.with_df,if_naf = self.if_naf,
                                                             thresh_naf = self.thresh_naf,
                                                             if_heri_eris = self.if_heri_eris,
-                                                            approx_trans_moments = True,
+                                                            approx_trans_moments = self.approx_trans_moments,
                                                             conv_tol = self.conv_tol,
                                                             tol_residual = self.tol_residual,
                                                             max_space = self.max_space, max_cycle = self.max_cycle)
@@ -661,6 +662,8 @@ class RFNOADC(RADC):
             for n in range(nroots):
                 print_string = ('%s k-point %d | root %d  |  Energy (Eh) = %14.10f  |  Energy (eV) = %12.8f  ' %
                                 (self.method, kshift, n, e_exc[k][n], e_exc[k][n]*HARTREE2EV))
+                if self.compute_properties:
+                    print_string += ("|  Spec factors = %10.8f  " % spec_fac[k][n])
                 logger.info(self, print_string)
         log.timer('RFNOADC', *cput0)
         return e_exc, v_exc, spec_fac, x
@@ -672,9 +675,7 @@ class RFNOADC(RADC):
                                         conv_tol = self.conv_tol,tol_residual = self.tol_residual,
                                         max_space = self.max_space, max_cycle = self.max_cycle)
         self.e_can,self.v_can,_,_ = adc2_can.kernel(nroots,guess=guess,kptlist=kptlist)
-        log.timer('can adc2', *cput0)
         rdm1_gs = adc2_can.make_ref_rdm1()
-        log.timer('make gs rdm1', *cput0)
         self.e_corr_can = adc2_can.e_corr
         if ref_state is not None:
             if isinstance(ref_state,(int, np.integer)):
@@ -689,7 +690,6 @@ class RFNOADC(RADC):
 
             log.info(f"the specific state is {sidx} with kidx {kidx}")
             rdm1 = adc2_can.make_rdm1(root=[sidx],kptlist=[kidx])[0][0]
-            log.timer('make es rdm1', *cput0)
             self.rdm1_ss = rdm1 + rdm1_gs
         else:
             self.rdm1_ss = rdm1_gs
@@ -731,12 +731,12 @@ class RFNOADC(RADC):
                 moeoccfrz0, moeocc, moevir, moevirfrz0 = [mf.mo_energy[kpt][m] for m in masks[kpt]]
                 orboccfrz0, orbocc, orbvir, orbvirfrz0 = [mf.mo_coeff[kpt][:,m] for m in masks[kpt]]
                 F_can =  np.diag(moevir)
-                F_na_trunc = V_trunc.T.dot(F_can).dot(V_trunc)
-                e_na_trunc,Z_na_trunc = np.linalg.eigh(F_na_trunc[:n_keep,:n_keep])
-                U_vir_act = orbvir.dot(V_trunc[:,:n_keep]).dot(Z_na_trunc)
+                F_trunc = V_trunc.T.dot(F_can).dot(V_trunc)
+                e_trunc,Z_trunc = np.linalg.eigh(F_trunc[:n_keep,:n_keep])
+                U_vir_act = orbvir.dot(V_trunc[:,:n_keep]).dot(Z_trunc)
                 U_vir_fro = orbvir.dot(V_trunc[:,n_keep:])
                 no_comp = (orboccfrz0,orbocc,U_vir_act,U_vir_fro,orbvirfrz0)
-                no_e_comp = (moeoccfrz0,moeocc,e_na_trunc,moevir[n_keep:],moevirfrz0)
+                no_e_comp = (moeoccfrz0,moeocc,e_trunc,moevir[n_keep:],moevirfrz0)
                 no_coeff_k = np.hstack(no_comp)
                 no_energy_k = np.hstack(no_e_comp)
                 nocc_loc = np.cumsum([0]+[x.shape[1] for x in no_comp]).astype(int)
@@ -761,12 +761,12 @@ class RFNOADC(RADC):
                 moeoccfrz0, moeocc, moevir, moevirfrz0 = [mf.mo_energy[kpt][m] for m in masks[kpt]]
                 orboccfrz0, orbocc, orbvir, orbvirfrz0 = [mf.mo_coeff[kpt][:,m] for m in masks[kpt]]
                 F_can =  np.diag(moevir)
-                F_na_trunc = V_trunc.T.dot(F_can).dot(V_trunc)
-                e_na_trunc,Z_na_trunc = np.linalg.eigh(F_na_trunc[:n_keep,:n_keep])
-                U_vir_act = orbvir.dot(V_trunc[:,:n_keep]).dot(Z_na_trunc).astype(np.float64)
+                F_trunc = V_trunc.T.dot(F_can).dot(V_trunc)
+                e_trunc,Z_trunc = np.linalg.eigh(F_trunc[:n_keep,:n_keep])
+                U_vir_act = orbvir.dot(V_trunc[:,:n_keep]).dot(Z_trunc).astype(np.float64)
                 U_vir_fro = orbvir.dot(V_trunc[:,n_keep:]).astype(np.float64)
                 no_comp = (orboccfrz0,orbocc,U_vir_act,U_vir_fro,orbvirfrz0)
-                no_e_comp = (moeoccfrz0,moeocc,e_na_trunc,moevir[n_keep:],moevirfrz0)
+                no_e_comp = (moeoccfrz0,moeocc,e_trunc,moevir[n_keep:],moevirfrz0)
                 no_coeff_k = np.hstack(no_comp)
                 no_energy_k = np.hstack(no_e_comp)
                 nocc_loc = np.cumsum([0]+[x.shape[1] for x in no_comp]).astype(int)
