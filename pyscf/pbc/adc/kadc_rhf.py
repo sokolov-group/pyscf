@@ -627,7 +627,7 @@ class RFNOADC(RADC):
 
         self.make_ss_rdm1(nroots, self.ref_state, guess, kptlist, log, cput0)
         log.timer('make ss rdm1', *cput0)
-        self.mo_coeff,self.mo_energy,frozen = self.make_fno(self.rdm1_ss, self._scf, thresh, mode=mode)
+        self.mo_coeff,self.mo_energy,frozen = self.make_fno(self.rdm1_ss, self._scf, thresh, log=log, mode=mode)
         log.timer('get frozen info', *cput0)
 
         adc3_ssfno = RADC(self._scf, frozen, self.mo_coeff, mo_energy = self.mo_energy).set(verbose = self.verbose,
@@ -687,14 +687,14 @@ class RFNOADC(RADC):
                 else:
                     (sidx,kidx) = (ref_state[0],ref_state[1])
 
-            logger.info(self, f"the specific state is {sidx} with kidx {kidx}")
+            log.info(f"the specific state is {sidx} with kidx {kidx}")
             rdm1 = adc2_can.make_rdm1(root=[sidx],kptlist=[kidx])[0][0]
             log.timer('make es rdm1', *cput0)
             self.rdm1_ss = rdm1 + rdm1_gs
         else:
             self.rdm1_ss = rdm1_gs
 
-    def make_fno(self, rdm1_ss, mf, thresh, mode="MIN"):
+    def make_fno(self, rdm1_ss, mf, thresh, log, mode="MIN"):
         nocc = mf.mol.nelectron//2
         masks = mo_splitter(self)
 
@@ -716,6 +716,12 @@ class RFNOADC(RADC):
             T_min = np.stack(T)
             T_min = np.logical_or.reduce(T_min,axis=0)
             n_fro_vir = np.sum(T_min == 0)
+            if n_fro_vir == self.nmo - self.nocc:
+                log.warn("All virtual orbitals were requested to be frozen.\n"
+                "At least one virtual orbital must be retained for ADC calculations.\n"
+                "Keeping one virtual orbital automatically.")
+                n_fro_vir -= 1
+                T_min[0] = True
             T_min = np.diag(T_min)
 
             for kpt in range(self.nkpts):
