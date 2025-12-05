@@ -731,7 +731,7 @@ class RFNOADC(RADC):
                 moeoccfrz0, moeocc, moevir, moevirfrz0 = [mf.mo_energy[kpt][m] for m in masks[kpt]]
                 orboccfrz0, orbocc, orbvir, orbvirfrz0 = [mf.mo_coeff[kpt][:,m] for m in masks[kpt]]
                 F_can =  np.diag(moevir)
-                F_trunc = V_trunc.T.dot(F_can).dot(V_trunc)
+                F_trunc = V_trunc.T.conj().dot(F_can).dot(V_trunc)
                 e_trunc,Z_trunc = np.linalg.eigh(F_trunc[:n_keep,:n_keep])
                 U_vir_act = orbvir.dot(V_trunc[:,:n_keep]).dot(Z_trunc)
                 U_vir_fro = orbvir.dot(V_trunc[:,n_keep:])
