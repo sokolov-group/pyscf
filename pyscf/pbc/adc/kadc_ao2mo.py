@@ -276,6 +276,9 @@ def transform_integrals_df(myadc):
         del(Lvv_big)
         del(L_big)
         del(W)
+        del(N)
+        del(n)
+        del(N_trunc)
 
     eris.feri = feri = lib.H5TmpFile()
 

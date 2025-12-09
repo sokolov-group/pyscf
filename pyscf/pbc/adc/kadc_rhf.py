@@ -499,10 +499,7 @@ class RADC(pyscf.adc.radc.RADC):
         self._adc_es = adc_es
         log.timer('complete kernel', *cput0)
         if self.if_heri_eris:
-            if self.if_naf:
-                return e_exc, v_exc, spec_fac, x, eris, self.naux
-            else:
-                return e_exc, v_exc, spec_fac, x, eris
+            return e_exc, v_exc, spec_fac, x, eris
         else:
             return e_exc, v_exc, spec_fac, x
 
@@ -577,7 +574,7 @@ class RADC(pyscf.adc.radc.RADC):
 class RFNOADC(RADC):
     #J. Chem. Phys. 159, 084113 (2023)
     _keys = RADC._keys | {'delta_e','e_can','v_can','e_corr_can',
-                          'rdm1_ss','ref_state','trans_guess'
+                          'rdm1_ss','trans_guess','mode','ref_state'
                           }
 
     def __init__(self, mf, frozen=0, mo_coeff=None, mo_occ=None):
@@ -588,66 +585,51 @@ class RFNOADC(RADC):
         self.v_can = None
         self.e_corr_can = None
         self.rdm1_ss = None
-        self.ref_state = None
         self.if_naf = True
         self.trans_guess = False
+        self.mode = "min"
+        self.ref_state = [0,0]
 
-    def compute_correction(self, mf, frozen, nroots, eris=None, guess=None, kptlist=None):
-        adc2_ssfno = RADC(mf, frozen, self.mo_coeff, mo_energy = self.mo_energy).set(verbose = self.verbose,
-                                                         method_type = self.method_type,
-                                                         with_df = self.with_df,if_naf = self.if_naf,
-                                                         thresh_naf = self.thresh_naf,naux = self.naux,
-                                                         approx_trans_moments = self.approx_trans_moments,
-                                                         chnk_size = self.chnk_size,
-                                                         conv_tol = self.conv_tol,
-                                                         tol_residual = self.tol_residual,
-                                                         max_space = self.max_space, max_cycle = self.max_cycle)
-        e2_ssfno,_,_,_ = adc2_ssfno.kernel(nroots, eris = eris, guess=guess, kptlist=kptlist)
+    def compute_correction(self, nroots, eris=None, guess=None, kptlist=None):
+        e_corr_tmp = self.e_corr
+        method_tmp = self.method
+        self.method = "adc(2)"
+        self.if_heri_eris = False
+        e2_ssfno,_,_,_ = RADC.kernel(self, nroots, eris = eris, guess=guess, kptlist=kptlist)
         self.delta_e = self.e_can - e2_ssfno
-        self.delta_e_corr = self.e_corr_can - adc2_ssfno.e_corr
+        self.delta_e_corr = self.e_corr_can - self.e_corr
+        self.e_corr = e_corr_tmp
+        self.method = method_tmp
 
-    def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, ref_state = None, kptlist = None, mode = "MIN"):
+    def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None, kptlist = None):
         cput0 = (logger.process_clock(), logger.perf_counter())
         log = logger.Logger(self.stdout, self.verbose)
-        if isinstance(self._scf.with_df, df.GDF):
-            self.with_df = self._scf.with_df
-            self.chnk_size = self.get_chnk_size()
-        self.ref_state = ref_state
-        self.naux = None
-        self.if_heri_eris = True
-        if ref_state is None:
+        if self.ref_state is None:
             logger.info(self, "Do fno kadc calculation")
-        elif (isinstance(ref_state, int) and 0<ref_state<=nroots) or \
-                (hasattr(ref_state, '__len__') and len(ref_state) == 2) :
+        elif (isinstance(self.ref_state, int) and 0<self.ref_state<=nroots) or \
+                (hasattr(self.ref_state, '__len__') and len(self.ref_state) == 2) :
             logger.info(self, "Do ss-fno kadc calculation")
         else:
-            raise ValueError("ref_state should be an int type or or a array-like object with two elements")
+            raise ValueError("self.ref_state should be an int type or or a array-like object with two elements")
 
-        if self.with_df is None and self._scf.with_df is None:
+        if not isinstance(self._scf.with_df, df.GDF):
             self.if_naf = False
 
-        self.make_ss_rdm1(nroots, self.ref_state, guess, kptlist, log, cput0)
+        self.make_ss_rdm1(nroots, guess, kptlist, log)
         log.timer('make ss rdm1', *cput0)
-        self.mo_coeff,self.mo_energy,frozen = self.make_fno(self.rdm1_ss, self._scf, thresh, log=log, mode=mode)
+        self.make_fno(self.rdm1_ss, self._scf, thresh, pct_occ, nvir_act, log=log)
         log.timer('get frozen info', *cput0)
 
-        adc3_ssfno = RADC(self._scf, frozen, self.mo_coeff, mo_energy = self.mo_energy).set(verbose = self.verbose,
-                                                            method_type = self.method_type,method = self.method,
-                                                            with_df = self.with_df,if_naf = self.if_naf,
-                                                            thresh_naf = self.thresh_naf,
-                                                            if_heri_eris = self.if_heri_eris,
-                                                            approx_trans_moments = self.approx_trans_moments,
-                                                            conv_tol = self.conv_tol,
-                                                            tol_residual = self.tol_residual,
-                                                            max_space = self.max_space, max_cycle = self.max_cycle)
-        if self.if_naf:
-            e_exc, v_exc, spec_fac, x, eris, self.naux = adc3_ssfno.kernel(nroots, guess, eris, kptlist=kptlist)
-        else:
-            e_exc, v_exc, spec_fac, x, eris = adc3_ssfno.kernel(nroots, guess, eris, kptlist=kptlist)
-        self.e_corr = adc3_ssfno.e_corr
+        self.if_heri_eris = True
+        e_exc, v_exc, spec_fac, x, eris = RADC.kernel(self, nroots, guess, eris, kptlist=kptlist)
+        self.transform_integrals = None
+        self.t1 = None
+        self.t2 = None
+        self._adc_es = None
+        self.imds.t2_1_vvvv = None
         log.timer(f'ADC{self.method[4]}', *cput0)
 
-        self.compute_correction(self._scf, frozen, nroots, eris, guess, kptlist=kptlist)
+        self.compute_correction(nroots, eris, guess, kptlist=kptlist)
         e_exc = e_exc + self.delta_e
         self.e_corr = self.e_corr + self.delta_e_corr
 
@@ -668,52 +650,76 @@ class RFNOADC(RADC):
         log.timer('RFNOADC', *cput0)
         return e_exc, v_exc, spec_fac, x
 
-    def make_ss_rdm1(self, nroots, ref_state, guess, kptlist, log, cput0):
-        adc2_can = RADC(self._scf,self.frozen).set(verbose = self.verbose,method_type = self.method_type,
-                                        approx_trans_moments = self.approx_trans_moments,
-                                        with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,
-                                        conv_tol = self.conv_tol,tol_residual = self.tol_residual,
-                                        max_space = self.max_space, max_cycle = self.max_cycle)
-        self.e_can,self.v_can,_,_ = adc2_can.kernel(nroots,guess=guess,kptlist=kptlist)
-        rdm1_gs = adc2_can.make_ref_rdm1()
-        self.e_corr_can = adc2_can.e_corr
-        if ref_state is not None:
-            if isinstance(ref_state,(int, np.integer)):
+    def make_ss_rdm1(self, nroots, guess, kptlist, log):
+        method_tmp = self.method
+        self.method = "adc(2)"
+        self.e_can,self.v_can,_,_ = RADC.kernel(self, nroots, guess=guess, kptlist=kptlist)
+        rdm1_gs = self.make_ref_rdm1()
+        self.e_corr_can = self.e_corr
+        if self.ref_state is not None:
+            if isinstance(self.ref_state,(int, np.integer)):
                 idx = np.argsort(self.e_can.ravel())
-                sidx = idx[ref_state - 1]% self.nkpts
-                kidx = idx[ref_state - 1]// self.nkpts
-            elif hasattr(ref_state, '__len__'):
-                if len(ref_state) != 2:
+                sidx = idx[self.ref_state - 1]% self.nkpts
+                kidx = idx[self.ref_state - 1]// self.nkpts
+            elif hasattr(self.ref_state, '__len__'):
+                if len(self.ref_state) != 2:
                     raise ValueError
                 else:
-                    (sidx,kidx) = (ref_state[0],ref_state[1])
+                    (sidx,kidx) = (self.ref_state[0],self.ref_state[1])
 
             log.info(f"the specific state is {sidx} with kidx {kidx}")
-            rdm1 = adc2_can.make_rdm1(root=[sidx],kptlist=[kidx])[0][0]
+            rdm1 = self.make_rdm1(root=[sidx],kptlist=[kidx])[0][0]
             self.rdm1_ss = rdm1 + rdm1_gs
         else:
             self.rdm1_ss = rdm1_gs
+        self.method = method_tmp
+        self.transform_integrals = None
+        self.t1 = None
+        self.t2 = None
+        self._adc_es = None
+        self.imds.t2_1_vvvv = None
 
-    def make_fno(self, rdm1_ss, mf, thresh, log, mode="MIN"):
+    def make_fno(self, rdm1_ss, mf, thresh, pct_occ, nvir_act, log):
         nocc = mf.mol.nelectron//2
         masks = mo_splitter(self)
-
         no_coeff=[]
         no_frozen=[]
         no_energy=[]
-        if mode =="MIN":
+
+        if self.mode.lower() == "min":
             V = []
-            T = []
+            if nvir_act is None:
+                T = []
+                if pct_occ is None:
+                    for kpt in range(self.nkpts):
+                        n,V_k = np.linalg.eigh(rdm1_ss[kpt][nocc:,nocc:])
+                        idx = np.argsort(n)[::-1]
+                        n,V_k = n[idx], V_k[:,idx]
+                        T_k = n > thresh
+                        V.append(V_k)
+                        T.append(T_k)
+                else:
+                    for kpt in range(self.nkpts):
+                        n,V_k = np.linalg.eigh(rdm1_ss[kpt][nocc:,nocc:])
+                        idx = np.argsort(n)[::-1]
+                        n,V_k = n[idx], V_k[:,idx]
+                        cumsum = np.cumsum(n/np.sum(n))
+                        T_k = np.array(
+                            [c <= pct_occ or np.isclose(c, pct_occ) for c in cumsum])
+                        V.append(V_k)
+                        T.append(T_k)
+                T_min = np.stack(T)
+            else:
+                for kpt in range(self.nkpts):
+                    n,V_k = np.linalg.eigh(rdm1_ss[kpt][nocc:,nocc:])
+                    idx = np.argsort(n)[::-1]
+                    n,V_k = n[idx], V_k[:,idx]
+                    T_k = np.array(
+                        [i < nvir_act for i in range(len(n))])
+                    V.append(V_k)
+                T_min = np.zeros((self.nkpts,self.mo_energy[0][nocc:].shape[0]), dtype=bool)
+                T_min[:,:nvir_act] = True
 
-            for kpt in range(self.nkpts):
-                n,V_k = np.linalg.eigh(rdm1_ss[kpt][nocc:,nocc:])
-                idx = np.argsort(n)[::-1]
-                n,V_k = n[idx], V_k[:,idx]
-                T_k = n > thresh
-                V.append(V_k)
-                T.append(T_k)
-
-            T_min = np.stack(T)
             T_min = np.logical_or.reduce(T_min,axis=0)
             n_fro_vir = np.sum(T_min == 0)
             if n_fro_vir == self.nmo - self.nocc:
@@ -751,7 +757,6 @@ class RFNOADC(RADC):
                 n,V = np.linalg.eigh(rdm1_ss[kpt][nocc:,nocc:])
                 idx = np.argsort(n)[::-1]
                 n,V = n[idx], V[:,idx]
-                print(n)
                 T = n > thresh
                 n_fro_vir = np.sum(T == 0)
                 T = np.diag(T)
@@ -761,7 +766,7 @@ class RFNOADC(RADC):
                 moeoccfrz0, moeocc, moevir, moevirfrz0 = [mf.mo_energy[kpt][m] for m in masks[kpt]]
                 orboccfrz0, orbocc, orbvir, orbvirfrz0 = [mf.mo_coeff[kpt][:,m] for m in masks[kpt]]
                 F_can =  np.diag(moevir)
-                F_trunc = V_trunc.T.dot(F_can).dot(V_trunc)
+                F_trunc = V_trunc.T.conj().dot(F_can).dot(V_trunc)
                 e_trunc,Z_trunc = np.linalg.eigh(F_trunc[:n_keep,:n_keep])
                 U_vir_act = orbvir.dot(V_trunc[:,:n_keep]).dot(Z_trunc).astype(np.float64)
                 U_vir_fro = orbvir.dot(V_trunc[:,n_keep:]).astype(np.float64)
@@ -775,5 +780,5 @@ class RFNOADC(RADC):
                 no_coeff.append(no_coeff_k)
                 no_energy.append(no_energy_k)
                 no_frozen.append(no_frozen_k)
-        return no_coeff,no_energy,no_frozen
+        self.mo_coeff,self.mo_energy,self.frozen = no_coeff,no_energy,no_frozen
 
