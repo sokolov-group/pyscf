@@ -588,7 +588,7 @@ class RFNOADC(RADC):
         self.if_naf = True
         self.trans_guess = False
         self.mode = "min"
-        self.ref_state = [0,0]
+        self.ref_state = None
 
     def compute_correction(self, nroots, eris=None, guess=None, kptlist=None):
         e_corr_tmp = self.e_corr
