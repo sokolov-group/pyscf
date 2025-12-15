@@ -143,7 +143,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
 
     return evals, evecs, P, X
 
-def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
+def make_ref_rdm1_slow(adc, with_frozen=True, ao_repr=False):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
@@ -159,28 +159,140 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
     nmo = adc.nmo
     nkpts = adc.nkpts
 
-    t1_ccee_ijb = np.zeros_like(t1_ccee)
-    t1_ccee_np = np.array(t1_ccee)
+    OPDM = np.zeros((nkpts,nmo,nmo), dtype=np.complex128)
+    OPDM[:, :nocc, :nocc] += np.identity(nocc)
 
-    ki, kj, ka = np.indices((nkpts, nkpts, nkpts))
-    kb = adc.khelper.kconserv[ki, ka, kj]
+    ####### ADC(2) SPIN ADAPTED REF OPDM with SQA ################
+    for ki in range(nkpts):
+        for kj in range(nkpts):
+            for ka in range(nkpts):
+                kb = adc.khelper.kconserv[ki, ka, kj]
+                ### OCC-OCC ###
+                OPDM[ki][:nocc, :nocc] -= 2 * lib.einsum('Iiab,Jiab->IJ', t1_ccee[ki]
+                                                         [kj][ka], t1_ccee[ki][kj][ka].conj(), optimize = einsum_type)
+                OPDM[ki][:nocc, :nocc] += lib.einsum('Iiab,Jiba->IJ', t1_ccee[ki]
+                                                     [kj][ka], t1_ccee[ki][kj][kb].conj(), optimize = einsum_type)
+                ### VIR-VIR ###
+                OPDM[ka][nocc:, nocc:] += 2 * lib.einsum('ijBa,ijAa->AB', t1_ccee[ki]
+                                                         [kj][ka], t1_ccee[ki][kj][ka].conj(), optimize = einsum_type)
+                OPDM[ka][nocc:, nocc:] -= lib.einsum('ijBa,ijaA->AB', t1_ccee[ki]
+                                                     [kj][ka], t1_ccee[ki][kj][kb].conj(), optimize = einsum_type)
+    if adc.approx_trans_moments is False or adc.method == "adc(3)":
+        for ki in range(nkpts):
+            ### OCC-VIR ###
+            OPDM[ki][:nocc, nocc:] += lib.einsum('IA->IA', t2_ce[ki], optimize = einsum_type).copy()
+            ### VIR-OCC ###
+            OPDM[ki][nocc:, :nocc] = OPDM[ki][:nocc, nocc:].conj().T
 
-    t1_ccee_ijb[ki, kj, ka] = t1_ccee_np[ki, kj, kb]
-    t1_ij_b = t1_ccee_ijb.reshape(-1, *t1_ccee_ijb.shape[2:])
-    t1_ij_a = t1_ccee_np.reshape(-1, *t1_ccee.shape[2:])
-    t1_jb = t1_ccee_ijb.reshape(nkpts, nkpts*nkpts, *t1_ccee_ijb.shape[3:])
-    t1_ja = t1_ccee_np.reshape(nkpts, nkpts*nkpts, *t1_ccee.shape[3:])
+    ####### ADC(3) SPIN ADAPTED REF OPDM WITH SQA ################
+    if adc.method == "adc(3)":
+        t2_ccee = t2[1]
+
+        for ki in range(nkpts):
+            for kj in range(nkpts):
+                for ka in range(nkpts):
+                    kb = adc.khelper.kconserv[ki, ka, kj]
+                    #### OCC-OCC ###
+                    OPDM[ki][:nocc, :nocc] -= 2 * lib.einsum('Iiab,Jiab->IJ', t1_ccee[ki]
+                                                            [kj][ka], t2_ccee[ki][kj][ka].conj(), optimize = einsum_type)
+                    OPDM[ki][:nocc, :nocc] += lib.einsum('Iiab,Jiba->IJ', t1_ccee[ki]
+                                                         [kj][ka], t2_ccee[ki][kj][kb].conj(), optimize = einsum_type)
+                    OPDM[ki][:nocc, :nocc] -= 2 * lib.einsum('Jiab,Iiab->IJ', t1_ccee[ki]
+                                                            [kj][ka].conj(), t2_ccee[ki][kj][ka], optimize = einsum_type)
+                    OPDM[ki][:nocc, :nocc] += lib.einsum('Jiab,Iiba->IJ', t1_ccee[ki]
+                                                         [kj][ka].conj(), t2_ccee[ki][kj][kb], optimize = einsum_type)
+                    ##### VIR-VIR ###
+                    OPDM[ka][nocc:, nocc:] += 2 * lib.einsum('ijBa,ijAa->AB', t1_ccee[ki]
+                                                            [kj][ka], t2_ccee[ki][kj][ka].conj(), optimize = einsum_type)
+                    OPDM[ka][nocc:, nocc:] -= lib.einsum('ijBa,ijaA->AB', t1_ccee[ki]
+                                                         [kj][ka], t2_ccee[ki][kj][kb].conj(), optimize = einsum_type)
+                    OPDM[ka][nocc:, nocc:] += 2 * lib.einsum('ijAa,ijBa->AB', t1_ccee[ki]
+                                                            [kj][ka].conj(), t2_ccee[ki][kj][ka], optimize = einsum_type)
+                    OPDM[ka][nocc:, nocc:] -= lib.einsum('ijAa,ijaB->AB', t1_ccee[ki]
+                                                         [kj][ka].conj(), t2_ccee[ki][kj][kb], optimize = einsum_type)
+
+                ka = ki
+                kb = kj
+                ##### OCC-VIR ### ####
+                OPDM[ki][:nocc, nocc:] += lib.einsum('IiAa,ia->IA', t1_ccee[ki][kj]
+                                                     [ka], t2_ce[kj].conj(), optimize = einsum_type)
+                OPDM[ki][:nocc, nocc:] -= 1/2 * \
+                    lib.einsum('IiaA,ia->IA', t1_ccee[ki][kj][kb], t2_ce[kj].conj(), optimize = einsum_type)
+            ###### VIR-OCC ###
+            OPDM[ki][nocc:, :nocc] = OPDM[ki][:nocc, nocc:].conj().T
+
+    for ki in range(nkpts):
+        OPDM[ki] += OPDM[ki].conj().T
+    if with_frozen and adc.frozen is not None:
+        nmo = adc.mo_occ[0].size
+        nocc = np.count_nonzero(adc.mo_occ[0] > 0)
+        mask = get_frozen_mask(adc)
+        dm = np.zeros((nkpts, nmo, nmo), dtype=np.complex128)
+        occ_idx = np.arange(nocc)
+        k_idx = np.arange(nkpts)
+        p_k_idx = padding_k_idx(adc, kind="joint")
+        dm[k_idx[:, None], occ_idx, occ_idx] = 2
+        for k in k_idx:
+            moidx = np.where(mask[k])[0]
+            dm[k][moidx[:,None],moidx] = OPDM[k][p_k_idx[k][:,None],p_k_idx[k]]
+        OPDM = dm
+        if ao_repr:
+            mo = adc.mo_coeff
+            for k in k_idx:
+                OPDM[k] = lib.einsum('pI,IJ,qJ->pq', mo[k], OPDM[k], mo[k].conj())
+
+    elif ao_repr:
+        mo = padded_mo_coeff(adc,adc.mo_coeff)
+        for k in k_idx:
+            OPDM[k] = lib.einsum('pI,IJ,qJ->pq', mo[k], OPDM[k], mo[k].conj())
+
+    return OPDM
+
+def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
+
+    if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
+        raise NotImplementedError(adc.method)
+
+    t1 = adc.t1
+    t2 = adc.t2
+    t2_ce = t1[0]
+    t1_ccee = t2[0]
+
+    ######################
+    einsum_type = True
+    nocc = adc.nocc
+    nmo = adc.nmo
+    nvir = nmo-nocc
+    nkpts = adc.nkpts
 
     OPDM = np.zeros((nkpts,nmo,nmo), dtype=np.complex128)
     OPDM[:, :nocc, :nocc] += np.identity(nocc)
 
     ####### ADC(2) SPIN ADAPTED REF OPDM with SQA ################
-    ### OCC-OCC ###
-    OPDM[:, :nocc, :nocc] -= 2 * lib.einsum('KkIiab,KkJiab->KIJ', t1_ja, t1_ja.conj(), optimize = einsum_type)
-    OPDM[:, :nocc, :nocc] += lib.einsum('KkIiab,KkJiba->KIJ', t1_ja, t1_jb.conj(), optimize = einsum_type)
-    ### VIR-VIR ###
-    OPDM[:, nocc:, nocc:] += 2 * lib.einsum('kKijBa,kKijAa->KAB', t1_ij_a, t1_ij_a.conj(), optimize = einsum_type)
-    OPDM[:, nocc:, nocc:] -= lib.einsum('kKijBa,kKijaA->KAB', t1_ij_a, t1_ij_b.conj(), optimize = einsum_type)
+    kj, ka = np.indices((nkpts, nkpts))
+    idx0 = np.arange(nkpts)[:, None]
+    oo = np.zeros((nkpts,nocc,nocc), dtype=np.complex128)
+    vv = np.zeros((nkpts,nvir,nvir), dtype=np.complex128)
+    path1 = np.einsum_path('KkIiab,KkJiab->IJ', t1_ccee[0], t1_ccee[0])[0]
+    path2 = np.einsum_path('KkIiab,KkJiba->IJ', t1_ccee[0], t1_ccee[0])[0]
+    path3 = np.einsum_path('kKijBa,kKijAa->KAB', t1_ccee[0], t1_ccee[0])[0]
+    path4 = np.einsum_path('kKijBa,kKijaA->KAB', t1_ccee[0], t1_ccee[0])[0]
+    for ki in range(nkpts):
+        kb = adc.khelper.kconserv[ki, ka, kj]
+        t1_ccee_np = np.array(t1_ccee[ki])
+        t1_ccee_ijb = t1_ccee_np[idx0, kb]
+
+        oo[ki] -= 2 * lib.einsum('KkIiab,KkJiab->IJ', t1_ccee_np, t1_ccee_np.conj(), optimize = path1)
+        oo[ki] += lib.einsum('KkIiab,KkJiba->IJ', t1_ccee_np, t1_ccee_ijb.conj(), optimize = path2)
+        vv += 2 * lib.einsum('kKijBa,kKijAa->KAB', t1_ccee_np, t1_ccee_np.conj(), optimize = path3)
+        vv -= lib.einsum('kKijBa,kKijaA->KAB', t1_ccee_np, t1_ccee_ijb.conj(), optimize = path4)
+        del(t1_ccee_np)
+        del(t1_ccee_ijb)
+
+    OPDM[:, :nocc, :nocc] += oo
+    OPDM[:, nocc:, nocc:] += vv
+    del(oo)
+    del(vv)
 
     if adc.approx_trans_moments is False or adc.method == "adc(3)":
         ### OCC-VIR ###
@@ -225,13 +337,6 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
             ###### VIR-OCC ###
             OPDM[ki][nocc:, :nocc] = OPDM[ki][:nocc, nocc:].conj().T
 
-    del(t1_ccee_np)
-    del(t1_ccee_ijb)
-    del(t1_ij_b)
-    del(t1_ij_a)
-    del(t1_jb)
-    del(t1_ja)
-
     for ki in range(nkpts):
         OPDM[ki] += OPDM[ki].conj().T
 
@@ -243,7 +348,7 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
         occ_idx = np.arange(nocc)
         k_idx = np.arange(nkpts)
         p_k_idx = padding_k_idx(adc, kind="joint")
-        dm[k_idx[:, None], occ_idx, occ_idx] = 1
+        dm[k_idx[:, None], occ_idx, occ_idx] = 2
         for k in k_idx:
             moidx = np.where(mask[k])[0]
             dm[k][moidx[:,None],moidx] = OPDM[k][p_k_idx[k][:,None],p_k_idx[k]]
@@ -279,7 +384,7 @@ class RADC(pyscf.adc.radc.RADC):
     _keys = pyscf.adc.radc.RADC._keys | {
         'kpts', 'khelper','exxdiv', 'cell',
         'nkop_chk', 'kop_npick', 'chnk_size', 'keep_exxdiv',
-        'naux', 'if_heri_eris', 'if_naf', 'thresh_naf'
+        'naux', 'if_heri_eris', 'if_naf', 'thresh_naf', 'if_corr'
     }
 
     def __init__(self, mf, frozen=None, mo_coeff=None, mo_occ=None, mo_energy=None):
@@ -332,6 +437,7 @@ class RADC(pyscf.adc.radc.RADC):
         self.naux = None
         self.if_heri_eris = False
         self.if_naf = False
+        self.if_corr = True
         self.thresh_naf = 1e-2
 
         if self.mo_coeff is not self._scf.mo_coeff or not self._scf.converged:
@@ -355,6 +461,7 @@ class RADC(pyscf.adc.radc.RADC):
                 self.mo_energy = mo_energy
 
     make_ref_rdm1 = make_ref_rdm1
+    make_ref_rdm1_slow = make_ref_rdm1_slow
     transform_integrals = kadc_ao2mo.transform_integrals_incore
     compute_amplitudes = kadc_rhf_amplitudes.compute_amplitudes
     compute_energy = kadc_rhf_amplitudes.compute_energy
@@ -378,7 +485,7 @@ class RADC(pyscf.adc.radc.RADC):
     get_nmo = get_nmo
 
 
-    def kernel_gs(self):
+    def kernel_gs(self, eris=None):
         assert(self.mo_coeff is not None)
         assert(self.mo_occ is not None)
 
@@ -413,22 +520,27 @@ class RADC(pyscf.adc.radc.RADC):
             logger.info(self, 'Frozen Orbital List: %s', self.frozen)
         logger.info(self, '*****************************************')
 
-        if isinstance(self._scf.with_df, df.GDF):
-            self.chnk_size = self.get_chnk_size()
-            self.with_df = self._scf.with_df
-            def df_transform():
-                return kadc_ao2mo.transform_integrals_df(self)
-            self.transform_integrals = df_transform
-        elif (mem_incore+mem_now >= self.max_memory and not self.incore_complete):
-            def outcore_transform():
-                return kadc_ao2mo.transform_integrals_outcore(self)
-            self.transform_integrals = outcore_transform
+        if eris is None:
+            if isinstance(self._scf.with_df, df.GDF):
+                self.chnk_size = self.get_chnk_size()
+                self.with_df = self._scf.with_df
+                def df_transform():
+                    return kadc_ao2mo.transform_integrals_df(self)
+                self.transform_integrals = df_transform
+            elif (mem_incore+mem_now >= self.max_memory and not self.incore_complete):
+                def outcore_transform():
+                    return kadc_ao2mo.transform_integrals_outcore(self)
+                self.transform_integrals = outcore_transform
 
-        eris = self.transform_integrals()
+            eris = self.transform_integrals()
+
         self.e_corr,self.t1,self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
-            self, eris=eris, verbose=self.verbose)
+            self, eris=eris, verbose=self.verbose, if_corr=self.if_corr)
         self._finalize()
-        return self.e_corr, self.t1,self.t2
+        if self.if_heri_eris:
+            return self.e_corr, self.t1,self.t2, eris
+        else:
+            return self.e_corr, self.t1,self.t2
 
     def kernel(self, nroots=1, guess=None, eris=None, kptlist=None):
         cput0 = (logger.process_clock(), logger.perf_counter())
@@ -482,7 +594,7 @@ class RADC(pyscf.adc.radc.RADC):
             eris = self.transform_integrals()
 
         self.e_corr, self.t1, self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
-            self, eris=eris, verbose=self.verbose)
+            self, eris=eris, verbose=self.verbose, if_corr=self.if_corr)
         self._finalize()
 
         self.method_type = self.method_type.lower()
@@ -531,7 +643,7 @@ class RADC(pyscf.adc.radc.RADC):
             self.with_df = with_df
         return self
 
-    def make_rdm1(self,root=None,kptlist=None,with_frozen=True,ao_repr=False):
+    def make_rdm1(self,root=None,kptlist=None,with_frozen=True,ao_repr=False,if_ss=False):
         if root is None:
             nroots = range(self._adc_es.U.shape[1])
         else:
@@ -540,7 +652,7 @@ class RADC(pyscf.adc.radc.RADC):
         if kptlist is None:
             kptlist = range(self.nkpts)
 
-        rdm1 = self._adc_es.make_rdm1(nroots,kptlist)
+        rdm1 = self._adc_es.make_rdm1(nroots,kptlist,if_ss)
 
         if with_frozen and self.frozen is not None:
             nmo = self.mo_occ[0].size
@@ -552,7 +664,10 @@ class RADC(pyscf.adc.radc.RADC):
             p_k_idx = padding_k_idx(self, kind="joint")
             s_idx = np.arange(len(rdm1))
             S, K0, K1, O = np.meshgrid(s_idx, k_idx, k_idx, occ_idx, indexing='ij')
-            dm[S, K0, K1, O, O] = 1
+            if if_ss:
+                dm[S, K0, K1, O, O] = 4
+            else:
+                dm[S, K0, K1, O, O] = 2
             for ki in k_idx:
                 moidx = np.where(mask[ki])[0]
                 for i in range(len(nroots)):
@@ -590,16 +705,44 @@ class RFNOADC(RADC):
         self.mode = "min"
         self.ref_state = None
 
-    def compute_correction(self, nroots, eris=None, guess=None, kptlist=None):
-        e_corr_tmp = self.e_corr
-        method_tmp = self.method
-        self.method = "adc(2)"
-        self.if_heri_eris = False
-        e2_ssfno,_,_,_ = RADC.kernel(self, nroots, eris = eris, guess=guess, kptlist=kptlist)
-        self.delta_e = self.e_can - e2_ssfno
-        self.delta_e_corr = self.e_corr_can - self.e_corr
-        self.e_corr = e_corr_tmp
-        self.method = method_tmp
+    def kernel_gs(self, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None):
+        cput0 = (logger.process_clock(), logger.perf_counter())
+        log = logger.Logger(self.stdout, self.verbose)
+        if self.method != "adc(3)":
+            raise NotImplementedError(self.method)
+        logger.info(self, "Do fno kadc calculation")
+        self.ref_state = None
+
+        if not isinstance(self._scf.with_df, df.GDF):
+            self.if_naf = False
+
+        self.make_ss_rdm1(log, cput0, if_gs=True)
+        log.timer('make gs rdm1', *cput0)
+        self.make_fno(self.rdm1_ss, self._scf, thresh, pct_occ, nvir_act, log=log)
+        log.timer('get frozen info', *cput0)
+        logger.info(self, 'current use %d MB',lib.current_memory()[0])
+        self.if_heri_eris = True
+        _,t1,t2, eris = RADC.kernel_gs(self, eris)
+        logger.info(self, 'current use %d MB',lib.current_memory()[0])
+        self.transform_integrals = None
+        self.t1 = None
+        self.t2 = None
+        self._adc_es = None
+        self.imds.t2_1_vvvv = None
+        log.timer(f'MP{self.method[4]}', *cput0)
+        logger.info(self, 'current use %d MB',lib.current_memory()[0])
+
+        self.compute_correction(eris=eris, if_gs=True)
+        self.e_corr = self.e_corr + self.delta_e_corr
+
+        msg = ("\n*************************************************************"
+            "\n            FNOMP calculation summary"
+            "\n*************************************************************")
+        logger.info(self, msg)
+        logger.info(self, 'FNO MP%s correlation energy of reference state (a.u.) = %.8f',
+                    self.method[4], self.e_corr)
+        log.timer('RFNOMP', *cput0)
+        return self.e_corr, t1, t2
 
     def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None, kptlist = None):
         cput0 = (logger.process_clock(), logger.perf_counter())
@@ -615,19 +758,23 @@ class RFNOADC(RADC):
         if not isinstance(self._scf.with_df, df.GDF):
             self.if_naf = False
 
-        self.make_ss_rdm1(nroots, guess, kptlist, log)
+        self.make_ss_rdm1(log, cput0, nroots, guess, kptlist)
         log.timer('make ss rdm1', *cput0)
         self.make_fno(self.rdm1_ss, self._scf, thresh, pct_occ, nvir_act, log=log)
         log.timer('get frozen info', *cput0)
-
+        logger.info(self, 'current use %d MB',lib.current_memory()[0])
+        if self.method == "adc(2)-x":
+            self.if_corr = False
         self.if_heri_eris = True
         e_exc, v_exc, spec_fac, x, eris = RADC.kernel(self, nroots, guess, eris, kptlist=kptlist)
+        logger.info(self, 'current use %d MB',lib.current_memory()[0])
         self.transform_integrals = None
         self.t1 = None
         self.t2 = None
         self._adc_es = None
         self.imds.t2_1_vvvv = None
         log.timer(f'ADC{self.method[4]}', *cput0)
+        logger.info(self, 'current use %d MB',lib.current_memory()[0])
 
         self.compute_correction(nroots, eris, guess, kptlist=kptlist)
         e_exc = e_exc + self.delta_e
@@ -650,11 +797,28 @@ class RFNOADC(RADC):
         log.timer('RFNOADC', *cput0)
         return e_exc, v_exc, spec_fac, x
 
-    def make_ss_rdm1(self, nroots, guess, kptlist, log):
+    def compute_correction(self, nroots=None, eris=None, guess=None, kptlist=None, if_gs=False):
+        e_corr_tmp = self.e_corr
         method_tmp = self.method
         self.method = "adc(2)"
-        self.e_can,self.v_can,_,_ = RADC.kernel(self, nroots, guess=guess, kptlist=kptlist)
-        rdm1_gs = self.make_ref_rdm1()
+        self.if_heri_eris = False
+        if if_gs:
+            _,_,_ = RADC.kernel_gs(self, eris = eris)
+        else:
+            e2_ssfno,_,_,_ = RADC.kernel(self, nroots, eris = eris, guess=guess, kptlist=kptlist)
+            self.delta_e = self.e_can - e2_ssfno
+        self.delta_e_corr = self.e_corr_can - self.e_corr
+        self.e_corr = e_corr_tmp
+        self.method = method_tmp
+
+    def make_ss_rdm1(self, log, cput0, nroots=None, guess=None, kptlist=None, if_gs=False):
+        method_tmp = self.method
+        self.method = "adc(2)"
+        if if_gs:
+            _,_,_ = RADC.kernel_gs(self)
+        else:
+            self.e_can,self.v_can,_,_ = RADC.kernel(self, nroots, guess=guess, kptlist=kptlist)
+        log.info('current use %d MB',lib.current_memory()[0])
         self.e_corr_can = self.e_corr
         if self.ref_state is not None:
             if isinstance(self.ref_state,(int, np.integer)):
@@ -666,12 +830,14 @@ class RFNOADC(RADC):
                     raise ValueError
                 else:
                     (sidx,kidx) = (self.ref_state[0],self.ref_state[1])
-
             log.info(f"the specific state is {sidx} with kidx {kidx}")
-            rdm1 = self.make_rdm1(root=[sidx],kptlist=[kidx])[0][0]
-            self.rdm1_ss = rdm1 + rdm1_gs
+            self.rdm1_ss = self.make_rdm1(root=[sidx],kptlist=[kidx],if_ss=True)[0][0]
+            log.info('current use %d MB',lib.current_memory()[0])
+            log.timer('make ss rdm1', *cput0)
         else:
-            self.rdm1_ss = rdm1_gs
+            self.rdm1_ss = self.make_ref_rdm1()
+            log.info('current use %d MB',lib.current_memory()[0])
+            log.timer('make ref rdm1', *cput0)
         self.method = method_tmp
         self.transform_integrals = None
         self.t1 = None
@@ -781,4 +947,3 @@ class RFNOADC(RADC):
                 no_energy.append(no_energy_k)
                 no_frozen.append(no_frozen_k)
         self.mo_coeff,self.mo_energy,self.frozen = no_coeff,no_energy,no_frozen
-
