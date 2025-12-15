@@ -50,10 +50,13 @@ import tempfile
 #        Chemist's  oovv(ijab) : ki - kj + ka - kb
 #        Amplitudes t2(ijab)  : ki + kj - ka - kba
 
-def compute_amplitudes_energy(myadc, eris, verbose=None):
+def compute_amplitudes_energy(myadc, eris, verbose=None, if_corr=True):
 
     t1,t2,myadc.imds.t2_1_vvvv = myadc.compute_amplitudes(eris)
-    e_corr = myadc.compute_energy(t2, eris)
+    if if_corr:
+        e_corr = myadc.compute_energy(t2, eris)
+    else:
+        e_corr = 0.
 
     return e_corr, t1, t2
 
