@@ -1214,21 +1214,17 @@ def make_rdm1_eigenvectors(adc, L, R, kshift, if_ss):
     t1_ccee_ijs_b = np.zeros_like(t1_ccee[0])
     oo = np.zeros((nkpts,nocc,nocc), dtype=np.complex128)
     vv = np.zeros((nkpts,nvir,nvir), dtype=np.complex128)
-    path1 = np.einsum_path('KkIjab,KkJjab->IJ', t1_ccee[0], t1_ccee[0])[0]
-    path2 = np.einsum_path('KkIjab,KkJjba->IJ', t1_ccee[0], t1_ccee[0])[0]
-    path3 = np.einsum_path('kKijBa,kKijAa->KAB', t1_ccee[0], t1_ccee[0])[0]
-    path4 = np.einsum_path('kKijBa,kKijaA->KAB', t1_ccee[0], t1_ccee[0])[0]
     for ki in range(nkpts):
         kb = adc.khelper.kconserv[ki, ka, kj]
         t1_ccee_np = np.array(t1_ccee[ki])
         t1_ccee_ijb = t1_ccee_np[idx0, kb]
         t1_ccee_ijs_b[ki] = t1_ccee_ijb[:, kshift].copy()
 ######### block- ij
-        oo[ki] -= 4 * einsum('KkIjab,KkJjab->IJ', t1_ccee_np, t1_ccee_np.conj(), optimize = path1)
-        oo[ki] += 2 * einsum('KkIjab,KkJjba->IJ', t1_ccee_np, t1_ccee_ijb.conj(), optimize = path2)
+        oo[ki] -= 4 * einsum('KkIjab,KkJjab->IJ', t1_ccee_np, t1_ccee_np.conj(), optimize = True)
+        oo[ki] += 2 * einsum('KkIjab,KkJjba->IJ', t1_ccee_np, t1_ccee_ijb.conj(), optimize = True)
 ########### block- ab
-        vv += 4 * einsum('kKijBa,kKijAa->KAB', t1_ccee_np, t1_ccee_np.conj(), optimize = path3)
-        vv -= 2 * einsum('kKijBa,kKijaA->KAB', t1_ccee_np, t1_ccee_ijb.conj(), optimize = path4)
+        vv += 4 * einsum('kKijBa,kKijAa->KAB', t1_ccee_np, t1_ccee_np.conj(), optimize = True)
+        vv -= 2 * einsum('kKijBa,kKijaA->KAB', t1_ccee_np, t1_ccee_ijb.conj(), optimize = True)
         del(t1_ccee_ijb)
         del(t1_ccee_np)
 
