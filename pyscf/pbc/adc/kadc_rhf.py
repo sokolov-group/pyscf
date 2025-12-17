@@ -273,19 +273,15 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
     idx0 = np.arange(nkpts)[:, None]
     oo = np.zeros((nkpts,nocc,nocc), dtype=np.complex128)
     vv = np.zeros((nkpts,nvir,nvir), dtype=np.complex128)
-    path1 = np.einsum_path('KkIiab,KkJiab->IJ', t1_ccee[0], t1_ccee[0])[0]
-    path2 = np.einsum_path('KkIiab,KkJiba->IJ', t1_ccee[0], t1_ccee[0])[0]
-    path3 = np.einsum_path('kKijBa,kKijAa->KAB', t1_ccee[0], t1_ccee[0])[0]
-    path4 = np.einsum_path('kKijBa,kKijaA->KAB', t1_ccee[0], t1_ccee[0])[0]
     for ki in range(nkpts):
         kb = adc.khelper.kconserv[ki, ka, kj]
         t1_ccee_np = np.array(t1_ccee[ki])
         t1_ccee_ijb = t1_ccee_np[idx0, kb]
 
-        oo[ki] -= 2 * lib.einsum('KkIiab,KkJiab->IJ', t1_ccee_np, t1_ccee_np.conj(), optimize = path1)
-        oo[ki] += lib.einsum('KkIiab,KkJiba->IJ', t1_ccee_np, t1_ccee_ijb.conj(), optimize = path2)
-        vv += 2 * lib.einsum('kKijBa,kKijAa->KAB', t1_ccee_np, t1_ccee_np.conj(), optimize = path3)
-        vv -= lib.einsum('kKijBa,kKijaA->KAB', t1_ccee_np, t1_ccee_ijb.conj(), optimize = path4)
+        oo[ki] -= 2 * lib.einsum('KkIiab,KkJiab->IJ', t1_ccee_np, t1_ccee_np.conj(), optimize = einsum_type)
+        oo[ki] += lib.einsum('KkIiab,KkJiba->IJ', t1_ccee_np, t1_ccee_ijb.conj(), optimize = einsum_type)
+        vv += 2 * lib.einsum('kKijBa,kKijAa->KAB', t1_ccee_np, t1_ccee_np.conj(), optimize = einsum_type)
+        vv -= lib.einsum('kKijBa,kKijaA->KAB', t1_ccee_np, t1_ccee_ijb.conj(), optimize = einsum_type)
         del(t1_ccee_np)
         del(t1_ccee_ijb)
 
@@ -486,6 +482,8 @@ class RADC(pyscf.adc.radc.RADC):
 
 
     def kernel_gs(self, eris=None):
+        cput0 = (logger.process_clock(), logger.perf_counter())
+        log = logger.Logger(self.stdout, self.verbose)
         assert(self.mo_coeff is not None)
         assert(self.mo_occ is not None)
 
@@ -537,6 +535,7 @@ class RADC(pyscf.adc.radc.RADC):
         self.e_corr,self.t1,self.t2 = kadc_rhf_amplitudes.compute_amplitudes_energy(
             self, eris=eris, verbose=self.verbose, if_corr=self.if_corr)
         self._finalize()
+        log.timer('complete kernel', *cput0)
         if self.if_heri_eris:
             return self.e_corr, self.t1,self.t2, eris
         else:
