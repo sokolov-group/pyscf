@@ -812,7 +812,9 @@ class RFNOADC(RADC):
 
     def make_ss_rdm1(self, log, cput0, nroots=None, guess=None, kptlist=None, if_gs=False):
         method_tmp = self.method
+        naf_tmp = self.if_naf
         self.method = "adc(2)"
+        self.if_naf = False
         if if_gs:
             _,_,_ = RADC.kernel_gs(self)
         else:
@@ -838,6 +840,7 @@ class RFNOADC(RADC):
             log.info('current use %d MB',lib.current_memory()[0])
             log.timer('make ref rdm1', *cput0)
         self.method = method_tmp
+        self.if_naf = naf_tmp
         self.transform_integrals = None
         self.t1 = None
         self.t2 = None
