@@ -1189,10 +1189,6 @@ def make_rdm1_eigenvectors(adc, L, R, kshift, if_ss):
 
 ############ block- ia
     rdm1[kshift, :nocc, nocc:] += einsum('kKaij,I,KkijAa->IA', L2_jia, R1, t1_ccee_ijs, optimize = True)
-    rdm1[:, :nocc, nocc:] -= 2 * einsum('kaij,i,KkKIjAa->KIA', L2_asj, R1, t1_ccee, optimize = True)
-    rdm1[:, :nocc, nocc:] += 1 * einsum('kaij,i,KkkIjaA->KIA', L2_asj, R1, t1_ccee, optimize = True)
-    rdm1[:, :nocc, nocc:] += 4 * einsum('kkaij,j,KkKIiAa->KIA', L2, R1, t1_ccee, optimize = True)
-    rdm1[:, :nocc, nocc:] -= 2 * einsum('kkaij,j,KkkIiaA->KIA', L2, R1, t1_ccee, optimize = True)
     rdm1[:, :nocc, nocc:] += 2 * einsum('i,KKAIi->KIA', L1, R2, optimize = True)
     rdm1[:, :nocc, nocc:] -= einsum('i,KAiI->KIA', L1, R2[:,kshift,:,:,:], optimize = True)
 
@@ -1203,7 +1199,6 @@ def make_rdm1_eigenvectors(adc, L, R, kshift, if_ss):
     del(t1_ccee_isb)
     del(R2_aji)
     del(L2_aji)
-    del(L2_asj)
 
     kj, ka = np.indices((nkpts, nkpts))
     idx0 = np.arange(nkpts)[:, None]
@@ -1214,6 +1209,7 @@ def make_rdm1_eigenvectors(adc, L, R, kshift, if_ss):
     t1_ccee_ijs_b = np.zeros_like(t1_ccee[0])
     oo = np.zeros((nkpts,nocc,nocc), dtype=np.complex128)
     vv = np.zeros((nkpts,nvir,nvir), dtype=np.complex128)
+    ov = np.zeros((nkpts,nocc,nvir), dtype=np.complex128)
     for ki in range(nkpts):
         kb = adc.khelper.kconserv[ki, ka, kj]
         t1_ccee_np = np.array(t1_ccee[ki])
@@ -1225,6 +1221,11 @@ def make_rdm1_eigenvectors(adc, L, R, kshift, if_ss):
 ########### block- ab
         vv += 4 * einsum('kKijBa,kKijAa->KAB', t1_ccee_np, t1_ccee_np.conj(), optimize = True)
         vv -= 2 * einsum('kKijBa,kKijaA->KAB', t1_ccee_np, t1_ccee_ijb.conj(), optimize = True)
+########### block- ia
+        ov[ki] -= 2 * einsum('kaij,i,kIjAa->IA', L2_asj, R1, t1_ccee_np[:,ki], optimize = True)
+        ov[ki] += 1 * einsum('kaij,i,kkIjaA->IA', L2_asj, R1, t1_ccee_np, optimize = True)
+        ov[ki] += 4 * einsum('kkaij,j,kIiAa->IA', L2, R1, t1_ccee_np[:,ki], optimize = True)
+        ov[ki] -= 2 * einsum('kkaij,j,kkIiaA->IA', L2, R1, t1_ccee_np, optimize = True)
         del(t1_ccee_ijb)
         del(t1_ccee_np)
 
@@ -1232,8 +1233,11 @@ def make_rdm1_eigenvectors(adc, L, R, kshift, if_ss):
     vv *= LR
     rdm1[:, :nocc, :nocc] += oo
     rdm1[:, nocc:, nocc:] += vv
+    rdm1[:, :nocc, nocc:] += ov
     del(oo)
     del(vv)
+    del(ov)
+    del(L2_asj)
 ############ block- ia
     rdm1[kshift, :nocc, nocc:] -= 2 * einsum('kKaij,I,KkijaA->IA', L2_jia, R1, t1_ccee_ijs_b, optimize = True)
     del(L2_jia)

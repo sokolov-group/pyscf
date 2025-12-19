@@ -1402,15 +1402,11 @@ def make_rdm1_eigenvectors(adc, L, R, kshift, if_ss):
     #110
     rdm1[kshift, :nocc, nocc:] -= 2 * einsum('kKiab,A,kKIiab->IA', L2, R1, t1_ccee_sja, optimize = True)
     rdm1[kshift, :nocc, nocc:] += einsum('kKiab,A,kKIiba->IA', L2, R1, t1_ccee_sjb, optimize = True)
-    rdm1[:, :nocc, nocc:] += 4 * einsum('kiab,a,KkKIiAb->KIA', L2_isb, R1, t1_ccee, optimize = True)
-    rdm1[:, :nocc, nocc:] -= 2 * einsum('kiab,a,KkkIibA->KIA', L2_isb, R1, t1_ccee, optimize = True)
-    rdm1[:, :nocc, nocc:] -= 2 * einsum('kiab,b,KkKIiAa->KIA', L2_isb, R1, t1_ccee, optimize = True)
     rdm1[:, :nocc, nocc:] += einsum('kiab,b,KkIiaA->KIA', L2_isb, R1, t1_ccee_ijs, optimize = True)
 
     del(R2_iba)
     del(L2_iba)
     del(R2_isb)
-    del(L2_isb)
     del(t1_ccee_sjb)
     del(t1_ccee_sja)
 
@@ -1423,6 +1419,7 @@ def make_rdm1_eigenvectors(adc, L, R, kshift, if_ss):
     t1_ccee_ijs_b = np.zeros_like(t1_ccee[0])
     oo = np.zeros((nkpts,nocc,nocc), dtype=np.complex128)
     vv = np.zeros((nkpts,nvir,nvir), dtype=np.complex128)
+    ov = np.zeros((nkpts,nocc,nvir), dtype=np.complex128)
     for ki in range(nkpts):
         kb = adc.khelper.kconserv[ki, ka, kj]
         t1_ccee_np = np.array(t1_ccee[ki])
@@ -1434,6 +1431,10 @@ def make_rdm1_eigenvectors(adc, L, R, kshift, if_ss):
 ########### block- ab
         vv += 4 * einsum('kKijBb,kKijAb->KAB', t1_ccee_np, t1_ccee_np.conj(), optimize = True)
         vv -= 2 * einsum('kKijBb,kKijbA->KAB', t1_ccee_np, t1_ccee_ijb.conj(), optimize = True)
+ ########### block- ia
+        ov[ki] += 4 * einsum('kiab,a,kIiAb->IA', L2_isb, R1, t1_ccee_np[:,ki], optimize = True)
+        ov[ki] -= 2 * einsum('kiab,a,kkIibA->IA', L2_isb, R1, t1_ccee_np, optimize = True)
+        ov[ki] -= 2 * einsum('kiab,b,kIiAa->IA', L2_isb, R1, t1_ccee_np[:,ki], optimize = True)
         del(t1_ccee_ijb)
         del(t1_ccee_np)
 
@@ -1441,8 +1442,11 @@ def make_rdm1_eigenvectors(adc, L, R, kshift, if_ss):
     vv *= LR
     rdm1[:, :nocc, :nocc] += oo
     rdm1[:, nocc:, nocc:] += vv
+    rdm1[:, :nocc, nocc:] += ov
     del(oo)
     del(vv)
+    del(ov)
+    del(L2_isb)
 
     ki, ka = np.indices((nkpts, nkpts))
     kj = kconserv_s[ki, ka]
