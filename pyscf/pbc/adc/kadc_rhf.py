@@ -193,23 +193,23 @@ def make_ref_rdm1_slow(adc, with_frozen=True, ao_repr=False):
                 for ka in range(nkpts):
                     kb = adc.khelper.kconserv[ki, ka, kj]
                     #### OCC-OCC ###
-                    OPDM[ki][:nocc, :nocc] -= 2 * lib.einsum('Iiab,Jiab->IJ', t1_ccee[ki]
-                                                            [kj][ka], t2_ccee[ki][kj][ka].conj(), optimize = einsum_type)
-                    OPDM[ki][:nocc, :nocc] += lib.einsum('Iiab,Jiba->IJ', t1_ccee[ki]
-                                                         [kj][ka], t2_ccee[ki][kj][kb].conj(), optimize = einsum_type)
-                    OPDM[ki][:nocc, :nocc] -= 2 * lib.einsum('Jiab,Iiab->IJ', t1_ccee[ki]
-                                                            [kj][ka].conj(), t2_ccee[ki][kj][ka], optimize = einsum_type)
-                    OPDM[ki][:nocc, :nocc] += lib.einsum('Jiab,Iiba->IJ', t1_ccee[ki]
-                                                         [kj][ka].conj(), t2_ccee[ki][kj][kb], optimize = einsum_type)
+                    OPDM[ki][:nocc, :nocc] -= 2 * lib.einsum('Iiab,Jiab->IJ', t1_ccee[ki][kj][ka],
+                                                            t2_ccee[ki][kj][ka].conj(), optimize = einsum_type)
+                    OPDM[ki][:nocc, :nocc] += lib.einsum('Iiab,Jiba->IJ', t1_ccee[ki][kj][ka],
+                                                            t2_ccee[ki][kj][kb].conj(), optimize = einsum_type)
+                    OPDM[ki][:nocc, :nocc] -= 2 * lib.einsum('Jiab,Iiab->IJ', t1_ccee[ki][kj][ka].conj(),
+                                                            t2_ccee[ki][kj][ka], optimize = einsum_type)
+                    OPDM[ki][:nocc, :nocc] += lib.einsum('Jiab,Iiba->IJ', t1_ccee[ki][kj][ka].conj(),
+                                                            t2_ccee[ki][kj][kb], optimize = einsum_type)
                     ##### VIR-VIR ###
-                    OPDM[ka][nocc:, nocc:] += 2 * lib.einsum('ijBa,ijAa->AB', t1_ccee[ki]
-                                                            [kj][ka], t2_ccee[ki][kj][ka].conj(), optimize = einsum_type)
-                    OPDM[ka][nocc:, nocc:] -= lib.einsum('ijBa,ijaA->AB', t1_ccee[ki]
-                                                         [kj][ka], t2_ccee[ki][kj][kb].conj(), optimize = einsum_type)
-                    OPDM[ka][nocc:, nocc:] += 2 * lib.einsum('ijAa,ijBa->AB', t1_ccee[ki]
-                                                            [kj][ka].conj(), t2_ccee[ki][kj][ka], optimize = einsum_type)
-                    OPDM[ka][nocc:, nocc:] -= lib.einsum('ijAa,ijaB->AB', t1_ccee[ki]
-                                                         [kj][ka].conj(), t2_ccee[ki][kj][kb], optimize = einsum_type)
+                    OPDM[ka][nocc:, nocc:] += 2 * lib.einsum('ijBa,ijAa->AB', t1_ccee[ki][kj][ka],
+                                                            t2_ccee[ki][kj][ka].conj(), optimize = einsum_type)
+                    OPDM[ka][nocc:, nocc:] -= lib.einsum('ijBa,ijaA->AB', t1_ccee[ki][kj][ka],
+                                                            t2_ccee[ki][kj][kb].conj(), optimize = einsum_type)
+                    OPDM[ka][nocc:, nocc:] += 2 * lib.einsum('ijAa,ijBa->AB', t1_ccee[ki][kj][ka].conj(),
+                                                            t2_ccee[ki][kj][ka], optimize = einsum_type)
+                    OPDM[ka][nocc:, nocc:] -= lib.einsum('ijAa,ijaB->AB', t1_ccee[ki][kj][ka].conj(),
+                                                            t2_ccee[ki][kj][kb], optimize = einsum_type)
 
                 ka = ki
                 kb = kj
