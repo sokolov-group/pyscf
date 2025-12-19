@@ -1431,7 +1431,7 @@ def make_rdm1_eigenvectors(adc, L, R, kshift, if_ss):
 ########### block- ab
         vv += 4 * einsum('kKijBb,kKijAb->KAB', t1_ccee_np, t1_ccee_np.conj(), optimize = True)
         vv -= 2 * einsum('kKijBb,kKijbA->KAB', t1_ccee_np, t1_ccee_ijb.conj(), optimize = True)
- ########### block- ia
+########### block- ia
         ov[ki] += 4 * einsum('kiab,a,kIiAb->IA', L2_isb, R1, t1_ccee_np[:,ki], optimize = True)
         ov[ki] -= 2 * einsum('kiab,a,kkIibA->IA', L2_isb, R1, t1_ccee_np, optimize = True)
         ov[ki] -= 2 * einsum('kiab,b,kIiAa->IA', L2_isb, R1, t1_ccee_np[:,ki], optimize = True)
