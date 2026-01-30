@@ -53,9 +53,11 @@ def vector_size(adc):
 
     n_singles = nvir
     n_doubles = nkpts * nkpts * nocc * nvir * nvir
+    n_doubles_int = nkpts * nkpts * nocc * (nvir-adc.ext_vir) * (nvir-adc.ext_vir)
     size = n_singles + n_doubles
+    size_int = n_singles + n_doubles_int
 
-    return size
+    return size, size_int
 
 
 def get_imds(adc, eris=None):
@@ -509,7 +511,7 @@ def get_diag(adc,kshift,M_ab=None,eris=None):
     nocc = adc.nocc
     nvir = adc.nmo - adc.nocc
     n_singles = nvir
-    n_doubles = nkpts * nkpts * nocc * nvir * nvir
+    n_doubles = nkpts * nkpts * nocc * (nvir-adc.ext_vir) * (nvir-adc.ext_vir)
 
     dim = n_singles + n_doubles
 
@@ -522,7 +524,7 @@ def get_diag(adc,kshift,M_ab=None,eris=None):
     mo_coeff =  adc.mo_coeff
     nocc = adc.nocc
     nmo = adc.nmo
-    nvir = nmo - nocc
+    nvir = nmo - nocc - adc.ext_vir
     mo_coeff, mo_energy = _add_padding(adc, mo_coeff, mo_energy)
 
     e_occ = [mo_energy[k][:nocc] for k in range(nkpts)]
@@ -541,7 +543,7 @@ def get_diag(adc,kshift,M_ab=None,eris=None):
     for kj in range(nkpts):
         for ka in range(nkpts):
             kb = kconserv[kshift,ka,kj]
-            d_ab = e_vir[ka][:,None] + e_vir[kb]
+            d_ab = e_vir[ka][:nvir,None] + e_vir[kb][:nvir]
             d_i = e_occ[kj][:,None]
             D_n = -d_i + d_ab.reshape(-1)
             doubles[kj,ka] += D_n.reshape(-1)
@@ -566,8 +568,8 @@ def matvec(adc, kshift, M_ab=None, eris=None):
     nkpts = adc.nkpts
     nocc = adc.nocc
     kconserv = adc.khelper.kconserv
-    nvir = adc.nmo - adc.nocc
-    n_singles = nvir
+    nvir = adc.nmo - adc.nocc - adc.ext_vir
+    n_singles = adc.nmo - adc.nocc
     n_doubles = nkpts * nkpts * nocc * nvir * nvir
 
     s_singles = 0
@@ -580,7 +582,7 @@ def matvec(adc, kshift, M_ab=None, eris=None):
     mo_coeff, mo_energy = _add_padding(adc, mo_coeff, mo_energy)
 
     e_occ = [mo_energy[k][:nocc] for k in range(nkpts)]
-    e_vir = [mo_energy[k][nocc:] for k in range(nkpts)]
+    e_vir = [mo_energy[k][nocc:nvir+nocc] for k in range(nkpts)]
 
     e_vir = np.array(e_vir)
     e_occ = np.array(e_occ)
@@ -592,6 +594,7 @@ def matvec(adc, kshift, M_ab=None, eris=None):
     def sigma_(r):
         cput0 = (time.process_time(), time.time())
         log = logger.Logger(adc.stdout, adc.verbose)
+        nvir = adc.nmo - adc.nocc - adc.ext_vir
 
         r1 = r[s_singles:f_singles]
         r2 = r[s_doubles:f_doubles]
@@ -608,6 +611,7 @@ def matvec(adc, kshift, M_ab=None, eris=None):
 
 ########### ADC(2) coupling blocks #########################
 
+        nvir_c = adc.nmo - adc.nocc
         for kb in range(nkpts):
             for kc in range(nkpts):
                 ki = kconserv[kb,kshift, kc]
@@ -618,25 +622,25 @@ def matvec(adc, kshift, M_ab=None, eris=None):
                     a = 0
                     for p in range(0,nocc,chnk_size):
                         eris_ovvv = dfadc.get_ovvv_df(
-                            adc, eris.Lov[ki,kc], eris.Lvv[kshift,kb], p, chnk_size).reshape(-1,nvir,nvir,nvir)/nkpts
+                            adc, eris.Lov[ki,kc], eris.Lvv[kshift,kb], p, chnk_size).reshape(-1,nvir_c,nvir_c,nvir_c)/nkpts
                         k = eris_ovvv.shape[0]
-                        s1 +=  2. * lib.einsum('icab,ibc->a', eris_ovvv.conj(),
+                        s1 +=  2. * lib.einsum('icab,ibc->a', eris_ovvv[:,:nvir,:,:nvir].conj(),
                                                r2[ki,kb,a:a+k], optimize=True)
-                        s2[ki,kb,a:a+k] += lib.einsum('icab,a->ibc', eris_ovvv, r1, optimize=True)
+                        s2[ki,kb,a:a+k] += lib.einsum('icab,a->ibc', eris_ovvv[:,:nvir,:,:nvir], r1, optimize=True)
                         del eris_ovvv
 
                         eris_ovvv = dfadc.get_ovvv_df(
-                            adc, eris.Lov[ki,kb], eris.Lvv[kshift,kc], p, chnk_size).reshape(-1,nvir,nvir,nvir)/nkpts
-                        s1 -=  lib.einsum('ibac,ibc->a',   eris_ovvv.conj(),
+                            adc, eris.Lov[ki,kb], eris.Lvv[kshift,kc], p, chnk_size).reshape(-1,nvir_c,nvir_c,nvir_c)/nkpts
+                        s1 -=  lib.einsum('ibac,ibc->a',   eris_ovvv[:,:nvir,:,:nvir].conj(),
                                           r2[ki,kb,a:a+k], optimize=True)
                         del eris_ovvv
                         a += k
                 else :
                     eris_ovvv = eris.ovvv[:]
                     s1 +=  2. * lib.einsum('icab,ibc->a',
-                                           eris_ovvv[ki,kc,kshift].conj(), r2[ki,kb], optimize=True)
+                                           eris_ovvv[ki,kc,kshift][:,:nvir,:,:nvir].conj(), r2[ki,kb], optimize=True)
                     s2[ki,kb] += lib.einsum('icab,a->ibc', eris_ovvv[ki,
-                                            kc,kshift], r1, optimize=True)
+                                            kc,kshift][:,:nvir,:,:nvir], r1, optimize=True)
                     del eris_ovvv
 
 
@@ -649,7 +653,7 @@ def matvec(adc, kshift, M_ab=None, eris=None):
 ################ ADC(3) ajk - bil block ############################
 
         if (method == "adc(2)-x" or method == "adc(3)"):
-
+            nvir = adc.nmo - adc.nocc
             eris_oovv = eris.oovv
             eris_ovvo = eris.ovvo
 
@@ -1513,6 +1517,9 @@ def mask_frozen_ea(adc, v1, v2, kshift, const=LARGE_DENOM):
     new_v2 = const * np.ones_like(v2)
 
     new_v1[nonzero_vpadding[kshift]] = v1[nonzero_vpadding[kshift]]
+    
+    if adc.ext_vir is not None:
+        nonzero_vpadding = [t[:adc.ext_vir] for t in nonzero_vpadding]
     for ki in range(nkpts):
         for ka in range(nkpts):
             kb = kconserv[kshift, ka, ki]
@@ -1607,6 +1614,8 @@ class RADCEA(kadc_rhf.RADC):
         self.U = adc.U
         self.if_naf = adc.if_naf
         self.naux = adc.naux
+        self.ext_vir = adc.ext_vir
+        self.if_div = adc.if_div
 
     kernel = kadc_rhf.kernel
     get_imds = get_imds
@@ -1625,13 +1634,13 @@ class RADCEA(kadc_rhf.RADC):
             nextern = self.nmo - ncore
             nkpts = self.nkpts
             n_singles = nextern
-            n_doubles = nkpts * nkpts * ncore * nextern * nextern
+            n_doubles = nkpts * nkpts * ncore * (nextern-self.ext_vir) * (nextern-self.ext_vir)
             dim  = n_singles + n_doubles
             g = ini.T
             if (self.frozen is not None) or (not np.all([x.shape[1] == self.nmo for x in self.mo_coeff])):
                 for p in range(g.shape[1]):
                     singles = g[:n_singles,p]
-                    doubles = g[n_singles:,p].reshape(nkpts,nkpts,ncore,nextern,nextern)
+                    doubles = g[n_singles:,p].reshape(nkpts,nkpts,ncore,(nextern-self.ext_vir),(nextern-self.ext_vir))
                     (singles,doubles) = mask_frozen_ea(self,singles,doubles,kshift,const = 0.0)
                     g[:,p] = np.hstack((singles,doubles.ravel()))
             if g.shape[0] != dim or g.shape[1] != nroots:

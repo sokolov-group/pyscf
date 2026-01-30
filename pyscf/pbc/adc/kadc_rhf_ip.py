@@ -53,9 +53,11 @@ def vector_size(adc):
 
     n_singles = nocc
     n_doubles = nkpts * nkpts * nvir * nocc * nocc
+    n_doubles_int = nkpts * nkpts * (nvir-adc.ext_vir) * nocc * nocc
     size = n_singles + n_doubles
+    size_int = n_singles + n_doubles_int
 
-    return size
+    return size, size_int
 
 
 def get_imds(adc, eris=None):
@@ -384,7 +386,7 @@ def get_diag(adc,kshift,M_ij=None,eris=None):
     kconserv = adc.khelper.kconserv
     nocc = adc.nocc
     n_singles = nocc
-    nvir = adc.nmo - adc.nocc
+    nvir = adc.nmo - adc.nocc - adc.ext_vir
     n_doubles = nkpts * nkpts * nvir * nocc * nocc
 
     dim = n_singles + n_doubles
@@ -416,7 +418,7 @@ def get_diag(adc,kshift,M_ij=None,eris=None):
         for ki in range(nkpts):
             kj = kconserv[kshift,ki,ka]
             d_ij = e_occ[ki][:,None] + e_occ[kj]
-            d_a = e_vir[ka][:,None]
+            d_a = e_vir[ka][:nvir,None]
             D_n = -d_a + d_ij.reshape(-1)
             doubles[ka,ki] += D_n.reshape(-1)
 
@@ -444,7 +446,7 @@ def matvec(adc, kshift, M_ij=None, eris=None):
     nocc = adc.nocc
     kconserv = adc.khelper.kconserv
     n_singles = nocc
-    nvir = adc.nmo - adc.nocc
+    nvir = adc.nmo - adc.nocc - adc.ext_vir
     n_doubles = nkpts * nkpts * nvir * nocc * nocc
 
     s_singles = 0
@@ -457,7 +459,7 @@ def matvec(adc, kshift, M_ij=None, eris=None):
     mo_coeff, mo_energy = _add_padding(adc, mo_coeff, mo_energy)
 
     e_occ = [mo_energy[k][:nocc] for k in range(nkpts)]
-    e_vir = [mo_energy[k][nocc:] for k in range(nkpts)]
+    e_vir = [mo_energy[k][nocc:nocc+nvir] for k in range(nkpts)]
 
     e_vir = np.array(e_vir)
     e_occ = np.array(e_occ)
@@ -469,6 +471,7 @@ def matvec(adc, kshift, M_ij=None, eris=None):
     def sigma_(r):
         cput0 = (time.process_time(), time.time())
         log = logger.Logger(adc.stdout, adc.verbose)
+        nvir = adc.nmo - adc.nocc - adc.ext_vir
 
         r1 = r[s_singles:f_singles]
         r2 = r[s_doubles:f_doubles]
@@ -479,7 +482,7 @@ def matvec(adc, kshift, M_ij=None, eris=None):
         kpts = adc.kpts
         madelung = tools.madelung(cell, kpts)
 
-        eris_ovoo = eris.ovoo
+        eris_ovoo = eris.ovoo[:,:,:,:,:nvir,:,:]
 
 ############ ADC(2) ij block ############################
 
@@ -558,6 +561,7 @@ def matvec(adc, kshift, M_ij=None, eris=None):
         if (method == "adc(3)"):
 
             eris_ovoo = eris.ovoo
+            nvir = adc.nmo - adc.nocc
 
 ################# ADC(3) i - kja block and ajk - i ############################
 
@@ -1377,6 +1381,8 @@ class RADCIP(kadc_rhf.RADC):
         self.U = adc.U
         self.if_naf = adc.if_naf
         self.naux = adc.naux
+        self.ext_vir = adc.ext_vir
+        self.if_div = adc.if_div
 
     kernel = kadc_rhf.kernel
     get_imds = get_imds
@@ -1395,13 +1401,13 @@ class RADCIP(kadc_rhf.RADC):
             nextern = self.nmo - ncore
             nkpts = self.nkpts
             n_singles = ncore
-            n_doubles = nkpts * nkpts * nextern * ncore * ncore
+            n_doubles = nkpts * nkpts * (nextern-self.ext_vir) * ncore * ncore
             dim  = n_singles + n_doubles
             g = ini.T
             if (self.frozen is not None) or (not np.all([x.shape[1] == self.nmo for x in self.mo_coeff])):
                 for p in range(g.shape[1]):
                     singles = g[:n_singles,p]
-                    doubles = g[n_singles:,p].reshape(nkpts,nkpts,nextern,ncore,ncore)
+                    doubles = g[n_singles:,p].reshape(nkpts,nkpts,(nextern-self.ext_vir),ncore,ncore)
                     (singles,doubles) = mask_frozen_ip(self,singles,doubles,kshift,const = 0.0)
                     g[:,p] = np.hstack((singles,doubles.ravel()))
             if g.shape[0] != dim or g.shape[1] != nroots:
