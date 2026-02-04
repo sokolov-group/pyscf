@@ -1518,7 +1518,7 @@ def mask_frozen_ea(adc, v1, v2, kshift, const=LARGE_DENOM):
 
     new_v1[nonzero_vpadding[kshift]] = v1[nonzero_vpadding[kshift]]
     
-    if adc.ext_vir is not None:
+    if adc.ext_vir is not None and adc.ext_vir > 0:
         nonzero_vpadding = [t[:adc.ext_vir] for t in nonzero_vpadding]
     for ki in range(nkpts):
         for ka in range(nkpts):
