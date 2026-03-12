@@ -473,7 +473,7 @@ class RADC(pyscf.adc.radc.RADC):
         self._finalize()
         if self.if_div:
             import math
-            self.ext_vir = math.ceil(nvir_arr.max()*(1-pct_orb))
+            self.ext_vir = nvir_arr.max() - math.ceil(nvir_arr.max()*(pct_orb))
             print("number of inactive virtual orbital is",self.ext_vir)
 
         self.method_type = self.method_type.lower()
