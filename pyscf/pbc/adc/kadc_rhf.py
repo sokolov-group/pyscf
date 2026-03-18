@@ -287,6 +287,8 @@ class RADC(pyscf.adc.radc.RADC):
             mo_coeff = mf.mo_coeff
         if mo_occ is None:
             mo_occ = mf.mo_occ
+        if mo_energy is None:
+            mo_energy = mf.mo_energy
 
         self._scf = mf
         self.kpts = self._scf.kpts
@@ -306,6 +308,7 @@ class RADC(pyscf.adc.radc.RADC):
         self.cell = self._scf.cell
         self.mo_coeff = mo_coeff
         self.mo_occ = mo_occ
+        self.mo_energy = mo_energy
         self.frozen = frozen
         self.compute_properties = True
         self.approx_trans_moments = True
@@ -323,7 +326,6 @@ class RADC(pyscf.adc.radc.RADC):
         self.imds = lambda:None
 
         self.keep_exxdiv = False
-        self.mo_energy = mf.mo_energy
         self.U = None
         self.naux = None
         self.if_heri_eris = False
