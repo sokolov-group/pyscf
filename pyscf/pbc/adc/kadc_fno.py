@@ -30,7 +30,7 @@ from pyscf.pbc import scf
 from pyscf.pbc import df
 from pyscf.pbc import mp
 from pyscf.lib import logger
-from pyscf.pbc.adc import kadc_rhf_amplitudes
+from pyscf.pbc.adc import kadc_rhf
 from pyscf.pbc.adc import kadc_ao2mo
 from pyscf.pbc.adc import dfadc
 from pyscf import __config__
@@ -42,12 +42,13 @@ from pyscf.pbc.lib import kpts_helper
 from pyscf.lib.parameters import LOOSE_ZERO_TOL, LARGE_DENOM  # noqa
 from pyscf.data.nist import HARTREE2EV
 
+from pyscf.pbc import tools
 import h5py
 import tempfile
 
-class RFNOADC(RADC):
+class RADC2FNO(kadc_rhf.RADC):
     #J. Chem. Phys. 159, 084113 (2023)
-    _keys = RADC._keys | {'delta_e','e_can','v_can','e_corr_can',
+    _keys = kadc_rhf.RADC._keys | {'delta_e','e_can','v_can','e_corr_can',
                           'rdm1_ss','trans_guess','mode','ref_state',
                           'if_adc2_guess','div_pct_orb','if_cc','delta_e_corr'
                           }
@@ -71,141 +72,53 @@ class RFNOADC(RADC):
     def kernel_gs(self, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None):
         cput0 = (logger.process_clock(), logger.perf_counter())
         log = logger.Logger(self.stdout, self.verbose)
-        if self.method != "adc(3)":
-            raise NotImplementedError(self.method)
-        logger.info(self, "Do fno kadc calculation")
+        logger.info(self, "generate fno with correction for the ground state")
         self.ref_state = None
 
         self.make_ss_rdm1(log, cput0, if_gs=True)
         log.timer('make gs rdm1', *cput0)
         self.make_fno(self.rdm1_ss, self._scf, log, thresh, pct_occ, nvir_act)
         log.timer('get frozen info', *cput0)
-        eris=self.compute_correction(if_gs=True)
-        logger.info(self, 'current use %d MB',lib.current_memory()[0])
-        _,t1,t2 = RADC.kernel_gs(self, eris=eris)
-        logger.info(self, 'current use %d MB',lib.current_memory()[0])
-        log.timer(f'MP{self.method[4]}', *cput0)
-        logger.info(self, 'current use %d MB',lib.current_memory()[0])
-
-        self.e_corr = self.e_corr + self.delta_e_corr
-
-        msg = ("\n*************************************************************"
-            "\n            FNOMP calculation summary"
-            "\n*************************************************************")
-        logger.info(self, msg)
-        logger.info(self, 'FNO MP%s correlation energy of reference state (a.u.) = %.8f',
-                    self.method[4], self.e_corr)
-        log.timer('RFNOMP', *cput0)
-        return self.e_corr, t1, t2
+        self.compute_correction(if_gs=True)
+        log.timer('gs FNO', *cput0)
 
     def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None, kptlist=None):
         cput0 = (logger.process_clock(), logger.perf_counter())
         log = logger.Logger(self.stdout, self.verbose)
         if self.ref_state is None:
-            logger.info(self, "Do fno kadc calculation")
+            logger.info(self, "generate fno with correction for the excited state")
         elif (isinstance(self.ref_state, int) and 0<self.ref_state<=nroots) or \
                 (hasattr(self.ref_state, '__len__') and len(self.ref_state) == 2) :
-            logger.info(self, "Do ss-fno kadc calculation")
+            logger.info(self, "generate ss-fno with correction for the excited state")
         else:
-            raise ValueError("self.ref_state should be an int type or or a array-like object with two elements")
+            raise ValueError("ref_state should be an int type or or a array-like object with two elements")
 
         self.make_ss_rdm1(log, cput0, nroots, guess, kptlist)
         log.timer('make ss rdm1', *cput0)
         self.make_fno(self.rdm1_ss, self._scf, log, thresh, pct_occ, nvir_act)
         log.timer('get frozen info', *cput0)
-        logger.info(self, 'current use %d MB',lib.current_memory()[0])
-        if self.method == "adc(2)-x":
-            self.if_corr = False
+
         self.if_div = False
         self.ext_vir = 0
-        eris,v2_ssfno = self.compute_correction(nroots, guess, kptlist=kptlist)
-        logger.info(self, 'current use %d MB',lib.current_memory()[0])
-
-        if self.if_cc:
-            from pyscf.pbc import cc
-            from pyscf.pbc.cc import eom_kccsd_rhf as eom_krccsd
-            mycc = cc.KRCCSD(self._scf, frozen=self.frozen, mo_coeff=self.mo_coeff, mo_occ=self.mo_occ)
-            mycc.conv_tol = self.conv_tol
-            mycc.conv_tol_normt = self.tol_residual
-            mycc.max_cycle = self.max_cycle
-            mycc.verbose = self.verbose
-            self.e_corr,_,_ = mycc.kernel()
-            if self.method_type == "ea":
-                myeom = eom_krccsd.EOMEA(mycc)
-            elif self.method_type == "ip":
-                myeom = eom_krccsd.EOMIP(mycc)
-            myeom.max_space = self.max_space
-            e_exc,v_exc = myeom.kernel(nroots=nroots, kptlist=kptlist)
-            spec_fac, x = None, None
-        elif self.if_adc2_guess:
-            e_exc, v_exc, spec_fac, x = RADC.kernel(self, nroots, guess=v2_ssfno, eris=eris, kptlist=kptlist)
-        else:
-            e_exc, v_exc, spec_fac, x = RADC.kernel(self, nroots, guess, eris=eris, kptlist=kptlist)
-        log.timer(f'ADC{self.method[4]}', *cput0)
-
-        e_exc = e_exc + self.delta_e
-        self.e_corr = self.e_corr + self.delta_e_corr
-
-        if self.if_cc:
-            msg = ("\n*************************************************************"
-                "\n            FNOCC calculation summary"
-                "\n*************************************************************")
-        else:
-            msg = ("\n*************************************************************"
-                "\n            FNOADC calculation summary"
-                "\n*************************************************************")
-        logger.info(self, msg)
-        logger.info(self, 'FNO MP%s correlation energy of reference state (a.u.) = %.8f',
-                    self.method[4], self.e_corr)
-
-        for k, kshift in enumerate(kptlist):
-            sort_indices = np.argsort(e_exc[k])
-            e_exc[k] = e_exc[k][sort_indices]
-            v_exc[k] = v_exc[k][sort_indices]
-            if self.compute_properties and not self.if_cc:
-                spec_fac[k] = spec_fac[k][sort_indices]
-                x[k] = x[k][:, sort_indices]
-            for n in range(nroots):
-                print_string = ('%s k-point %d | root %d  |  Energy (Eh) = %14.10f  |  Energy (eV) = %12.8f  ' %
-                                (self.method, kshift, n, e_exc[k][n], e_exc[k][n]*HARTREE2EV))
-                if self.compute_properties and not self.if_cc:
-                    print_string += ("|  Spec factors = %10.8f  " % spec_fac[k][n])
-                logger.info(self, print_string)
-        log.timer('RFNOADC', *cput0)
-        return e_exc, v_exc, spec_fac, x
+        self.compute_correction(nroots, guess, kptlist=kptlist)
+        log.timer('es FNO', *cput0)
 
     def compute_correction(self, nroots=None, guess=None, kptlist=None, if_gs=False):
-        method_tmp = self.method
-        self.method = "adc(2)"
         self.if_heri_eris = True
         if if_gs:
-            _,_,_,eris = RADC.kernel_gs(self)
+            _,_,_,self.eris = kadc_rhf.RADC.kernel_gs(self)
         else:
-            e2_ssfno,v2_ssfno,_,_,eris = RADC.kernel(self, nroots, guess=guess, kptlist=kptlist)
-            self.delta_e = self.e_can - e2_ssfno
+            self.e2_ssfno,self.v2_ssfno,_,_,self.eris = kadc_rhf.RADC.kernel(self, nroots, guess=guess, kptlist=kptlist)
+            self.delta_e = self.e_can - self.e2_ssfno
         self.delta_e_corr = self.e_corr_can - self.e_corr
-        self.method = method_tmp
-        self.if_heri_eris = False
-        self.t1 = None
-        self.t2 = None
-        self._adc_es = None
-        def incore_transform():
-            return kadc_ao2mo.transform_integrals_incore(self)
-        self.transform_integrals = incore_transform
-        if if_gs:
-            return eris
-        else:
-            return eris,v2_ssfno
 
     def make_ss_rdm1(self, log, cput0, nroots=None, guess=None, kptlist=None, if_gs=False):
-        method_tmp = self.method
         naf_tmp = self.if_naf
-        self.method = "adc(2)"
         self.if_naf = False
         if if_gs:
-            _,_,_ = RADC.kernel_gs(self)
+            _,_,_ = kadc_rhf.RADC.kernel_gs(self)
         else:
-            self.e_can,self.v_can,_,_ = RADC.kernel(self,nroots,guess=guess,kptlist=kptlist,pct_orb=self.div_pct_orb)
+            self.e_can,self.v_can,_,_ = kadc_rhf.RADC.kernel(self,nroots,guess=guess,kptlist=kptlist,pct_orb=self.div_pct_orb)
         log.info('current use %d MB',lib.current_memory()[0])
         self.e_corr_can = self.e_corr
         if self.ref_state is not None:
@@ -231,7 +144,6 @@ class RFNOADC(RADC):
             self.rdm1_ss = self.make_ref_rdm1()
             log.info('current use %d MB',lib.current_memory()[0])
             log.timer('make ref rdm1', *cput0)
-        self.method = method_tmp
         self.if_naf = naf_tmp
         def incore_transform():
             return kadc_ao2mo.transform_integrals_incore(self)
@@ -243,7 +155,7 @@ class RFNOADC(RADC):
 
     def make_fno(self, rdm1_ss, mf, log, thresh=None, pct_occ=None, nvir_act=None):
         nocc = mf.mol.nelectron//2
-        masks = mo_splitter(self)
+        masks = kadc_rhf.mo_splitter(self)
         no_coeff=[]
         no_frozen=[]
         no_energy=[]
