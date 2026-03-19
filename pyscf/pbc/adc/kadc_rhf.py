@@ -275,7 +275,7 @@ class RADC(pyscf.adc.radc.RADC):
     _keys = pyscf.adc.radc.RADC._keys | {
         'kpts', 'khelper','exxdiv', 'cell',
         'nkop_chk', 'kop_npick', 'chnk_size', 'keep_exxdiv',
-        'naux', 'if_heri_eris', 'if_naf', 'thresh_naf', 'if_corr','ext_vir','if_div'
+        'naux', 'if_heri_eris', 'eris', 'if_naf', 'thresh_naf', 'if_corr','ext_vir','if_div'
     }
 
     def __init__(self, mf, frozen=None, mo_coeff=None, mo_occ=None, mo_energy=None):
@@ -334,6 +334,7 @@ class RADC(pyscf.adc.radc.RADC):
         self.thresh_naf = 1e-2
         self.ext_vir = 0
         self.if_div = False
+        self.eris = None
 
     make_ref_rdm1 = make_ref_rdm1
     transform_integrals = kadc_ao2mo.transform_integrals_incore
@@ -415,9 +416,8 @@ class RADC(pyscf.adc.radc.RADC):
         self._finalize()
         log.timer('complete kernel', *cput0)
         if self.if_heri_eris:
-            return self.e_corr, self.t1,self.t2, eris
-        else:
-            return self.e_corr, self.t1,self.t2
+            self.eris=eris
+        return self.e_corr, self.t1,self.t2
 
     def kernel(self, nroots=1, guess=None, eris=None, kptlist=None, pct_orb=0.70):
         cput0 = (logger.process_clock(), logger.perf_counter())
@@ -492,9 +492,8 @@ class RADC(pyscf.adc.radc.RADC):
         self._adc_es = adc_es
         log.timer('complete kernel', *cput0)
         if self.if_heri_eris:
-            return e_exc, v_exc, spec_fac, x, eris
-        else:
-            return e_exc, v_exc, spec_fac, x
+            self.eris=eris
+        return e_exc, v_exc, spec_fac, x
 
     def ip_adc(self, nroots=1, guess=None, eris=None, kptlist=None):
         from pyscf.pbc.adc import kadc_rhf_ip
