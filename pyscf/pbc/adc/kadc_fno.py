@@ -57,7 +57,6 @@ class RADC2FNO(kadc_rhf.RADC):
         super().__init__(mf, frozen, mo_coeff, mo_occ)
         self.delta_e = None
         self.delta_e_corr = None
-        self.method = "adc(3)"
         self.e_can = None
         self.v_can = None
         self.e_corr_can = None
@@ -104,11 +103,10 @@ class RADC2FNO(kadc_rhf.RADC):
         log.timer('es FNO', *cput0)
 
     def compute_correction(self, nroots=None, guess=None, kptlist=None, if_gs=False):
-        self.if_heri_eris = True
         if if_gs:
-            _,_,_,self.eris = kadc_rhf.RADC.kernel_gs(self)
+            _,_,_ = kadc_rhf.RADC.kernel_gs(self)
         else:
-            self.e2_ssfno,self.v2_ssfno,_,_,self.eris = kadc_rhf.RADC.kernel(self, nroots, guess=guess, kptlist=kptlist)
+            self.e2_ssfno,self.v2_ssfno,self.p2_ssfno,_ = kadc_rhf.RADC.kernel(self, nroots, guess=guess, kptlist=kptlist)
             self.delta_e = self.e_can - self.e2_ssfno
         self.delta_e_corr = self.e_corr_can - self.e_corr
 
