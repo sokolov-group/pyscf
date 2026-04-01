@@ -38,7 +38,7 @@ def qp_correct(FG, E, P, kptlist):
     for k, kshift in enumerate(kptlist):
         delta_e_k = FG.delta_e[k,mask_fno[k]]
         E_p_k = E[k,mask[k]]
-        E_p_corrected_k = E_p_k + delta_e_k[:E_p_k.shape[0]]
+        E_p_corrected_k = E_p_k[:min(len(E_p_k), len(delta_e_k))] + delta_e_k[:min(len(E_p_k), len(delta_e_k))]
         sort_indices = np.argsort(E_p_corrected_k)
         E_p_corrected.append(E_p_corrected_k[sort_indices])
         for n in range(E_p_corrected[k].shape[0]):
@@ -76,7 +76,7 @@ kmf = scf.KRHF(cell, kpts=kpts, exxdiv=None).density_fit()
 ekrhf = kmf.kernel()
 
 # FNOGenerator
-ADCFG  = adc.KRADC2FNO(kmf)
+ADCFG = adc.KRADC2FNO(kmf)
 ADCFG.method_type = 'ea'
 ADCFG.approx_trans_moments = True
 ADCFG.verbose = 5
