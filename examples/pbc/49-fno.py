@@ -80,7 +80,7 @@ ADCFG = adc.KRADC2FNO(kmf)
 ADCFG.method_type = 'ea'
 ADCFG.approx_trans_moments = True
 ADCFG.verbose = 5
-ADCFG.ref_state = [0,0]
+ADCFG.ref_state = [[0],[0]]
 ADCFG.kernel(nroots_test,pct_occ=0.90,kptlist=[0])
 
 # kadc3

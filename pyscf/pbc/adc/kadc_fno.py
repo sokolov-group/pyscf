@@ -50,7 +50,8 @@ class RADC2FNO(kadc_rhf.RADC):
     #J. Chem. Phys. 159, 084113 (2023)
     _keys = kadc_rhf.RADC._keys | {'delta_e','e_can','v_can','e_corr_can',
                           'rdm1_ss','trans_guess','mode','ref_state',
-                          'if_adc2_guess','div_pct_orb','if_cc','delta_e_corr'
+                          'if_adc2_guess','div_pct_orb','if_cc','delta_e_corr',
+                          'p_can','if_ref_qp','delta_e_qp','is_qp'
                           }
 
     def __init__(self, mf, frozen=0, mo_coeff=None, mo_occ=None):
@@ -67,6 +68,7 @@ class RADC2FNO(kadc_rhf.RADC):
         self.trans_guess = False
         self.mode = "min"
         self.ref_state = None
+        self.if_ref_qp = True
         self.div_pct_orb = 0.70
         self.if_adc2_guess = False
         self.if_cc = False
@@ -95,36 +97,34 @@ class RADC2FNO(kadc_rhf.RADC):
         else:
             raise ValueError("ref_state should be an int type or or a array-like object with two elements")
 
-        self.make_ss_rdm1(log, cput0, nroots, guess, kptlist)
+        if kptlist is None:
+            kptlist = range(self.nkpts)
+        self.make_ss_rdm1(log, cput0, kptlist, nroots, guess)
         log.timer('make ss rdm1', *cput0)
         self.make_fno(self.rdm1_ss, self._scf, log, thresh, pct_occ, nvir_act)
         log.timer('get frozen info', *cput0)
 
         self.if_div = False
         self.ext_vir = 0
-        self.compute_correction(nroots, guess, kptlist)
+        self.compute_correction(kptlist, nroots, guess)
         log.timer('es FNO', *cput0)
 
-    def compute_correction(self, nroots=None, guess=None, kptlist=None, if_gs=False):
+    def compute_correction(self, kptlist, nroots=None, guess=None, if_gs=False):
         if if_gs:
             _,_,_ = kadc_rhf.RADC.kernel_gs(self)
         else:
             self.e2_ssfno,self.v2_ssfno,self.p2_ssfno,_ = kadc_rhf.RADC.kernel(self, nroots, guess=guess, kptlist=kptlist)
             self.delta_e = self.e_can - self.e2_ssfno
-            if kptlist is None:
-                kptlist = range(self.nkpts)
             self.delta_e_qp = []
-            print(self.p2_ssfno.shape)
-            print(self.e_can.shape)
+            mask_fno = self.p2_ssfno > self.is_qp
+            mask_can = self.p_can > self.is_qp
             for kpt in kptlist:
-                mask_fno = self.p2_ssfno[kpt] > self.is_qp
-                mask_can = self.p_can[kpt] > self.is_qp
-                e_can_qp_k = self.e_can[kpt][mask_can]
-                e2_ssfno_qp_k = self.e2_ssfno[kpt][mask_fno]
+                e_can_qp_k = self.e_can[kpt][mask_can[kpt]]
+                e2_ssfno_qp_k = self.e2_ssfno[kpt][mask_fno[kpt]]
                 self.delta_e_qp.append(e_can_qp_k[:min(len(e_can_qp_k), len(e2_ssfno_qp_k))] - e2_ssfno_qp_k[:min(len(e_can_qp_k), len(e2_ssfno_qp_k))])
         self.delta_e_corr = self.e_corr_can - self.e_corr
 
-    def make_ss_rdm1(self, log, cput0, nroots=None, guess=None, kptlist=None, if_gs=False):
+    def make_ss_rdm1(self, log, cput0, kptlist, nroots=None, guess=None, if_gs=False):
         naf_tmp = self.if_naf
         self.if_naf = False
         if if_gs:
@@ -135,21 +135,40 @@ class RADC2FNO(kadc_rhf.RADC):
         self.e_corr_can = self.e_corr
         if self.ref_state is not None:
             if isinstance(self.ref_state,(int, np.integer)):
-                idx = np.argsort(self.e_can.ravel())
-                sidx = idx[self.ref_state - 1]% self.nkpts
-                kidx = idx[self.ref_state - 1]// self.nkpts
+                idx = np.argsort(self.e_can.ravel()).tolist()
+                sidx = [[idx[self.ref_state - 1]% self.nkpts]]
+                kidx = [idx[self.ref_state - 1]// self.nkpts]
             elif hasattr(self.ref_state, '__len__'):
                 if len(self.ref_state) != 2:
                     raise ValueError
-                elif hasattr(self.ref_state[0], '__len__'):
-                    (sidx,kidx) = (self.ref_state[0],self.ref_state[1])
+                if not isinstance(self.ref_state[0], list) or not isinstance(self.ref_state[1], list):
+                    raise ValueError("when ref_state is a array-like object, both elements should be list type")
+                if not isinstance(self.ref_state[1][0], (int, np.integer)):
+                    raise ValueError("elements in the second list of ref_state should be int type")
+                if isinstance(self.ref_state[0][0], (int, np.integer)):
+                    sidx = [self.ref_state[0] for _ in range(len(self.ref_state[1]))]
                 else:
-                    (sidx,kidx) = ([self.ref_state[0]],self.ref_state[1])
+                    if len(self.ref_state[0]) != len(self.ref_state[1]):
+                        raise ValueError("when the first element of ref_state is a array-like object, its length should be the same as the second element")
+                    sidx = self.ref_state[0]
+                kidx = self.ref_state[1]
+                if self.if_ref_qp:
+                    state_list = []
+                    mask_can = self.p_can > self.is_qp
+                    for kpt, kshift in enumerate(kidx):
+                        k = kptlist.index(kshift)
+                        state_list_k = np.arange(nroots)
+                        state_list_k = state_list_k[mask_can[k]].tolist()
+                        state_list.append([state_list_k[s] for s in sidx[kpt]])
+                    sidx = state_list
+
             log.info(f"the specific state is {sidx} with kidx {kidx}")
-            es_DM = self.make_rdm1(root=sidx,kptlist=[kidx],if_ss=True)
+            es_DM = self.make_rdm1(kptlist,root=sidx,K_idx=kidx,if_ss=True)
             self.rdm1_ss = np.zeros_like(es_DM[0][0])
-            for i in range(len(sidx)):
-                self.rdm1_ss += es_DM[i][0]/len(sidx)
+            n_state = sum([len(s_k) for s_k in sidx])
+            for k in range(len(kidx)):
+                for i in range(len(sidx[k])):
+                    self.rdm1_ss += es_DM[k][i]/n_state
             log.info('current use %d MB',lib.current_memory()[0])
             log.timer('make ss rdm1', *cput0)
         else:
