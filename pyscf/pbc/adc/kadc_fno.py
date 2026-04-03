@@ -57,8 +57,11 @@ class RADC2FNO(kadc_rhf.RADC):
         super().__init__(mf, frozen, mo_coeff, mo_occ)
         self.delta_e = None
         self.delta_e_corr = None
+        self.delta_e_qp = None
+        self.is_qp = 0.5
         self.e_can = None
         self.v_can = None
+        self.p_can = None
         self.e_corr_can = None
         self.rdm1_ss = None
         self.trans_guess = False
@@ -99,7 +102,7 @@ class RADC2FNO(kadc_rhf.RADC):
 
         self.if_div = False
         self.ext_vir = 0
-        self.compute_correction(nroots, guess, kptlist=kptlist)
+        self.compute_correction(nroots, guess, kptlist)
         log.timer('es FNO', *cput0)
 
     def compute_correction(self, nroots=None, guess=None, kptlist=None, if_gs=False):
@@ -108,6 +111,17 @@ class RADC2FNO(kadc_rhf.RADC):
         else:
             self.e2_ssfno,self.v2_ssfno,self.p2_ssfno,_ = kadc_rhf.RADC.kernel(self, nroots, guess=guess, kptlist=kptlist)
             self.delta_e = self.e_can - self.e2_ssfno
+            if kptlist is None:
+                kptlist = range(self.nkpts)
+            self.delta_e_qp = []
+            print(self.p2_ssfno.shape)
+            print(self.e_can.shape)
+            for kpt in kptlist:
+                mask_fno = self.p2_ssfno[kpt] > self.is_qp
+                mask_can = self.p_can[kpt] > self.is_qp
+                e_can_qp_k = self.e_can[kpt][mask_can]
+                e2_ssfno_qp_k = self.e2_ssfno[kpt][mask_fno]
+                self.delta_e_qp.append(e_can_qp_k[:min(len(e_can_qp_k), len(e2_ssfno_qp_k))] - e2_ssfno_qp_k[:min(len(e_can_qp_k), len(e2_ssfno_qp_k))])
         self.delta_e_corr = self.e_corr_can - self.e_corr
 
     def make_ss_rdm1(self, log, cput0, nroots=None, guess=None, kptlist=None, if_gs=False):
@@ -116,7 +130,7 @@ class RADC2FNO(kadc_rhf.RADC):
         if if_gs:
             _,_,_ = kadc_rhf.RADC.kernel_gs(self)
         else:
-            self.e_can,self.v_can,_,_ = kadc_rhf.RADC.kernel(self,nroots,guess=guess,kptlist=kptlist,pct_orb=self.div_pct_orb)
+            self.e_can,self.v_can,self.p_can,_ = kadc_rhf.RADC.kernel(self,nroots,guess=guess,kptlist=kptlist,pct_orb=self.div_pct_orb)
         log.info('current use %d MB',lib.current_memory()[0])
         self.e_corr_can = self.e_corr
         if self.ref_state is not None:
