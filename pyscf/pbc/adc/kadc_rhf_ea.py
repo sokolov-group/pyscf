@@ -1158,22 +1158,23 @@ def renormalize_eigenvectors(adc, kshift, U, nroots=1):
     return U
 
 
-def make_rdm1(adc,root=None,kptlist=None,if_ss=False):
+def make_rdm1(adc,root=None,kptlist=None,K_idx=None,if_ss=False):
     cput0 = (logger.process_clock(), logger.perf_counter())
     log = logger.Logger(adc.stdout, adc.verbose)
 
-    list_rdm1 = []
+    rdm1 = []
 
-    for i in root:
-        rdm1 = []
-        for k, kshift in enumerate(kptlist):
-            U = np.array(adc.U[k]).T.copy()
-            U = adc.renormalize_eigenvectors(kshift, U, adc.U.shape[1])
-            rdm1.append(make_rdm1_eigenvectors(adc, U[:,i], U[:,i], kshift, if_ss))
-        rdm1_band = np.stack(rdm1,axis=0)
-        list_rdm1.append(rdm1_band)
+    for kpt, kshift in enumerate(K_idx):
+        k = kptlist.index(kshift)
+        U = np.array(adc.U[k]).T.copy()
+        U = adc.renormalize_eigenvectors(kshift, U, adc.U.shape[1])
+        rdm1_k = []
+        for i in root[kpt]:
+            rdm1_k.append(make_rdm1_eigenvectors(adc, U[:,i], U[:,i], kshift, if_ss))
+        rdm1_k = np.stack(rdm1_k,axis=0)
+        rdm1.append(rdm1_k)
     cput0 = log.timer_debug1("completed OPDM calculation", *cput0)
-    return list_rdm1
+    return rdm1
 
 
 def make_rdm1_eigenvectors_slow(adc, L, R, kshift):

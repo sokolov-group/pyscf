@@ -523,44 +523,45 @@ class RADC(pyscf.adc.radc.RADC):
             self.with_df = with_df
         return self
 
-    def make_rdm1(self,root=None,kptlist=None,with_frozen=True,ao_repr=False,if_ss=False):
+    def make_rdm1(self,kptlist,root=None,K_idx=None,with_frozen=True,ao_repr=False,if_ss=False):
+        if K_idx is None:
+            K_idx = kptlist
+
         if root is None:
-            nroots = range(self._adc_es.U.shape[1])
+            nroots = [range(self._adc_es.U.shape[1]) for _ in K_idx]
         else:
             nroots = root
 
-        if kptlist is None:
-            kptlist = range(self.nkpts)
-
-        rdm1 = self._adc_es.make_rdm1(nroots,kptlist,if_ss)
+        rdm1 = self._adc_es.make_rdm1(nroots,kptlist,K_idx,if_ss)
 
         if with_frozen and self.frozen is not None:
             nmo = self.mo_occ[0].size
             nocc = np.count_nonzero(self.mo_occ[0] > 0)
             mask = get_frozen_mask(self)
-            dm = np.zeros((len(rdm1), self.nkpts, self.nkpts, nmo, nmo), dtype=np.complex128)
+            dm = np.zeros((len(K_idx), len(nroots), self.nkpts, nmo, nmo), dtype=np.complex128)
             occ_idx = np.arange(nocc)
-            k_idx = np.arange(self.nkpts)
+            k0_idx = np.arange(len(K_idx))
+            k1_idx = np.arange(self.nkpts)
             p_k_idx = padding_k_idx(self, kind="joint")
-            s_idx = np.arange(len(rdm1))
-            S, K0, K1, O = np.meshgrid(s_idx, k_idx, k_idx, occ_idx, indexing='ij')
+            s_idx = np.arange(len(nroots))
+            K0, S, K1, O = np.meshgrid(k0_idx, s_idx, k1_idx, occ_idx, indexing='ij')
             if if_ss:
-                dm[S, K0, K1, O, O] = 4
+                dm[K0, S, K1, O, O] = 4
             else:
-                dm[S, K0, K1, O, O] = 2
-            for ki in k_idx:
+                dm[K0, S, K1, O, O] = 2
+            for ki in k1_idx:
                 moidx = np.where(mask[ki])[0]
                 for i in range(len(nroots)):
-                    for kj in kptlist:
-                        dm[i][kj][ki][moidx[:,None],moidx] = rdm1[i][kj][ki][p_k_idx[ki][:,None],p_k_idx[ki]]
+                    for kj in k0_idx:
+                        dm[kj][i][ki][moidx[:,None],moidx] = rdm1[kj][i][ki][p_k_idx[ki][:,None],p_k_idx[ki]]
             rdm1 = dm
             if ao_repr:
                 mo = self.mo_coeff
                 mo_H = [c.conj() for c in mo]
-                rdm1 = lib.einsum('kpI,SKkIJ,kqJ->SKkpq', mo, rdm1, mo_H)
+                rdm1 = lib.einsum('kpI,KSkIJ,kqJ->KSkpq', mo, rdm1, mo_H)
         elif ao_repr:
             mo = padded_mo_coeff(self,self.mo_coeff)
             mo_H = [c.conj() for c in mo]
-            rdm1 = lib.einsum('kpI,SKkIJ,kqJ->SKkpq', mo, rdm1, mo_H)
+            rdm1 = lib.einsum('kpI,KSkIJ,kqJ->KSkpq', mo, rdm1, mo_H)
 
         return rdm1
