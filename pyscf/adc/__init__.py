@@ -36,6 +36,8 @@ from pyscf.adc import uadc_ip
 from pyscf.adc import uadc_ip_cvs
 from pyscf.adc import uadc_ea
 from pyscf.adc import uadc_ee
+from pyscf.adc import radc_fno
+from pyscf.adc import uadc_fno
 
 
 def ADC(mf, frozen=None, mo_coeff=None, mo_occ=None):
@@ -76,14 +78,14 @@ def FNOADC(mf, frozen=None, mo_coeff=None, mo_occ=None):
     #J. Chem. Phys. 159, 084113 (2023)
 
     if mf.istype('UHF'):
-        return uadc.UFNOADC(mf, frozen, mo_coeff, mo_occ)
+        return uadc_fno.UADC2FNO(mf, frozen, mo_coeff, mo_occ)
     elif mf.istype('ROHF'):
-        return uadc.UFNOADC(mf, frozen, mo_coeff, mo_occ)
+        return uadc_fno.UADC2FNO(mf, frozen, mo_coeff, mo_occ)
     elif mf.istype('RHF'):
-        return radc.RFNOADC(mf, frozen, mo_coeff, mo_occ)
+        return radc_fno.RADC2FNO(mf, frozen, mo_coeff, mo_occ)
     else :
         raise RuntimeError('FNOADC code only supports RHF and UHF references')
 
-FNOADC.__doc__ = uadc.UFNOADC.__doc__
+FNOADC.__doc__ = uadc_fno.UADC2FNO.__doc__
 
 
