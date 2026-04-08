@@ -33,128 +33,100 @@ class UADC2FNO(uadc.UADC):
                           'mo_energy','rdm1_ss','ref_state','trans_guess'
                           }
 
-    def __init__(self, mf, frozen=0, mo_coeff=None, mo_occ=None):
-        super().__init__(mf, frozen, mo_coeff, mo_occ)
+    def __init__(self, mf, frozen=0, mo_coeff=None, mo_occ=None, mo_energy=None, f_ov=None):
+        super().__init__(mf, frozen, mo_coeff, mo_occ, mo_energy, f_ov)
         self.delta_e = None
         self.delta_e_corr = None
-        self.mo_energy = None
-        self.method = "adc(3)"
         self.e_can = None
         self.v_can = None
         self.e_corr_can = None
         self.rdm1_ss = None
         self.ref_state = None
-        self.if_naf = True
+        self.if_naf = False
         self.trans_guess = False
 
-
-    def compute_correction(self, mf, frozen, nroots, eris=None, guess=None):
-        if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
-            if self.with_df is None:
-                self.with_df = self._scf.with_df
-        adc2_ssfno = uadc.UADC(mf, frozen, self.mo_coeff, mo_energy = self.mo_energy, f_ov = self.f_ov).set(
-                                                        verbose = self.verbose,method_type = self.method_type,
-                                                        with_df = self.with_df,if_naf = self.if_naf,
-                                                        thresh_naf = self.thresh_naf,naux = self.naux,
-                                                        ncvs = self.ncvs,
-                                                        approx_trans_moments = self.approx_trans_moments,
-                                                        conv_tol = self.conv_tol,tol_residual = self.tol_residual,
-                                                        max_space = self.max_space, max_cycle = self.max_cycle)
-        e2_ssfno,_,_,_ = adc2_ssfno.kernel(nroots, eris = eris, guess = guess)
-        self.delta_e = self.e_can - e2_ssfno
-        self.delta_e_corr = self.e_corr_can - adc2_ssfno.e_corr
-
-    def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, ref_state = None):
+    def kernel_gs(self, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None):
         cput0 = (logger.process_clock(), logger.perf_counter())
         log = logger.Logger(self.stdout, self.verbose)
-        self.ref_state = ref_state
-        self.naux = None
-        self.if_heri_eris = True
-        if ref_state is None:
+        logger.info(self, "generate fno with correction for the ground state")
+        self.ref_state = None
+
+        if not getattr(self, 'with_df', None) and not getattr(self._scf, 'with_df', None):
+            self.if_naf = False
+
+        self.make_ss_rdm1(if_gs=True)
+        log.timer('make gs rdm1', *cput0)
+        self.make_fno(self.rdm1_ss, thresh, pct_occ, nvir_act)
+        log.timer('get frozen info', *cput0)
+        self.compute_correction(self._scf, eris=eris, if_gs=True)
+
+        log.timer('gs FNO', *cput0)
+
+    def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None):
+        cput0 = (logger.process_clock(), logger.perf_counter())
+        log = logger.Logger(self.stdout, self.verbose)
+        if self.ref_state is None:
             logger.info(self,"Do fno adc calculation")
-        elif isinstance(ref_state, int) and 0<ref_state<=nroots:
-            logger.info(self,f"Do ss-fno adc calculation, the specic state is {ref_state}")
+        elif isinstance(self.ref_state, int) and 0<self.ref_state<=nroots:
+            logger.info(self,f"Do ss-fno adc calculation, the specic state is {self.ref_state}")
         else:
             raise ValueError("ref_state should be an int type and in (0,nroots]")
 
         if not getattr(self, 'with_df', None) and not getattr(self._scf, 'with_df', None):
                 self.if_naf = False
 
-        self.make_ss_rdm1(nroots, self.ref_state, guess)
+        self.make_ss_rdm1(nroots, guess)
         log.timer('make ss rdm1', *cput0)
-        if isinstance(self._scf, scf.rohf.ROHF):
-            self.mo_coeff,self.mo_energy,frozen,self.f_ov = self.make_fno(self.rdm1_ss, thresh)
-        else:
-            self.mo_coeff,self.mo_energy,frozen = self.make_fno(self.rdm1_ss, thresh)
+        self.make_fno(self.rdm1_ss, thresh, pct_occ, nvir_act)
         log.timer('get frozen info', *cput0)
-        adc3_ssfno = uadc.UADC(self._scf, frozen, self.mo_coeff, mo_energy = self.mo_energy, f_ov = self.f_ov).set(
-                                                                    verbose = self.verbose,
-                                                                    method_type = self.method_type,method = self.method,
-                                                                    with_df = self.with_df,
-                                                                    if_naf = self.if_naf,thresh_naf = self.thresh_naf,
-                                                                    if_heri_eris = self.if_heri_eris,ncvs = self.ncvs,
-                                                                    approx_trans_moments = self.approx_trans_moments,
-                                                                    conv_tol = self.conv_tol,
-                                                                    tol_residual = self.tol_residual,
-                                                                    max_space = self.max_space, max_cycle = self.max_cycle)
 
-        if self.if_naf:
-            if self.trans_guess:
-                e_exc, v_exc, spec_fac, x, eris, self.naux = adc3_ssfno.kernel(nroots, guess=self.v_can, eris=eris)
-            else:
-                e_exc, v_exc, spec_fac, x, eris, self.naux = adc3_ssfno.kernel(nroots, guess, eris)
+        if self.trans_guess and self.method_type == 'ip' and self.ncvs == 0:
+            self.compute_correction(self._scf, nroots, eris, guess=self.v_can)
         else:
-            if self.trans_guess:
-                e_exc, v_exc, spec_fac, x, eris = adc3_ssfno.kernel(nroots, guess=self.v_can, eris=eris)
-            else:
-                e_exc, v_exc, spec_fac, x, eris = adc3_ssfno.kernel(nroots, guess, eris)
+            self.compute_correction(self._scf, nroots, eris, guess=guess)
 
-        self.e_corr = adc3_ssfno.e_corr
-        log.timer(f'ADC{self.method[4]}', *cput0)
+        log.timer('es FNO', *cput0)
 
-        self.compute_correction(self._scf, frozen, nroots, eris, guess=v_exc)
-        e_exc = e_exc + self.delta_e
-        self.e_corr = self.e_corr + self.delta_e_corr
+    def compute_correction(self, mf, nroots=None, eris=None, guess=None, if_gs=False):
+        adc_ssfno = uadc.UADC(mf, self.frozen, self.mo_coeff, mo_energy = self.mo_energy, f_ov = self.f_ov).set(
+                                                        verbose = self.verbose,
+                                                        method_type = self.method_type,method=self.method,
+                                                        with_df = self.with_df,if_naf = self.if_naf,
+                                                        thresh_naf = self.thresh_naf,naux = self.naux,
+                                                        if_heri_eris = self.if_heri_eris,ncvs = self.ncvs,
+                                                        approx_trans_moments = self.approx_trans_moments,
+                                                        conv_tol = self.conv_tol,tol_residual = self.tol_residual,
+                                                        max_space = self.max_space, max_cycle = self.max_cycle)
+        if if_gs:
+            _,_,_ = adc_ssfno.kernel_gs(eris)
+        else:
+            self.e_ssfno,self.v_ssfno,_,_ = adc_ssfno.kernel(nroots,guess,eris)
+            self.delta_e = self.e_can - self.e_ssfno
+        self.naux = adc_ssfno.naux
+        self.eris = adc_ssfno.eris
+        self.delta_e_corr = self.e_corr_can - adc_ssfno.e_corr
 
-        msg = ("\n*************************************************************"
-                "\n                   ADC calculation summary"
-                "\n*************************************************************")
-        logger.info(self, msg)
-        logger.info(self, 'FNO MP%s correlation energy of reference state (a.u.) = %.8f',
-                    self.method[4], self.e_corr)
-
-        for n in range(nroots):
-            print_string = ('%s root %d  |  Energy (Eh) = %14.10f  |  Energy (eV) = %12.8f  ' %
-                            (self.method, n, e_exc[n], e_exc[n]*HARTREE2EV))
-            if self.compute_properties:
-                if (self.method_type == "ee"):
-                    print_string += ("|  Osc. strength = %10.8f  " % spec_fac[n])
-                else:
-                    print_string += ("|  Spec. factor = %10.8f  " % spec_fac[n])
-            logger.info(self, print_string)
-            log.timer('UFNOADC', *cput0)
-        return e_exc, v_exc, spec_fac, x
-
-    def make_ss_rdm1(self,nroots,ref_state,guess):
-        adc2_can = uadc.UADC(self._scf,self.frozen).set(verbose = self.verbose,method_type = self.method_type,
-                        with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,
-                        ncvs = self.ncvs, approx_trans_moments = self.approx_trans_moments,
-                        conv_tol = self.conv_tol,tol_residual = self.tol_residual,
-                        max_space = self.max_space, max_cycle = self.max_cycle)
-        self.e_can,self.v_can,_,_ = adc2_can.kernel(nroots,guess)
-        rdm1_gs = adc2_can.make_ref_rdm1()
-        self.e_corr_can = adc2_can.e_corr
-        if ref_state is not None:
+    def make_ss_rdm1(self,nroots=None,guess=None,if_gs=False):
+        heri_tmp = self.if_heri_eris
+        self.if_heri_eris = False
+        if if_gs:
+            _,_,_ = uadc.UADC.kernel_gs(self)
+        else:
+            self.e_can,self.v_can,_,_ = uadc.UADC.kernel(self,nroots,guess)
+        self.if_heri_eris = heri_tmp
+        rdm1_gs = self.make_ref_rdm1()
+        self.e_corr_can = self.e_corr
+        if self.ref_state is not None:
             rdm1_gs_a = rdm1_gs[0]
             rdm1_gs_b = rdm1_gs[1]
-            rdm1_ref = adc2_can.make_ref_rdm1()
-            rdm1_ref_a = rdm1_ref[0][ref_state - 1]
-            rdm1_ref_b = rdm1_ref[1][ref_state - 1]
-            self.rdm1_ss = (rdm1_ref_a + rdm1_gs_a, rdm1_ref_b + rdm1_gs_b)
+            rdm1_es = self.make_rdm1()
+            rdm1_es_a = rdm1_es[0][self.ref_state - 1]
+            rdm1_es_b = rdm1_es[1][self.ref_state - 1]
+            self.rdm1_ss = (rdm1_es_a + rdm1_gs_a, rdm1_es_b + rdm1_gs_b)
         else:
             self.rdm1_ss = rdm1_gs
 
-    def make_fno(self, rdm1_ss, thresh):
+    def make_fno(self, rdm1_ss, thresh, pct_occ, nvir_act):
         nocc_a = self._scf.nelec[0]
         nocc_b = self._scf.nelec[1]
         mo_energy_a = self.mo_energy_hf[0]
@@ -170,16 +142,29 @@ class UADC2FNO(uadc.UADC):
         n_a,V_a = np.linalg.eigh(rdm1_ss_a[nocc_a:,nocc_a:])
         idx = np.argsort(n_a)[::-1]
         n_a,V_a = n_a[idx], V_a[:,idx]
-        T_a = n_a > thresh
+
+        n_b,V_b = np.linalg.eigh(rdm1_ss_b[nocc_b:,nocc_b:])
+        idx = np.argsort(n_b)[::-1]
+        n_b,V_b = n_b[idx], V_b[:,idx]
+
+        if nvir_act is None:
+            if pct_occ is None:
+                T_a = n_a > thresh
+                T_b = n_b > thresh
+            else:
+                cumsum_a = np.cumsum(n_a/np.sum(n_a))
+                cumsum_b = np.cumsum(n_b/np.sum(n_b))
+                T_a = np.array([c <= pct_occ or np.isclose(c, pct_occ) for c in cumsum_a])
+                T_b = np.array([c <= pct_occ or np.isclose(c, pct_occ) for c in cumsum_b])
+        else:
+            T_a = np.array([i < nvir_act for i in range(len(n_a))])
+            T_b = np.array([i < nvir_act for i in range(len(n_b))])
+    
         n_fro_vir_a = np.sum(T_a == 0)
         T_a = np.diag(T_a)
         V_trunc_a = V_a.dot(T_a)
         n_keep_a = V_trunc_a.shape[0]-n_fro_vir_a
 
-        n_b,V_b = np.linalg.eigh(rdm1_ss_b[nocc_b:,nocc_b:])
-        idx = np.argsort(n_b)[::-1]
-        n_b,V_b = n_b[idx], V_b[:,idx]
-        T_b = n_b > thresh
         n_fro_vir_b = np.sum(T_b == 0)
         T_b = np.diag(T_b)
         V_trunc_b = V_b.dot(T_b)
@@ -226,6 +211,6 @@ class UADC2FNO(uadc.UADC):
             f_ov_a = f_ov_a.dot(V_trunc_a[:,:n_keep_a]).dot(Z_trunc_a)
             f_ov_b = f_ov_b.dot(V_trunc_b[:,:n_keep_b]).dot(Z_trunc_b)
             f_ov = (f_ov_a,f_ov_b)
-            return no_coeff,no_energy,no_frozen,f_ov
+            self.mo_coeff,self.mo_energy,self.frozen,self.f_ov = no_coeff,no_energy,no_frozen,f_ov
         else:
-            return no_coeff,no_energy,no_frozen
+            self.mo_coeff,self.mo_energy,self.frozen = no_coeff,no_energy,no_frozen

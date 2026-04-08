@@ -17,15 +17,9 @@
 #
 
 import numpy as np
-from pyscf import lib
 from pyscf.lib import logger
-from pyscf.adc import radc_ao2mo
-from pyscf.adc import radc_amplitudes
 from pyscf.adc import radc
 from pyscf import __config__
-from pyscf import df
-from pyscf.mp import mp2
-from pyscf.data.nist import HARTREE2EV
 
 class RADC2FNO(radc.RADC):
     #J. Chem. Phys. 159, 084113 (2023)
@@ -33,116 +27,95 @@ class RADC2FNO(radc.RADC):
                           'mo_energy','rdm1_ss','ref_state','trans_guess'
                           }
 
-    def __init__(self, mf, frozen=0, mo_coeff=None, mo_occ=None):
-        super().__init__(mf, frozen, mo_coeff, mo_occ)
+    def __init__(self, mf, frozen=0, mo_coeff=None, mo_occ=None, mo_energy=None):
+        super().__init__(mf, frozen, mo_coeff, mo_occ, mo_energy)
         self.delta_e = None
         self.delta_e_corr = None
-        self.mo_energy = None
-        self.method = "adc(3)"
         self.e_can = None
         self.v_can = None
         self.e_corr_can = None
         self.rdm1_ss = None
         self.ref_state = None
-        self.if_naf = True
+        self.if_naf = False
         self.trans_guess = False
 
-    def compute_correction(self, mf, frozen, nroots, eris=None, guess=None):
-        if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
-            if self.with_df is None:
-                self.with_df = self._scf.with_df
-        adc2_ssfno = radc.RADC(mf, frozen, self.mo_coeff, mo_energy = self.mo_energy).set(verbose = self.verbose,
-                                                        method_type = self.method_type,
-                                                        with_df = self.with_df,if_naf = self.if_naf,
-                                                        thresh_naf = self.thresh_naf,naux = self.naux,
-                                                        ncvs = self.ncvs,
-                                                        approx_trans_moments = self.approx_trans_moments,
-                                                        conv_tol = self.conv_tol,tol_residual = self.tol_residual,
-                                                        max_space = self.max_space, max_cycle = self.max_cycle)
-        e2_ssfno,_,_,_ = adc2_ssfno.kernel(nroots, eris = eris, guess=guess)
-        self.delta_e = self.e_can - e2_ssfno
-        self.delta_e_corr = self.e_corr_can - adc2_ssfno.e_corr
-
-    def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, ref_state = None):
+    def kernel_gs(self, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None):
         cput0 = (logger.process_clock(), logger.perf_counter())
         log = logger.Logger(self.stdout, self.verbose)
-        self.ref_state = ref_state
-        self.naux = None
-        self.if_heri_eris = True
-        if ref_state is None:
+        logger.info(self, "generate fno with correction for the ground state")
+        self.ref_state = None
+
+        if not getattr(self, 'with_df', None) and not getattr(self._scf, 'with_df', None):
+            self.if_naf = False
+
+        self.make_ss_rdm1(log, cput0, if_gs=True)
+        log.timer('make gs rdm1', *cput0)
+        self.make_fno(self.rdm1_ss, self._scf, thresh, pct_occ, nvir_act)
+        log.timer('get frozen info', *cput0)
+        self.compute_correction(self._scf, self.frozen, eris=eris, if_gs=True)
+
+        log.timer('gs FNO', *cput0)
+
+    def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None):
+        cput0 = (logger.process_clock(), logger.perf_counter())
+        log = logger.Logger(self.stdout, self.verbose)
+        if self.ref_state is None:
             logger.info(self,"Do fno adc calculation")
-        elif isinstance(ref_state, int) and 0<ref_state<=nroots:
-            logger.info(self,f"Do ss-fno adc calculation, the specic state is {ref_state}")
+        elif isinstance(self.ref_state, int) and 0<self.ref_state<=nroots:
+            logger.info(self,f"Do ss-fno adc calculation, the specic state is {self.ref_state}")
         else:
             raise ValueError("ref_state should be an int type and in (0,nroots]")
 
         if not getattr(self, 'with_df', None) and not getattr(self._scf, 'with_df', None):
             self.if_naf = False
 
-        self.make_ss_rdm1(nroots, self.ref_state, guess)
+        self.make_ss_rdm1(nroots, guess)
         log.timer('make ss rdm1', *cput0)
-        self.mo_coeff,self.mo_energy,frozen = self.make_fno(self.rdm1_ss, self._scf, thresh)
+        self.make_fno(self.rdm1_ss, self._scf, thresh, pct_occ, nvir_act)
         log.timer('get frozen info', *cput0)
-        adc3_ssfno = radc.RADC(self._scf, frozen, self.mo_coeff, mo_energy = self.mo_energy).set(verbose = self.verbose,
-                                                                    method_type = self.method_type,method = self.method,
-                                                                    with_df = self.with_df,
-                                                                    if_naf = self.if_naf,thresh_naf = self.thresh_naf,
-                                                                    if_heri_eris = self.if_heri_eris,ncvs = self.ncvs,
-                                                                    approx_trans_moments = self.approx_trans_moments,
-                                                                    conv_tol = self.conv_tol,
-                                                                    tol_residual = self.tol_residual,
-                                                                    max_space = self.max_space, max_cycle = self.max_cycle)
 
-        if self.if_naf:
-            if self.trans_guess:
-                e_exc, v_exc, spec_fac, x, eris, self.naux = adc3_ssfno.kernel(nroots, guess=self.v_can, eris=eris)
-            else:
-                e_exc, v_exc, spec_fac, x, eris, self.naux = adc3_ssfno.kernel(nroots, guess, eris)
+        if self.trans_guess and self.method_type == 'ip' and self.ncvs == 0:
+            self.compute_correction(self._scf, nroots, eris, guess=self.v_can)
         else:
-            if self.trans_guess:
-                e_exc, v_exc, spec_fac, x, eris = adc3_ssfno.kernel(nroots, guess=self.v_can, eris=eris)
-            else:
-                e_exc, v_exc, spec_fac, x, eris = adc3_ssfno.kernel(nroots, guess, eris)
+            self.compute_correction(self._scf, nroots, eris, guess)
 
-        self.e_corr = adc3_ssfno.e_corr
-        log.timer(f'ADC{self.method[4]}', *cput0)
+        log.timer('es FNO', *cput0)
 
-        self.compute_correction(self._scf, frozen, nroots, eris, guess=v_exc)
-        e_exc = e_exc + self.delta_e
-        self.e_corr = self.e_corr + self.delta_e_corr
+    def compute_correction(self, mf, nroots=None, eris=None, guess=None, if_gs=False):
+        adc_ssfno = radc.RADC(mf, self.frozen, self.mo_coeff, mo_energy = self.mo_energy).set(verbose = self.verbose,
+                                                        method = self.method,method_type = self.method_type,
+                                                        with_df = self.with_df,if_naf = self.if_naf,
+                                                        thresh_naf = self.thresh_naf,naux = self.naux,
+                                                        if_heri_eris = self.if_heri_eris,ncvs = self.ncvs,
+                                                        approx_trans_moments = self.approx_trans_moments,
+                                                        conv_tol = self.conv_tol,tol_residual = self.tol_residual,
+                                                        max_space = self.max_space, max_cycle = self.max_cycle)
+        if if_gs:
+            _,_,_ = adc_ssfno.kernel_gs(eris)
+        else:
+            self.e_ssfno,self.v_ssfno,_,_ = adc_ssfno.kernel(nroots,guess,eris)
+            self.delta_e = self.e_can - self.e_ssfno
+        self.naux = adc_ssfno.naux
+        self.eris = adc_ssfno.eris
+        self.delta_e_corr = self.e_corr_can - adc_ssfno.e_corr
 
-        msg = ("\n*************************************************************"
-            "\n            FNOADC calculation summary"
-            "\n*************************************************************")
-        logger.info(self, msg)
-        logger.info(self, 'FNO MP%s correlation energy of reference state (a.u.) = %.8f',
-                    self.method[4], self.e_corr)
-
-        for n in range(nroots):
-            print_string = ('%s root %d  |  Energy (Eh) = %14.10f  |  Energy (eV) = %12.8f  ' %
-                            (self.method, n, e_exc[n], e_exc[n]*HARTREE2EV))
-            if self.compute_properties:
-                print_string += ("|  Spec factors = %10.8f  " % spec_fac[n])
-            logger.info(self, print_string)
-        log.timer('RFNOADC', *cput0)
-        return e_exc, v_exc, spec_fac, x
-
-    def make_ss_rdm1(self,nroots,ref_state,guess):
-        adc2_can = radc.RADC(self._scf,self.frozen).set(verbose = self.verbose,method_type = self.method_type,
-                                        with_df = self.with_df,if_naf = self.if_naf,thresh_naf = self.thresh_naf,
-                                        ncvs = self.ncvs, approx_trans_moments = self.approx_trans_moments,
-                                        conv_tol = self.conv_tol,tol_residual = self.tol_residual,
-                                        max_space = self.max_space, max_cycle = self.max_cycle)
-        self.e_can,self.v_can,_,_ = adc2_can.kernel(nroots,guess=guess)
-        rdm1_gs = adc2_can.make_ref_rdm1()
-        self.e_corr_can = adc2_can.e_corr
-        if ref_state is not None:
-            rdm1_ref = adc2_can.make_rdm1()[ref_state - 1]
-            self.rdm1_ss = rdm1_ref + rdm1_gs
+    def make_ss_rdm1(self,nroots,guess,if_gs=False):
+        heri_tmp = self.if_heri_eris
+        self.if_heri_eris = False
+        if if_gs:
+            _,_,_ = radc.RADC.kernel_gs(self)
+        else:
+            self.e_can,self.v_can,_,_ = radc.RADC.kernel(self,nroots,guess)
+        self.if_heri_eris = heri_tmp
+        rdm1_gs = self.make_ref_rdm1()
+        self.e_corr_can = self.e_corr
+        if self.ref_state is not None:
+            rdm1_es = self.make_rdm1()[self.ref_state - 1]
+            self.rdm1_ss = rdm1_es + rdm1_gs
         else:
             self.rdm1_ss = rdm1_gs
 
-    def make_fno(self, rdm1_ss, mf, thresh):
+    def make_fno(self, rdm1_ss, mf, thresh, pct_occ, nvir_act):
         from pyscf.mp import mp2
         nocc = mf.mol.nelectron//2
         nmo = self._nmo
@@ -153,7 +126,15 @@ class RADC2FNO(radc.RADC):
         n,V = np.linalg.eigh(rdm1_ss[nocc:,nocc:])
         idx = np.argsort(n)[::-1]
         n,V = n[idx], V[:,idx]
-        T = n > thresh
+        if nvir_act is None:
+            if pct_occ is None:
+                T = n > thresh
+            else:
+                cumsum = np.cumsum(n/np.sum(n))
+                T = np.array([c <= pct_occ or np.isclose(c, pct_occ) for c in cumsum])
+        else:
+            T = np.array([i < nvir_act for i in range(len(n))])
+
         n_fro_vir = np.sum(T == 0)
         T = np.diag(T)
         V_trunc = V.dot(T)
@@ -173,4 +154,5 @@ class RADC2FNO(radc.RADC):
         nocc_loc = np.cumsum([0]+[x.shape[1] for x in no_comp]).astype(int)
         no_frozen = np.hstack((np.arange(nocc_loc[0], nocc_loc[1]),
                                 np.arange(nocc_loc[3], nocc_loc[5]))).astype(int)
-        return no_coeff,no_energy,no_frozen
+        
+        self.mo_coeff,self.mo_energy,self.frozen = no_coeff,no_energy,no_frozen

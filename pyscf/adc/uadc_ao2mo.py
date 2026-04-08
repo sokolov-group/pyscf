@@ -74,7 +74,8 @@ def transform_integrals_incore(myadc):
     if ((myadc.method == "adc(2)" and myadc.method_type == "ee" and myadc.approx_trans_moments is False)
         or (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False)
         or (myadc.method == "adc(2)-x" and myadc.method_type != "ip")
-        or (myadc.method == "adc(3)")):
+        or (myadc.method == "adc(3)")
+        or myadc.if_heri_eris):
 
         eris.vvvv_p = ao2mo.general(myadc._scf._eri, (vir_a, vir_a, vir_a, vir_a),
                                     compact=False).reshape(nvir_a, nvir_a, nvir_a, nvir_a)
@@ -223,7 +224,8 @@ def transform_integrals_outcore(myadc):
     if ((myadc.method == "adc(2)" and myadc.method_type == "ee" and myadc.approx_trans_moments is False)
         or (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False)
         or (myadc.method == "adc(2)-x" and myadc.method_type != "ip")
-        or (myadc.method == "adc(3)")):
+        or (myadc.method == "adc(3)")
+        or myadc.if_heri_eris):
 
         cput2 = logger.process_clock(), logger.perf_counter()
 

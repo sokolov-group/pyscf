@@ -439,7 +439,7 @@ class UADC(lib.StreamObject):
         'E', 'U', 'P', 'X', 'ncvs', 'dip_mom', 'dip_mom_nuc',
         'compute_spin_square', 'f_ov',
         'nocc_a', 'nocc_b', 'nvir_a', 'nvir_b',
-        'if_heri_eris', 'if_naf', 'thresh_naf', 'naux'
+        'if_heri_eris', 'if_naf', 'thresh_naf', 'naux', 'eris'
     }
 
     def __init__(self, mf, frozen=None, mo_coeff=None, mo_occ=None, mo_energy=None, f_ov=None):
@@ -468,17 +468,17 @@ class UADC(lib.StreamObject):
         self.f_ov = f_ov
         self._nmo = None
         self._nocc = mf.nelec
-        self.mo_occ = mo_occ
 
         if isinstance(mf, scf.rohf.ROHF):
 
             logger.info(mf, "\nROHF reference detected in ADC")
 
-            mo_occa = (mo_occ>1e-8).astype(np.double)
-            mo_occb = mo_occ - mo_occa
+            mo_occa = (mf.mo_occ>1e-8).astype(np.double)
+            mo_occb = mf.mo_occ - mo_occa
             self.mo_occ = [mo_occa, mo_occb]
             if_canonical = False
         else:
+            self.mo_occ = mo_occ
             self.mo_energy_a = mf.mo_energy[0]
             self.mo_energy_b = mf.mo_energy[1]
             self.mo_energy_hf = (self.mo_energy_a,self.mo_energy_b)
@@ -622,6 +622,7 @@ class UADC(lib.StreamObject):
         self.evec_print_tol = 0.1
         self.spec_factor_print_tol = 0.1
         self.ncvs = None
+        self.eris = None
 
         self.E = None
         self.U = None
@@ -695,7 +696,7 @@ class UADC(lib.StreamObject):
                     self.max_memory, lib.current_memory()[0])
         return self
 
-    def kernel_gs(self):
+    def kernel_gs(self, eris=None):
         assert(self.mo_coeff is not None)
         assert(self.mo_occ is not None)
 
@@ -736,26 +737,29 @@ class UADC(lib.StreamObject):
                 logger.info(self, 'Frozen Orbital List (Beta): %s', self.frozen[1])
         logger.info(self, '*****************************************')
 
-        if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
-            if getattr(self, 'with_df', None):
-                self.with_df = self.with_df
-            else:
-                self.with_df = self._scf.with_df
+        if eris is None:
+            if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
+                if getattr(self, 'with_df', None):
+                    self.with_df = self.with_df
+                else:
+                    self.with_df = self._scf.with_df
 
-            def df_transform():
-                return uadc_ao2mo.transform_integrals_df(self)
-            self.transform_integrals = df_transform
-        elif (self._scf._eri is None or
-              (mem_incore+mem_now >= self.max_memory and not self.incore_complete)):
-            def outcore_transform():
-                return uadc_ao2mo.transform_integrals_outcore(self)
-            self.transform_integrals = outcore_transform
+                def df_transform():
+                    return uadc_ao2mo.transform_integrals_df(self)
+                self.transform_integrals = df_transform
+            elif (self._scf._eri is None or
+                    (mem_incore+mem_now >= self.max_memory and not self.incore_complete)):
+                def outcore_transform():
+                    return uadc_ao2mo.transform_integrals_outcore(self)
+                self.transform_integrals = outcore_transform
 
-        eris = self.transform_integrals()
+            eris = self.transform_integrals()
 
         self.e_corr, self.t1, self.t2 = uadc_amplitudes.compute_amplitudes_energy(
             self, eris=eris, verbose=self.verbose)
         self._finalize()
+        if self.if_heri_eris:
+            self.eris = eris
 
         return self.e_corr, self.t1, self.t2
 
@@ -842,12 +846,9 @@ class UADC(lib.StreamObject):
 
         self._adc_es = adc_es
         if self.if_heri_eris:
-            if self.if_naf:
-                return e_exc, v_exc, spec_fac, X, eris, self.naux
-            else:
-                return e_exc, v_exc, spec_fac, X, eris
-        else:
-            return e_exc, v_exc, spec_fac, X
+            self.eris = eris
+
+        return e_exc, v_exc, spec_fac, X
 
     def _finalize(self):
         '''Hook for dumping results and clearing up the object.'''

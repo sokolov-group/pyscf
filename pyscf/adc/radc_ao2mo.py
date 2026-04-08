@@ -47,7 +47,8 @@ def transform_integrals_incore(myadc):
     if ((myadc.method == "adc(2)" and myadc.method_type == "ee" and myadc.approx_trans_moments is False)
         or (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False)
         or (myadc.method == "adc(2)-x" and myadc.method_type != "ip")
-        or (myadc.method == "adc(3)")):
+        or (myadc.method == "adc(3)")
+        or myadc.if_heri_eris):
         eris.vvvv = ao2mo.general(myadc._scf._eri, (vir, vir, vir, vir),
                                 compact=False).reshape(nvir, nvir, nvir, nvir)
         eris.vvvv = np.ascontiguousarray(eris.vvvv.transpose(0,2,1,3))
@@ -159,7 +160,8 @@ def transform_integrals_outcore(myadc):
     if ((myadc.method == "adc(2)" and myadc.method_type == "ee" and myadc.approx_trans_moments is False)
         or (myadc.method == "adc(2)-x" and myadc.approx_trans_moments is False)
         or (myadc.method == "adc(2)-x" and myadc.method_type != "ip")
-        or (myadc.method == "adc(3)")):
+        or (myadc.method == "adc(3)")
+        or myadc.if_heri_eris):
 
         eris.vvvv = []
 
@@ -254,6 +256,10 @@ def transform_integrals_df(myadc):
         eris.Lov = lib.ddot(N_trunc,eris.Lov)
         Lvo = lib.ddot(N_trunc,Lvo)
         eris.Lvv = lib.ddot(N_trunc,eris.Lvv)
+        if not isinstance(myadc.ncvs, type(None)) and myadc.ncvs > 0:
+            ncvs = myadc.ncvs
+            eris.Lee = eris.Lvv
+            eris.Lce = eris.Lov.reshape(myadc.naux,nocc,nvir)[:,:ncvs,:]
 
     eris.feri1 = lib.H5TmpFile()
     eris.oooo = eris.feri1.create_dataset('oooo', (nocc,nocc,nocc,nocc), 'f8')
