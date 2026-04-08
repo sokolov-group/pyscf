@@ -59,12 +59,12 @@ class RADC2FNO(radc.RADC):
     def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None):
         cput0 = (logger.process_clock(), logger.perf_counter())
         log = logger.Logger(self.stdout, self.verbose)
-        if self.ref_state is None:
+        if self.ref_state is None or self.ref_state == 0:
             logger.info(self,"Do fno adc calculation")
         elif isinstance(self.ref_state, int) and 0<self.ref_state<=nroots:
             logger.info(self,f"Do ss-fno adc calculation, the specic state is {self.ref_state}")
         else:
-            raise ValueError("ref_state should be an int type and in (0,nroots]")
+            raise ValueError("ref_state should be an int type and in [0,nroots]")
 
         if not getattr(self, 'with_df', None) and not getattr(self._scf, 'with_df', None):
             self.if_naf = False
@@ -109,7 +109,7 @@ class RADC2FNO(radc.RADC):
         self.if_heri_eris = heri_tmp
         rdm1_gs = self.make_ref_rdm1()
         self.e_corr_can = self.e_corr
-        if self.ref_state is not None:
+        if self.ref_state is not None and self.ref_state > 0:
             rdm1_es = self.make_rdm1()[self.ref_state - 1]
             self.rdm1_ss = rdm1_es + rdm1_gs
         else:
