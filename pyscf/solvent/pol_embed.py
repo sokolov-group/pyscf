@@ -155,7 +155,7 @@ class PolEmbed(lib.StreamObject):
     _keys = {
         'mol', 'max_cycle', 'conv_tol', 'state_id', 'frozen',
         'equilibrium_solvation', 'options', 'do_ecp', 'eef', 'cppe_state',
-        'potentials', 'V_es', 'ecpmol', 'e', 'v', 'use_xr', 'h5_file',
+        'potentials', 'V_es', 'ecpmol', 'e', 'v', 'use_xr', 'h5_file', 'xr'
     }
 
     def __init__(self, mol, options_or_potfile):
@@ -192,6 +192,7 @@ class PolEmbed(lib.StreamObject):
         self.eef = self.options.pop("eef", False)
         self.h5_file = self.options.pop("h5_file", None)
         self.use_xr = self.options.pop("use_xr", False)
+        self.xr = None
         self.cppe_state = self._create_cppe_state(mol)
         self.potentials = self.cppe_state.potentials
         self.V_es = None
@@ -229,11 +230,15 @@ class PolEmbed(lib.StreamObject):
 
                 # packed upper-triangle (row-major): use triu indices
                 xr = numpy.zeros((nbasis, nbasis), dtype=xr_raw.dtype)
-                iu = numpy.triu_indices(nbasis)
-                xr[iu] = xr_raw
-                # mirror to lower triangle (keep diagonal once)
+                il = numpy.tril_indices(nbasis)
+                xr = numpy.zeros((nbasis, nbasis))
+                xr[il] = xr_raw
                 xr = xr + xr.T - numpy.diag(numpy.diag(xr))
                 self.xr = xr
+                
+                asym = numpy.linalg.norm(xr - xr.T)
+                print("symmetry error:", asym)
+                #exit()
 
         # e (the electrostatic and induction energy)
         # and v (the additional potential) are
@@ -351,11 +356,9 @@ class PolEmbed(lib.StreamObject):
             
         if self.use_xr:
            
-            e_xr = numpy.einsum('ij,xij->x', -self.xr, dms)[0]
+            e_xr = numpy.einsum('ij,xij->x', self.xr, dms)[0]
             e_xr = e_xr 
-            print(e_xr)
-
-
+        
         positions = self.cppe_state.positions_polarizable
         n_sites = positions.shape[0]
         V_ind = numpy.zeros((n_dm, nao, nao))
@@ -405,6 +408,9 @@ class PolEmbed(lib.StreamObject):
             if self.use_xr:
                 if self.xr.shape != vmat[0].shape:
                     raise ValueError(f"Shape mismatch in XR correction: xr.shape={self.xr.shape}, vmat.shape={vmat.shape}... Is the .h5 file using the same basis set?")
+                else:
+                    vmat += self.xr
+                    
             e = numpy.array(e_tot)
         else:
             vmat = V_ind
