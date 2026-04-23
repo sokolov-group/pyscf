@@ -50,7 +50,7 @@ class RADC2FNO(kadc_rhf.RADC):
     #J. Chem. Phys. 159, 084113 (2023)
     _keys = kadc_rhf.RADC._keys | {'delta_e','e_can','v_can','e_corr_can',
                           'rdm1_ss','trans_guess','mode','ref_state',
-                          'if_adc2_guess','div_pct_orb','if_cc','delta_e_corr',
+                          'if_adc2_guess','div_pct_orb','delta_e_corr',
                           'p_can','if_ref_qp','delta_e_qp','is_qp'
                           }
 
@@ -71,7 +71,6 @@ class RADC2FNO(kadc_rhf.RADC):
         self.if_ref_qp = True
         self.div_pct_orb = 0.70
         self.if_adc2_guess = False
-        self.if_cc = False
 
     def kernel_gs(self, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None):
         cput0 = (logger.process_clock(), logger.perf_counter())
@@ -113,20 +112,18 @@ class RADC2FNO(kadc_rhf.RADC):
         if if_gs:
             _,_,_ = kadc_rhf.RADC.kernel_gs(self)
         else:
-            self.e2_ssfno,self.v2_ssfno,self.p2_ssfno,_ = kadc_rhf.RADC.kernel(self, nroots, guess=guess, kptlist=kptlist)
-            self.delta_e = self.e_can - self.e2_ssfno
+            self.e_ssfno,self.v_ssfno,self.p_ssfno,_ = kadc_rhf.RADC.kernel(self, nroots, guess=guess, kptlist=kptlist)
+            self.delta_e = self.e_can - self.e_ssfno
             self.delta_e_qp = []
-            mask_fno = self.p2_ssfno > self.is_qp
+            mask_fno = self.p_ssfno > self.is_qp
             mask_can = self.p_can > self.is_qp
             for kpt in kptlist:
                 e_can_qp_k = self.e_can[kpt][mask_can[kpt]]
-                e2_ssfno_qp_k = self.e2_ssfno[kpt][mask_fno[kpt]]
-                self.delta_e_qp.append(e_can_qp_k[:min(len(e_can_qp_k), len(e2_ssfno_qp_k))] - e2_ssfno_qp_k[:min(len(e_can_qp_k), len(e2_ssfno_qp_k))])
+                e_ssfno_qp_k = self.e_ssfno[kpt][mask_fno[kpt]]
+                self.delta_e_qp.append(e_can_qp_k[:min(len(e_can_qp_k), len(e_ssfno_qp_k))] - e_ssfno_qp_k[:min(len(e_can_qp_k), len(e_ssfno_qp_k))])
         self.delta_e_corr = self.e_corr_can - self.e_corr
 
     def make_ss_rdm1(self, log, cput0, kptlist, nroots=None, guess=None, if_gs=False):
-        naf_tmp = self.if_naf
-        self.if_naf = False
         if if_gs:
             _,_,_ = kadc_rhf.RADC.kernel_gs(self)
         else:
@@ -175,7 +172,6 @@ class RADC2FNO(kadc_rhf.RADC):
             self.rdm1_ss = self.make_ref_rdm1()
             log.info('current use %d MB',lib.current_memory()[0])
             log.timer('make ref rdm1', *cput0)
-        self.if_naf = naf_tmp
         def incore_transform():
             return kadc_ao2mo.transform_integrals_incore(self)
         self.transform_integrals = incore_transform
@@ -223,8 +219,6 @@ class RADC2FNO(kadc_rhf.RADC):
                     n,V_k = np.linalg.eigh(rdm1_ss_comp[nocc:,nocc:])
                     idx = np.argsort(n)[::-1]
                     n,V_k = n[idx], V_k[:,idx]
-                    T_k = np.array(
-                        [i < nvir_act for i in range(len(n))])
                     V.append(V_k)
                 T_min = np.zeros((self.nkpts,self.mo_energy[0][nocc:].shape[0]), dtype=bool)
                 T_min[:,:nvir_act] = True
