@@ -50,7 +50,7 @@ import tempfile
 #        Chemist's  oovv(ijab) : ki - kj + ka - kb
 #        Amplitudes t2(ijab)  : ki + kj - ka - kba
 
-def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
+def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, koopmans=False):
 
     adc.method = adc.method.lower()
     if adc.method not in ("adc(2)", "adc(2)-x","adc(3)"):
@@ -95,19 +95,37 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None, verbose=None):
 
     for k, kshift in enumerate(kptlist):
         matvec, diag = adc.gen_matvec(kshift, imds, eris)
-        if guess_type is None:
-            guess = adc.get_init_guess(nroots, diag, ascending = True)
-        elif guess_type == "read":
+        if guess_type == "read":
             guess = adc.get_init_guess(nroots, diag, ascending = True, type = guess_type,
                                        ini = guess_k[k], kshift = kshift)
+        elif guess_type is None:
+            guess = adc.get_init_guess(nroots, diag, ascending = True, kshift = kshift, koopmans = koopmans)
         else:
             raise NotImplementedError("Guess type not implemented")
-
-        conv_k,evals_k, evecs_k = lib.linalg_helper.davidson_nosym1(
-                lambda xs : [matvec(x) for x in xs], guess, diag,
-                nroots=nroots, verbose=log, tol=adc.conv_tol,
-                max_cycle=adc.max_cycle, max_space=adc.max_space,
-                tol_residual=adc.tol_residual)
+        if koopmans:
+            def pickeig(w, v, nroots, envs):
+                threshold = 1e-6
+                x0 = lib.linalg_helper._gen_x0(envs['v'], envs['xs'])
+                s = np.dot(np.asarray(guess).conj(), np.asarray(x0).T)
+                snorm = np.einsum('pi,pi->i', s.conj(), s)
+                least_snorm_tol = min(threshold, -np.sort(-snorm)[min(w.size,nroots)-1])
+                qp_idx = np.where(snorm > least_snorm_tol)[0]
+                nqp = np.count_nonzero(snorm[qp_idx] > threshold)
+                if nqp < nroots and w.size >= nroots:
+                    logger.warn(adc, 'Only %d eigenvalues (out of %3d requested roots) with norm > %4.3g.\n'
+                                % (nqp, min(w.size,nroots), threshold))
+                return lib.linalg_helper._eigs_cmplx2real(w, v, qp_idx, real_eigenvectors=False)
+            conv_k, evals_k, evecs_k = lib.linalg_helper.davidson_nosym1(
+                    lambda xs : [matvec(x) for x in xs], guess, diag, pick=pickeig,
+                    nroots=nroots, verbose=log, tol=adc.conv_tol,
+                    max_cycle=adc.max_cycle,max_space=adc.max_space,
+                    tol_residual=adc.tol_residual)
+        else:
+            conv_k,evals_k, evecs_k = lib.linalg_helper.davidson_nosym1(
+                    lambda xs : [matvec(x) for x in xs], guess, diag,
+                    nroots=nroots, verbose=log, tol=adc.conv_tol,
+                    max_cycle=adc.max_cycle, max_space=adc.max_space,
+                    tol_residual=adc.tol_residual)
 
         evals_k = evals_k.real
         evals[k] = evals_k
@@ -419,7 +437,7 @@ class RADC(pyscf.adc.radc.RADC):
             self.eris=eris
         return self.e_corr, self.t1,self.t2
 
-    def kernel(self, nroots=1, guess=None, eris=None, kptlist=None, pct_orb=0.70):
+    def kernel(self, nroots=1, guess=None, eris=None, kptlist=None, pct_orb=0.70, koopmans=False):
         cput0 = (logger.process_clock(), logger.perf_counter())
         log = logger.Logger(self.stdout, self.verbose)
         assert(self.mo_coeff is not None)
@@ -481,11 +499,11 @@ class RADC(pyscf.adc.radc.RADC):
         self.method_type = self.method_type.lower()
         if(self.method_type == "ea"):
             e_exc, v_exc, spec_fac, x, adc_es = self.ea_adc(
-                nroots=nroots, guess=guess, eris=eris, kptlist=kptlist)
+                nroots=nroots, guess=guess, eris=eris, kptlist=kptlist, koopmans=koopmans)
 
         elif(self.method_type == "ip"):
             e_exc, v_exc, spec_fac, x, adc_es = self.ip_adc(
-                nroots=nroots, guess=guess, eris=eris, kptlist=kptlist)
+                nroots=nroots, guess=guess, eris=eris, kptlist=kptlist, koopmans=koopmans)
 
         else:
             raise NotImplementedError(self.method_type)
@@ -495,17 +513,17 @@ class RADC(pyscf.adc.radc.RADC):
             self.eris=eris
         return e_exc, v_exc, spec_fac, x
 
-    def ip_adc(self, nroots=1, guess=None, eris=None, kptlist=None):
+    def ip_adc(self, nroots=1, guess=None, eris=None, kptlist=None, koopmans=False):
         from pyscf.pbc.adc import kadc_rhf_ip
         adc_es = kadc_rhf_ip.RADCIP(self)
-        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris, kptlist)
+        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris, kptlist, koopmans=koopmans)
         adc_es.U = v_exc
         return e_exc, v_exc, spec_fac, x, adc_es
 
-    def ea_adc(self, nroots=1, guess=None, eris=None, kptlist=None):
+    def ea_adc(self, nroots=1, guess=None, eris=None, kptlist=None, koopmans=False):
         from pyscf.pbc.adc import kadc_rhf_ea
         adc_es = kadc_rhf_ea.RADCEA(self)
-        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris, kptlist)
+        e_exc, v_exc, spec_fac, x = adc_es.kernel(nroots, guess, eris, kptlist, koopmans=koopmans)
         adc_es.U = v_exc
         return e_exc, v_exc, spec_fac, x, adc_es
 

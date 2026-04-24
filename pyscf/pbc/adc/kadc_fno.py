@@ -85,7 +85,8 @@ class RADC2FNO(kadc_rhf.RADC):
         self.compute_correction(if_gs=True)
         log.timer('gs FNO', *cput0)
 
-    def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None, kptlist=None):
+    def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None, kptlist=None,
+               koopmans=False):
         cput0 = (logger.process_clock(), logger.perf_counter())
         log = logger.Logger(self.stdout, self.verbose)
         if self.ref_state is None:
@@ -98,21 +99,21 @@ class RADC2FNO(kadc_rhf.RADC):
 
         if kptlist is None:
             kptlist = range(self.nkpts)
-        self.make_ss_rdm1(log, cput0, kptlist, nroots, guess)
+        self.make_ss_rdm1(log, cput0, kptlist, nroots, guess, koopmans=koopmans)
         log.timer('make ss rdm1', *cput0)
         self.make_fno(self.rdm1_ss, self._scf, log, thresh, pct_occ, nvir_act)
         log.timer('get frozen info', *cput0)
 
         self.if_div = False
         self.ext_vir = 0
-        self.compute_correction(kptlist, nroots, guess)
+        self.compute_correction(kptlist, nroots, guess, koopmans=koopmans)
         log.timer('es FNO', *cput0)
 
-    def compute_correction(self, kptlist, nroots=None, guess=None, if_gs=False):
+    def compute_correction(self, kptlist, nroots=None, guess=None, if_gs=False, koopmans=False):
         if if_gs:
             _,_,_ = kadc_rhf.RADC.kernel_gs(self)
         else:
-            self.e_ssfno,self.v_ssfno,self.p_ssfno,_ = kadc_rhf.RADC.kernel(self, nroots, guess=guess, kptlist=kptlist)
+            self.e_ssfno,self.v_ssfno,self.p_ssfno,_ = kadc_rhf.RADC.kernel(self, nroots, guess=guess, kptlist=kptlist, koopmans=koopmans)
             self.delta_e = self.e_can - self.e_ssfno
             self.delta_e_qp = []
             mask_fno = self.p_ssfno > self.is_qp
@@ -123,11 +124,12 @@ class RADC2FNO(kadc_rhf.RADC):
                 self.delta_e_qp.append(e_can_qp_k[:min(len(e_can_qp_k), len(e_ssfno_qp_k))] - e_ssfno_qp_k[:min(len(e_can_qp_k), len(e_ssfno_qp_k))])
         self.delta_e_corr = self.e_corr_can - self.e_corr
 
-    def make_ss_rdm1(self, log, cput0, kptlist, nroots=None, guess=None, if_gs=False):
+    def make_ss_rdm1(self, log, cput0, kptlist, nroots=None, guess=None, if_gs=False, koopmans=False):
         if if_gs:
             _,_,_ = kadc_rhf.RADC.kernel_gs(self)
         else:
-            self.e_can,self.v_can,self.p_can,_ = kadc_rhf.RADC.kernel(self,nroots,guess=guess,kptlist=kptlist,pct_orb=self.div_pct_orb)
+            self.e_can,self.v_can,self.p_can,_ = kadc_rhf.RADC.kernel(self,nroots,guess=guess,kptlist=kptlist,
+                                                                      pct_orb=self.div_pct_orb,koopmans=koopmans)
         log.info('current use %d MB',lib.current_memory()[0])
         self.e_corr_can = self.e_corr
         if self.ref_state is not None:
