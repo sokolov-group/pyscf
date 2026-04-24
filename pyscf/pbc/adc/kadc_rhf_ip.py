@@ -1395,22 +1395,17 @@ class RADCIP(kadc_rhf.RADC):
     get_properties = get_properties
     make_rdm1 = make_rdm1
 
-    def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None, kshift=None):
+    def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None, kshift=None, koopmans = False):
+        ncore = self.nocc
+        nextern = self.nmo - ncore
+        nkpts = self.nkpts
+        n_singles = ncore
+        n_doubles = nkpts * nkpts * (nextern-self.ext_vir) * ncore * ncore
+        dim  = n_singles + n_doubles
+
         if (type=="read"):
             print("obtain initial guess from input variable")
-            ncore = self.nocc
-            nextern = self.nmo - ncore
-            nkpts = self.nkpts
-            n_singles = ncore
-            n_doubles = nkpts * nkpts * (nextern-self.ext_vir) * ncore * ncore
-            dim  = n_singles + n_doubles
             g = ini.T
-            if (self.frozen is not None) or (not np.all([x.shape[1] == self.nmo for x in self.mo_coeff])):
-                for p in range(g.shape[1]):
-                    singles = g[:n_singles,p]
-                    doubles = g[n_singles:,p].reshape(nkpts,nkpts,(nextern-self.ext_vir),ncore,ncore)
-                    (singles,doubles) = mask_frozen_ip(self,singles,doubles,kshift,const = 0.0)
-                    g[:,p] = np.hstack((singles,doubles.ravel()))
             if g.shape[0] != dim or g.shape[1] != nroots:
                 raise ValueError(f"Shape of guess each k point should be ({dim},{nroots})")
         else:
@@ -1418,19 +1413,32 @@ class RADCIP(kadc_rhf.RADC):
                 diag = self.get_diag()
             idx = None
             dtype = getattr(diag, 'dtype', np.complex128)
-            if ascending:
-                idx = np.argsort(diag)
-            else:
-                idx = np.argsort(diag)[::-1]
-            guess = np.zeros((diag.shape[0], nroots), dtype=dtype)
-            min_shape = min(diag.shape[0], nroots)
-            guess[:min_shape,:min_shape] = np.identity(min_shape)
             g = np.zeros((diag.shape[0], nroots), dtype=dtype)
-            g[idx] = guess.copy()
+            if koopmans:
+                nonzero_opadding, _ = padding_k_idx(self)
+                for n in nonzero_opadding[kshift][::-1][:nroots]:
+                    g[n] = 1.0
+            else:
+                if ascending:
+                    idx = np.argsort(diag)
+                else:
+                    idx = np.argsort(diag)[::-1]
+                guess = np.zeros((diag.shape[0], nroots), dtype=dtype)
+                min_shape = min(diag.shape[0], nroots)
+                guess[:min_shape,:min_shape] = np.identity(min_shape)
+                g[idx] = guess.copy()
+        if (self.frozen is not None or not np.all([x.shape[1] == self.nmo for x in self.mo_coeff])) \
+                and (type=="read" or koopmans):
+            for p in range(g.shape[1]):
+                singles = g[:n_singles,p]
+                doubles = g[n_singles:,p].reshape(nkpts,nkpts,(nextern-self.ext_vir),ncore,ncore)
+                (singles,doubles) = mask_frozen_ip(self,singles,doubles,kshift,const = 0.0)
+                g[:,p] = np.hstack((singles,doubles.ravel()))
+
         guess = []
         for p in range(g.shape[1]):
             if (self.frozen is not None) or (not np.all([x.shape[1] == self.nmo for x in self.mo_coeff])) \
-                    or (type=="read"):
+                    or (type=="read") or koopmans:
                 guess_norm = np.linalg.norm(g[:,p])
                 guess_norm_tol = LOOSE_ZERO_TOL
                 if guess_norm < guess_norm_tol:
