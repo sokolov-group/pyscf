@@ -109,7 +109,7 @@ class RADC2FNO(kadc_rhf.RADC):
         self.compute_correction(kptlist, nroots, guess, koopmans=koopmans)
         log.timer('es FNO', *cput0)
 
-    def compute_correction(self, kptlist, nroots=None, guess=None, if_gs=False, koopmans=False):
+    def compute_correction(self, kptlist=None, nroots=None, guess=None, if_gs=False, koopmans=False):
         if if_gs:
             _,_,_ = kadc_rhf.RADC.kernel_gs(self)
         else:
@@ -124,7 +124,7 @@ class RADC2FNO(kadc_rhf.RADC):
                 self.delta_e_qp.append(e_can_qp_k[:min(len(e_can_qp_k), len(e_ssfno_qp_k))] - e_ssfno_qp_k[:min(len(e_can_qp_k), len(e_ssfno_qp_k))])
         self.delta_e_corr = self.e_corr_can - self.e_corr
 
-    def make_ss_rdm1(self, log, cput0, kptlist, nroots=None, guess=None, if_gs=False, koopmans=False):
+    def make_ss_rdm1(self, log, cput0, kptlist=None, nroots=None, guess=None, if_gs=False, koopmans=False):
         if if_gs:
             _,_,_ = kadc_rhf.RADC.kernel_gs(self)
         else:
