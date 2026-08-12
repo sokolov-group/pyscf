@@ -11,6 +11,8 @@ The third case uses MP2 to generate FNOs and then do FNO-ADC(3) calculation.
 The fourth case demonstrates the multi-threshold FNO feature: several FNO truncation
 levels are generated in a single call, with the expensive canonical MP2/ADC(2) step
 performed only once.
+The sixth case demonstrates the per-k-point FNO mode (mode='per_kpt'), which lets
+each k-point keep a different number of active virtuals instead of a common count.
 '''
 
 import numpy as np
@@ -185,3 +187,21 @@ for i in range(len(ADCMFG.frozen)):
     k_e_ea_corrected = k_e_ea + ADCMFG.delta_e[i]
     print('pct %4.2f | n_frozen/kpt = %s | uncorrected root 0 = %.10f eV | corrected root 0 = %.10f eV' %
           (pct_list_es[i], [len(f) for f in ADCMFG.frozen[i]], k_e_ea[0][0]*27.2114, k_e_ea_corrected[0][0]*27.2114))
+
+# case6 Per-k-point FNO (mode='per_kpt')
+# By default mode='min' unions the per-k-point truncation masks so every k-point
+# keeps the same number of active virtuals.  mode='per_kpt' instead truncates
+# each k-point independently, so the frozen count can differ across k-points.
+# Here thresh=0.05 keeps 3/2/2/1 active virtuals, illustrating the difference.
+PKFG = adc.KRADC2FNO(kmf)
+PKFG.mode = 'per_kpt'
+PKFG.approx_trans_moments = True
+PKFG.verbose = 5
+PKFG.kernel_gs(thresh=0.05)
+
+kadc_pk = adc.KRADC(kmf, PKFG.frozen, PKFG.mo_coeff, PKFG.mo_occ, PKFG.mo_energy)
+kadc_pk.approx_trans_moments = True
+kadc_pk.verbose = 5
+kadc_pk.method = 'adc(3)'
+e_corr_pk, t1_pk, t2_pk = kadc_pk.kernel_gs()
+print('per_kpt FNO-MP3 correlation energy (eV):', (e_corr_pk + PKFG.delta_e_corr)*27.2114)
