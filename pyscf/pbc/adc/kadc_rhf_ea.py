@@ -1606,7 +1606,7 @@ class RADCEA(kadc_rhf.RADC):
         n_doubles = nkpts * nkpts * ncore * nextern * nextern
         dim  = n_singles + n_doubles
         if (type=="read"):
-            print("obtain initial guess from input variable")
+            logger.info(self, "obtain initial guess from input variable")
             g = ini.T
             if g.shape[0] != dim or g.shape[1] != nroots:
                 raise ValueError(f"Shape of guess each k point should be ({dim},{nroots})")
