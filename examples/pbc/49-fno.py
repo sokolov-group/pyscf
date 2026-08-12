@@ -104,7 +104,7 @@ ekrcc, t1, t2 = mycc.kernel()
 myeom = EOMEA(mycc)
 eomcc_e,eomcc_v = myeom.kernel(nroots_test,kptlist=[0])
 
-eomcc_e_corrected = eomcc_e+ADCFG.delta_e
+eomcc_e_corrected = ADCFG.correct(eomcc_e)
 print("SS-FNO K-EA-EOM-CCSD roots (eV):", eomcc_e_corrected*27.2114)
 
 # case3 FNO-MP3
@@ -119,7 +119,7 @@ kadc_gs.verbose = 5
 kadc_gs.method = "adc(3)"
 e_corr,t1,t2 = kadc_gs.kernel_gs()
 
-e_corr_correct = e_corr+MPFG.delta_e_corr
+e_corr_correct = MPFG.correct_corr(e_corr)
 print("FNO KMP3 correlation energy (eV):", e_corr_correct*27.2114)
 
 # case4 Multi-threshold FNO-MP3 (ground state)
@@ -143,7 +143,7 @@ for i in range(len(MPMFG.frozen)):
     kadc_gs.verbose = 5
     kadc_gs.method = "adc(3)"
     e_corr, t1, t2 = kadc_gs.kernel_gs()
-    e_corr_correct = e_corr + MPMFG.delta_e_corr[i]
+    e_corr_correct = MPMFG.correct_corr(e_corr, i)
     print('pct %4.2f | n_frozen/kpt = %s | uncorrected E_corr = %.10f eV | corrected E_corr = %.10f eV' %
           (pct_list[i], [len(f) for f in MPMFG.frozen[i]], e_corr*27.2114, e_corr_correct*27.2114))
     e_corr_list.append(e_corr)
@@ -184,7 +184,7 @@ for i in range(len(ADCMFG.frozen)):
     k_e_ea, k_v_ea, k_p_ea, _ = kadc.kernel(nroots_test,
                                               guess=ADCMFG.v_ssfno[i],
                                               kptlist=[0])
-    k_e_ea_corrected = k_e_ea + ADCMFG.delta_e[i]
+    k_e_ea_corrected = ADCMFG.correct(k_e_ea, i)
     print('pct %4.2f | n_frozen/kpt = %s | uncorrected root 0 = %.10f eV | corrected root 0 = %.10f eV' %
           (pct_list_es[i], [len(f) for f in ADCMFG.frozen[i]], k_e_ea[0][0]*27.2114, k_e_ea_corrected[0][0]*27.2114))
 

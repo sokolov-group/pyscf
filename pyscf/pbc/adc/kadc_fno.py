@@ -269,6 +269,14 @@ class RADC2FNO(kadc_rhf.RADC):
                 self.delta_e_qp.append(e_can_qp_k[:min(len(e_can_qp_k), len(e_ssfno_qp_k))] - e_ssfno_qp_k[:min(len(e_can_qp_k), len(e_ssfno_qp_k))])
         self.delta_e_corr = self.e_corr_can - self.e_corr
 
+    def correct(self, e, i=None):
+        """Additively-corrected excitation energies e + delta_e (use i for multi-threshold)."""
+        return e + (self.delta_e[i] if i is not None else self.delta_e)
+
+    def correct_corr(self, e, i=None):
+        """Additively-corrected correlation energy e + delta_e_corr (use i for multi-threshold)."""
+        return e + (self.delta_e_corr[i] if i is not None else self.delta_e_corr)
+
     def make_ss_rdm1(self, log, cput0, kptlist=None, nroots=None, guess=None, if_gs=False):
         """Run the canonical reference and build the 1-RDM used to construct the FNOs."""
         if if_gs:
@@ -328,8 +336,7 @@ class RADC2FNO(kadc_rhf.RADC):
         self.imds.t2_1_vvvv = None
 
     def make_fno(self, rdm1_ss, mf, log, thresh=None, pct_occ=None, nvir_act=None):
-        """Build the FNO virtual space: diagonalize the virtual 1-RDM, truncate by thresh/pct_occ/nvir_act, 
-        and semicanonicalize the retained orbitals."""
+        """Build the FNO virtual space: diagonalize the virtual 1-RDM, truncate by thresh/pct_occ/nvir_act, and semicanonicalize the retained orbitals."""
         nocc = mf.mol.nelectron//2
         masks = kadc_rhf.mo_splitter(self)
         no_coeff=[]
@@ -338,42 +345,24 @@ class RADC2FNO(kadc_rhf.RADC):
         V = []
         padding_convention = padding_k_idx(self, kind="joint")
 
-        # "min": common active-virtual count across k-points; others: truncate each k-point independently
-        if self.mode.lower() == "min":
-            if nvir_act is None:
-                T = []
-                if pct_occ is None:
-                    for kpt in range(self.nkpts):
-                        rdm1_ss_comp = rdm1_ss[kpt][np.ix_(padding_convention[kpt], padding_convention[kpt])]
-                        n,V_k = np.linalg.eigh(rdm1_ss_comp[nocc:,nocc:])
-                        idx = np.argsort(n)[::-1]
-                        n,V_k = n[idx], V_k[:,idx]
-                        T_k = n > thresh
-                        V.append(V_k)
-                        T.append(T_k)
-                else:
-                    for kpt in range(self.nkpts):
-                        rdm1_ss_comp = rdm1_ss[kpt][np.ix_(padding_convention[kpt], padding_convention[kpt])]
-                        n,V_k = np.linalg.eigh(rdm1_ss_comp[nocc:,nocc:])
-                        idx = np.argsort(n)[::-1]
-                        n,V_k = n[idx], V_k[:,idx]
-                        cumsum = np.cumsum(n/np.sum(n))
-                        T_k = np.array(
-                            [c <= pct_occ or np.isclose(c, pct_occ) for c in cumsum])
-                        V.append(V_k)
-                        T.append(T_k)
-                T_min = np.stack(T)
+        T = []
+        for kpt in range(self.nkpts):
+            rdm1_ss_comp = rdm1_ss[kpt][np.ix_(padding_convention[kpt], padding_convention[kpt])]
+            n,V_k = np.linalg.eigh(rdm1_ss_comp[nocc:,nocc:])
+            idx = np.argsort(n)[::-1]
+            n,V_k = n[idx], V_k[:,idx]
+            V.append(V_k)
+            if nvir_act is not None:
+                T.append(np.arange(len(n)) < nvir_act)
+            elif pct_occ is not None:
+                cumsum = np.cumsum(n/np.sum(n))
+                T.append(np.array([c <= pct_occ or np.isclose(c, pct_occ) for c in cumsum]))
             else:
-                for kpt in range(self.nkpts):
-                    rdm1_ss_comp = rdm1_ss[kpt][np.ix_(padding_convention[kpt], padding_convention[kpt])]
-                    n,V_k = np.linalg.eigh(rdm1_ss_comp[nocc:,nocc:])
-                    idx = np.argsort(n)[::-1]
-                    n,V_k = n[idx], V_k[:,idx]
-                    V.append(V_k)
-                T_min = np.zeros((self.nkpts,self.mo_energy[0][nocc:].shape[0]), dtype=bool)
-                T_min[:,:nvir_act] = True
+                T.append(n > thresh)
 
-            T_min = np.logical_or.reduce(T_min,axis=0)
+        # "min": union the per-kpt masks so every k-point keeps the same count
+        if self.mode.lower() == "min":
+            T_min = np.logical_or.reduce(np.stack(T),axis=0)
             n_fro_vir = np.sum(T_min == 0)
             if n_fro_vir == self.nmo - self.nocc:
                 log.warn("All virtual orbitals were requested to be frozen.\n"
@@ -382,38 +371,6 @@ class RADC2FNO(kadc_rhf.RADC):
                 n_fro_vir -= 1
                 T_min[0] = True
             T_k = np.diag(T_min)
-
-        else:
-            if nvir_act is None:
-                T = []
-                if pct_occ is None:
-                    for kpt in range(self.nkpts):
-                        rdm1_ss_comp = rdm1_ss[kpt][np.ix_(padding_convention[kpt], padding_convention[kpt])]
-                        n,V_k = np.linalg.eigh(rdm1_ss_comp[nocc:,nocc:])
-                        idx = np.argsort(n)[::-1]
-                        n,V_k = n[idx], V_k[:,idx]
-                        T_k = n > thresh
-                        V.append(V_k)
-                        T.append(T_k)
-                else:
-                    for kpt in range(self.nkpts):
-                        rdm1_ss_comp = rdm1_ss[kpt][np.ix_(padding_convention[kpt], padding_convention[kpt])]
-                        n,V_k = np.linalg.eigh(rdm1_ss_comp[nocc:,nocc:])
-                        idx = np.argsort(n)[::-1]
-                        n,V_k = n[idx], V_k[:,idx]
-                        cumsum = np.cumsum(n/np.sum(n))
-                        T_k = np.array([c <= pct_occ or np.isclose(c, pct_occ) for c in cumsum])
-                        V.append(V_k)
-                        T.append(T_k)
-            else:
-                for kpt in range(self.nkpts):
-                    rdm1_ss_comp = rdm1_ss[kpt][np.ix_(padding_convention[kpt], padding_convention[kpt])]
-                    n,V_k = np.linalg.eigh(rdm1_ss_comp[nocc:,nocc:])
-                    idx = np.argsort(n)[::-1]
-                    n,V_k = n[idx], V_k[:,idx]
-                    T_k = np.array([i < nvir_act for i in range(len(n))])
-                    V.append(V_k)
-                    T.append(T_k)
 
         for kpt in range(self.nkpts):
             if self.mode.lower() != "min":
