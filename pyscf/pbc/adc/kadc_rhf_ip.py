@@ -53,7 +53,7 @@ def vector_size(adc):
 
     n_singles = nocc
     n_doubles = nkpts * nkpts * nvir * nocc * nocc
-    n_doubles_int = nkpts * nkpts * (nvir-adc.ext_vir) * nocc * nocc
+    n_doubles_int = nkpts * nkpts * nvir * nocc * nocc
     size = n_singles + n_doubles
     size_int = n_singles + n_doubles_int
 
@@ -386,7 +386,7 @@ def get_diag(adc,kshift,M_ij=None,eris=None):
     kconserv = adc.khelper.kconserv
     nocc = adc.nocc
     n_singles = nocc
-    nvir = adc.nmo - adc.nocc - adc.ext_vir
+    nvir = adc.nmo - adc.nocc
     n_doubles = nkpts * nkpts * nvir * nocc * nocc
 
     dim = n_singles + n_doubles
@@ -446,7 +446,7 @@ def matvec(adc, kshift, M_ij=None, eris=None):
     nocc = adc.nocc
     kconserv = adc.khelper.kconserv
     n_singles = nocc
-    nvir = adc.nmo - adc.nocc - adc.ext_vir
+    nvir = adc.nmo - adc.nocc
     n_doubles = nkpts * nkpts * nvir * nocc * nocc
 
     s_singles = 0
@@ -471,7 +471,7 @@ def matvec(adc, kshift, M_ij=None, eris=None):
     def sigma_(r):
         cput0 = (time.process_time(), time.time())
         log = logger.Logger(adc.stdout, adc.verbose)
-        nvir = adc.nmo - adc.nocc - adc.ext_vir
+        nvir = adc.nmo - adc.nocc
 
         r1 = r[s_singles:f_singles]
         r2 = r[s_doubles:f_doubles]
@@ -1382,8 +1382,6 @@ class RADCIP(kadc_rhf.RADC):
         self.U = adc.U
         self.if_naf = adc.if_naf
         self.naux = adc.naux
-        self.ext_vir = adc.ext_vir
-        self.if_div = adc.if_div
 
     kernel = kadc_rhf.kernel
     get_imds = get_imds
@@ -1395,12 +1393,12 @@ class RADCIP(kadc_rhf.RADC):
     get_properties = get_properties
     make_rdm1 = make_rdm1
 
-    def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None, kshift=None, koopmans = False):
+    def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None, kshift=None):
         ncore = self.nocc
         nextern = self.nmo - ncore
         nkpts = self.nkpts
         n_singles = ncore
-        n_doubles = nkpts * nkpts * (nextern-self.ext_vir) * ncore * ncore
+        n_doubles = nkpts * nkpts * nextern * ncore * ncore
         dim  = n_singles + n_doubles
 
         if (type=="read"):
@@ -1414,31 +1412,26 @@ class RADCIP(kadc_rhf.RADC):
             idx = None
             dtype = getattr(diag, 'dtype', np.complex128)
             g = np.zeros((diag.shape[0], nroots), dtype=dtype)
-            if koopmans:
-                nonzero_opadding, _ = padding_k_idx(self)
-                for n in nonzero_opadding[kshift][::-1][:nroots]:
-                    g[n] = 1.0
+            if ascending:
+                idx = np.argsort(diag)
             else:
-                if ascending:
-                    idx = np.argsort(diag)
-                else:
-                    idx = np.argsort(diag)[::-1]
-                guess = np.zeros((diag.shape[0], nroots), dtype=dtype)
-                min_shape = min(diag.shape[0], nroots)
-                guess[:min_shape,:min_shape] = np.identity(min_shape)
-                g[idx] = guess.copy()
+                idx = np.argsort(diag)[::-1]
+            guess = np.zeros((diag.shape[0], nroots), dtype=dtype)
+            min_shape = min(diag.shape[0], nroots)
+            guess[:min_shape,:min_shape] = np.identity(min_shape)
+            g[idx] = guess.copy()
         if (self.frozen is not None or not np.all([x.shape[1] == self.nmo for x in self.mo_coeff])) \
-                and (type=="read" or koopmans):
+                and (type=="read"):
             for p in range(g.shape[1]):
                 singles = g[:n_singles,p]
-                doubles = g[n_singles:,p].reshape(nkpts,nkpts,(nextern-self.ext_vir),ncore,ncore)
+                doubles = g[n_singles:,p].reshape(nkpts,nkpts,nextern,ncore,ncore)
                 (singles,doubles) = mask_frozen_ip(self,singles,doubles,kshift,const = 0.0)
                 g[:,p] = np.hstack((singles,doubles.ravel()))
 
         guess = []
         for p in range(g.shape[1]):
             if (self.frozen is not None) or (not np.all([x.shape[1] == self.nmo for x in self.mo_coeff])) \
-                    or (type=="read") or koopmans:
+                    or (type=="read"):
                 guess_norm = np.linalg.norm(g[:,p])
                 guess_norm_tol = LOOSE_ZERO_TOL
                 if guess_norm < guess_norm_tol:

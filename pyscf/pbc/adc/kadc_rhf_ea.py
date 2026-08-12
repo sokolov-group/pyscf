@@ -53,7 +53,7 @@ def vector_size(adc):
 
     n_singles = nvir
     n_doubles = nkpts * nkpts * nocc * nvir * nvir
-    n_doubles_int = nkpts * nkpts * nocc * (nvir-adc.ext_vir) * (nvir-adc.ext_vir)
+    n_doubles_int = nkpts * nkpts * nocc * nvir * nvir
     size = n_singles + n_doubles
     size_int = n_singles + n_doubles_int
 
@@ -485,7 +485,7 @@ def get_diag(adc,kshift,M_ab=None,eris=None):
     nocc = adc.nocc
     nvir = adc.nmo - adc.nocc
     n_singles = nvir
-    n_doubles = nkpts * nkpts * nocc * (nvir-adc.ext_vir) * (nvir-adc.ext_vir)
+    n_doubles = nkpts * nkpts * nocc * nvir * nvir
 
     dim = n_singles + n_doubles
 
@@ -498,7 +498,7 @@ def get_diag(adc,kshift,M_ab=None,eris=None):
     mo_coeff =  adc.mo_coeff
     nocc = adc.nocc
     nmo = adc.nmo
-    nvir = nmo - nocc - adc.ext_vir
+    nvir = nmo - nocc
     mo_coeff, mo_energy = _add_padding(adc, mo_coeff, mo_energy)
 
     e_occ = [mo_energy[k][:nocc] for k in range(nkpts)]
@@ -542,7 +542,7 @@ def matvec(adc, kshift, M_ab=None, eris=None):
     nkpts = adc.nkpts
     nocc = adc.nocc
     kconserv = adc.khelper.kconserv
-    nvir = adc.nmo - adc.nocc - adc.ext_vir
+    nvir = adc.nmo - adc.nocc
     n_singles = adc.nmo - adc.nocc
     n_doubles = nkpts * nkpts * nocc * nvir * nvir
 
@@ -568,7 +568,7 @@ def matvec(adc, kshift, M_ab=None, eris=None):
     def sigma_(r):
         cput0 = (time.process_time(), time.time())
         log = logger.Logger(adc.stdout, adc.verbose)
-        nvir = adc.nmo - adc.nocc - adc.ext_vir
+        nvir = adc.nmo - adc.nocc
 
         r1 = r[s_singles:f_singles]
         r2 = r[s_doubles:f_doubles]
@@ -1493,8 +1493,6 @@ def mask_frozen_ea(adc, v1, v2, kshift, const=LARGE_DENOM):
 
     new_v1[nonzero_vpadding[kshift]] = v1[nonzero_vpadding[kshift]]
     
-    if adc.ext_vir is not None and adc.ext_vir > 0:
-        nonzero_vpadding = [t[:adc.ext_vir] for t in nonzero_vpadding]
     for ki in range(nkpts):
         for ka in range(nkpts):
             kb = kconserv[kshift, ka, ki]
@@ -1589,8 +1587,6 @@ class RADCEA(kadc_rhf.RADC):
         self.U = adc.U
         self.if_naf = adc.if_naf
         self.naux = adc.naux
-        self.ext_vir = adc.ext_vir
-        self.if_div = adc.if_div
 
     kernel = kadc_rhf.kernel
     get_imds = get_imds
@@ -1602,12 +1598,12 @@ class RADCEA(kadc_rhf.RADC):
     get_properties = get_properties
     make_rdm1 = make_rdm1
 
-    def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None, kshift=None, koopmans = False):
+    def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None, kshift=None):
         ncore = self.nocc
         nextern = self.nmo - ncore
         nkpts = self.nkpts
         n_singles = nextern
-        n_doubles = nkpts * nkpts * ncore * (nextern-self.ext_vir) * (nextern-self.ext_vir)
+        n_doubles = nkpts * nkpts * ncore * nextern * nextern
         dim  = n_singles + n_doubles
         if (type=="read"):
             print("obtain initial guess from input variable")
@@ -1620,31 +1616,26 @@ class RADCEA(kadc_rhf.RADC):
             idx = None
             dtype = getattr(diag, 'dtype', np.complex128)
             g = np.zeros((diag.shape[0], nroots), dtype=dtype)
-            if koopmans:
-                _, nonzero_vpadding = padding_k_idx(self)
-                for n in nonzero_vpadding[kshift][:nroots]:
-                    g[n] = 1.0
+            if ascending:
+                idx = np.argsort(diag)
             else:
-                if ascending:
-                    idx = np.argsort(diag)
-                else:
-                    idx = np.argsort(diag)[::-1]
-                guess = np.zeros((diag.shape[0], nroots), dtype=dtype)
-                min_shape = min(diag.shape[0], nroots)
-                guess[:min_shape,:min_shape] = np.identity(min_shape)
-                g[idx] = guess.copy()
+                idx = np.argsort(diag)[::-1]
+            guess = np.zeros((diag.shape[0], nroots), dtype=dtype)
+            min_shape = min(diag.shape[0], nroots)
+            guess[:min_shape,:min_shape] = np.identity(min_shape)
+            g[idx] = guess.copy()
         if (self.frozen is not None or not np.all([x.shape[1] == self.nmo for x in self.mo_coeff])) \
-        and (type=="read" or koopmans):
+        and (type=="read"):
             for p in range(g.shape[1]):
                 singles = g[:n_singles,p]
-                doubles = g[n_singles:,p].reshape(nkpts,nkpts,ncore,(nextern-self.ext_vir),(nextern-self.ext_vir))
+                doubles = g[n_singles:,p].reshape(nkpts,nkpts,ncore,nextern,nextern)
                 (singles,doubles) = mask_frozen_ea(self,singles,doubles,kshift,const = 0.0)
                 g[:,p] = np.hstack((singles,doubles.ravel()))
 
         guess = []
         for p in range(g.shape[1]):
             if (self.frozen is not None) or (not np.all([x.shape[1] == self.nmo for x in self.mo_coeff])) \
-                    or (type=="read") or koopmans:
+                    or (type=="read"):
                 guess_norm = np.linalg.norm(g[:,p])
                 guess_norm_tol = LOOSE_ZERO_TOL
                 if guess_norm < guess_norm_tol:

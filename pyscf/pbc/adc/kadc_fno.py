@@ -67,8 +67,8 @@ class RADC2FNO(kadc_rhf.RADC):
     #J. Chem. Phys. 159, 084113 (2023)
     _keys = kadc_rhf.RADC._keys | {'delta_e','e_can','v_can','e_corr_can',
                           'rdm1_ss','trans_guess','mode','ref_state',
-                          'if_adc2_guess','div_pct_orb','delta_e_corr',
-                          'p_can','if_ref_qp','delta_e_qp','is_qp',
+                          'if_adc2_guess','delta_e_corr','p_can',
+                          'if_ref_qp','delta_e_qp','is_qp',
                           'e_corr_fno'
                           }
 
@@ -87,7 +87,6 @@ class RADC2FNO(kadc_rhf.RADC):
         self.mode = "min"
         self.ref_state = None
         self.if_ref_qp = True
-        self.div_pct_orb = 0.70
         self.if_adc2_guess = False
         self.e_corr_fno = None
 
@@ -167,8 +166,7 @@ class RADC2FNO(kadc_rhf.RADC):
             self.delta_e_corr  = all_delta_e_corr
             self.e_corr_fno    = all_e_corr_fno
 
-    def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None, kptlist=None,
-               koopmans=False):
+    def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None, kptlist=None):
         """Excited-state FNO driver: generate the FNO (SS/SA-FNO when ref_state is set) virtual space 
         and the excitation-energy corrections."""
         cput0 = (logger.process_clock(), logger.perf_counter())
@@ -184,7 +182,7 @@ class RADC2FNO(kadc_rhf.RADC):
         if kptlist is None:
             kptlist = range(self.nkpts)
 
-        self.make_ss_rdm1(log, cput0, kptlist, nroots, guess, koopmans=koopmans)
+        self.make_ss_rdm1(log, cput0, kptlist, nroots, guess)
         log.timer('make ss rdm1', *cput0)
 
         # Snapshot canonical orbital layout
@@ -215,10 +213,8 @@ class RADC2FNO(kadc_rhf.RADC):
             fno_mo_energy = list(self.mo_energy)
             fno_frozen    = list(self.frozen)
 
-            self.if_div = False
-            self.ext_vir = 0
             self._reset_adc_state()
-            self.compute_correction(kptlist, nroots, guess, koopmans=koopmans)
+            self.compute_correction(kptlist, nroots, guess)
 
             all_mo_coeff.append(fno_mo_coeff)
             all_mo_energy.append(fno_mo_energy)
@@ -257,12 +253,12 @@ class RADC2FNO(kadc_rhf.RADC):
             self.v_ssfno       = all_v_ssfno
             self.p_ssfno       = all_p_ssfno
 
-    def compute_correction(self, kptlist=None, nroots=None, guess=None, if_gs=False, koopmans=False):
+    def compute_correction(self, kptlist=None, nroots=None, guess=None, if_gs=False):
         """Compute the additive FNO corrections by running the reference MP2/ADC(2) in the FNO space."""
         if if_gs:
             _,_,_ = kadc_rhf.RADC.kernel_gs(self)
         else:
-            self.e_ssfno,self.v_ssfno,self.p_ssfno,_ = kadc_rhf.RADC.kernel(self, nroots, guess=guess, kptlist=kptlist, koopmans=koopmans)
+            self.e_ssfno,self.v_ssfno,self.p_ssfno,_ = kadc_rhf.RADC.kernel(self, nroots, guess=guess, kptlist=kptlist)
             self.delta_e = self.e_can - self.e_ssfno
             self.delta_e_qp = []
             mask_fno = self.p_ssfno > self.is_qp
@@ -273,13 +269,12 @@ class RADC2FNO(kadc_rhf.RADC):
                 self.delta_e_qp.append(e_can_qp_k[:min(len(e_can_qp_k), len(e_ssfno_qp_k))] - e_ssfno_qp_k[:min(len(e_can_qp_k), len(e_ssfno_qp_k))])
         self.delta_e_corr = self.e_corr_can - self.e_corr
 
-    def make_ss_rdm1(self, log, cput0, kptlist=None, nroots=None, guess=None, if_gs=False, koopmans=False):
+    def make_ss_rdm1(self, log, cput0, kptlist=None, nroots=None, guess=None, if_gs=False):
         """Run the canonical reference and build the 1-RDM used to construct the FNOs."""
         if if_gs:
             _,_,_ = kadc_rhf.RADC.kernel_gs(self)
         else:
-            self.e_can,self.v_can,self.p_can,_ = kadc_rhf.RADC.kernel(self,nroots,guess=guess,kptlist=kptlist,
-                                                                      pct_orb=self.div_pct_orb,koopmans=koopmans)
+            self.e_can,self.v_can,self.p_can,_ = kadc_rhf.RADC.kernel(self,nroots,guess=guess,kptlist=kptlist)
         log.info('current use %d MB',lib.current_memory()[0])
         self.e_corr_can = self.e_corr
         if self.ref_state is not None:
@@ -343,6 +338,7 @@ class RADC2FNO(kadc_rhf.RADC):
         V = []
         padding_convention = padding_k_idx(self, kind="joint")
 
+        # "min": common active-virtual count across k-points; others: truncate each k-point independently
         if self.mode.lower() == "min":
             if nvir_act is None:
                 T = []
@@ -422,6 +418,10 @@ class RADC2FNO(kadc_rhf.RADC):
         for kpt in range(self.nkpts):
             if self.mode.lower() != "min":
                 n_fro_vir = np.sum(T[kpt] == 0)
+                if n_fro_vir == len(T[kpt]):
+                    log.warn("All virtual orbitals frozen at kpt %d; keeping one." % kpt)
+                    n_fro_vir -= 1
+                    T[kpt][0] = True
                 T_k = np.diag(T[kpt])
             V_trunc = V[kpt].dot(T_k)
             n_keep = V_trunc.shape[0]-n_fro_vir
