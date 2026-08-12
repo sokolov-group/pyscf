@@ -214,9 +214,6 @@ def transform_integrals_df(myadc):
 
     kconserv = myadc.khelper.kconserv
 
-    # The momentum conservation array
-    kconserv = myadc.khelper.kconserv
-
     with_df = myadc.with_df
     naux = with_df.get_naoaux()
     eris = lambda:None
@@ -261,7 +258,7 @@ def transform_integrals_df(myadc):
         Lvv_big = eris.Lvv.transpose(2,0,1,3,4).reshape(naux,-1)
         L_big = np.concatenate([Loo_big, Lov_big, Lvo_big, Lvv_big], axis=1)
         W = L_big.dot(L_big.T.conj())
-        n,N = np.linalg.eigh(W/nkpts**2)
+        n,N = np.linalg.eigh(W/nkpts)
         N_trunc = N[:,n>myadc.thresh_naf].T
         myadc.naux = N_trunc.shape[0]
         log.info(f"origin naux is {naux}||naf naux is {myadc.naux}")

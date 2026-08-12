@@ -46,12 +46,30 @@ from pyscf.pbc import tools
 import h5py
 import tempfile
 
+
+def _count_thresholds(thresh, pct_occ, nvir_act):
+    """Return the number of thresholds implied by the parameters."""
+    n = 1
+    for val in (thresh, pct_occ, nvir_act):
+        if val is not None and isinstance(val, (list, tuple, np.ndarray)):
+            n = max(n, len(val))
+    return n
+
+
+def _pick(param, i):
+    """Extract the i-th element if *param* is a sequence, else return as-is."""
+    if param is not None and isinstance(param, (list, tuple, np.ndarray)):
+        return param[i]
+    return param
+
+
 class RADC2FNO(kadc_rhf.RADC):
     #J. Chem. Phys. 159, 084113 (2023)
     _keys = kadc_rhf.RADC._keys | {'delta_e','e_can','v_can','e_corr_can',
                           'rdm1_ss','trans_guess','mode','ref_state',
                           'if_adc2_guess','div_pct_orb','delta_e_corr',
-                          'p_can','if_ref_qp','delta_e_qp','is_qp'
+                          'p_can','if_ref_qp','delta_e_qp','is_qp',
+                          'e_corr_fno'
                           }
 
     def __init__(self, mf, frozen=0, mo_coeff=None, mo_occ=None):
@@ -71,8 +89,19 @@ class RADC2FNO(kadc_rhf.RADC):
         self.if_ref_qp = True
         self.div_pct_orb = 0.70
         self.if_adc2_guess = False
+        self.e_corr_fno = None
+
+    def _reset_adc_state(self):
+        """Clear cached amplitudes / intermediates so a fresh FNO-ADC run can start."""
+        self.t1 = None
+        self.t2 = None
+        self._adc_es = None
+        if hasattr(self.imds, 't2_1_vvvv'):
+            self.imds.t2_1_vvvv = None
 
     def kernel_gs(self, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None):
+        """Ground-state FNO driver: generate the FNO virtual space from the MP2 density 
+        and the additive correlation-energy correction."""
         cput0 = (logger.process_clock(), logger.perf_counter())
         log = logger.Logger(self.stdout, self.verbose)
         logger.info(self, "generate fno with correction for the ground state")
@@ -80,13 +109,68 @@ class RADC2FNO(kadc_rhf.RADC):
 
         self.make_ss_rdm1(log, cput0, if_gs=True)
         log.timer('make gs rdm1', *cput0)
-        self.make_fno(self.rdm1_ss, self._scf, log, thresh, pct_occ, nvir_act)
-        log.timer('get frozen info', *cput0)
-        self.compute_correction(if_gs=True)
+
+        # Snapshot canonical orbital layout needed by make_fno
+        _can_frozen  = self.frozen
+        _can_mo_coeff  = self.mo_coeff
+        _can_mo_energy = self.mo_energy
+        _can_mo_occ    = [np.copy(oc) for oc in self.mo_occ]
+
+        n_thresh = _count_thresholds(thresh, pct_occ, nvir_act)
+
+        all_mo_coeff, all_mo_energy, all_frozen = [], [], []
+        all_delta_e_corr, all_e_corr_fno = [], []
+
+        for i in range(n_thresh):
+            # Restore canonical orbitals so make_fno always starts from the full space
+            self.frozen    = _can_frozen
+            self.mo_coeff  = _can_mo_coeff
+            self.mo_energy = _can_mo_energy
+
+            t = _pick(thresh,   i)
+            p = _pick(pct_occ,  i)
+            v = _pick(nvir_act, i)
+
+            self.make_fno(self.rdm1_ss, self._scf, log, thresh=t, pct_occ=p, nvir_act=v)
+
+            # Snapshot FNO orbitals before solver state is overwritten
+            fno_mo_coeff  = list(self.mo_coeff)
+            fno_mo_energy = list(self.mo_energy)
+            fno_frozen    = list(self.frozen)
+
+            self._reset_adc_state()
+            self.compute_correction(if_gs=True)
+
+            all_mo_coeff.append(fno_mo_coeff)
+            all_mo_energy.append(fno_mo_energy)
+            all_frozen.append(fno_frozen)
+            all_delta_e_corr.append(self.delta_e_corr)
+            all_e_corr_fno.append(self.e_corr)
+
+            log.timer('get frozen info (%d/%d)' % (i + 1, n_thresh), *cput0)
+
         log.timer('gs FNO', *cput0)
+
+        # Expose results — single threshold keeps scalar attrs (backward compatible)
+        if n_thresh == 1:
+            self.mo_coeff      = all_mo_coeff[0]
+            self.mo_energy     = all_mo_energy[0]
+            self.frozen        = all_frozen[0]
+            self.delta_e_corr  = all_delta_e_corr[0]
+            self.e_corr_fno    = all_e_corr_fno[0]
+        else:
+            self.mo_coeff      = all_mo_coeff
+            self.mo_energy     = all_mo_energy
+            self.frozen        = all_frozen
+            self.mo_occ        = [[np.copy(oc) for oc in _can_mo_occ]
+                                  for _ in range(n_thresh)]
+            self.delta_e_corr  = all_delta_e_corr
+            self.e_corr_fno    = all_e_corr_fno
 
     def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None, kptlist=None,
                koopmans=False):
+        """Excited-state FNO driver: generate the FNO (SS/SA-FNO when ref_state is set) virtual space 
+        and the excitation-energy corrections."""
         cput0 = (logger.process_clock(), logger.perf_counter())
         log = logger.Logger(self.stdout, self.verbose)
         if self.ref_state is None:
@@ -99,17 +183,82 @@ class RADC2FNO(kadc_rhf.RADC):
 
         if kptlist is None:
             kptlist = range(self.nkpts)
+
         self.make_ss_rdm1(log, cput0, kptlist, nroots, guess, koopmans=koopmans)
         log.timer('make ss rdm1', *cput0)
-        self.make_fno(self.rdm1_ss, self._scf, log, thresh, pct_occ, nvir_act)
-        log.timer('get frozen info', *cput0)
 
-        self.if_div = False
-        self.ext_vir = 0
-        self.compute_correction(kptlist, nroots, guess, koopmans=koopmans)
+        # Snapshot canonical orbital layout
+        _can_frozen    = self.frozen
+        _can_mo_coeff  = self.mo_coeff
+        _can_mo_energy = self.mo_energy
+        _can_mo_occ    = [np.copy(oc) for oc in self.mo_occ]
+
+        n_thresh = _count_thresholds(thresh, pct_occ, nvir_act)
+
+        all_mo_coeff, all_mo_energy, all_frozen = [], [], []
+        all_delta_e_corr, all_e_corr_fno = [], []
+        all_delta_e, all_delta_e_qp = [], []
+        all_e_ssfno, all_v_ssfno, all_p_ssfno = [], [], []
+
+        for i in range(n_thresh):
+            self.frozen    = _can_frozen
+            self.mo_coeff  = _can_mo_coeff
+            self.mo_energy = _can_mo_energy
+
+            t = _pick(thresh,   i)
+            p = _pick(pct_occ,  i)
+            v = _pick(nvir_act, i)
+
+            self.make_fno(self.rdm1_ss, self._scf, log, thresh=t, pct_occ=p, nvir_act=v)
+
+            fno_mo_coeff  = list(self.mo_coeff)
+            fno_mo_energy = list(self.mo_energy)
+            fno_frozen    = list(self.frozen)
+
+            self.if_div = False
+            self.ext_vir = 0
+            self._reset_adc_state()
+            self.compute_correction(kptlist, nroots, guess, koopmans=koopmans)
+
+            all_mo_coeff.append(fno_mo_coeff)
+            all_mo_energy.append(fno_mo_energy)
+            all_frozen.append(fno_frozen)
+            all_delta_e_corr.append(self.delta_e_corr)
+            all_e_corr_fno.append(self.e_corr)
+            all_delta_e.append(self.delta_e)
+            all_delta_e_qp.append(self.delta_e_qp)
+            all_e_ssfno.append(self.e_ssfno)
+            all_v_ssfno.append(self.v_ssfno)
+            all_p_ssfno.append(self.p_ssfno)
+
+            log.timer('es FNO (%d/%d)' % (i + 1, n_thresh), *cput0)
+
         log.timer('es FNO', *cput0)
 
+        if n_thresh == 1:
+            self.mo_coeff      = all_mo_coeff[0]
+            self.mo_energy     = all_mo_energy[0]
+            self.frozen        = all_frozen[0]
+            self.delta_e_corr  = all_delta_e_corr[0]
+            self.e_corr_fno    = all_e_corr_fno[0]
+            self.delta_e       = all_delta_e[0]
+            self.delta_e_qp    = all_delta_e_qp[0]
+        else:
+            self.mo_coeff      = all_mo_coeff
+            self.mo_energy     = all_mo_energy
+            self.frozen        = all_frozen
+            self.mo_occ        = [[np.copy(oc) for oc in _can_mo_occ]
+                                  for _ in range(n_thresh)]
+            self.delta_e_corr  = all_delta_e_corr
+            self.e_corr_fno    = all_e_corr_fno
+            self.delta_e       = all_delta_e
+            self.delta_e_qp    = all_delta_e_qp
+            self.e_ssfno       = all_e_ssfno
+            self.v_ssfno       = all_v_ssfno
+            self.p_ssfno       = all_p_ssfno
+
     def compute_correction(self, kptlist=None, nroots=None, guess=None, if_gs=False, koopmans=False):
+        """Compute the additive FNO corrections by running the reference MP2/ADC(2) in the FNO space."""
         if if_gs:
             _,_,_ = kadc_rhf.RADC.kernel_gs(self)
         else:
@@ -125,6 +274,7 @@ class RADC2FNO(kadc_rhf.RADC):
         self.delta_e_corr = self.e_corr_can - self.e_corr
 
     def make_ss_rdm1(self, log, cput0, kptlist=None, nroots=None, guess=None, if_gs=False, koopmans=False):
+        """Run the canonical reference and build the 1-RDM used to construct the FNOs."""
         if if_gs:
             _,_,_ = kadc_rhf.RADC.kernel_gs(self)
         else:
@@ -183,6 +333,8 @@ class RADC2FNO(kadc_rhf.RADC):
         self.imds.t2_1_vvvv = None
 
     def make_fno(self, rdm1_ss, mf, log, thresh=None, pct_occ=None, nvir_act=None):
+        """Build the FNO virtual space: diagonalize the virtual 1-RDM, truncate by thresh/pct_occ/nvir_act, 
+        and semicanonicalize the retained orbitals."""
         nocc = mf.mol.nelectron//2
         masks = kadc_rhf.mo_splitter(self)
         no_coeff=[]
