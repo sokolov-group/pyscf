@@ -635,9 +635,11 @@ def matvec(adc, kshift, M_ab=None, eris=None):
                 else:
                     eris_ovvv = eris.ovvv[:]
                     s1 += 2. * lib.einsum('icab,ibc->a',
-                                          eris_ovvv[ki, kc, kshift][:, :nvir, :, :nvir].conj(), r2[ki, kb], optimize=True)
-                    s2[ki, kb] += lib.einsum('icab,a->ibc', eris_ovvv[ki,
-                                                                      kc, kshift][:, :nvir, :, :nvir], r1, optimize=True)
+                                          eris_ovvv[ki, kc, kshift][:, :nvir, :, :nvir].conj(),
+                                          r2[ki, kb], optimize=True)
+                    s2[ki, kb] += lib.einsum('icab,a->ibc',
+                                             eris_ovvv[ki, kc, kshift][:, :nvir, :, :nvir],
+                                             r1, optimize=True)
                     del eris_ovvv
 
 

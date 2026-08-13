@@ -138,7 +138,8 @@ def compute_amplitudes(myadc, eris):
                         a = 0
                         for p in range(0, nocc, chnk_size):
                             eris_ovvv = dfadc.get_ovvv_df(
-                                myadc, eris.Lov[kk, kd], eris.Lvv[ka, kc], p, chnk_size).reshape(-1, nvir, nvir, nvir) / nkpts
+                                myadc, eris.Lov[kk, kd], eris.Lvv[ka, kc],
+                                p, chnk_size).reshape(-1, nvir, nvir, nvir) / nkpts
                             k = eris_ovvv.shape[0]
                             t1_2[ki] += 1.5 * lib.einsum('kdac,ikcd->ia',
                                                          eris_ovvv, t2_1[ki, kk, kc, :, a:a + k], optimize=True)
@@ -146,7 +147,8 @@ def compute_amplitudes(myadc, eris):
                                                          eris_ovvv, t2_1[kk, ki, kc, a:a + k, :], optimize=True)
                             del eris_ovvv
                             eris_ovvv = dfadc.get_ovvv_df(
-                                myadc, eris.Lov[kk, kc], eris.Lvv[ka, kd], p, chnk_size).reshape(-1, nvir, nvir, nvir) / nkpts
+                                myadc, eris.Lov[kk, kc], eris.Lvv[ka, kd],
+                                p, chnk_size).reshape(-1, nvir, nvir, nvir) / nkpts
                             t1_2[ki] -= 0.5 * lib.einsum('kcad,ikcd->ia',
                                                          eris_ovvv, t2_1[ki, kk, kc, :, a:a + k], optimize=True)
                             t1_2[ki] += 0.5 * lib.einsum('kcad,kicd->ia',
