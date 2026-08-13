@@ -49,7 +49,8 @@ def transform_integrals_incore(myadc):
     orbv = np.asarray(mo_coeff[:, :, nocc:], order='C')
 
     fao2mo = myadc._scf.with_df.ao2mo
-    def eris(): return None
+    def eris():
+        return None
 
     log.info('using incore ERI storage')
     eris.oooo = np.empty((nkpts, nkpts, nkpts, nocc, nocc, nocc, nocc), dtype=dtype)
@@ -103,7 +104,8 @@ def transform_integrals_outcore(myadc):
     kconserv = myadc.khelper.kconserv
     khelper = myadc.khelper
 
-    def eris(): return None
+    def eris():
+        return None
     eris.feri = feri = lib.H5TmpFile()
 
     # The momentum conservation array
@@ -218,7 +220,8 @@ def transform_integrals_df(myadc):
 
     with_df = myadc.with_df
     naux = with_df.get_naoaux()
-    def eris(): return None
+    def eris():
+        return None
 
     eris.dtype = dtype = np.result_type(dtype)
     eris.Lpq_mo = Lpq_mo = np.empty((nkpts, nkpts), dtype=object)
