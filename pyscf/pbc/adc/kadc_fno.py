@@ -34,7 +34,7 @@ from pyscf.pbc.adc import kadc_rhf
 from pyscf.pbc.adc import kadc_ao2mo
 from pyscf.pbc.adc import dfadc
 from pyscf import __config__
-from pyscf.pbc.mp.kmp2 import (get_nocc, get_nmo, padding_k_idx,_padding_k_idx,
+from pyscf.pbc.mp.kmp2 import (get_nocc, get_nmo, padding_k_idx, _padding_k_idx,
                                padded_mo_coeff, get_frozen_mask, _add_padding)
 from pyscf.pbc.cc.kccsd_rhf import _get_epq
 from pyscf.pbc.cc.kccsd_t_rhf import _get_epqr
@@ -64,13 +64,12 @@ def _pick(param, i):
 
 
 class RADC2FNO(kadc_rhf.RADC):
-    #J. Chem. Phys. 159, 084113 (2023)
-    _keys = kadc_rhf.RADC._keys | {'delta_e','e_can','v_can','e_corr_can',
-                          'rdm1_ss','trans_guess','mode','ref_state',
-                          'if_adc2_guess','delta_e_corr','p_can',
-                          'if_ref_qp','delta_e_qp','is_qp',
-                          'e_corr_fno'
-                          }
+    # J. Chem. Phys. 159, 084113 (2023)
+    _keys = kadc_rhf.RADC._keys | {'delta_e', 'e_can', 'v_can', 'e_corr_can',
+                                   'rdm1_ss', 'trans_guess', 'mode', 'ref_state',
+                                   'if_adc2_guess', 'delta_e_corr', 'p_can',
+                                   'if_ref_qp', 'delta_e_qp', 'is_qp',
+                                   'e_corr_fno'}
 
     def __init__(self, mf, frozen=0, mo_coeff=None, mo_occ=None):
         super().__init__(mf, frozen, mo_coeff, mo_occ)
@@ -98,8 +97,8 @@ class RADC2FNO(kadc_rhf.RADC):
         if hasattr(self.imds, 't2_1_vvvv'):
             self.imds.t2_1_vvvv = None
 
-    def kernel_gs(self, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None):
-        """Ground-state FNO driver: generate the FNO virtual space from the MP2 density 
+    def kernel_gs(self, eris=None, thresh=1e-4, pct_occ=None, nvir_act=None):
+        """Ground-state FNO driver: generate the FNO virtual space from the MP2 density
         and the additive correlation-energy correction."""
         cput0 = (logger.process_clock(), logger.perf_counter())
         log = logger.Logger(self.stdout, self.verbose)
@@ -110,10 +109,10 @@ class RADC2FNO(kadc_rhf.RADC):
         log.timer('make gs rdm1', *cput0)
 
         # Snapshot canonical orbital layout needed by make_fno
-        _can_frozen  = self.frozen
-        _can_mo_coeff  = self.mo_coeff
+        _can_frozen = self.frozen
+        _can_mo_coeff = self.mo_coeff
         _can_mo_energy = self.mo_energy
-        _can_mo_occ    = [np.copy(oc) for oc in self.mo_occ]
+        _can_mo_occ = [np.copy(oc) for oc in self.mo_occ]
 
         n_thresh = _count_thresholds(thresh, pct_occ, nvir_act)
 
@@ -122,20 +121,20 @@ class RADC2FNO(kadc_rhf.RADC):
 
         for i in range(n_thresh):
             # Restore canonical orbitals so make_fno always starts from the full space
-            self.frozen    = _can_frozen
-            self.mo_coeff  = _can_mo_coeff
+            self.frozen = _can_frozen
+            self.mo_coeff = _can_mo_coeff
             self.mo_energy = _can_mo_energy
 
-            t = _pick(thresh,   i)
-            p = _pick(pct_occ,  i)
+            t = _pick(thresh, i)
+            p = _pick(pct_occ, i)
             v = _pick(nvir_act, i)
 
             self.make_fno(self.rdm1_ss, self._scf, log, thresh=t, pct_occ=p, nvir_act=v)
 
             # Snapshot FNO orbitals before solver state is overwritten
-            fno_mo_coeff  = list(self.mo_coeff)
+            fno_mo_coeff = list(self.mo_coeff)
             fno_mo_energy = list(self.mo_energy)
-            fno_frozen    = list(self.frozen)
+            fno_frozen = list(self.frozen)
 
             self._reset_adc_state()
             self.compute_correction(if_gs=True)
@@ -152,29 +151,29 @@ class RADC2FNO(kadc_rhf.RADC):
 
         # Expose results — single threshold keeps scalar attrs (backward compatible)
         if n_thresh == 1:
-            self.mo_coeff      = all_mo_coeff[0]
-            self.mo_energy     = all_mo_energy[0]
-            self.frozen        = all_frozen[0]
-            self.delta_e_corr  = all_delta_e_corr[0]
-            self.e_corr_fno    = all_e_corr_fno[0]
+            self.mo_coeff = all_mo_coeff[0]
+            self.mo_energy = all_mo_energy[0]
+            self.frozen = all_frozen[0]
+            self.delta_e_corr = all_delta_e_corr[0]
+            self.e_corr_fno = all_e_corr_fno[0]
         else:
-            self.mo_coeff      = all_mo_coeff
-            self.mo_energy     = all_mo_energy
-            self.frozen        = all_frozen
-            self.mo_occ        = [[np.copy(oc) for oc in _can_mo_occ]
-                                  for _ in range(n_thresh)]
-            self.delta_e_corr  = all_delta_e_corr
-            self.e_corr_fno    = all_e_corr_fno
+            self.mo_coeff = all_mo_coeff
+            self.mo_energy = all_mo_energy
+            self.frozen = all_frozen
+            self.mo_occ = [[np.copy(oc) for oc in _can_mo_occ]
+                           for _ in range(n_thresh)]
+            self.delta_e_corr = all_delta_e_corr
+            self.e_corr_fno = all_e_corr_fno
 
-    def kernel(self, nroots=1, guess=None, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None, kptlist=None):
-        """Excited-state FNO driver: generate the FNO (SS/SA-FNO when ref_state is set) virtual space 
+    def kernel(self, nroots=1, guess=None, eris=None, thresh=1e-4, pct_occ=None, nvir_act=None, kptlist=None):
+        """Excited-state FNO driver: generate the FNO (SS/SA-FNO when ref_state is set) virtual space
         and the excitation-energy corrections."""
         cput0 = (logger.process_clock(), logger.perf_counter())
         log = logger.Logger(self.stdout, self.verbose)
         if self.ref_state is None:
             logger.info(self, "generate fno with correction for the excited state")
-        elif (isinstance(self.ref_state, int) and 0<self.ref_state<=nroots) or \
-                (hasattr(self.ref_state, '__len__') and len(self.ref_state) == 2) :
+        elif (isinstance(self.ref_state, int) and 0 < self.ref_state <= nroots) or \
+                (hasattr(self.ref_state, '__len__') and len(self.ref_state) == 2):
             logger.info(self, "generate ss-fno with correction for the excited state")
         else:
             raise ValueError("ref_state should be an int type or or a array-like object with two elements")
@@ -186,10 +185,10 @@ class RADC2FNO(kadc_rhf.RADC):
         log.timer('make ss rdm1', *cput0)
 
         # Snapshot canonical orbital layout
-        _can_frozen    = self.frozen
-        _can_mo_coeff  = self.mo_coeff
+        _can_frozen = self.frozen
+        _can_mo_coeff = self.mo_coeff
         _can_mo_energy = self.mo_energy
-        _can_mo_occ    = [np.copy(oc) for oc in self.mo_occ]
+        _can_mo_occ = [np.copy(oc) for oc in self.mo_occ]
 
         n_thresh = _count_thresholds(thresh, pct_occ, nvir_act)
 
@@ -199,19 +198,19 @@ class RADC2FNO(kadc_rhf.RADC):
         all_e_ssfno, all_v_ssfno, all_p_ssfno = [], [], []
 
         for i in range(n_thresh):
-            self.frozen    = _can_frozen
-            self.mo_coeff  = _can_mo_coeff
+            self.frozen = _can_frozen
+            self.mo_coeff = _can_mo_coeff
             self.mo_energy = _can_mo_energy
 
-            t = _pick(thresh,   i)
-            p = _pick(pct_occ,  i)
+            t = _pick(thresh, i)
+            p = _pick(pct_occ, i)
             v = _pick(nvir_act, i)
 
             self.make_fno(self.rdm1_ss, self._scf, log, thresh=t, pct_occ=p, nvir_act=v)
 
-            fno_mo_coeff  = list(self.mo_coeff)
+            fno_mo_coeff = list(self.mo_coeff)
             fno_mo_energy = list(self.mo_energy)
-            fno_frozen    = list(self.frozen)
+            fno_frozen = list(self.frozen)
 
             self._reset_adc_state()
             self.compute_correction(kptlist, nroots, guess)
@@ -232,33 +231,34 @@ class RADC2FNO(kadc_rhf.RADC):
         log.timer('es FNO', *cput0)
 
         if n_thresh == 1:
-            self.mo_coeff      = all_mo_coeff[0]
-            self.mo_energy     = all_mo_energy[0]
-            self.frozen        = all_frozen[0]
-            self.delta_e_corr  = all_delta_e_corr[0]
-            self.e_corr_fno    = all_e_corr_fno[0]
-            self.delta_e       = all_delta_e[0]
-            self.delta_e_qp    = all_delta_e_qp[0]
+            self.mo_coeff = all_mo_coeff[0]
+            self.mo_energy = all_mo_energy[0]
+            self.frozen = all_frozen[0]
+            self.delta_e_corr = all_delta_e_corr[0]
+            self.e_corr_fno = all_e_corr_fno[0]
+            self.delta_e = all_delta_e[0]
+            self.delta_e_qp = all_delta_e_qp[0]
         else:
-            self.mo_coeff      = all_mo_coeff
-            self.mo_energy     = all_mo_energy
-            self.frozen        = all_frozen
-            self.mo_occ        = [[np.copy(oc) for oc in _can_mo_occ]
-                                  for _ in range(n_thresh)]
-            self.delta_e_corr  = all_delta_e_corr
-            self.e_corr_fno    = all_e_corr_fno
-            self.delta_e       = all_delta_e
-            self.delta_e_qp    = all_delta_e_qp
-            self.e_ssfno       = all_e_ssfno
-            self.v_ssfno       = all_v_ssfno
-            self.p_ssfno       = all_p_ssfno
+            self.mo_coeff = all_mo_coeff
+            self.mo_energy = all_mo_energy
+            self.frozen = all_frozen
+            self.mo_occ = [[np.copy(oc) for oc in _can_mo_occ]
+                           for _ in range(n_thresh)]
+            self.delta_e_corr = all_delta_e_corr
+            self.e_corr_fno = all_e_corr_fno
+            self.delta_e = all_delta_e
+            self.delta_e_qp = all_delta_e_qp
+            self.e_ssfno = all_e_ssfno
+            self.v_ssfno = all_v_ssfno
+            self.p_ssfno = all_p_ssfno
 
     def compute_correction(self, kptlist=None, nroots=None, guess=None, if_gs=False):
         """Compute the additive FNO corrections by running the reference MP2/ADC(2) in the FNO space."""
         if if_gs:
-            _,_,_ = kadc_rhf.RADC.kernel_gs(self)
+            _, _, _ = kadc_rhf.RADC.kernel_gs(self)
         else:
-            self.e_ssfno,self.v_ssfno,self.p_ssfno,_ = kadc_rhf.RADC.kernel(self, nroots, guess=guess, kptlist=kptlist)
+            self.e_ssfno, self.v_ssfno, self.p_ssfno, _ = kadc_rhf.RADC.kernel(
+                self, nroots, guess=guess, kptlist=kptlist)
             self.delta_e = self.e_can - self.e_ssfno
             self.delta_e_qp = []
             mask_fno = self.p_ssfno > self.is_qp
@@ -266,7 +266,8 @@ class RADC2FNO(kadc_rhf.RADC):
             for kpt in kptlist:
                 e_can_qp_k = self.e_can[kpt][mask_can[kpt]]
                 e_ssfno_qp_k = self.e_ssfno[kpt][mask_fno[kpt]]
-                self.delta_e_qp.append(e_can_qp_k[:min(len(e_can_qp_k), len(e_ssfno_qp_k))] - e_ssfno_qp_k[:min(len(e_can_qp_k), len(e_ssfno_qp_k))])
+                n_qp = min(len(e_can_qp_k), len(e_ssfno_qp_k))
+                self.delta_e_qp.append(e_can_qp_k[:n_qp] - e_ssfno_qp_k[:n_qp])
         self.delta_e_corr = self.e_corr_can - self.e_corr
 
     def correct(self, e, i=None):
@@ -280,16 +281,16 @@ class RADC2FNO(kadc_rhf.RADC):
     def make_ss_rdm1(self, log, cput0, kptlist=None, nroots=None, guess=None, if_gs=False):
         """Run the canonical reference and build the 1-RDM used to construct the FNOs."""
         if if_gs:
-            _,_,_ = kadc_rhf.RADC.kernel_gs(self)
+            _, _, _ = kadc_rhf.RADC.kernel_gs(self)
         else:
-            self.e_can,self.v_can,self.p_can,_ = kadc_rhf.RADC.kernel(self,nroots,guess=guess,kptlist=kptlist)
-        log.info('current use %d MB',lib.current_memory()[0])
+            self.e_can, self.v_can, self.p_can, _ = kadc_rhf.RADC.kernel(self, nroots, guess=guess, kptlist=kptlist)
+        log.info('current use %d MB', lib.current_memory()[0])
         self.e_corr_can = self.e_corr
         if self.ref_state is not None:
-            if isinstance(self.ref_state,(int, np.integer)):
+            if isinstance(self.ref_state, (int, np.integer)):
                 idx = np.argsort(self.e_can.ravel()).tolist()
-                sidx = [[idx[self.ref_state - 1]% self.nkpts]]
-                kidx = [idx[self.ref_state - 1]// self.nkpts]
+                sidx = [[idx[self.ref_state - 1] % self.nkpts]]
+                kidx = [idx[self.ref_state - 1] // self.nkpts]
             elif hasattr(self.ref_state, '__len__'):
                 if len(self.ref_state) != 2:
                     raise ValueError
@@ -301,7 +302,9 @@ class RADC2FNO(kadc_rhf.RADC):
                     sidx = [self.ref_state[0] for _ in range(len(self.ref_state[1]))]
                 else:
                     if len(self.ref_state[0]) != len(self.ref_state[1]):
-                        raise ValueError("when the first element of ref_state is a array-like object, its length should be the same as the second element")
+                        raise ValueError("when the first element of ref_state is a "
+                                         "array-like object, its length should be "
+                                         "the same as the second element")
                     sidx = self.ref_state[0]
                 kidx = self.ref_state[1]
                 if self.if_ref_qp:
@@ -315,18 +318,19 @@ class RADC2FNO(kadc_rhf.RADC):
                     sidx = state_list
 
             log.info(f"the specific state is {sidx} with kidx {kidx}")
-            es_DM = self.make_rdm1(kptlist,root=sidx,K_idx=kidx,if_ss=True)
+            es_DM = self.make_rdm1(kptlist, root=sidx, K_idx=kidx, if_ss=True)
             self.rdm1_ss = np.zeros_like(es_DM[0][0])
             n_state = sum([len(s_k) for s_k in sidx])
             for k in range(len(kidx)):
                 for i in range(len(sidx[k])):
-                    self.rdm1_ss += es_DM[k][i]/n_state
-            log.info('current use %d MB',lib.current_memory()[0])
+                    self.rdm1_ss += es_DM[k][i] / n_state
+            log.info('current use %d MB', lib.current_memory()[0])
             log.timer('make ss rdm1', *cput0)
         else:
             self.rdm1_ss = self.make_ref_rdm1()
-            log.info('current use %d MB',lib.current_memory()[0])
+            log.info('current use %d MB', lib.current_memory()[0])
             log.timer('make ref rdm1', *cput0)
+
         def incore_transform():
             return kadc_ao2mo.transform_integrals_incore(self)
         self.transform_integrals = incore_transform
@@ -336,38 +340,38 @@ class RADC2FNO(kadc_rhf.RADC):
         self.imds.t2_1_vvvv = None
 
     def make_fno(self, rdm1_ss, mf, log, thresh=None, pct_occ=None, nvir_act=None):
-        """Build the FNO virtual space: diagonalize the virtual 1-RDM, truncate by thresh/pct_occ/nvir_act, and semicanonicalize the retained orbitals."""
-        nocc = mf.mol.nelectron//2
+        """Build the FNO virtual space: diagonalize the virtual 1-RDM, truncate, and semicanonicalize."""
+        nocc = mf.mol.nelectron // 2
         masks = kadc_rhf.mo_splitter(self)
-        no_coeff=[]
-        no_frozen=[]
-        no_energy=[]
+        no_coeff = []
+        no_frozen = []
+        no_energy = []
         V = []
         padding_convention = padding_k_idx(self, kind="joint")
 
         T = []
         for kpt in range(self.nkpts):
             rdm1_ss_comp = rdm1_ss[kpt][np.ix_(padding_convention[kpt], padding_convention[kpt])]
-            n,V_k = np.linalg.eigh(rdm1_ss_comp[nocc:,nocc:])
+            n, V_k = np.linalg.eigh(rdm1_ss_comp[nocc:, nocc:])
             idx = np.argsort(n)[::-1]
-            n,V_k = n[idx], V_k[:,idx]
+            n, V_k = n[idx], V_k[:, idx]
             V.append(V_k)
             if nvir_act is not None:
                 T.append(np.arange(len(n)) < nvir_act)
             elif pct_occ is not None:
-                cumsum = np.cumsum(n/np.sum(n))
+                cumsum = np.cumsum(n / np.sum(n))
                 T.append(np.array([c <= pct_occ or np.isclose(c, pct_occ) for c in cumsum]))
             else:
                 T.append(n > thresh)
 
         # "min": union the per-kpt masks so every k-point keeps the same count
         if self.mode.lower() == "min":
-            T_min = np.logical_or.reduce(np.stack(T),axis=0)
+            T_min = np.logical_or.reduce(np.stack(T), axis=0)
             n_fro_vir = np.sum(T_min == 0)
             if n_fro_vir == self.nmo - self.nocc:
                 log.warn("All virtual orbitals were requested to be frozen.\n"
-                "At least one virtual orbital must be retained for ADC calculations.\n"
-                "Keeping one virtual orbital automatically.")
+                         "At least one virtual orbital must be retained for ADC calculations.\n"
+                         "Keeping one virtual orbital automatically.")
                 n_fro_vir -= 1
                 T_min[0] = True
             T_k = np.diag(T_min)
@@ -381,24 +385,24 @@ class RADC2FNO(kadc_rhf.RADC):
                     T[kpt][0] = True
                 T_k = np.diag(T[kpt])
             V_trunc = V[kpt].dot(T_k)
-            n_keep = V_trunc.shape[0]-n_fro_vir
+            n_keep = V_trunc.shape[0] - n_fro_vir
 
             moeoccfrz0, moeocc, moevir, moevirfrz0 = [mf.mo_energy[kpt][m] for m in masks[kpt]]
-            orboccfrz0, orbocc, orbvir, orbvirfrz0 = [mf.mo_coeff[kpt][:,m] for m in masks[kpt]]
-            F_can =  np.diag(moevir)
+            orboccfrz0, orbocc, orbvir, orbvirfrz0 = [mf.mo_coeff[kpt][:, m] for m in masks[kpt]]
+            F_can = np.diag(moevir)
             F_trunc = V_trunc.T.conj().dot(F_can).dot(V_trunc)
-            e_trunc,Z_trunc = np.linalg.eigh(F_trunc[:n_keep,:n_keep])
-            U_vir_act = orbvir.dot(V_trunc[:,:n_keep]).dot(Z_trunc)
-            U_vir_fro = orbvir.dot(V_trunc[:,n_keep:])
-            no_comp = (orboccfrz0,orbocc,U_vir_act,U_vir_fro,orbvirfrz0)
-            no_e_comp = (moeoccfrz0,moeocc,e_trunc,moevir[n_keep:],moevirfrz0)
+            e_trunc, Z_trunc = np.linalg.eigh(F_trunc[:n_keep, :n_keep])
+            U_vir_act = orbvir.dot(V_trunc[:, :n_keep]).dot(Z_trunc)
+            U_vir_fro = orbvir.dot(V_trunc[:, n_keep:])
+            no_comp = (orboccfrz0, orbocc, U_vir_act, U_vir_fro, orbvirfrz0)
+            no_e_comp = (moeoccfrz0, moeocc, e_trunc, moevir[n_keep:], moevirfrz0)
             no_coeff_k = np.hstack(no_comp)
             no_energy_k = np.hstack(no_e_comp)
-            nocc_loc = np.cumsum([0]+[x.shape[1] for x in no_comp]).astype(int)
+            nocc_loc = np.cumsum([0] + [x.shape[1] for x in no_comp]).astype(int)
             no_frozen_k = np.hstack((np.arange(nocc_loc[0], nocc_loc[1]),
                                     np.arange(nocc_loc[3], nocc_loc[5]))).astype(int)
             no_coeff.append(no_coeff_k)
             no_energy.append(no_energy_k)
             no_frozen.append(no_frozen_k)
 
-        self.mo_coeff,self.mo_energy,self.frozen = no_coeff,no_energy,no_frozen
+        self.mo_coeff, self.mo_energy, self.frozen = no_coeff, no_energy, no_frozen
