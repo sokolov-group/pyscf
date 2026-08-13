@@ -19,10 +19,12 @@ from pyscf.pbc.adc import kadc_rhf_ip
 from pyscf.pbc.adc import kadc_rhf_ea
 from pyscf.pbc.adc import kadc_fno
 
+
 def KRADC(mf, frozen=None, mo_coeff=None, mo_occ=None, mo_energy=None):
     if not isinstance(mf, scf.khf.KRHF):
         mf = mf.to_rhf()
     return kadc_rhf.RADC(mf, frozen, mo_coeff, mo_occ, mo_energy)
+
 
 def KRADC2FNO(mf, frozen=None, mo_coeff=None, mo_occ=None):
     if not isinstance(mf, scf.khf.KRHF):

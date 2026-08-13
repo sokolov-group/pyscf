@@ -15,14 +15,15 @@
 # Author: Ning-Yuan Chen <cny003@outlook.com>
 #         Alexander Sokolov <alexander.y.sokolov@gmail.com>
 #
+from pyscf.pbc import gto, scf, adc
+import numpy as np
+import unittest
 import warnings
 warnings.simplefilter('ignore', ResourceWarning)
 
-import unittest
-import numpy as np
-from pyscf.pbc import gto, scf, adc
 
 nroots = 3
+
 
 def setUpModule():
     global cell, kmf
@@ -44,9 +45,11 @@ def setUpModule():
     kmf.verbose = 0
     kmf.kernel()
 
+
 def tearDownModule():
     global cell, kmf
     del cell, kmf
+
 
 def _fno(pct_occ=None, thresh=None, nvir_act=None, mode=None):
     """Ground-state FNO generator and its additively-corrected ADC(3) energy."""
@@ -58,6 +61,7 @@ def _fno(pct_occ=None, thresh=None, nvir_act=None, mode=None):
     fg.kernel_gs(pct_occ=pct_occ, thresh=thresh, nvir_act=nvir_act)
     return fg
 
+
 def _fno_es(method_type, ref_state, pct_occ):
     """Excited-state SS/SA-FNO generator."""
     fg = adc.KRADC2FNO(kmf)
@@ -67,6 +71,7 @@ def _fno_es(method_type, ref_state, pct_occ):
     fg.ref_state = ref_state
     fg.kernel(nroots, pct_occ=pct_occ, kptlist=[0])
     return fg
+
 
 def _gs_corr(fg, i=None):
     """Corrected ADC(3) ground-state correlation energy in the FNO space."""
@@ -78,6 +83,7 @@ def _gs_corr(fg, i=None):
     k.verbose = 0
     k.method = 'adc(3)'
     return fg.correct_corr(k.kernel_gs()[0], i)
+
 
 def _es_corr(fg, method_type, i=None):
     """Corrected ADC(3) root-0 excitation energy in the FNO space."""
@@ -92,6 +98,7 @@ def _es_corr(fg, method_type, i=None):
     k.method_type = method_type
     e, v, p, _ = k.kernel(nroots, guess=guess, kptlist=[0])
     return fg.correct(e, i)[0][0]
+
 
 class KnownValues(unittest.TestCase):
 
@@ -130,6 +137,7 @@ class KnownValues(unittest.TestCase):
 
     def test_ss_fno_ip(self):
         self.assertAlmostEqual(_es_corr(_fno_es('ip', [[0], [0]], 0.9), 'ip'), -0.7491959409, 4)
+
 
 if __name__ == '__main__':
     print("k-point FNO (conventional / SS / SA) tests")
