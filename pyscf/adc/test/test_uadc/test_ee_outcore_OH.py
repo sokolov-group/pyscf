@@ -13,7 +13,6 @@
 # limitations under the License.
 #
 # Author: Terrence Stahl <terrencestahl1@@gmail.com>
-#         Ning-Yuan Chen <cny003@outlook.com>
 #         Alexander Sokolov <alexander.y.sokolov@gmail.com>
 #
 

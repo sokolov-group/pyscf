@@ -267,9 +267,11 @@ class RADC(lib.StreamObject):
         'max_space', 'mo_occ', 'max_cycle', 'imds', 'with_df', 'compute_properties',
         'approx_trans_moments', 'evec_print_tol', 'spec_factor_print_tol',
         'E', 'U', 'P', 'X', 'ncvs', 'dip_mom', 'dip_mom_nuc', 'if_heri_eris'
+        'E', 'U', 'P', 'X', 'ncvs', 'dip_mom', 'dip_mom_nuc', 'if_naf', 'thresh_naf',
+        'naux', 'if_heri_eris', 'eris'
     }
 
-    def __init__(self, mf, frozen=None, mo_coeff=None, mo_occ=None):
+    def __init__(self, mf, frozen=None, mo_coeff=None, mo_occ=None, mo_energy=None):
 
         if 'dft' in str(mf.__module__):
             raise NotImplementedError('DFT reference for UADC')
@@ -303,6 +305,9 @@ class RADC(lib.StreamObject):
         self.mo_coeff = mo_coeff
         self.mo_coeff_hf = mo_coeff
         self.mo_energy = mf.mo_energy
+        self.naux = None
+        self.if_naf = False
+        self.thresh_naf = 1e-2
         self.if_heri_eris = False
         self._nmo = None
         mask = self.get_frozen_mask()
@@ -323,6 +328,8 @@ class RADC(lib.StreamObject):
                 raise ValueError("No occupied orbitals found")
             if mo_coeff is self._scf.mo_coeff and self._scf.converged:
                 self.mo_energy = self.mo_energy[mask]
+            elif mo_energy is not None:
+                self.mo_energy = mo_energy[mask]
             else:
                 dm = self._scf.make_rdm1(mo_coeff, self.mo_occ)
                 vhf = self._scf.get_veff(self.mol, dm)
@@ -342,6 +349,7 @@ class RADC(lib.StreamObject):
         self.evec_print_tol = 0.1
         self.spec_factor_print_tol = 0.1
         self.ncvs = None
+        self.eris = None
 
         self.E = None
         self.U = None
@@ -384,7 +392,7 @@ class RADC(lib.StreamObject):
                     self.max_memory, lib.current_memory()[0])
         return self
 
-    def kernel_gs(self):
+    def kernel_gs(self, eris=None):
         assert(self.mo_coeff is not None)
         assert(self.mo_occ is not None)
 
@@ -414,26 +422,29 @@ class RADC(lib.StreamObject):
             logger.info(self, 'Frozen Orbital List: %s', self.frozen)
         logger.info(self, '*****************************************')
 
-        if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
-            if getattr(self, 'with_df', None):
-                self.with_df = self.with_df
-            else:
-                self.with_df = self._scf.with_df
+        if eris is None:
+            if getattr(self, 'with_df', None) or getattr(self._scf, 'with_df', None):
+                if getattr(self, 'with_df', None):
+                    self.with_df = self.with_df
+                else:
+                    self.with_df = self._scf.with_df
 
-            def df_transform():
-                return radc_ao2mo.transform_integrals_df(self)
-            self.transform_integrals = df_transform
-        elif (self._scf._eri is None or
-              (mem_incore+mem_now >= self.max_memory and not self.incore_complete)):
-            def outcore_transform():
-                return radc_ao2mo.transform_integrals_outcore(self)
-            self.transform_integrals = outcore_transform
+                def df_transform():
+                    return radc_ao2mo.transform_integrals_df(self)
+                self.transform_integrals = df_transform
+            elif (self._scf._eri is None or
+                    (mem_incore+mem_now >= self.max_memory and not self.incore_complete)):
+                def outcore_transform():
+                    return radc_ao2mo.transform_integrals_outcore(self)
+                self.transform_integrals = outcore_transform
 
-        eris = self.transform_integrals()
+            eris = self.transform_integrals()
 
         self.e_corr, self.t1, self.t2 = radc_amplitudes.compute_amplitudes_energy(
             self, eris=eris, verbose=self.verbose)
         self._finalize()
+        if self.if_heri_eris:
+            self.eris = eris
 
         return self.e_corr, self.t1, self.t2
 
@@ -507,9 +518,9 @@ class RADC(lib.StreamObject):
             raise NotImplementedError(self.method_type)
         self._adc_es = adc_es
         if self.if_heri_eris:
-            return e_exc, v_exc, spec_fac, x, eris
-        else:
-            return e_exc, v_exc, spec_fac, x
+            self.eris = eris
+
+        return e_exc, v_exc, spec_fac, x
 
     def _finalize(self):
         '''Hook for dumping results and clearing up the object.'''
