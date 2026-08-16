@@ -21,6 +21,7 @@ import numpy
 from pyscf import gto
 from pyscf import scf
 from pyscf import adc
+from pyscf.adc.uadc_ea import get_spin_square
 
 def setUpModule():
     global mol, mf, myadc
@@ -52,6 +53,7 @@ class KnownValues(unittest.TestCase):
 
         myadc.method_type = "ea"
         e,v,p,x = myadc.kernel(nroots=3)
+        spin = get_spin_square(myadc._adc_es)[0]
         e_corr = myadc.e_corr
 
         self.assertAlmostEqual(e_corr, -0.16402828164387806, 6)
@@ -64,14 +66,21 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.9953781149964537, 6)
         self.assertAlmostEqual(p[2], 0.9956169835481459, 6)
 
+        self.assertAlmostEqual(spin[0],0.10364918 , 5)
+        self.assertAlmostEqual(spin[1],2.00245829 , 5)
+        self.assertAlmostEqual(spin[2],1.00242291 , 5)
+
     def test_ea_adc2_oneroot(self):
 
         myadc.method_type = "ea"
         e,v,p,x = myadc.kernel(nroots=1)
+        spin = get_spin_square(myadc._adc_es)[0]
 
         self.assertAlmostEqual(e[0], 0.030845983085818485, 6)
 
         self.assertAlmostEqual(p[0], 0.9953781149964537, 6)
+
+        self.assertAlmostEqual(spin[0],2.00245829 , 5)
 
     def test_ea_adc2x(self):
 
@@ -79,6 +88,7 @@ class KnownValues(unittest.TestCase):
         myadc.method_type = "ea"
 
         e,v,p,x = myadc.kernel(nroots=3)
+        spin = get_spin_square(myadc._adc_es)[0]
 
         self.assertAlmostEqual(e[0], -0.07750642898162931, 6)
         self.assertAlmostEqual(e[1], 0.029292010466571882, 6)
@@ -87,6 +97,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[0], 0.8323987058794676, 6)
         self.assertAlmostEqual(p[1], 0.9918705979602267, 6)
         self.assertAlmostEqual(p[2], 0.9772855298541363, 6)
+
+        self.assertAlmostEqual(spin[0],0.11613015 , 5)
+        self.assertAlmostEqual(spin[1],2.00053620 , 5)
+        self.assertAlmostEqual(spin[2],1.00119649 , 5)
 
 
     def test_ea_adc3(self):
@@ -97,6 +111,7 @@ class KnownValues(unittest.TestCase):
 
         myadc.method_type = "ea"
         e,v,p,x = myadc.kernel(nroots=3)
+        spin = get_spin_square(myadc._adc_es)[0]
         myadc.analyze()
 
         self.assertAlmostEqual(e[0], -0.045097652872531736, 6)
@@ -106,6 +121,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[0], 0.8722483551941809, 6)
         self.assertAlmostEqual(p[1], 0.9927117650068699, 6)
         self.assertAlmostEqual(p[2], 0.9766456031927034, 6)
+
+        self.assertAlmostEqual(spin[0],0.14282701 , 5)
+        self.assertAlmostEqual(spin[1],2.00133383 , 5)
+        self.assertAlmostEqual(spin[2],1.00204599 , 5)
 
 if __name__ == "__main__":
     print("EA calculations for different ADC methods for open-shell molecule")

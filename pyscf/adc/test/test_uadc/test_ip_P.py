@@ -21,6 +21,7 @@ import numpy
 from pyscf import gto
 from pyscf import scf
 from pyscf import adc
+from pyscf.adc.uadc_ip import get_spin_square
 
 def setUpModule():
     global mol, mf, myadc
@@ -52,6 +53,7 @@ class KnownValues(unittest.TestCase):
 
         myadcip = adc.uadc_ip.UADCIP(myadc)
         e,v,p,x = myadcip.kernel(nroots=3)
+        spin = get_spin_square(myadcip)[0]
 
         self.assertAlmostEqual(e[0], 0.38071502275761, 6)
         self.assertAlmostEqual(e[1], 0.38071502275761, 6)
@@ -61,6 +63,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.94893331006538, 6)
         self.assertAlmostEqual(p[2], 0.94893331006538, 6)
 
+        self.assertAlmostEqual(spin[0],2.01804931 , 5)
+        self.assertAlmostEqual(spin[1],2.01804931 , 5)
+        self.assertAlmostEqual(spin[2],2.01804931 , 5)
+
     def test_ip_adc2x(self):
         myadc.method = "adc(2)-x"
         e, t_amp1, t_amp2 = myadc.kernel_gs()
@@ -68,6 +74,7 @@ class KnownValues(unittest.TestCase):
 
         myadcip = adc.uadc_ip.UADCIP(myadc)
         e,v,p,x = myadcip.kernel(nroots=3)
+        spin = get_spin_square(myadcip)[0]
 
         self.assertAlmostEqual(e[0], 0.36951642121691, 6)
         self.assertAlmostEqual(e[1], 0.36951642121691,  6)
@@ -77,6 +84,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.92695415467651,  6)
         self.assertAlmostEqual(p[2], 0.92695415467651,  6)
 
+        self.assertAlmostEqual(spin[0],2.02906429 , 5)
+        self.assertAlmostEqual(spin[1],2.02906429 , 5)
+        self.assertAlmostEqual(spin[2],2.02906429 , 5)
+
     def test_ip_adc3(self):
         myadc.method = "adc(3)"
         e, t_amp1, t_amp2 = myadc.kernel_gs()
@@ -84,6 +95,7 @@ class KnownValues(unittest.TestCase):
 
         myadcip = adc.uadc_ip.UADCIP(myadc)
         e,v,p,x = myadcip.kernel(nroots=3)
+        spin = get_spin_square(myadcip)[0]
 
         self.assertAlmostEqual(e[0], 0.37866365404487, 6)
         self.assertAlmostEqual(e[1], 0.37866365404487, 6)
@@ -92,6 +104,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[0], 0.92603990249875, 6)
         self.assertAlmostEqual(p[1], 0.92603990249875, 6)
         self.assertAlmostEqual(p[2], 0.92603990249875, 6)
+
+        self.assertAlmostEqual(spin[0],2.02999351 , 5)
+        self.assertAlmostEqual(spin[1],2.02999351 , 5)
+        self.assertAlmostEqual(spin[2],2.02999351 , 5)
 
 if __name__ == "__main__":
     print("IP calculations for different ADC methods for open-shell atom")

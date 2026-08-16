@@ -21,6 +21,7 @@ import numpy
 from pyscf import gto
 from pyscf import scf
 from pyscf import adc
+from pyscf.adc.uadc_ip import get_spin_square
 
 def setUpModule():
     global mol, mf, myadc
@@ -51,6 +52,7 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e, -0.32201692499346535, 6)
 
         e,v,p,x = myadc.kernel(nroots=3)
+        spin = get_spin_square(myadc._adc_es)[0]
 
         self.assertAlmostEqual(e[0], 0.5434389897908212, 6)
         self.assertAlmostEqual(e[1], 0.5434389942222756, 6)
@@ -60,19 +62,27 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.8844048539643351, 6)
         self.assertAlmostEqual(p[2], 0.9096460559671828, 6)
 
+        self.assertAlmostEqual(spin[0],0.75000000 , 5)
+        self.assertAlmostEqual(spin[1],0.75000000 , 5)
+        self.assertAlmostEqual(spin[2],0.75000000 , 5)
+
     def test_ip_adc2_oneroot(self):
 
         e,v,p,x = myadc.kernel()
+        spin = get_spin_square(myadc._adc_es)[0]
 
         self.assertAlmostEqual(e[0], 0.5434389897908212, 6)
 
         self.assertAlmostEqual(p[0], 0.884404855445607, 6)
+
+        self.assertAlmostEqual(spin[0],0.75000000 , 5)
 
     def test_ip_adc2x(self):
 
         myadc.method = "adc(2)-x"
         myadc.method_type = "ip"
         e,v,p,x = myadc.kernel(nroots=3)
+        spin = get_spin_square(myadc._adc_es)[0]
 
         self.assertAlmostEqual(e[0], 0.5405255355249104, 6)
         self.assertAlmostEqual(e[1], 0.5405255399061982, 6)
@@ -82,11 +92,16 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.8756642844804134 , 6)
         self.assertAlmostEqual(p[2], 0.9076434703549277, 6)
 
+        self.assertAlmostEqual(spin[0],0.75000000 , 5)
+        self.assertAlmostEqual(spin[1],0.75000000 , 5)
+        self.assertAlmostEqual(spin[2],0.75000000 , 5)
+
     def test_ip_adc3_high_cost(self):
 
         myadc.method = "adc(3)"
         myadc.method_type = "ip"
         e,v,p,x = myadc.kernel(nroots=3)
+        spin = get_spin_square(myadc._adc_es)[0]
         e_corr = myadc.e_corr
 
         self.assertAlmostEqual(e_corr, -0.31694173142858517 , 6)
@@ -98,6 +113,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[0], 0.9086596203469742, 6)
         self.assertAlmostEqual(p[1], 0.9086596190173993, 6)
         self.assertAlmostEqual(p[2], 0.9214613318791076, 6)
+
+        self.assertAlmostEqual(spin[0],0.75000000 , 5)
+        self.assertAlmostEqual(spin[1],0.75000000 , 5)
+        self.assertAlmostEqual(spin[2],0.75000000 , 5)
 
 if __name__ == "__main__":
     print("IP calculations for different ADC methods")
