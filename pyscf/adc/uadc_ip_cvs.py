@@ -2103,7 +2103,7 @@ def analyze_eigenvector(adc):
             doubles_bbb_val.append(doubles_bbb_ecc_val[idx])
 
         logger.info(adc,'%s | root %d | Energy (eV) = %12.8f | norm(1h)  = %6.4f | norm(2h1p) = %6.4f ',
-                    adc.method, I, adc.E[I]*HARTREE2EV, U1dotU1, U2dotU2)
+                    adc.method, I, adc.E[I]*27.2114, U1dotU1, U2dotU2)
 
         if singles_a_val:
             logger.info(adc, "\n1h(alpha) block: ")
@@ -3029,6 +3029,8 @@ class UADCIPCVS(uadc.UADC):
         self.ncvs = adc.ncvs
         self.frozen = adc.frozen
         self.mo_occ = adc.mo_occ
+        self.if_naf = adc.if_naf
+        self.naux = adc.naux
 
         self.compute_properties = adc.compute_properties
         self.approx_trans_moments = adc.approx_trans_moments

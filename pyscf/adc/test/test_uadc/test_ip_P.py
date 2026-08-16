@@ -13,15 +13,15 @@
 # limitations under the License.
 #
 # Author: Samragni Banerjee <samragnibanerjee4@gmail.com>
-#         Ning-Yuan Chen <cny003@outlook.com>
 #         Alexander Sokolov <alexander.y.sokolov@gmail.com>
 #
 
 import unittest
-import numpy as np
+import numpy
 from pyscf import gto
 from pyscf import scf
 from pyscf import adc
+from pyscf.adc.uadc_ip import get_spin_square
 
 def setUpModule():
     global mol, mf, myadc
@@ -45,13 +45,6 @@ def tearDownModule():
     global mol, mf, myadc
     del mol, mf, myadc
 
-def rdms_test(dm_a,dm_b):
-    r2_int = mol.intor('int1e_r2')
-    dm_ao_a = np.einsum('pi,ij,qj->pq', mf.mo_coeff[0], dm_a, mf.mo_coeff[0].conj())
-    dm_ao_b = np.einsum('pi,ij,qj->pq', mf.mo_coeff[1], dm_b, mf.mo_coeff[1].conj())
-    r2 = np.einsum('pq,pq->',r2_int,dm_ao_a+dm_ao_b)
-    return r2
-
 class KnownValues(unittest.TestCase):
 
     def test_ip_adc2(self):
@@ -60,6 +53,7 @@ class KnownValues(unittest.TestCase):
 
         myadcip = adc.uadc_ip.UADCIP(myadc)
         e,v,p,x = myadcip.kernel(nroots=3)
+        spin = get_spin_square(myadcip)[0]
 
         self.assertAlmostEqual(e[0], 0.38071502275761, 6)
         self.assertAlmostEqual(e[1], 0.38071502275761, 6)
@@ -69,10 +63,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.94893331006538, 6)
         self.assertAlmostEqual(p[2], 0.94893331006538, 6)
 
-        dm1_exc = np.array(myadcip.make_rdm1())
-        self.assertAlmostEqual(rdms_test(dm1_exc[0][0],dm1_exc[1][0]), 21.53337229793503, 6)
-        self.assertAlmostEqual(rdms_test(dm1_exc[0][1],dm1_exc[1][1]), 21.53337229793504, 6)
-        self.assertAlmostEqual(rdms_test(dm1_exc[0][2],dm1_exc[1][2]), 21.53337229793506, 6)
+        self.assertAlmostEqual(spin[0],2.01804931 , 5)
+        self.assertAlmostEqual(spin[1],2.01804931 , 5)
+        self.assertAlmostEqual(spin[2],2.01804931 , 5)
 
     def test_ip_adc2x(self):
         myadc.method = "adc(2)-x"
@@ -81,6 +74,7 @@ class KnownValues(unittest.TestCase):
 
         myadcip = adc.uadc_ip.UADCIP(myadc)
         e,v,p,x = myadcip.kernel(nroots=3)
+        spin = get_spin_square(myadcip)[0]
 
         self.assertAlmostEqual(e[0], 0.36951642121691, 6)
         self.assertAlmostEqual(e[1], 0.36951642121691,  6)
@@ -90,10 +84,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.92695415467651,  6)
         self.assertAlmostEqual(p[2], 0.92695415467651,  6)
 
-        dm1_exc = np.array(myadcip.make_rdm1())
-        self.assertAlmostEqual(rdms_test(dm1_exc[0][0],dm1_exc[1][0]), 21.18511985058944, 6)
-        self.assertAlmostEqual(rdms_test(dm1_exc[0][1],dm1_exc[1][1]), 21.18511985058942, 6)
-        self.assertAlmostEqual(rdms_test(dm1_exc[0][2],dm1_exc[1][2]), 21.18511985058942, 6)
+        self.assertAlmostEqual(spin[0],2.02906429 , 5)
+        self.assertAlmostEqual(spin[1],2.02906429 , 5)
+        self.assertAlmostEqual(spin[2],2.02906429 , 5)
 
     def test_ip_adc3(self):
         myadc.method = "adc(3)"
@@ -102,6 +95,7 @@ class KnownValues(unittest.TestCase):
 
         myadcip = adc.uadc_ip.UADCIP(myadc)
         e,v,p,x = myadcip.kernel(nroots=3)
+        spin = get_spin_square(myadcip)[0]
 
         self.assertAlmostEqual(e[0], 0.37866365404487, 6)
         self.assertAlmostEqual(e[1], 0.37866365404487, 6)
@@ -111,10 +105,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.92603990249875, 6)
         self.assertAlmostEqual(p[2], 0.92603990249875, 6)
 
-        dm1_exc = np.array(myadcip.make_rdm1())
-        self.assertAlmostEqual(rdms_test(dm1_exc[0][0],dm1_exc[1][0]), 21.31223422821962, 6)
-        self.assertAlmostEqual(rdms_test(dm1_exc[0][1],dm1_exc[1][1]), 21.31223422821966, 6)
-        self.assertAlmostEqual(rdms_test(dm1_exc[0][2],dm1_exc[1][2]), 21.31223422821963, 6)
+        self.assertAlmostEqual(spin[0],2.02999351 , 5)
+        self.assertAlmostEqual(spin[1],2.02999351 , 5)
+        self.assertAlmostEqual(spin[2],2.02999351 , 5)
 
 if __name__ == "__main__":
     print("IP calculations for different ADC methods for open-shell atom")

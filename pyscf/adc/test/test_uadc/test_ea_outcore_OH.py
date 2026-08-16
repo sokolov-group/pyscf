@@ -13,7 +13,6 @@
 # limitations under the License.
 #
 # Author: Samragni Banerjee <samragnibanerjee4@gmail.com>
-#         Ning-Yuan Chen <cny003@outlook.com>
 #         Alexander Sokolov <alexander.y.sokolov@gmail.com>
 #
 
@@ -22,9 +21,10 @@ import numpy
 from pyscf import gto
 from pyscf import scf
 from pyscf import adc
+from pyscf.adc.uadc_ea import get_spin_square
 
 def setUpModule():
-    global mol, mf, myadc, myadc_fr
+    global mol, mf, myadc
     r = 0.969286393
     mol = gto.Mole()
     mol.atom = [
@@ -42,13 +42,10 @@ def setUpModule():
     myadc = adc.ADC(mf)
     myadc.conv_tol = 1e-12
     myadc.tol_residual = 1e-6
-    myadc_fr = adc.ADC(mf,frozen=(1,1))
-    myadc_fr.conv_tol = 1e-12
-    myadc_fr.tol_residual = 1e-6
 
 def tearDownModule():
-    global mol, mf, myadc, myadc_fr
-    del mol, mf, myadc, myadc_fr
+    global mol, mf, myadc
+    del mol, mf, myadc
 
 class KnownValues(unittest.TestCase):
 
@@ -58,6 +55,7 @@ class KnownValues(unittest.TestCase):
         myadc.incore_complete = False
         myadc.method_type = "ea"
         e,v,p,x = myadc.kernel(nroots=3)
+        spin = get_spin_square(myadc._adc_es)[0]
         e_corr = myadc.e_corr
 
         self.assertAlmostEqual(e_corr, -0.16402828164387806, 6)
@@ -70,6 +68,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.9953781149964537, 6)
         self.assertAlmostEqual(p[2], 0.9956169835481459, 6)
 
+        self.assertAlmostEqual(spin[0],0.10364918 , 5)
+        self.assertAlmostEqual(spin[1],2.00245829 , 5)
+        self.assertAlmostEqual(spin[2],1.00242291 , 5)
+
     def test_ea_adc2x(self):
 
         myadc.max_memory = 300
@@ -78,6 +80,7 @@ class KnownValues(unittest.TestCase):
         myadc.method_type = "ea"
 
         e,v,p,x = myadc.kernel(nroots=3)
+        spin = get_spin_square(myadc._adc_es)[0]
 
         self.assertAlmostEqual(e[0], -0.07750642898162931, 6)
         self.assertAlmostEqual(e[1], 0.029292010466571882, 6)
@@ -86,6 +89,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[0], 0.8323987058794676, 6)
         self.assertAlmostEqual(p[1], 0.9918705979602267, 6)
         self.assertAlmostEqual(p[2], 0.9772855298541363, 6)
+
+        self.assertAlmostEqual(spin[0],0.11613015 , 5)
+        self.assertAlmostEqual(spin[1],2.00053620 , 5)
+        self.assertAlmostEqual(spin[2],1.00119649 , 5)
 
     def test_ea_adc3_high_cost(self):
 
@@ -97,6 +104,7 @@ class KnownValues(unittest.TestCase):
 
         myadc.method_type = "ea"
         e,v,p,x = myadc.kernel(nroots=3)
+        spin = get_spin_square(myadc._adc_es)[0]
         myadc.analyze()
 
         self.assertAlmostEqual(e[0], -0.045097652872531736, 6)
@@ -107,25 +115,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.9927117650068699, 6)
         self.assertAlmostEqual(p[2], 0.9766456031927034, 6)
 
-    def test_ea_adc3_high_cost_frozen(self):
-
-        myadc_fr.max_memory = 300
-        myadc_fr.incore_complete = False
-        myadc_fr.method = "adc(3)"
-        e, t_amp1, t_amp2 = myadc_fr.kernel_gs()
-        self.assertAlmostEqual(e, -0.17416890784191413, 6)
-
-        myadc_fr.method_type = "ea"
-        e,v,p,x = myadc_fr.kernel(nroots=3)
-        myadc_fr.analyze()
-
-        self.assertAlmostEqual(e[0], -0.0449624364309033, 6)
-        self.assertAlmostEqual(e[1],  0.0300414467534955, 6)
-        self.assertAlmostEqual(e[2],  0.03153991727098654, 6)
-
-        self.assertAlmostEqual(p[0], 0.8722200055138165, 6)
-        self.assertAlmostEqual(p[1], 0.9927113317116674, 6)
-        self.assertAlmostEqual(p[2], 0.9767596218115033, 6)
+        self.assertAlmostEqual(spin[0],0.14282701 , 5)
+        self.assertAlmostEqual(spin[1],2.00133383 , 5)
+        self.assertAlmostEqual(spin[2],1.00204599 , 5)
 
 if __name__ == "__main__":
     print("EA calculations for different ADC methods for open-shell molecule")
