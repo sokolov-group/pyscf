@@ -21,7 +21,9 @@ import numpy as np
 from pyscf import gto
 from pyscf import scf
 from pyscf import adc
-from pyscf.adc.uadc_ea import get_spin_square
+from pyscf.adc.uadc_ea import get_spin_square as get_spin_square_ea
+from pyscf.adc.uadc_ee import get_spin_square as get_spin_square_ee
+from pyscf.adc.uadc_ip import get_spin_square as get_spin_square_ip
 
 def setUpModule():
     global mol, mf
@@ -76,7 +78,7 @@ class KnownValues(unittest.TestCase):
         myadc.method = 'adc(3)'
         myadc.method_type = 'ea'
         e,v,p,x = myadc.kernel(nroots=3)
-        spin = get_spin_square(myadc._adc_es)[0]
+        spin = get_spin_square_ea(myadc._adc_es)[0]
 
         e = ADCFG.correct(e)
         self.assertAlmostEqual(e[0], 0.03549859, 6)
@@ -90,6 +92,90 @@ class KnownValues(unittest.TestCase):
         self.assertEqual(len(ADCFG.frozen[0]), 7)
         self.assertEqual(len(ADCFG.frozen[1]), 7)
         self.assertEqual(myadc.nvir_b - myadc.nvir_a, 1)
+
+    def test_ssfno_ee(self):
+        ADCFG = adc.ADC2FNO(mf).set(verbose=0, method_type='ee', ref_state=1)
+        ADCFG.kernel(nroots=3, thresh=1e-3)
+
+        myadc = adc.UADC(mf, ADCFG.frozen, ADCFG.mo_coeff, ADCFG.mo_occ,
+                         ADCFG.mo_energy)
+        myadc.verbose = 0
+        myadc.method = 'adc(3)'
+        myadc.method_type = 'ee'
+        myadc.conv_tol = 1e-8
+        myadc.tol_residual = 1e-6
+        e,v,p,x = myadc.kernel(nroots=3)
+        spin = get_spin_square_ee(myadc._adc_es)[0]
+
+        e = ADCFG.correct(e)
+        self.assertAlmostEqual(e[0], -0.0017148008, 6)
+        self.assertAlmostEqual(e[1],  0.1578325448, 6)
+        self.assertAlmostEqual(e[2],  0.2538784631, 6)
+
+        self.assertAlmostEqual(spin[0], 0.74945130 , 4)
+        self.assertAlmostEqual(spin[1], 0.74941619 , 4)
+        self.assertAlmostEqual(spin[2], 3.69806781 , 4)
+
+        self.assertEqual(len(ADCFG.frozen[0]), 5)
+        self.assertEqual(len(ADCFG.frozen[1]), 5)
+        self.assertAlmostEqual(ADCFG.delta_e_corr, -0.0095566166, 6)
+
+    def test_ssfno_ip_trans_guess(self):
+        ADCFG = adc.ADC2FNO(mf).set(verbose=0, method_type='ip', ref_state=1)
+        ADCFG.trans_guess = True
+        ADCFG.kernel(nroots=3, pct_occ=0.90)
+
+        myadc = adc.UADC(mf, ADCFG.frozen, ADCFG.mo_coeff, ADCFG.mo_occ,
+                         ADCFG.mo_energy)
+        myadc.verbose = 0
+        myadc.method = 'adc(3)'
+        myadc.method_type = 'ip'
+        myadc.conv_tol = 1e-8
+        myadc.tol_residual = 1e-6
+        e,v,p,x = myadc.kernel(nroots=3, guess=ADCFG.v_ssfno)
+        spin = get_spin_square_ip(myadc._adc_es)[0]
+
+        e = ADCFG.correct(e)
+        self.assertAlmostEqual(e[0], 0.4583022367, 6)
+        self.assertAlmostEqual(e[1], 0.4758405834, 6)
+        self.assertAlmostEqual(e[2], 0.5852997495, 6)
+
+        self.assertAlmostEqual(p[0], 0.946861, 6)
+        self.assertAlmostEqual(p[1], 0.727942, 6)
+        self.assertAlmostEqual(p[2], 0.219144, 6)
+
+        self.assertAlmostEqual(spin[0], 2.00297688 , 4)
+        self.assertAlmostEqual(spin[1], 1.02033212 , 4)
+        self.assertAlmostEqual(spin[2], 0.99735675 , 4)
+
+        self.assertEqual(len(ADCFG.frozen[0]), 8)
+        self.assertEqual(len(ADCFG.frozen[1]), 10)
+        self.assertAlmostEqual(ADCFG.delta_e_corr, -0.0564949471, 6)
+
+    def test_ssfno_ea(self):
+        ADCFG = adc.ADC2FNO(mf).set(verbose=0, method_type='ea', ref_state=1)
+        ADCFG.kernel(nroots=3, thresh=1e-3)
+
+        myadc = adc.UADC(mf, ADCFG.frozen, ADCFG.mo_coeff, ADCFG.mo_occ,
+                         ADCFG.mo_energy)
+        myadc.verbose = 0
+        myadc.method = 'adc(3)'
+        myadc.method_type = 'ea'
+        e,v,p,x = myadc.kernel(nroots=3)
+        spin = get_spin_square_ea(myadc._adc_es)[0]
+
+        e = ADCFG.correct(e)
+        self.assertAlmostEqual(e[0], 0.0377227177, 6)
+        self.assertAlmostEqual(e[1], 0.174180062, 6)
+        self.assertAlmostEqual(e[2], 0.1767330484, 6)
+
+        self.assertAlmostEqual(spin[0], 0.04538591 , 4)
+        self.assertAlmostEqual(spin[1], 1.01203833 , 4)
+        self.assertAlmostEqual(spin[2], 2.00037740 , 4)
+
+        self.assertEqual(len(ADCFG.frozen[0]), 5)
+        self.assertEqual(len(ADCFG.frozen[1]), 5)
+        self.assertAlmostEqual(ADCFG.delta_e_corr, -0.0103985555, 6)
 
 if __name__ == "__main__":
     print("FNO/OSFNO calculations for UADC for open-shell OH molecule")

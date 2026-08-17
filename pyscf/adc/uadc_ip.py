@@ -3022,7 +3022,7 @@ class UADCIP(uadc.UADC):
         self.spec_factor_print_tol = adc.spec_factor_print_tol
         self.evec_print_tol = adc.evec_print_tol
 
-        self.compute_spin_square = False
+        self.compute_spin_square = adc.compute_spin_square
 
         self.E = adc.E
         self.U = adc.U
