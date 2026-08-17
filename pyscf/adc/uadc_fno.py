@@ -31,7 +31,7 @@ class UADC2FNO(uadc.UADC):
     #J. Chem. Phys. 159, 084113 (2023)
     _keys = uadc.UADC._keys | {'delta_e','delta_e_corr','e_can','v_can','e_corr_can',
                           'mo_energy','rdm1_ss','ref_state','trans_guess',
-                          'p_can','p_ssfno','delta_e_qp','is_qp'
+                          'p_can','p_ssfno','delta_e_qp','is_qp','if_osfno'
                           }
 
     def __init__(self, mf, frozen=0, mo_coeff=None, mo_occ=None, mo_energy=None, f_ov=None):
@@ -49,6 +49,7 @@ class UADC2FNO(uadc.UADC):
         self.ref_state = None
         self.if_naf = False
         self.trans_guess = False
+        self.if_osfno = False
 
     def kernel_gs(self, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None):
         cput0 = (logger.process_clock(), logger.perf_counter())
@@ -133,12 +134,12 @@ class UADC2FNO(uadc.UADC):
         else:
             self.e_can,self.v_can,self.p_can,_ = uadc.UADC.kernel(self,nroots,guess)
         self.if_heri_eris = heri_tmp
-        rdm1_gs = self.make_ref_rdm1()
+        rdm1_gs = self.make_ref_rdm1(ao_repr=self.if_osfno)
         self.e_corr_can = self.e_corr
         if self.ref_state is not None and self.ref_state > 0:
             rdm1_gs_a = rdm1_gs[0]
             rdm1_gs_b = rdm1_gs[1]
-            rdm1_es = self.make_rdm1()
+            rdm1_es = self.make_rdm1(ao_repr=self.if_osfno)
             rdm1_es_a = rdm1_es[0][self.ref_state - 1]
             rdm1_es_b = rdm1_es[1][self.ref_state - 1]
             self.rdm1_ss = (rdm1_es_a + rdm1_gs_a, rdm1_es_b + rdm1_gs_b)
@@ -157,56 +158,118 @@ class UADC2FNO(uadc.UADC):
         mask_b = masks[1]
         rdm1_ss_a = rdm1_ss[0]
         rdm1_ss_b = rdm1_ss[1]
-
-        n_a,V_a = np.linalg.eigh(rdm1_ss_a[nocc_a:,nocc_a:])
-        idx = np.argsort(n_a)[::-1]
-        n_a,V_a = n_a[idx], V_a[:,idx]
-
-        n_b,V_b = np.linalg.eigh(rdm1_ss_b[nocc_b:,nocc_b:])
-        idx = np.argsort(n_b)[::-1]
-        n_b,V_b = n_b[idx], V_b[:,idx]
-
-        if nvir_act is None:
-            if pct_occ is None:
-                T_a = n_a > thresh
-                T_b = n_b > thresh
-            else:
-                cumsum_a = np.cumsum(n_a/np.sum(n_a))
-                cumsum_b = np.cumsum(n_b/np.sum(n_b))
-                T_a = np.array([c <= pct_occ or np.isclose(c, pct_occ) for c in cumsum_a])
-                T_b = np.array([c <= pct_occ or np.isclose(c, pct_occ) for c in cumsum_b])
-        else:
-            T_a = np.array([i < nvir_act for i in range(len(n_a))])
-            T_b = np.array([i < nvir_act for i in range(len(n_b))])
-    
-        n_fro_vir_a = np.sum(T_a == 0)
-        T_a = np.diag(T_a)
-        V_trunc_a = V_a.dot(T_a)
-        n_keep_a = V_trunc_a.shape[0]-n_fro_vir_a
-
-        n_fro_vir_b = np.sum(T_b == 0)
-        T_b = np.diag(T_b)
-        V_trunc_b = V_b.dot(T_b)
-        n_keep_b = V_trunc_b.shape[0]-n_fro_vir_b
-
         moeoccfrz0_a, moeocc_a, moevir_a, moevirfrz0_a = [mo_energy_a[m] for m in mask_a]
         orboccfrz0_a, orbocc_a, orbvir_a, orbvirfrz0_a = [mo_a_coeff[:,m] for m in mask_a]
-        F_can_a =  np.diag(moevir_a)
-        F_trunc_a = V_trunc_a.T.dot(F_can_a).dot(V_trunc_a)
-        e_trunc_a,Z_trunc_a = np.linalg.eigh(F_trunc_a[:n_keep_a,:n_keep_a])
-        U_vir_act_a = orbvir_a.dot(V_trunc_a[:,:n_keep_a]).dot(Z_trunc_a)
-        U_vir_fro_a = orbvir_a.dot(V_trunc_a[:,n_keep_a:])
-
         moeoccfrz0_b, moeocc_b, moevir_b, moevirfrz0_b = [mo_energy_b[m] for m in mask_b]
         orboccfrz0_b, orbocc_b, orbvir_b, orbvirfrz0_b = [mo_b_coeff[:,m] for m in mask_b]
-        F_can_b =  np.diag(moevir_b)
+
+        if self.if_osfno:
+            # Open-shell FNO, J. Chem. Phys. 152, 034105 (2020)
+            ovlp_ao = self._scf.get_ovlp()
+
+            if nocc_a >= nocc_b:
+                ovlp_oV = orbocc_a.T.dot(ovlp_ao).dot(orbvir_b)
+                _, s_sv, Vh_sv = np.linalg.svd(ovlp_oV)
+                B_a = np.eye(orbvir_a.shape[1])
+                B_b = Vh_sv.T
+            else:
+                ovlp_Ov = orbocc_b.T.dot(ovlp_ao).dot(orbvir_a)
+                _, s_sv, Vh_sv = np.linalg.svd(ovlp_Ov)
+                B_a = Vh_sv.T
+                B_b = np.eye(orbvir_b.shape[1])
+
+            k_os = int(np.count_nonzero(s_sv > 0.5))
+            logger.debug(self, "OSFNO overlap singular values: %s", s_sv)
+            logger.info(self, "OSFNO: %d open-shell partner virtuals detected "
+                        "(nocc_a - nocc_b = %d)", k_os, nocc_a - nocc_b)
+            if k_os != abs(nocc_a - nocc_b):
+                logger.warn(self, "OSFNO: number of near-unity overlap singular "
+                            "values (%d) differs from nocc_a - nocc_b (%d)",
+                            k_os, nocc_a - nocc_b)
+
+            # singlet part of the state density in the AO basis
+            rdm1_s_ao = 0.5 * (rdm1_ss_a + rdm1_ss_b)
+
+            if nocc_a >= nocc_b:
+                tilde_vir_a = orbvir_a
+                tilde_vir_b = orbvir_b.dot(B_b[:, k_os:])
+            else:
+                tilde_vir_a = orbvir_a.dot(B_a[:, k_os:])
+                tilde_vir_b = orbvir_b
+
+            rdm1_vV = tilde_vir_a.T.dot(ovlp_ao).dot(rdm1_s_ao).dot(ovlp_ao).dot(tilde_vir_b)
+            V_a, n, Vh_b = np.linalg.svd(rdm1_vV)
+            V_b = Vh_b.T
+
+            if nvir_act is None:
+                if pct_occ is None:
+                    T = n > thresh
+                else:
+                    cumsum = np.cumsum(n/np.sum(n))
+                    T = np.array([c <= pct_occ or np.isclose(c, pct_occ) for c in cumsum])
+            else:
+                T = np.array([i < nvir_act for i in range(len(n))])
+            if not T.any():
+                logger.warn(self, "All virtual NO pairs were requested to be frozen.\n"
+                            "At least one pair must be retained for ADC calculations.\n"
+                            "Keeping one pair automatically.")
+                T[0] = True
+
+            idx = np.argsort(~T, kind='stable')
+            n_keep = int(np.sum(T))
+
+            if nocc_a >= nocc_b:
+                V_trunc_a = V_a[:, idx]
+                n_keep_a = n_keep
+                V_trunc_b = np.hstack((B_b[:, :k_os], B_b[:, k_os:].dot(V_b[:, idx])))
+                n_keep_b = k_os + n_keep
+            else:
+                V_trunc_b = V_b[:, idx]
+                n_keep_b = n_keep
+                V_trunc_a = np.hstack((B_a[:, :k_os], B_a[:, k_os:].dot(V_a[:, idx])))
+                n_keep_a = k_os + n_keep
+
+        else:
+            n_a,V_a = np.linalg.eigh(rdm1_ss_a[nocc_a:,nocc_a:])
+            idx = np.argsort(n_a)[::-1]
+            n_a,V_trunc_a = n_a[idx], V_a[:,idx]
+
+            n_b,V_b = np.linalg.eigh(rdm1_ss_b[nocc_b:,nocc_b:])
+            idx = np.argsort(n_b)[::-1]
+            n_b,V_trunc_b = n_b[idx], V_b[:,idx]
+
+            if nvir_act is None:
+                if pct_occ is None:
+                    T_a = n_a > thresh
+                    T_b = n_b > thresh
+                else:
+                    cumsum_a = np.cumsum(n_a/np.sum(n_a))
+                    cumsum_b = np.cumsum(n_b/np.sum(n_b))
+                    T_a = np.array([c <= pct_occ or np.isclose(c, pct_occ) for c in cumsum_a])
+                    T_b = np.array([c <= pct_occ or np.isclose(c, pct_occ) for c in cumsum_b])
+            else:
+                T_a = np.array([i < nvir_act for i in range(len(n_a))])
+                T_b = np.array([i < nvir_act for i in range(len(n_b))])
+        
+            n_keep_a = int(np.sum(T_a))
+            n_keep_b = int(np.sum(T_b))
+
+        F_can_a = np.diag(moevir_a)
+        F_can_b = np.diag(moevir_b)
+        F_trunc_a = V_trunc_a.T.dot(F_can_a).dot(V_trunc_a)
         F_trunc_b = V_trunc_b.T.dot(F_can_b).dot(V_trunc_b)
-        e_trunc_b,Z_trunc_b = np.linalg.eigh(F_trunc_b[:n_keep_b,:n_keep_b])
-        U_vir_act_b = orbvir_b.dot(V_trunc_b[:,:n_keep_b]).dot(Z_trunc_b)
-        U_vir_fro_b = orbvir_b.dot(V_trunc_b[:,n_keep_b:])
+        e_trunc_a, Z_trunc_a = np.linalg.eigh(F_trunc_a[:n_keep_a, :n_keep_a])
+        e_trunc_b, Z_trunc_b = np.linalg.eigh(F_trunc_b[:n_keep_b, :n_keep_b])
+        e_fro_a = np.diagonal(F_trunc_a[n_keep_a:, n_keep_a:]).copy()
+        e_fro_b = np.diagonal(F_trunc_b[n_keep_b:, n_keep_b:]).copy()
+
+        U_vir_act_a = orbvir_a.dot(V_trunc_a[:, :n_keep_a]).dot(Z_trunc_a)
+        U_vir_act_b = orbvir_b.dot(V_trunc_b[:, :n_keep_b]).dot(Z_trunc_b)
+        U_vir_fro_a = orbvir_a.dot(V_trunc_a[:, n_keep_a:])
+        U_vir_fro_b = orbvir_b.dot(V_trunc_b[:, n_keep_b:])
 
         no_comp_a = (orboccfrz0_a,orbocc_a,U_vir_act_a,U_vir_fro_a,orbvirfrz0_a)
-        no_e_comp_a = (moeoccfrz0_a, moeocc_a, e_trunc_a, moevir_a[n_keep_a:], moevirfrz0_a)
+        no_e_comp_a = (moeoccfrz0_a, moeocc_a, e_trunc_a, e_fro_a, moevirfrz0_a)
         no_coeff_a = np.hstack(no_comp_a)
         no_energy_a = np.hstack(no_e_comp_a)
         nocc_loc_a = np.cumsum([0]+[x.shape[1] for x in no_comp_a]).astype(int)
@@ -214,7 +277,7 @@ class UADC2FNO(uadc.UADC):
                                 np.arange(nocc_loc_a[3], nocc_loc_a[5]))).astype(int)
 
         no_comp_b = (orboccfrz0_b,orbocc_b,U_vir_act_b,U_vir_fro_b,orbvirfrz0_b)
-        no_e_comp_b = (moeoccfrz0_b, moeocc_b, e_trunc_b, moevir_b[n_keep_b:], moevirfrz0_b)
+        no_e_comp_b = (moeoccfrz0_b, moeocc_b, e_trunc_b, e_fro_b, moevirfrz0_b)
         no_coeff_b = np.hstack(no_comp_b)
         no_energy_b = np.hstack(no_e_comp_b)
         nocc_loc_b = np.cumsum([0]+[x.shape[1] for x in no_comp_b]).astype(int)

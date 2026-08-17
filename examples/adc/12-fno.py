@@ -148,3 +148,49 @@ myadc.tol_residual = 1e-6
 e,v,p,x=myadc.kernel(nroots=4,guess=ADCFG.v_ssfno)
 print("SS-FNO-IP-CVS-UADC excitation energies (eV) are")
 print(ADCFG.correct(e)*27.2114)
+
+#2.3 OSFNO: open-shell FNO for UHF references
+
+# For open-shell references the plain FNO scheme truncates the alpha and beta
+# virtual spaces independently, which unbalances the two spin spaces and may
+# contaminate the spin of the target states. The OSFNO scheme
+# (J. Chem. Phys. 152, 034105 (2020)) identifies, via SVD of the overlap
+# between majority-spin occupied and minority-spin virtual orbitals, the
+# virtual partners of the singly occupied orbitals, which are always kept
+# active, and truncates the remaining virtuals as alpha-beta natural-orbital
+# pairs obtained from the SVD of the singlet part of the state density.
+# It is enabled by setting if_osfno = True (UADC2FNO only).
+from pyscf.adc.uadc_ee import get_spin_square as uadc_ee_get_spin_square
+mol = gto.M(atom='H 0 0 0; O 0 0 0.8', basis='ccpvtz',spin=1)
+mol.verbose=5
+mf = scf.UHF(mol).set(verbose=1).run()
+
+ADCFG = adc.ADC2FNO(mf, frozen=[0,0]).set(verbose=5, method_type='ee')
+ADCFG.if_osfno = True
+# canonical orbitals frozen in advance are combined with the OSFNO truncation
+ADCFG.kernel(nroots=4, pct_occ=0.90)
+
+myadc = adc.UADC(mf,ADCFG.frozen,ADCFG.mo_coeff,ADCFG.mo_occ,ADCFG.mo_energy)
+myadc.method = "adc(3)"
+myadc.method_type = "ee"
+e,v,p,x=myadc.kernel(nroots=4)
+print("OSFNO-UADC excitation energies (eV) are")
+print(ADCFG.correct(e)*27.2114)
+
+#2.4 OSFNO with the ROHF reference: spin purity of the truncated states
+
+mf = scf.ROHF(mol).set(verbose=1).run()
+ADCFG = adc.ADC2FNO(mf).set(verbose=5, method_type='ee')
+ADCFG.if_osfno = True
+ADCFG.kernel(nroots=4, pct_occ=0.90)
+
+# f_ov must be passed when the ROHF reference is used with explicit orbitals
+myadc = adc.UADC(mf,ADCFG.frozen,ADCFG.mo_coeff,mo_energy=ADCFG.mo_energy,f_ov=ADCFG.f_ov)
+myadc.method = "adc(2)-x"
+myadc.method_type = 'ee'
+e,v,p,x=myadc.kernel(nroots=4)
+spin = uadc_ee_get_spin_square(myadc._adc_es)[0]
+print("OSFNO-EE-UADC excitation energies (eV) are")
+print(ADCFG.correct(e)*27.2114)
+print("OSFNO-EE-UADC <S^2> values are")
+print(spin)

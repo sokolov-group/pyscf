@@ -144,7 +144,7 @@ class RADC2FNO(radc.RADC):
 
         n,V = np.linalg.eigh(rdm1_ss[nocc:,nocc:])
         idx = np.argsort(n)[::-1]
-        n,V = n[idx], V[:,idx]
+        n,V_trunc = n[idx], V[:,idx]
         if nvir_act is None:
             if pct_occ is None:
                 T = n > thresh
@@ -154,20 +154,20 @@ class RADC2FNO(radc.RADC):
         else:
             T = np.array([i < nvir_act for i in range(len(n))])
 
-        n_fro_vir = np.sum(T == 0)
-        T = np.diag(T)
-        V_trunc = V.dot(T)
-        n_keep = V_trunc.shape[0]-n_fro_vir
+        n_keep = int(np.sum(T))
 
         moeoccfrz0, moeocc, moevir, moevirfrz0 = [mf.mo_energy[m] for m in masks]
         orboccfrz0, orbocc, orbvir, orbvirfrz0 = [mf.mo_coeff[:,m] for m in masks]
         F_can =  np.diag(moevir)
         F_trunc = V_trunc.T.dot(F_can).dot(V_trunc)
         e_trunc,Z_trunc = np.linalg.eigh(F_trunc[:n_keep,:n_keep])
+        e_fro = np.diagonal(F_trunc[n_keep:, n_keep:]).copy()
+
         U_vir_act = orbvir.dot(V_trunc[:,:n_keep]).dot(Z_trunc)
         U_vir_fro = orbvir.dot(V_trunc[:,n_keep:])
+
         no_comp = (orboccfrz0,orbocc,U_vir_act,U_vir_fro,orbvirfrz0)
-        no_e_comp = (moeoccfrz0,moeocc,e_trunc,moevir[n_keep:],moevirfrz0)
+        no_e_comp = (moeoccfrz0,moeocc,e_trunc,e_fro,moevirfrz0)
         no_coeff = np.hstack(no_comp)
         no_energy = np.hstack(no_e_comp)
         nocc_loc = np.cumsum([0]+[x.shape[1] for x in no_comp]).astype(int)
