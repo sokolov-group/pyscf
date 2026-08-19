@@ -178,7 +178,7 @@ class UADC2FNO(uadc.UADC):
                 B_a = Vh_sv.T
                 B_b = np.eye(orbvir_b.shape[1])
 
-            k_os = int(np.count_nonzero(s_sv > 0.5))
+            k_os = int(np.count_nonzero(s_sv > 0.8))
             logger.debug(self, "OSFNO overlap singular values: %s", s_sv)
             logger.info(self, "OSFNO: %d open-shell partner virtuals detected "
                         "(nocc_a - nocc_b = %d)", k_os, nocc_a - nocc_b)
