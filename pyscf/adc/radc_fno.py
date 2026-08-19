@@ -23,10 +23,9 @@ from pyscf import __config__
 
 class RADC2FNO(radc.RADC):
     #J. Chem. Phys. 159, 084113 (2023)
-    _keys = radc.RADC._keys | {'delta_e','delta_e_corr','e_can','v_can','e_corr_can',
-                          'mo_energy','rdm1_ss','ref_state','trans_guess',
-                          'p_can','p_ssfno','delta_e_qp','is_qp'
-                          }
+    _keys = radc.RADC._keys | {'delta_e', 'delta_e_corr', 'e_can', 'v_can', 'e_corr_can',
+                               'mo_energy', 'rdm1_ss', 'ref_state', 'trans_guess',
+                               'p_can', 'p_ssfno', 'delta_e_qp', 'is_qp'}
 
     def __init__(self, mf, frozen=0, mo_coeff=None, mo_occ=None, mo_energy=None):
         super().__init__(mf, frozen, mo_coeff, mo_occ, mo_energy)
@@ -173,5 +172,5 @@ class RADC2FNO(radc.RADC):
         nocc_loc = np.cumsum([0]+[x.shape[1] for x in no_comp]).astype(int)
         no_frozen = np.hstack((np.arange(nocc_loc[0], nocc_loc[1]),
                                 np.arange(nocc_loc[3], nocc_loc[5]))).astype(int)
-        
+
         self.mo_coeff,self.mo_energy,self.frozen = no_coeff,no_energy,no_frozen

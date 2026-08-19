@@ -29,10 +29,9 @@ from pyscf.data.nist import HARTREE2EV
 
 class UADC2FNO(uadc.UADC):
     #J. Chem. Phys. 159, 084113 (2023)
-    _keys = uadc.UADC._keys | {'delta_e','delta_e_corr','e_can','v_can','e_corr_can',
-                          'mo_energy','rdm1_ss','ref_state','trans_guess',
-                          'p_can','p_ssfno','delta_e_qp','is_qp','if_osfno'
-                          }
+    _keys = uadc.UADC._keys | {'delta_e', 'delta_e_corr', 'e_can', 'v_can', 'e_corr_can',
+                               'mo_energy', 'rdm1_ss', 'ref_state', 'trans_guess',
+                               'p_can', 'p_ssfno', 'delta_e_qp', 'is_qp', 'if_osfno'}
 
     def __init__(self, mf, frozen=0, mo_coeff=None, mo_occ=None, mo_energy=None, f_ov=None):
         super().__init__(mf, frozen, mo_coeff, mo_occ, mo_energy, f_ov)
@@ -79,7 +78,7 @@ class UADC2FNO(uadc.UADC):
             raise ValueError("ref_state should be an int type and in [0,nroots]")
 
         if not getattr(self, 'with_df', None) and not getattr(self._scf, 'with_df', None):
-                self.if_naf = False
+            self.if_naf = False
 
         self.make_ss_rdm1(nroots, guess)
         log.timer('make ss rdm1', *cput0)
@@ -250,7 +249,7 @@ class UADC2FNO(uadc.UADC):
             else:
                 T_a = np.array([i < nvir_act for i in range(len(n_a))])
                 T_b = np.array([i < nvir_act for i in range(len(n_b))])
-        
+
             n_keep_a = int(np.sum(T_a))
             n_keep_b = int(np.sum(T_b))
 
