@@ -346,7 +346,7 @@ class RADC2FNO(kadc_rhf.RADC):
         no_coeff = []
         no_frozen = []
         no_energy = []
-        V = []
+        V_trunc = []
         padding_convention = padding_k_idx(self, kind="joint")
 
         T = []
@@ -355,7 +355,7 @@ class RADC2FNO(kadc_rhf.RADC):
             n, V_k = np.linalg.eigh(rdm1_ss_comp[nocc:, nocc:])
             idx = np.argsort(n)[::-1]
             n, V_k = n[idx], V_k[:, idx]
-            V.append(V_k)
+            V_trunc.append(V_k)
             if nvir_act is not None:
                 T.append(np.arange(len(n)) < nvir_act)
             elif pct_occ is not None:
@@ -367,35 +367,33 @@ class RADC2FNO(kadc_rhf.RADC):
         # "min": union the per-kpt masks so every k-point keeps the same count
         if self.mode.lower() == "min":
             T_min = np.logical_or.reduce(np.stack(T), axis=0)
-            n_fro_vir = np.sum(T_min == 0)
-            if n_fro_vir == self.nmo - self.nocc:
+            n_keep = int(np.sum(T_min))
+            if n_keep == 0:
                 log.warn("All virtual orbitals were requested to be frozen.\n"
                          "At least one virtual orbital must be retained for ADC calculations.\n"
                          "Keeping one virtual orbital automatically.")
-                n_fro_vir -= 1
+                n_keep += 1
                 T_min[0] = True
-            T_k = np.diag(T_min)
 
         for kpt in range(self.nkpts):
+            V_trunc_k = V_trunc[kpt]
             if self.mode.lower() != "min":
-                n_fro_vir = np.sum(T[kpt] == 0)
-                if n_fro_vir == len(T[kpt]):
+                n_keep = int(np.sum(T[kpt]))
+                if n_keep == 0:
                     log.warn("All virtual orbitals frozen at kpt %d; keeping one." % kpt)
-                    n_fro_vir -= 1
+                    n_keep += 1
                     T[kpt][0] = True
-                T_k = np.diag(T[kpt])
-            V_trunc = V[kpt].dot(T_k)
-            n_keep = V_trunc.shape[0] - n_fro_vir
 
             moeoccfrz0, moeocc, moevir, moevirfrz0 = [mf.mo_energy[kpt][m] for m in masks[kpt]]
             orboccfrz0, orbocc, orbvir, orbvirfrz0 = [mf.mo_coeff[kpt][:, m] for m in masks[kpt]]
             F_can = np.diag(moevir)
-            F_trunc = V_trunc.T.conj().dot(F_can).dot(V_trunc)
+            F_trunc = V_trunc_k.T.conj().dot(F_can).dot(V_trunc_k)
             e_trunc, Z_trunc = np.linalg.eigh(F_trunc[:n_keep, :n_keep])
-            U_vir_act = orbvir.dot(V_trunc[:, :n_keep]).dot(Z_trunc)
-            U_vir_fro = orbvir.dot(V_trunc[:, n_keep:])
+            e_fro = np.diagonal(F_trunc[n_keep:, n_keep:]).copy()
+            U_vir_act = orbvir.dot(V_trunc_k[:, :n_keep]).dot(Z_trunc)
+            U_vir_fro = orbvir.dot(V_trunc_k[:, n_keep:])
             no_comp = (orboccfrz0, orbocc, U_vir_act, U_vir_fro, orbvirfrz0)
-            no_e_comp = (moeoccfrz0, moeocc, e_trunc, moevir[n_keep:], moevirfrz0)
+            no_e_comp = (moeoccfrz0, moeocc, e_trunc, e_fro, moevirfrz0)
             no_coeff_k = np.hstack(no_comp)
             no_energy_k = np.hstack(no_e_comp)
             nocc_loc = np.cumsum([0] + [x.shape[1] for x in no_comp]).astype(int)
