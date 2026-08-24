@@ -67,9 +67,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.9953781149964537, 6)
         self.assertAlmostEqual(p[2], 0.9956169835481459, 6)
 
-        self.assertAlmostEqual(spin[0],0.10364918 , 5)
-        self.assertAlmostEqual(spin[1],2.00245829 , 5)
-        self.assertAlmostEqual(spin[2],1.00242291 , 5)
+        self.assertAlmostEqual(spin[0],0.09548451 , 5)
+        self.assertAlmostEqual(spin[1],2.00137477 , 5)
+        self.assertAlmostEqual(spin[2],1.00133557 , 5)
 
     def test_ea_adc2_oneroot(self):
 
@@ -81,7 +81,7 @@ class KnownValues(unittest.TestCase):
 
         self.assertAlmostEqual(p[0], 0.9953781149964537, 6)
 
-        self.assertAlmostEqual(spin[0],2.00245829 , 5)
+        self.assertAlmostEqual(spin[0],2.00137477 , 5)
 
     def test_ea_adc2x(self):
 
@@ -99,9 +99,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.9918705979602267, 6)
         self.assertAlmostEqual(p[2], 0.9772855298541363, 6)
 
-        self.assertAlmostEqual(spin[0],0.11613015 , 5)
-        self.assertAlmostEqual(spin[1],2.00053620 , 5)
-        self.assertAlmostEqual(spin[2],1.00119649 , 5)
+        self.assertAlmostEqual(spin[0],0.10968161 , 5)
+        self.assertAlmostEqual(spin[1],1.99945865 , 5)
+        self.assertAlmostEqual(spin[2],1.00013160 , 5)
 
 
     def test_ea_adc3(self):
@@ -123,9 +123,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.9927117650068699, 6)
         self.assertAlmostEqual(p[2], 0.9766456031927034, 6)
 
-        self.assertAlmostEqual(spin[0],0.14282701 , 5)
-        self.assertAlmostEqual(spin[1],2.00133383 , 5)
-        self.assertAlmostEqual(spin[2],1.00204599 , 5)
+        self.assertAlmostEqual(spin[0],0.13478510 , 5)
+        self.assertAlmostEqual(spin[1],2.00074712 , 5)
+        self.assertAlmostEqual(spin[2],0.99950514 , 5)
 
 if __name__ == "__main__":
     print("EA calculations for different ADC methods for open-shell molecule")

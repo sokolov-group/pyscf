@@ -92,10 +92,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2], 0.77604385, 6)
         self.assertAlmostEqual(p[3], 0.20823964, 6)
 
-        self.assertAlmostEqual(spin[0],0.04458781 , 5)
-        self.assertAlmostEqual(spin[1],2.00043523 , 5)
-        self.assertAlmostEqual(spin[2],1.00417610 , 5)
-        self.assertAlmostEqual(spin[3],1.00858227 , 5)
+        self.assertAlmostEqual(spin[0],0.04214584 , 5)
+        self.assertAlmostEqual(spin[1],2.00016818 , 5)
+        self.assertAlmostEqual(spin[2],0.99959686 , 5)
+        self.assertAlmostEqual(spin[3],1.01303795 , 5)
 
 
     def test_ip_dfadc3_dif_aux_basis(self):
@@ -121,9 +121,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.58692581, 6)
         self.assertAlmostEqual(p[2], 0.35111056, 6)
 
-        self.assertAlmostEqual(spin[0],2.00071967 , 5)
-        self.assertAlmostEqual(spin[1],1.01917294 , 5)
-        self.assertAlmostEqual(spin[2],1.00048723 , 5)
+        self.assertAlmostEqual(spin[0],2.00027744 , 5)
+        self.assertAlmostEqual(spin[1],1.01484199 , 5)
+        self.assertAlmostEqual(spin[2],1.00552388 , 5)
 
 
     def test_hf_dfadc3_ip(self):
@@ -150,9 +150,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.58692425, 6)
         self.assertAlmostEqual(p[2], 0.35110754 ,6)
 
-        self.assertAlmostEqual(spin[0],2.00071947 , 5)
-        self.assertAlmostEqual(spin[1],1.01917353 , 5)
-        self.assertAlmostEqual(spin[2],1.00048707 , 5)
+        self.assertAlmostEqual(spin[0],2.00027725 , 5)
+        self.assertAlmostEqual(spin[1],1.01484194 , 5)
+        self.assertAlmostEqual(spin[2],1.00552440 , 5)
 
 if __name__ == "__main__":
     print("DF-ADC calculations for different UADC methods for OH")

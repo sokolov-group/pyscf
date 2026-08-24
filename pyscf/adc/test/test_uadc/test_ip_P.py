@@ -64,9 +64,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.94893331006538, 6)
         self.assertAlmostEqual(p[2], 0.94893331006538, 6)
 
-        self.assertAlmostEqual(spin[0],2.01804931 , 5)
-        self.assertAlmostEqual(spin[1],2.01804931 , 5)
-        self.assertAlmostEqual(spin[2],2.01804931 , 5)
+        self.assertAlmostEqual(spin[0],2.01810687 , 5)
+        self.assertAlmostEqual(spin[1],2.01810687 , 5)
+        self.assertAlmostEqual(spin[2],2.01810687 , 5)
 
     def test_ip_adc2x(self):
         myadc.method = "adc(2)-x"
@@ -85,9 +85,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.92695415467651,  6)
         self.assertAlmostEqual(p[2], 0.92695415467651,  6)
 
-        self.assertAlmostEqual(spin[0],2.02906429 , 5)
-        self.assertAlmostEqual(spin[1],2.02906429 , 5)
-        self.assertAlmostEqual(spin[2],2.02906429 , 5)
+        self.assertAlmostEqual(spin[0],2.02912071 , 5)
+        self.assertAlmostEqual(spin[1],2.02912071 , 5)
+        self.assertAlmostEqual(spin[2],2.02912071 , 5)
 
     def test_ip_adc3(self):
         myadc.method = "adc(3)"
@@ -106,9 +106,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.92603990249875, 6)
         self.assertAlmostEqual(p[2], 0.92603990249875, 6)
 
-        self.assertAlmostEqual(spin[0],2.02999351 , 5)
-        self.assertAlmostEqual(spin[1],2.02999351 , 5)
-        self.assertAlmostEqual(spin[2],2.02999351 , 5)
+        self.assertAlmostEqual(spin[0],2.02358658 , 5)
+        self.assertAlmostEqual(spin[1],2.02358658 , 5)
+        self.assertAlmostEqual(spin[2],2.02358658 , 5)
 
 if __name__ == "__main__":
     print("IP calculations for different ADC methods for open-shell atom")

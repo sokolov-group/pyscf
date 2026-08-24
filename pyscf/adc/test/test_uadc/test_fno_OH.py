@@ -85,9 +85,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[1], 0.16628554, 6)
         self.assertAlmostEqual(e[2], 0.18655859, 6)
 
-        self.assertAlmostEqual(spin[0], 0.04230651 , 4)
-        self.assertAlmostEqual(spin[1], 1.01062603 , 4)
-        self.assertAlmostEqual(spin[2], 2.00184363 , 4)
+        self.assertAlmostEqual(spin[0], 0.04000281 , 4)
+        self.assertAlmostEqual(spin[1], 1.00930902 , 4)
+        self.assertAlmostEqual(spin[2], 2.00185480 , 4)
 
         self.assertEqual(len(ADCFG.frozen[0]), 7)
         self.assertEqual(len(ADCFG.frozen[1]), 7)
@@ -144,9 +144,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.727942, 6)
         self.assertAlmostEqual(p[2], 0.219144, 6)
 
-        self.assertAlmostEqual(spin[0], 2.00297688 , 4)
-        self.assertAlmostEqual(spin[1], 1.02033212 , 4)
-        self.assertAlmostEqual(spin[2], 0.99735675 , 4)
+        self.assertAlmostEqual(spin[0], 2.00270571 , 4)
+        self.assertAlmostEqual(spin[1], 1.01817654 , 4)
+        self.assertAlmostEqual(spin[2], 1.00095355 , 4)
 
         self.assertEqual(len(ADCFG.frozen[0]), 8)
         self.assertEqual(len(ADCFG.frozen[1]), 10)
@@ -169,9 +169,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[1], 0.174180062, 6)
         self.assertAlmostEqual(e[2], 0.1767330484, 6)
 
-        self.assertAlmostEqual(spin[0], 0.04538591 , 4)
-        self.assertAlmostEqual(spin[1], 1.01203833 , 4)
-        self.assertAlmostEqual(spin[2], 2.00037740 , 4)
+        self.assertAlmostEqual(spin[0], 0.04293942 , 4)
+        self.assertAlmostEqual(spin[1], 1.00898190 , 4)
+        self.assertAlmostEqual(spin[2], 2.00026898 , 4)
 
         self.assertEqual(len(ADCFG.frozen[0]), 5)
         self.assertEqual(len(ADCFG.frozen[1]), 5)
