@@ -23994,13 +23994,13 @@ class UADCEE(uadc.UADC):
 
     _keys = {
         'tol_residual', 'conv_tol', 'e_corr', 'method',
-        'method_type', 'mo_coeff', 'mo_coeff_hf', 'mo_energy_a', 'mo_energy_b', 'max_memory',
+        'method_type', 'mo_coeff', 'mo_energy_a', 'mo_energy_b', 'max_memory',
         't1', 't2', 'max_space', 'max_cycle',
         'nocc_a', 'nocc_b', 'nvir_a', 'nvir_b', 'mo_energy_a',
         'mo_energy_b', 'nmo_a', 'nmo_b', 'mol', 'transform_integrals',
         'with_df', 'spec_factor_print_tol', 'evec_print_tol',
         'compute_properties', 'approx_trans_moments', 'E', 'U', 'P', 'X',
-        '_make_rdm1', 'frozen', 'mo_occ'
+        'if_naf', 'naux'
     }
 
     def __init__(self, adc):
@@ -24035,8 +24035,8 @@ class UADCEE(uadc.UADC):
         self.with_df = adc.with_df
         self.compute_properties = adc.compute_properties
         self.approx_trans_moments = adc.approx_trans_moments
-        self.frozen = adc.frozen
-        self.mo_occ = adc.mo_occ
+        self.if_naf = adc.if_naf
+        self.naux = adc.naux
 
         self.spec_factor_print_tol = adc.spec_factor_print_tol
         self.evec_print_tol = adc.evec_print_tol
@@ -24045,13 +24045,14 @@ class UADCEE(uadc.UADC):
         self.U = adc.U
         self.P = adc.P
         self.X = adc.X
+        self._adc_es = self
 
         self.f_ov = adc.f_ov
+        self.frozen = adc.frozen
+        self.mo_occ = adc.mo_occ
         self.compute_spin_square = adc.compute_spin_square
         self.dip_mom = adc.dip_mom
         self.dip_mom_nuc = adc.dip_mom_nuc
-
-        self._adc_es = self
 
     kernel = uadc.kernel
     get_imds = get_imds
