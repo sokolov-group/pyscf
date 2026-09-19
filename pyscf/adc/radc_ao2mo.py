@@ -256,7 +256,7 @@ def transform_integrals_df(myadc):
         eris.Lov = lib.ddot(N_trunc,eris.Lov)
         Lvo = lib.ddot(N_trunc,Lvo)
         eris.Lvv = lib.ddot(N_trunc,eris.Lvv)
-        if not isinstance(myadc.ncvs, type(None)) and myadc.ncvs > 0:
+        if myadc.ncvs is not None and myadc.ncvs > 0:
             ncvs = myadc.ncvs
             eris.Lee = eris.Lvv
             eris.Lce = eris.Lov.reshape(myadc.naux,nocc,nvir)[:,:ncvs,:]

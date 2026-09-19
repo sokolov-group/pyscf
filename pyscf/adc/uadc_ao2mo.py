@@ -427,7 +427,7 @@ def transform_integrals_df(myadc):
 
         eris.Lvv = eris.Lvv.reshape(myadc.naux,nvir_a,nvir_a)
         eris.LVV = eris.LVV.reshape(myadc.naux,nvir_b,nvir_b)
-        if not isinstance(myadc.ncvs, type(None)) and myadc.ncvs > 0:
+        if myadc.ncvs is not None and myadc.ncvs > 0:
             eris.Lee = eris.Lvv
             eris.LEE = eris.LVV
 
@@ -509,7 +509,7 @@ def transform_integrals_df(myadc):
     else:
         eris.Lov = eris.Lov.reshape(myadc.naux,nocc_a,nvir_a)
         eris.LOV = eris.LOV.reshape(myadc.naux,nocc_b,nvir_b)
-        if not isinstance(myadc.ncvs, type(None)) and myadc.ncvs > 0:
+        if myadc.ncvs is not None and myadc.ncvs > 0:
             eris.Lce = eris.Lov[:,:myadc.ncvs,:]
             eris.LCE = eris.LOV[:,:myadc.ncvs,:]
 

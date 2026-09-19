@@ -402,7 +402,7 @@ def get_imds(adc, eris=None):
                             'lmdf,lmed->ef', t2_1[kl, km, kd], t2_1[kl, km, ke].conj(), optimize=True)
                         temp_t2_vv_5 = lib.einsum(
                             'mlfd,mled->ef', t2_1[km, kl, kf], t2_1[km, kl, ke].conj(), optimize=True)
-                        if isinstance(eris.vvvv, type(None)):
+                        if eris.vvvv is None:
                             chnk_size = adc.chnk_size
                             chnk_size = min(chnk_size, nvir)
                             a = 0
@@ -606,7 +606,7 @@ def matvec(adc, kshift, M_ab=None, eris=None):
         for kb in range(nkpts):
             for kc in range(nkpts):
                 ki = kconserv[kb, kshift, kc]
-                if isinstance(eris.ovvv, type(None)):
+                if eris.ovvv is None:
                     chnk_size = adc.chnk_size
                     chnk_size = min(chnk_size, nocc)
                     a = 0
@@ -663,7 +663,7 @@ def matvec(adc, kshift, M_ab=None, eris=None):
                             r2_1 = r2.reshape(nkpts, nkpts, nocc, nvir * nvir)
                             s2[ki, kx] += np.dot(r2_1[ki, kw], eris_vvvv[kx, ky,
                                                  kw].T.conj()).reshape(nocc, nvir, nvir)
-                        elif isinstance(eris.vvvv, type(None)):
+                        elif eris.vvvv is None:
                             s2[ki, kx] += ea_contract_r_vvvv(adc, r2[ki, kw], eris.Lvv, kx, ky, kw)
                         else:
                             s2[ki, kx] += ea_contract_r_vvvv(adc, r2[ki, kw], eris.vvvv, kx, ky, kw)
@@ -890,7 +890,7 @@ def matvec(adc, kshift, M_ab=None, eris=None):
                         temp = np.zeros((nocc, nvir, nvir), dtype=np.complex128)
                         temp_1_1 = np.zeros((nocc, nvir, nvir), dtype=np.complex128)
                         temp_2_1 = np.zeros((nocc, nvir, nvir), dtype=np.complex128)
-                        if isinstance(eris.ovvv, type(None)):
+                        if eris.ovvv is None:
                             chnk_size = adc.chnk_size
                             chnk_size = min(chnk_size, nocc)
                             a = 0
