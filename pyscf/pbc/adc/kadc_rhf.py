@@ -491,6 +491,19 @@ class RADC(pyscf.adc.radc.RADC):
             self.eris = eris
         return e_exc, v_exc, spec_fac, x
 
+    def _close_amp_scratch(self):
+        # close the HDF5 scratch file backing the on-disk amplitudes
+        for attr in ('_amp_h5file', '_amp_tmpfile'):
+            fh = getattr(self, attr, None)
+            if fh is not None:
+                try:
+                    fh.close()
+                except (AttributeError, OSError, ValueError):
+                    pass
+
+    def __del__(self):
+        self._close_amp_scratch()
+
     def ip_adc(self, nroots=1, guess=None, eris=None, kptlist=None):
         from pyscf.pbc.adc import kadc_rhf_ip
         adc_es = kadc_rhf_ip.RADCIP(self)

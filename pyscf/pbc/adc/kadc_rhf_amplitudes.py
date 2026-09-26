@@ -77,9 +77,15 @@ def compute_amplitudes(myadc, eris):
     kpts = myadc.kpts
     madelung = tools.madelung(cell, kpts)
 
+    # release the scratch file from a previous kernel call, if any
+    myadc._close_amp_scratch()
+
     # Compute first-order doubles t2 (tijab)
     tf = tempfile.TemporaryFile()
     f = h5py.File(tf, 'a')
+    # keep the handles so RADC.__del__ can close them when the amplitudes die
+    myadc._amp_h5file = f
+    myadc._amp_tmpfile = tf
     t2_1 = f.create_dataset('t2_1', (nkpts, nkpts, nkpts, nocc, nocc, nvir, nvir), dtype=eris.ovov.dtype)
 
     mo_energy = myadc.mo_energy
