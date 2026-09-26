@@ -66,7 +66,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None):
     if eris is None:
         eris = adc.transform_integrals()
 
-    size, size_int = adc.vector_size()
+    size = adc.vector_size()
     nroots = min(nroots, size)
     nkpts = adc.nkpts
     nmo = adc.nmo
@@ -110,7 +110,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None):
 
         evals_k = evals_k.real
         evals[k] = evals_k
-        evecs[k, :, :size_int] += evecs_k
+        evecs[k, :, :size] += evecs_k
         conv[k] = conv_k.real
 
         U = np.array(evecs[k]).T.copy()

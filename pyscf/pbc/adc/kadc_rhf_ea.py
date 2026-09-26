@@ -53,11 +53,9 @@ def vector_size(adc):
 
     n_singles = nvir
     n_doubles = nkpts * nkpts * nocc * nvir * nvir
-    n_doubles_int = nkpts * nkpts * nocc * nvir * nvir
     size = n_singles + n_doubles
-    size_int = n_singles + n_doubles_int
 
-    return size, size_int
+    return size
 
 
 def get_imds(adc, eris=None):
@@ -585,7 +583,6 @@ def matvec(adc, kshift, M_ab=None, eris=None):
     def sigma_(r):
         cput0 = (time.process_time(), time.time())
         log = logger.Logger(adc.stdout, adc.verbose)
-        nvir = adc.nmo - adc.nocc
 
         r1 = r[s_singles:f_singles]
         r2 = r[s_doubles:f_doubles]
@@ -602,7 +599,6 @@ def matvec(adc, kshift, M_ab=None, eris=None):
 
 ########### ADC(2) coupling blocks #########################
 
-        nvir_c = adc.nmo - adc.nocc
         for kb in range(nkpts):
             for kc in range(nkpts):
                 ki = kconserv[kb, kshift, kc]
@@ -613,28 +609,27 @@ def matvec(adc, kshift, M_ab=None, eris=None):
                     for p in range(0, nocc, chnk_size):
                         eris_ovvv = dfadc.get_ovvv_df(
                             adc, eris.Lov[ki, kc], eris.Lvv[kshift, kb], p, chnk_size).reshape(
-                                -1, nvir_c, nvir_c, nvir_c) / nkpts
+                                -1, nvir, nvir, nvir) / nkpts
                         k = eris_ovvv.shape[0]
-                        s1 += 2. * lib.einsum('icab,ibc->a', eris_ovvv[:, :nvir, :, :nvir].conj(),
+                        s1 += 2. * lib.einsum('icab,ibc->a', eris_ovvv.conj(),
                                               r2[ki, kb, a:a + k], optimize=True)
-                        s2[ki, kb, a:a + k] += lib.einsum('icab,a->ibc', eris_ovvv[:,
-                                                          :nvir, :, :nvir], r1, optimize=True)
+                        s2[ki, kb, a:a + k] += lib.einsum('icab,a->ibc', eris_ovvv, r1, optimize=True)
                         del eris_ovvv
 
                         eris_ovvv = dfadc.get_ovvv_df(
                             adc, eris.Lov[ki, kb], eris.Lvv[kshift, kc], p, chnk_size).reshape(
-                                -1, nvir_c, nvir_c, nvir_c) / nkpts
-                        s1 -= lib.einsum('ibac,ibc->a', eris_ovvv[:, :nvir, :, :nvir].conj(),
+                                -1, nvir, nvir, nvir) / nkpts
+                        s1 -= lib.einsum('ibac,ibc->a', eris_ovvv.conj(),
                                          r2[ki, kb, a:a + k], optimize=True)
                         del eris_ovvv
                         a += k
                 else:
                     eris_ovvv = eris.ovvv[:]
                     s1 += 2. * lib.einsum('icab,ibc->a',
-                                          eris_ovvv[ki, kc, kshift][:, :nvir, :, :nvir].conj(),
+                                          eris_ovvv[ki, kc, kshift].conj(),
                                           r2[ki, kb], optimize=True)
                     s2[ki, kb] += lib.einsum('icab,a->ibc',
-                                             eris_ovvv[ki, kc, kshift][:, :nvir, :, :nvir],
+                                             eris_ovvv[ki, kc, kshift],
                                              r1, optimize=True)
                     del eris_ovvv
 
@@ -648,7 +643,6 @@ def matvec(adc, kshift, M_ab=None, eris=None):
 ################ ADC(3) ajk - bil block ############################
 
         if (method == "adc(2)-x" or method == "adc(3)"):
-            nvir = adc.nmo - adc.nocc
             eris_oovv = eris.oovv
             eris_ovvo = eris.ovvo
 
@@ -1166,151 +1160,6 @@ def make_rdm1(adc, root=None, kptlist=None, K_idx=None, if_ss=False):
         rdm1_k = np.stack(rdm1_k, axis=0)
         rdm1.append(rdm1_k)
     cput0 = log.timer_debug1("completed OPDM calculation", *cput0)
-    return rdm1
-
-
-def make_rdm1_eigenvectors_slow(adc, L, R, kshift):
-
-    L = np.array(L).ravel().conj()
-    R = np.array(R).ravel()
-
-    t2_ce = adc.t1[0]
-    t1_ccee = adc.t2[0]
-
-    einsum = lib.einsum
-    kconserv = adc.khelper.kconserv
-
-    nocc = adc.nocc
-    nmo = adc.nmo
-    nvir = nmo - nocc
-    nkpts = adc.nkpts
-
-    n_singles = nvir
-    n_doubles = nkpts * nkpts * nocc * nvir * nvir
-
-    s1 = 0
-    f1 = n_singles
-    s2 = f1
-    f2 = s2 + n_doubles
-
-    rdm1 = np.zeros((nkpts, nmo, nmo), dtype=np.complex128)
-    kd_oc = np.identity(nocc)
-
-    L1 = L[s1:f1]
-    L2 = L[s2:f2]
-    R1 = R[s1:f1]
-    R2 = R[s2:f2]
-
-    L2 = L2.reshape(nkpts, nkpts, nocc, nvir, nvir)
-    R2 = R2.reshape(nkpts, nkpts, nocc, nvir, nvir)
-
-# block- ij
-    # 000
-    for ki in range(nkpts):
-        rdm1[ki][:nocc, :nocc] += 2 * einsum('ij,m,m->ij', kd_oc, L1, R1, optimize=True)
-    # 101
-    for ka in range(nkpts):
-        for ki in range(nkpts):
-            kb = kconserv[ki, ka, kshift]
-            rdm1[ki][:nocc, :nocc] -= 2 * einsum('Jab,Iab->IJ', L2[ki][ka], R2[ki][ka], optimize=True)
-            rdm1[ki][:nocc, :nocc] += einsum('Jab,Iba->IJ', L2[ki][ka], R2[ki][kb], optimize=True)
-    for kj in range(nkpts):
-        for ki in range(nkpts):
-            for ka in range(nkpts):
-                kb = kconserv[ki, ka, kshift]
-                rdm1[kj][:nocc, :nocc] += 4 * einsum('iab,iab,IJ->IJ', L2[ki][ka], R2[ki][ka], kd_oc, optimize=True)
-                rdm1[kj][:nocc, :nocc] -= 2 * einsum('iab,iba,IJ->IJ', L2[ki][ka], R2[ki][kb], kd_oc, optimize=True)
-    # 020
-    for kj in range(nkpts):
-        for ki in range(nkpts):
-            for kb in range(nkpts):
-                kc = kconserv[kj, kb, ki]
-                rdm1[kj][:nocc, :nocc] -= 4 * einsum('a,a,Iibc,Jibc->IJ', L1, R1,
-                                                     t1_ccee[kj][ki][kb], t1_ccee[kj][ki][kb].conj(), optimize=True)
-                rdm1[kj][:nocc, :nocc] += 2 * einsum('a,a,Iibc,Jicb->IJ', L1, R1,
-                                                     t1_ccee[kj][ki][kb], t1_ccee[kj][ki][kc].conj(), optimize=True)
-            kb = kshift
-            kc = kconserv[kj, kb, ki]
-            rdm1[kj][:nocc, :nocc] += 2 * einsum('a,b,Iiac,Jibc->IJ', L1, R1,
-                                                 t1_ccee[kj][ki][kb], t1_ccee[kj][ki][kb].conj(), optimize=True)
-            rdm1[kj][:nocc, :nocc] -= einsum('a,b,Iiac,Jicb->IJ', L1, R1, t1_ccee[kj]
-                                             [ki][kb], t1_ccee[kj][ki][kc].conj(), optimize=True)
-            rdm1[kj][:nocc, :nocc] -= einsum('a,b,Iica,Jibc->IJ', L1, R1, t1_ccee[kj]
-                                             [ki][kc], t1_ccee[kj][ki][kb].conj(), optimize=True)
-            rdm1[kj][:nocc, :nocc] += 2 * einsum('a,b,Iica,Jicb->IJ', L1, R1,
-                                                 t1_ccee[kj][ki][kc], t1_ccee[kj][ki][kc].conj(), optimize=True)
-
-# block- ab
-    # 000
-    rdm1[kshift][nocc:, nocc:] += einsum('A,B->AB', L1, R1, optimize=True)
-    # 101
-    for ka in range(nkpts):
-        for ki in range(nkpts):
-            kb = kconserv[ki, ka, kshift]
-            rdm1[kb][nocc:, nocc:] += 2 * einsum('iAa,iBa->AB', L2[ki][kb], R2[ki][kb], optimize=True)
-            rdm1[kb][nocc:, nocc:] -= einsum('iAa,iaB->AB', L2[ki][kb], R2[ki][ka], optimize=True)
-            rdm1[kb][nocc:, nocc:] -= einsum('iaA,iBa->AB', L2[ki][ka], R2[ki][kb], optimize=True)
-            rdm1[kb][nocc:, nocc:] += 2 * einsum('iaA,iaB->AB', L2[ki][ka], R2[ki][ka], optimize=True)
-    # 020
-    for ki in range(nkpts):
-        for kj in range(nkpts):
-            ka = kshift
-            kb = kconserv[ki, ka, kj]
-            rdm1[ka][nocc:, nocc:] -= einsum('A,a,ijBb,ijab->AB', L1, R1, t1_ccee[ki]
-                                             [kj][ka], t1_ccee[ki][kj][ka].conj(), optimize=True)
-            rdm1[ka][nocc:, nocc:] += 1 / 2 * einsum('A,a,ijBb,ijba->AB', L1, R1,
-                                                     t1_ccee[ki][kj][ka], t1_ccee[ki][kj][kb].conj(), optimize=True)
-            rdm1[ka][nocc:, nocc:] -= einsum('a,B,ijab,ijAb->AB', L1, R1, t1_ccee[ki]
-                                             [kj][ka], t1_ccee[ki][kj][ka].conj(), optimize=True)
-            rdm1[ka][nocc:, nocc:] += 1 / 2 * einsum('a,B,ijab,ijbA->AB', L1, R1,
-                                                     t1_ccee[ki][kj][ka], t1_ccee[ki][kj][kb].conj(), optimize=True)
-            for ka in range(nkpts):
-                kb = kconserv[ki, ka, kj]
-                rdm1[ka][nocc:, nocc:] += 4 * einsum('a,a,ijBb,ijAb->AB', L1, R1,
-                                                     t1_ccee[ki][kj][ka], t1_ccee[ki][kj][ka].conj(), optimize=True)
-                rdm1[ka][nocc:, nocc:] -= 2 * einsum('a,a,ijBb,ijbA->AB', L1, R1,
-                                                     t1_ccee[ki][kj][ka], t1_ccee[ki][kj][kb].conj(), optimize=True)
-            kb = kshift
-            ka = kconserv[ki, kb, kj]
-            rdm1[ka][nocc:, nocc:] -= 2 * einsum('a,b,ijBa,ijAb->AB', L1, R1,
-                                                 t1_ccee[ki][kj][ka], t1_ccee[ki][kj][ka].conj(), optimize=True)
-            rdm1[ka][nocc:, nocc:] += einsum('a,b,ijBa,ijbA->AB', L1, R1, t1_ccee[ki]
-                                             [kj][ka], t1_ccee[ki][kj][kb].conj(), optimize=True)
-
-# block- ia
-    # 100
-    for ki in range(nkpts):
-        rdm1[ki][:nocc, nocc:] -= einsum('a,IAa->IA', L1, R2[ki][ki], optimize=True)
-        ka = kshift
-        rdm1[ki][:nocc, nocc:] += 2 * einsum('a,IaA->IA', L1, R2[ki][ka], optimize=True)
-    # 110
-    for ki in range(nkpts):
-        for ka in range(nkpts):
-            kj = kshift
-            kb = kconserv[ki, ka, kj]
-            rdm1[kj][:nocc, nocc:] -= 2 * einsum('iab,A,Iiab->IA', L2[ki][ka], R1, t1_ccee[kj][ki][ka], optimize=True)
-            rdm1[kj][:nocc, nocc:] += einsum('iab,A,Iiba->IA', L2[ki][ka], R1, t1_ccee[kj][ki][kb], optimize=True)
-        for kj in range(nkpts):
-            ka = kshift
-            kb = kconserv[kj, kj, ki]
-            rdm1[kj][:nocc, nocc:] += 4 * einsum('iab,a,IiAb->IA', L2[ki][ka], R1, t1_ccee[kj][ki][kj], optimize=True)
-            rdm1[kj][:nocc, nocc:] -= 2 * einsum('iab,a,IibA->IA', L2[ki][ka], R1, t1_ccee[kj][ki][kb], optimize=True)
-            rdm1[kj][:nocc, nocc:] -= 2 * einsum('iab,b,IiAa->IA', L2[ki][ka], R1, t1_ccee[kj][ki][kj], optimize=True)
-            rdm1[kj][:nocc, nocc:] += einsum('iab,b,IiaA->IA', L2[ki][ka], R1, t1_ccee[kj][ki][ka], optimize=True)
-
-# block- ai
-    for ki in range(nkpts):
-        rdm1[ki][nocc:, :nocc] = rdm1[ki][:nocc, nocc:].conj().T
-
-    if adc.approx_trans_moments is False or adc.method == "adc(3)":
-        ki = kshift
-        ### block- ia ###
-        rdm1[ki][:nocc, nocc:] -= einsum('a,A,Ia->IA', L1, R1, t2_ce[ki], optimize=True)
-        for kj in range(nkpts):
-            rdm1[kj][:nocc, nocc:] += 2 * einsum('a,a,IA->IA', L1, R1, t2_ce[kj], optimize=True)
-        ### block- ai ###
-            rdm1[kj][nocc:, :nocc] = rdm1[kj][:nocc, nocc:].conj().T
-
     return rdm1
 
 
