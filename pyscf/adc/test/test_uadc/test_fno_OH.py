@@ -21,7 +21,9 @@ import numpy as np
 from pyscf import gto
 from pyscf import scf
 from pyscf import adc
+from pyscf.adc.uadc_ea import get_spin_square as get_spin_square_ea
 from pyscf.adc.uadc_ee import get_spin_square as get_spin_square_ee
+from pyscf.adc.uadc_ip import get_spin_square as get_spin_square_ip
 
 def setUpModule():
     global mol, mf
@@ -76,12 +78,16 @@ class KnownValues(unittest.TestCase):
         myadc.method = 'adc(3)'
         myadc.method_type = 'ea'
         e,v,p,x = myadc.kernel(nroots=3)
+        spin = get_spin_square_ea(myadc._adc_es)[0]
 
         e = ADCFG.correct(e)
         self.assertAlmostEqual(e[0], 0.03549859, 6)
         self.assertAlmostEqual(e[1], 0.16628554, 6)
         self.assertAlmostEqual(e[2], 0.18655859, 6)
 
+        self.assertAlmostEqual(spin[0], 0.04000281 , 4)
+        self.assertAlmostEqual(spin[1], 1.00930902 , 4)
+        self.assertAlmostEqual(spin[2], 2.00185480 , 4)
 
         self.assertEqual(len(ADCFG.frozen[0]), 7)
         self.assertEqual(len(ADCFG.frozen[1]), 7)
@@ -127,6 +133,7 @@ class KnownValues(unittest.TestCase):
         myadc.conv_tol = 1e-8
         myadc.tol_residual = 1e-6
         e,v,p,x = myadc.kernel(nroots=3, guess=ADCFG.v_ssfno)
+        spin = get_spin_square_ip(myadc._adc_es)[0]
 
         e = ADCFG.correct(e)
         self.assertAlmostEqual(e[0], 0.4583022367, 6)
@@ -137,6 +144,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.727942, 6)
         self.assertAlmostEqual(p[2], 0.219144, 6)
 
+        self.assertAlmostEqual(spin[0], 2.00270571 , 4)
+        self.assertAlmostEqual(spin[1], 1.01817654 , 4)
+        self.assertAlmostEqual(spin[2], 1.00095355 , 4)
 
         self.assertEqual(len(ADCFG.frozen[0]), 8)
         self.assertEqual(len(ADCFG.frozen[1]), 10)
@@ -152,12 +162,16 @@ class KnownValues(unittest.TestCase):
         myadc.method = 'adc(3)'
         myadc.method_type = 'ea'
         e,v,p,x = myadc.kernel(nroots=3)
+        spin = get_spin_square_ea(myadc._adc_es)[0]
 
         e = ADCFG.correct(e)
         self.assertAlmostEqual(e[0], 0.0377227177, 6)
         self.assertAlmostEqual(e[1], 0.174180062, 6)
         self.assertAlmostEqual(e[2], 0.1767330484, 6)
 
+        self.assertAlmostEqual(spin[0], 0.04293942 , 4)
+        self.assertAlmostEqual(spin[1], 1.00898190 , 4)
+        self.assertAlmostEqual(spin[2], 2.00026898 , 4)
 
         self.assertEqual(len(ADCFG.frozen[0]), 5)
         self.assertEqual(len(ADCFG.frozen[1]), 5)
