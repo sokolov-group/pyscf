@@ -110,10 +110,10 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         if adc.compute_properties:
             if (adc.method_type == "ee"):
                 print_string += ("|  Osc. strength = %10.8f  " % adc.P[n])
-                if (adc.compute_spin_square is True):
-                    print_string += ("|  S^2 = %10.8f  " % spin_square[n])
             else:
                 print_string += ("|  Spec. factor = %10.8f  " % adc.P[n])
+            if (adc.compute_spin_square is True):
+                print_string += ("|  S^2 = %10.8f  " % spin_square[n])
         print_string += ("|  conv = %s" % conv[n])
         logger.info(adc, print_string)
 
