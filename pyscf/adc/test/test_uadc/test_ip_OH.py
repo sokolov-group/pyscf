@@ -144,6 +144,7 @@ class KnownValues(unittest.TestCase):
 
         myadc_fr.method_type = "ip"
         e,v,p,x = myadc_fr.kernel(nroots=3)
+        spin = get_spin_square(myadc_fr._adc_es)[0]
         myadc_fr.analyze()
 
         self.assertAlmostEqual(e[0], 0.479335828293046, 6)
@@ -153,6 +154,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[0], 0.928283370231907, 6)
         self.assertAlmostEqual(p[1], 0.520023087174258, 6)
         self.assertAlmostEqual(p[2], 0.405384799660555, 6)
+
+        self.assertAlmostEqual(spin[0],2.00026048 , 5)
+        self.assertAlmostEqual(spin[1],1.96931720 , 5)
+        self.assertAlmostEqual(spin[2],0.05083684 , 5)
 
         dm1_exc = np.array(myadc_fr.make_rdm1())
         self.assertAlmostEqual(rdms_test(dm1_exc[0][0],dm1_exc[1][0]), 16.404088067453547, 6)
