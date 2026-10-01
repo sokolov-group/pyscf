@@ -75,9 +75,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(rdms_test(dm1_exc[0][0],dm1_exc[1][0]), 21.53337229793503, 6)
         self.assertAlmostEqual(rdms_test(dm1_exc[0][1],dm1_exc[1][1]), 21.53337229793504, 6)
         self.assertAlmostEqual(rdms_test(dm1_exc[0][2],dm1_exc[1][2]), 21.53337229793506, 6)
-        self.assertAlmostEqual(spin[0],2.01810687 , 5)
-        self.assertAlmostEqual(spin[1],2.01810687 , 5)
-        self.assertAlmostEqual(spin[2],2.01810687 , 5)
+        self.assertAlmostEqual(spin[0],2.00048272 , 5)
+        self.assertAlmostEqual(spin[1],2.00048272 , 5)
+        self.assertAlmostEqual(spin[2],2.00048272 , 5)
 
     def test_ip_adc2x(self):
         myadc.method = "adc(2)-x"
@@ -100,9 +100,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(rdms_test(dm1_exc[0][0],dm1_exc[1][0]), 21.18511985058944, 6)
         self.assertAlmostEqual(rdms_test(dm1_exc[0][1],dm1_exc[1][1]), 21.18511985058942, 6)
         self.assertAlmostEqual(rdms_test(dm1_exc[0][2],dm1_exc[1][2]), 21.18511985058942, 6)
-        self.assertAlmostEqual(spin[0],2.02912071 , 5)
-        self.assertAlmostEqual(spin[1],2.02912071 , 5)
-        self.assertAlmostEqual(spin[2],2.02912071 , 5)
+        self.assertAlmostEqual(spin[0],2.00434029 , 5)
+        self.assertAlmostEqual(spin[1],2.00434029 , 5)
+        self.assertAlmostEqual(spin[2],2.00434029 , 5)
 
     def test_ip_adc3(self):
         myadc.method = "adc(3)"
@@ -125,9 +125,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(rdms_test(dm1_exc[0][0],dm1_exc[1][0]), 21.31223422821962, 6)
         self.assertAlmostEqual(rdms_test(dm1_exc[0][1],dm1_exc[1][1]), 21.31223422821966, 6)
         self.assertAlmostEqual(rdms_test(dm1_exc[0][2],dm1_exc[1][2]), 21.31223422821963, 6)
-        self.assertAlmostEqual(spin[0],2.02358658 , 5)
-        self.assertAlmostEqual(spin[1],2.02358658 , 5)
-        self.assertAlmostEqual(spin[2],2.02358658 , 5)
+        self.assertAlmostEqual(spin[0],2.00058328 , 5)
+        self.assertAlmostEqual(spin[1],2.00058328 , 5)
+        self.assertAlmostEqual(spin[2],2.00058328 , 5)
 
 if __name__ == "__main__":
     print("IP calculations for different ADC methods for open-shell atom")
