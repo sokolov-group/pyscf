@@ -16807,8 +16807,6 @@ def get_spin_square(adc):
 
     nocc_a = adc.nocc_a
     nocc_b = adc.nocc_b
-    nvir_a = adc.nvir_a
-    nvir_b = adc.nvir_b
 
     ovlp = adc._scf.get_ovlp(adc._scf.mol).copy()
     delta = np.dot(adc.mo_coeff_hf[0].transpose(), np.dot(ovlp, adc.mo_coeff_hf[1]))
