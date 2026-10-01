@@ -85,9 +85,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[1], 0.16628554, 6)
         self.assertAlmostEqual(e[2], 0.18655859, 6)
 
-        self.assertAlmostEqual(spin[0], 0.04000281 , 4)
-        self.assertAlmostEqual(spin[1], 1.00930902 , 4)
-        self.assertAlmostEqual(spin[2], 2.00185480 , 4)
+        self.assertAlmostEqual(spin[0], 0.00314430 , 4)
+        self.assertAlmostEqual(spin[1], 1.64538528 , 4)
+        self.assertAlmostEqual(spin[2], 2.00169617 , 4)
 
         self.assertEqual(len(ADCFG.frozen[0]), 7)
         self.assertEqual(len(ADCFG.frozen[1]), 7)
@@ -112,9 +112,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[1],  0.1578325448, 6)
         self.assertAlmostEqual(e[2],  0.2538784631, 6)
 
-        self.assertAlmostEqual(spin[0], 0.74945130 , 4)
-        self.assertAlmostEqual(spin[1], 0.74941619 , 4)
-        self.assertAlmostEqual(spin[2], 3.69806781 , 4)
+        self.assertAlmostEqual(spin[0], 0.75030931 , 4)
+        self.assertAlmostEqual(spin[1], 0.75024453 , 4)
+        self.assertAlmostEqual(spin[2], 3.69251854 , 4)
 
         self.assertEqual(len(ADCFG.frozen[0]), 5)
         self.assertEqual(len(ADCFG.frozen[1]), 5)
@@ -144,9 +144,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.727942, 6)
         self.assertAlmostEqual(p[2], 0.219144, 6)
 
-        self.assertAlmostEqual(spin[0], 2.00270571 , 4)
-        self.assertAlmostEqual(spin[1], 1.01817654 , 4)
-        self.assertAlmostEqual(spin[2], 1.00095355 , 4)
+        self.assertAlmostEqual(spin[0], 2.00184751 , 4)
+        self.assertAlmostEqual(spin[1], 1.81988374 , 4)
+        self.assertAlmostEqual(spin[2], 0.19717758 , 4)
 
         self.assertEqual(len(ADCFG.frozen[0]), 8)
         self.assertEqual(len(ADCFG.frozen[1]), 10)
@@ -169,9 +169,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[1], 0.174180062, 6)
         self.assertAlmostEqual(e[2], 0.1767330484, 6)
 
-        self.assertAlmostEqual(spin[0], 0.04293942 , 4)
-        self.assertAlmostEqual(spin[1], 1.00898190 , 4)
-        self.assertAlmostEqual(spin[2], 2.00026898 , 4)
+        self.assertAlmostEqual(spin[0], 0.00163859 , 4)
+        self.assertAlmostEqual(spin[1], 1.76990593 , 4)
+        self.assertAlmostEqual(spin[2], 2.00008495 , 4)
 
         self.assertEqual(len(ADCFG.frozen[0]), 5)
         self.assertEqual(len(ADCFG.frozen[1]), 5)

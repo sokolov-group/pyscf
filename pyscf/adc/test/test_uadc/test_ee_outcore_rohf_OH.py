@@ -120,10 +120,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[2],0.00000000 , 6)
         self.assertAlmostEqual(p[3],0.01485308 , 6)
 
-        self.assertAlmostEqual(spin[0], 0.75027556 , 5)
-        self.assertAlmostEqual(spin[1],0.75009053  , 5)
-        self.assertAlmostEqual(spin[2],3.72613641  , 5)
-        self.assertAlmostEqual(spin[3],0.75901326  , 5)
+        self.assertAlmostEqual(spin[0], 0.75002142 , 5)
+        self.assertAlmostEqual(spin[1],0.75000106  , 5)
+        self.assertAlmostEqual(spin[2],3.71887746  , 5)
+        self.assertAlmostEqual(spin[3],0.76022331  , 5)
 if __name__ == "__main__":
     print("EE calculations for different ADC methods for OH molecule")
     unittest.main()

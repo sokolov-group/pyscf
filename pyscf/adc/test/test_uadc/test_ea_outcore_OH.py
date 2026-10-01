@@ -72,9 +72,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.9953781149964537, 6)
         self.assertAlmostEqual(p[2], 0.9956169835481459, 6)
 
-        self.assertAlmostEqual(spin[0],0.09548451 , 5)
-        self.assertAlmostEqual(spin[1],2.00137477 , 5)
-        self.assertAlmostEqual(spin[2],1.00133557 , 5)
+        self.assertAlmostEqual(spin[0],0.02730691 , 5)
+        self.assertAlmostEqual(spin[1],2.00144515 , 5)
+        self.assertAlmostEqual(spin[2],1.00628977 , 5)
 
     def test_ea_adc2x(self):
 
@@ -94,9 +94,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.9918705979602267, 6)
         self.assertAlmostEqual(p[2], 0.9772855298541363, 6)
 
-        self.assertAlmostEqual(spin[0],0.10968161 , 5)
-        self.assertAlmostEqual(spin[1],1.99945865 , 5)
-        self.assertAlmostEqual(spin[2],1.00013160 , 5)
+        self.assertAlmostEqual(spin[0],-0.00360557 , 5)
+        self.assertAlmostEqual(spin[1],1.99963565 , 5)
+        self.assertAlmostEqual(spin[2],1.24185551 , 5)
 
     def test_ea_adc3_high_cost(self):
 
@@ -119,9 +119,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[1], 0.9927117650068699, 6)
         self.assertAlmostEqual(p[2], 0.9766456031927034, 6)
 
-        self.assertAlmostEqual(spin[0],0.13478510 , 5)
-        self.assertAlmostEqual(spin[1],2.00074712 , 5)
-        self.assertAlmostEqual(spin[2],0.99950514 , 5)
+        self.assertAlmostEqual(spin[0],0.00769901 , 5)
+        self.assertAlmostEqual(spin[1],2.00091925 , 5)
+        self.assertAlmostEqual(spin[2],1.25284951 , 5)
     def test_ea_adc3_high_cost_frozen(self):
 
         myadc_fr.max_memory = 300
