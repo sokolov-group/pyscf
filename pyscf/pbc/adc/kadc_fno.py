@@ -83,7 +83,8 @@ class RADC2FNO(kadc_rhf.RADC):
                                    'rdm1_ss', 'mode', 'ref_state',
                                    'delta_e_corr', 'p_can',
                                    'if_ref_qp', 'delta_e_qp', 'is_qp',
-                                   'e_corr_fno'}
+                                   'e_corr_fno', 'trans_guess', 'S_vir',
+                                   'w_guess_lost'}
 
     def __init__(self, mf, frozen=0, mo_coeff=None, mo_occ=None):
         super().__init__(mf, frozen, mo_coeff, mo_occ)
@@ -100,6 +101,9 @@ class RADC2FNO(kadc_rhf.RADC):
         self.ref_state = None
         self.if_ref_qp = True
         self.e_corr_fno = None
+        self.trans_guess = False
+        self.S_vir = None
+        self.w_guess_lost = None
 
     def _reset_adc_state(self):
         """Clear cached amplitudes / intermediates so a fresh FNO-ADC run can start."""
@@ -201,6 +205,8 @@ class RADC2FNO(kadc_rhf.RADC):
         _can_mo_coeff = self.mo_coeff
         _can_mo_energy = self.mo_energy
         _can_mo_occ = [np.copy(oc) for oc in self.mo_occ]
+        _can_nocc = self.nocc
+        _can_nvir = self.nmo - self.nocc
 
         n_thresh = _count_thresholds(thresh, pct_occ, nvir_act)
 
@@ -224,8 +230,19 @@ class RADC2FNO(kadc_rhf.RADC):
             fno_mo_energy = list(self.mo_energy)
             fno_frozen = list(self.frozen)
 
-            self._reset_adc_state()
-            self.compute_correction(kptlist, nroots, guess)
+            if self.trans_guess and self.method_type in ('ip', 'ea'):
+                guess_proj, w_lost = self.project_guess(self.v_can, kptlist,
+                                                        _can_nocc, _can_nvir)
+                self.w_guess_lost = w_lost
+                logger.info(self, "trans_guess: canonical guesses projected "
+                            "onto the FNO basis; weight lost to frozen "
+                            "virtuals per (k, root): %s",
+                            np.array2string(w_lost, precision=4))
+                self._reset_adc_state()
+                self.compute_correction(kptlist, nroots, guess_proj)
+            else:
+                self._reset_adc_state()
+                self.compute_correction(kptlist, nroots, guess)
 
             all_mo_coeff.append(fno_mo_coeff)
             all_mo_energy.append(fno_mo_energy)
@@ -293,10 +310,15 @@ class RADC2FNO(kadc_rhf.RADC):
 
     def make_ss_rdm1(self, log, cput0, kptlist=None, nroots=None, guess=None, if_gs=False):
         """Run the canonical reference and build the 1-RDM used to construct the FNOs."""
+        pick_tmp = self.pick
+        self.pick = None
         if if_gs:
             _, _, _ = kadc_rhf.RADC.kernel_gs(self)
         else:
             self.e_can, self.v_can, self.p_can, _ = kadc_rhf.RADC.kernel(self, nroots, guess=guess, kptlist=kptlist)
+            for k in range(self._adc_es.U.shape[0]):
+                self._adc_es.U[k] = np.linalg.qr(self._adc_es.U[k].T)[0].T
+        self.pick = pick_tmp
         log.info('current use %d MB', lib.current_memory()[0])
         self.e_corr_can = self.e_corr
         if self.ref_state is not None:
@@ -352,6 +374,52 @@ class RADC2FNO(kadc_rhf.RADC):
         self._adc_es = None
         self.imds.t2_1_vvvv = None
 
+    def project_guess(self, v_can, kptlist, nocc, nvir):
+        if self.S_vir is None:
+            raise RuntimeError('project_guess requires make_fno to have been '
+                               'called first (S_vir not set)')
+        nkpts = self.nkpts
+        kconserv = self.khelper.kconserv
+        v_proj = []
+        w_lost = []
+        for k, kshift in enumerate(kptlist):
+            nroots = v_can[k].shape[0]
+            proj_k = []
+            for r in range(nroots):
+                vec = v_can[k][r]
+                if self.method_type == 'ip':
+                    dbl = vec[nocc:].reshape(nkpts, nkpts, nvir, -1)
+                    blocks = [np.einsum('kai,ap->kpi', dbl[ka],
+                                        self.S_vir[ka].conj())
+                              for ka in range(nkpts)]
+                    dblp = np.stack(blocks, axis=0)
+                    vp = np.hstack((vec[:nocc], dblp.ravel()))
+                elif self.method_type == 'ea':
+                    dbl = vec[nvir:].reshape(nkpts, nkpts, nocc, nvir, nvir)
+                    blocks = []
+                    for ki in range(nkpts):
+                        row = []
+                        for ka in range(nkpts):
+                            kb = kconserv[kshift, ka, ki]
+                            row.append(np.einsum('iab,pa,qb->ipq', dbl[ki, ka],
+                                                 self.S_vir[ka].conj().T,
+                                                 self.S_vir[kb].conj().T))
+                        blocks.append(row)
+                    dblp = np.block([[b for b in row] for row in blocks])
+                    vp = np.hstack((self.S_vir[kshift].conj().T.dot(vec[:nvir]),
+                                    dblp.ravel()))
+                else:
+                    raise NotImplementedError('project_guess for method_type = %s'
+                                              % self.method_type)
+                proj_k.append(vp)
+            proj_k = np.array(proj_k)
+            raw = np.einsum('ij,ij->i', v_can[k].conj(), v_can[k]).real
+            norm = np.einsum('ij,ij->i', proj_k.conj(), proj_k).real
+            w_lost.append(1.0 - norm / raw)
+            proj_k = proj_k / np.sqrt(norm)[:, None]
+            v_proj.append(proj_k)
+        return np.array(v_proj), np.array(w_lost)
+
     def make_fno(self, rdm1_ss, mf, log, thresh=None, pct_occ=None, nvir_act=None):
         """Build the FNO virtual space: diagonalize the virtual 1-RDM, truncate, and semicanonicalize."""
         nocc = mf.mol.nelectron // 2
@@ -376,6 +444,8 @@ class RADC2FNO(kadc_rhf.RADC):
                 T.append(np.array([c <= pct_occ or np.isclose(c, pct_occ) for c in cumsum]))
             else:
                 T.append(n > thresh)
+
+        S_vir = [None] * self.nkpts
 
         # "min": union the per-kpt masks so every k-point keeps the same count
         if self.mode.lower() == "min":
@@ -403,7 +473,8 @@ class RADC2FNO(kadc_rhf.RADC):
             F_trunc = V_trunc_k.T.conj().dot(F_can).dot(V_trunc_k)
             e_trunc, Z_trunc = np.linalg.eigh(F_trunc[:n_keep, :n_keep])
             e_fro = np.diagonal(F_trunc[n_keep:, n_keep:]).copy()
-            U_vir_act = orbvir.dot(V_trunc_k[:, :n_keep]).dot(Z_trunc)
+            S_vir[kpt] = V_trunc_k[:, :n_keep].dot(Z_trunc)
+            U_vir_act = orbvir.dot(S_vir[kpt])
             U_vir_fro = orbvir.dot(V_trunc_k[:, n_keep:])
             no_comp = (orboccfrz0, orbocc, U_vir_act, U_vir_fro, orbvirfrz0)
             no_e_comp = (moeoccfrz0, moeocc, e_trunc, e_fro, moevirfrz0)
@@ -417,3 +488,4 @@ class RADC2FNO(kadc_rhf.RADC):
             no_frozen.append(no_frozen_k)
 
         self.mo_coeff, self.mo_energy, self.frozen = no_coeff, no_energy, no_frozen
+        self.S_vir = S_vir

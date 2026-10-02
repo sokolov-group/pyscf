@@ -21,6 +21,7 @@ import numpy as np
 from pyscf import ao2mo
 import pyscf.adc
 import pyscf.adc.radc
+from pyscf.adc.uadc import make_overlap_pick
 from pyscf.adc import radc_ao2mo
 import itertools
 
@@ -93,6 +94,14 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None):
         else:
             guess_k = guess.copy()
 
+    if adc.pick is None:
+        pick = lib.linalg_helper.pick_real_eigs
+    elif adc.pick is True or (isinstance(adc.pick, str) and adc.pick.lower() == 'overlap'):
+        pick = None
+    else:
+        pick = adc.pick
+
+    ovl_guess = []
     for k, kshift in enumerate(kptlist):
         matvec, diag = adc.gen_matvec(kshift, imds, eris)
         if guess_type == "read":
@@ -102,11 +111,22 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None):
             guess = adc.get_init_guess(nroots, diag, ascending=True, kshift=kshift)
         else:
             raise NotImplementedError("Guess type not implemented")
+        pick_k = pick
+        if pick_k is None:
+            pick_k = make_overlap_pick(guess)
         conv_k, evals_k, evecs_k = lib.linalg_helper.davidson_nosym1(
             lambda xs: [matvec(x) for x in xs], guess, diag,
             nroots=nroots, verbose=log, tol=adc.conv_tol,
             max_cycle=adc.max_cycle, max_space=adc.max_space,
-            tol_residual=adc.tol_residual)
+            tol_residual=adc.tol_residual, pick=pick_k)
+
+        if pick_k is not pick:
+            u_mat = np.array(evecs_k).T
+            g = np.asarray(guess)
+            g = g / np.linalg.norm(g, axis=1, keepdims=True)
+            ovl_guess.append(np.abs(g.conj().dot(u_mat)).T)
+        else:
+            ovl_guess.append(None)
 
         evals_k = evals_k.real
         evals[k] = evals_k
@@ -138,6 +158,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None):
             print_string += ("|  conv = %s" % conv[k][n].real)
             logger.info(adc, print_string)
 
+    adc.ovl_guess = ovl_guess
     log.timer('ADC', *cput0)
 
     return evals, evecs, P, X
@@ -295,6 +316,8 @@ class RADC(pyscf.adc.radc.RADC):
         self._scf = mf
         self.kpts = self._scf.kpts
         self.exxdiv = self._scf.exxdiv
+        self.pick = None
+        self.ovl_guess = None
         self.verbose = mf.verbose
         self.max_memory = mf.max_memory
         self.method = "adc(2)"
@@ -486,6 +509,7 @@ class RADC(pyscf.adc.radc.RADC):
         else:
             raise NotImplementedError(self.method_type)
         self._adc_es = adc_es
+        self.ovl_guess = getattr(adc_es, 'ovl_guess', None)
         log.timer('complete kernel', *cput0)
         if self.if_heri_eris:
             self.eris = eris
