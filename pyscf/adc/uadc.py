@@ -23,6 +23,7 @@
 Unrestricted algebraic diagrammatic construction
 '''
 
+import warnings
 import numpy as np
 from pyscf import lib
 from pyscf.lib import logger
@@ -32,6 +33,73 @@ from pyscf import __config__
 from pyscf import df
 from pyscf import scf
 from pyscf.data.nist import HARTREE2EV
+
+
+def make_overlap_pick(guesses, ovl_floor=0.3):
+    '''Build a Davidson ``pick`` callback that ranks Ritz pairs by their
+    overlap with the seeded guess vectors instead of by energy, implementing
+    multi-root character-based root following inside the iterative solver.
+    Usable with both :func:`pyscf.lib.linalg_helper.davidson1` and
+    ``davidson_nosym1``: for non-Hermitian solvers the eigenpairs are complex,
+    so near-real eigenvalues are selected and cast to real, mirroring the
+    default ``pick_real_eigs``.
+
+    Ritz vectors carrying a seeded character come first (one per seed,
+    assigned greedily by best overlap); remaining slots are filled in
+    ascending-energy order.
+
+    Args:
+        guesses : list of 1D arrays or (nseed, ndim) array
+            The guess vectors seeded into the Davidson space (e.g. canonical
+            ADC vectors projected onto a truncated FNO basis).
+        ovl_floor : float
+            Overlap below which a Ritz vector is not considered as carrying
+            a seeded character (it then competes only by energy).
+
+    Returns:
+        pick(w, v, nroots, envs) -> (w, v, idx), the reordering callback of
+        :func:`pyscf.lib.linalg_helper.davidson1`.
+    '''
+    g = np.asarray(guesses)
+    g = g.reshape(g.shape[0], -1)
+    norms = np.linalg.norm(g, axis=1)
+    norms[norms == 0] = 1.0
+    g = g / norms[:, None]
+
+    def pick(w, v, nroots, envs):
+        if np.iscomplexobj(w) or np.iscomplexobj(v):
+            abs_imag = np.abs(np.asarray(w).imag)
+            max_imag_tol = max(1e-3, np.sort(abs_imag)[min(len(w), nroots) - 1])
+            real_idx = np.where(abs_imag <= max_imag_tol)[0]
+            nbelow = int(np.count_nonzero(abs_imag[real_idx] < 1e-3))
+            if nbelow < nroots and len(w) >= nroots:
+                warnings.warn('Only %d eigenvalues (out of %3d requested roots) '
+                              'with imaginary part < %4.3g.\n'
+                              % (nbelow, min(len(w), nroots), 1e-3))
+            real_eigvecs = (envs.get('dtype') == np.double)
+            w, v, _ = lib.linalg_helper._eigs_cmplx2real(w, v, real_idx, real_eigvecs)
+
+        xs = np.asarray(envs['xs'])
+        xfull = xs.T.dot(v[:, :len(w)])
+        ovl = np.abs(g.dot(xfull))
+        score = ovl.max(axis=0)
+        claimed = []
+        for s in range(g.shape[0]):
+            cand = np.argsort(-ovl[s])
+            for c in cand:
+                if int(c) not in claimed:
+                    claimed.append(int(c))
+                    break
+        if len(claimed) < g.shape[0] and len(w) >= g.shape[0]:
+            warnings.warn('Root following: only %d of %d guess vectors found a '
+                          'Ritz partner with overlap >= %4.3g.\n'
+                          % (len(claimed), g.shape[0], ovl_floor))
+        claimed = [c for c in claimed if score[c] >= ovl_floor]
+        order = claimed + [int(i) for i in np.argsort(w) if int(i) not in claimed]
+        order = np.array(order[:len(w)])
+        return w[order], v[:, order], order
+
+    return pick
 
 
 # Excited-state kernel
@@ -81,10 +149,25 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     else:
         raise NotImplementedError("Guess type not implemented")
 
+    pick = None
+    if adc.pick is True or (isinstance(adc.pick, str) and adc.pick.lower() == 'overlap'):
+        pick = make_overlap_pick(guess)
+    elif adc.pick is not None:
+        pick = adc.pick
+
     conv, adc.E, U = lib.linalg_helper.davidson1(
         lambda xs : [matvec(x) for x in xs],
         guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_memory=adc.max_memory,
-        max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual=adc.tol_residual)
+        max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual=adc.tol_residual,
+        pick=pick)
+
+    if pick is not None:
+        xs = np.asarray(U).T
+        g = np.asarray(guess).reshape(len(guess), -1)
+        g = g / np.linalg.norm(g, axis=1, keepdims=True)
+        adc.ovl_guess = np.abs(g.dot(xs)).T
+        logger.info(adc, 'root-following overlaps (root x guess): %s',
+                    np.array2string(adc.ovl_guess, precision=3))
 
     adc.U = np.array(U).T.copy()
 
@@ -457,7 +540,8 @@ class UADC(lib.StreamObject):
         'E', 'U', 'P', 'X', 'ncvs', 'dip_mom', 'dip_mom_nuc',
         'compute_spin_square', 'f_ov',
         'nocc_a', 'nocc_b', 'nvir_a', 'nvir_b',
-        'if_heri_eris', 'if_naf', 'thresh_naf', 'naux', 'eris'
+        'if_heri_eris', 'if_naf', 'thresh_naf', 'naux', 'eris',
+        'pick', 'ovl_guess'
     }
 
     def __init__(self, mf, frozen=None, mo_coeff=None, mo_occ=None, mo_energy=None, f_ov=None):
@@ -478,6 +562,13 @@ class UADC(lib.StreamObject):
         self.max_cycle = getattr(__config__, 'adc_uadc_UADC_max_cycle', 50)
         self.conv_tol = getattr(__config__, 'adc_uadc_UADC_conv_tol', 1e-8)
         self.tol_residual = getattr(__config__, 'adc_uadc_UADC_tol_residual', 1e-5)
+        # Root-following Davidson selection: None (default, energy-ordered),
+        # True/'overlap' (overlap-ranked against the kernel guess vectors,
+        # see make_overlap_pick)
+        self.pick = None
+        # After kernel: overlap matrix between converged roots and the guess
+        # vectors (nroots_guess x nroots), filled when pick is enabled
+        self.ovl_guess = None
         self.scf_energy = mf.e_tot
 
         # The frozen attribute cannot be modified after instantiating ADC object
@@ -824,6 +915,7 @@ class UADC(lib.StreamObject):
             raise NotImplementedError(self.method_type)
 
         self._adc_es = adc_es
+        self.ovl_guess = getattr(adc_es, 'ovl_guess', None)
         if self.if_heri_eris:
             self.eris = eris
 

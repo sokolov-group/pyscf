@@ -1285,6 +1285,7 @@ class RADCEA(radc.RADC):
         self.max_cycle = adc.max_cycle
         self.conv_tol  = adc.conv_tol
         self.tol_residual  = adc.tol_residual
+        self.pick = adc.pick
         self.t1 = adc.t1
         self.t2 = adc.t2
         self.imds = adc.imds

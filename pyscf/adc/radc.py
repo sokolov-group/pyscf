@@ -31,6 +31,7 @@ from pyscf.adc import radc_amplitudes
 from pyscf import __config__
 from pyscf import df
 from pyscf.mp import mp2
+from pyscf.adc.uadc import make_overlap_pick
 from pyscf.data.nist import HARTREE2EV
 
 
@@ -76,10 +77,24 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     else:
         raise NotImplementedError("Guess type not implemented")
 
+    pick = lib.linalg_helper.pick_real_eigs
+    if adc.pick is True or (isinstance(adc.pick, str) and adc.pick.lower() == 'overlap'):
+        pick = make_overlap_pick(guess)
+
     conv, adc.E, U = lib.linalg_helper.davidson_nosym1(
         lambda xs : [matvec(x) for x in xs],
         guess, diag, nroots=nroots, verbose=log, tol=adc.conv_tol, max_memory=adc.max_memory,
-        max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual=adc.tol_residual)
+        max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual=adc.tol_residual,
+        pick=pick)
+
+    if pick is not None:
+        # overlap of the converged roots with the seeded guesses
+        u_mat = np.asarray(U).T                             
+        g = np.asarray(guess).reshape(len(guess), -1)
+        g = g / np.linalg.norm(g, axis=1, keepdims=True)
+        adc.ovl_guess = np.abs(g.dot(u_mat)).T             
+        logger.info(adc, 'root-following overlaps (root x guess): %s',
+                    np.array2string(adc.ovl_guess, precision=3))
 
     adc.U = np.array(U).T.copy()
 
@@ -285,7 +300,7 @@ class RADC(lib.StreamObject):
         'max_space', 'mo_occ', 'max_cycle', 'imds', 'with_df', 'compute_properties',
         'approx_trans_moments', 'evec_print_tol', 'spec_factor_print_tol',
         'E', 'U', 'P', 'X', 'ncvs', 'dip_mom', 'dip_mom_nuc', 'if_heri_eris',
-        'if_naf', 'thresh_naf', 'naux', 'eris'
+        'if_naf', 'thresh_naf', 'naux', 'eris', 'pick', 'ovl_guess'
     }
 
     def __init__(self, mf, frozen=None, mo_coeff=None, mo_occ=None, mo_energy=None):
@@ -308,6 +323,10 @@ class RADC(lib.StreamObject):
         self.max_cycle = getattr(__config__, 'adc_radc_RADC_max_cycle', 50)
         self.conv_tol = getattr(__config__, 'adc_radc_RADC_conv_tol', 1e-8)
         self.tol_residual = getattr(__config__, 'adc_radc_RADC_tol_residual', 1e-5)
+        # Root-following Davidson selection: None (energy-ordered)
+        # or True/'overlap' (overlap-ranked against the kernel guesses)
+        self.pick = None
+        self.ovl_guess = None
         self.scf_energy = mf.e_tot
 
         # The frozen attribute cannot be modified after instantiating ADC object
@@ -535,6 +554,7 @@ class RADC(lib.StreamObject):
         else:
             raise NotImplementedError(self.method_type)
         self._adc_es = adc_es
+        self.ovl_guess = getattr(adc_es, 'ovl_guess', None)
         if self.if_heri_eris:
             self.eris = eris
 

@@ -42,7 +42,7 @@ class UADC2FNO(uadc.UADC):
     _keys = uadc.UADC._keys | {'delta_e', 'delta_e_corr', 'e_can', 'v_can', 'e_corr_can',
                                'mo_energy', 'rdm1_ss', 'ref_state', 'trans_guess',
                                'p_can', 'p_ssfno', 'delta_e_qp', 'is_qp', 'if_osfno',
-                               'if_ref_qp'}
+                               'if_ref_qp', 'S_vir', 'w_guess_lost'}
 
     def __init__(self, mf, frozen=0, mo_coeff=None, mo_occ=None, mo_energy=None, f_ov=None):
         super().__init__(mf, frozen, mo_coeff, mo_occ, mo_energy, f_ov)
@@ -60,6 +60,103 @@ class UADC2FNO(uadc.UADC):
         self.if_ref_qp = False
         self.trans_guess = False
         self.if_osfno = False
+        self.S_vir = None
+        self.w_guess_lost = None
+        self.ovl_guess = None
+
+    @staticmethod
+    def _unpack_pairs(cblk, n):
+        # packed antisymmetric pair coefficients -> full antisymmetric matrix
+        p, q = np.tril_indices(n, k=-1)
+        f = np.zeros(cblk.shape[:-1] + (n, n))
+        f[..., p, q] = cblk
+        f[..., q, p] = -cblk
+        return f
+
+    @staticmethod
+    def _pack_pairs(f):
+        p, q = np.tril_indices(f.shape[-1], k=-1)
+        return f[..., p, q]
+
+    def project_guess(self, v):
+        if getattr(self, 'S_vir', None) is None:
+            raise RuntimeError('project_guess requires make_fno to have been '
+                               'called first (S_vir not set)')
+        v = np.asarray(v)
+        single = (v.ndim == 1)
+        vcol = v.reshape(v.shape[0], -1)
+
+        nocc_a, nocc_b = self._scf.nelec
+        nvir_a, nvir_b = self.nvir_a, self.nvir_b
+        Sa, Sb = self.S_vir
+        unpack, pack = self._unpack_pairs, self._pack_pairs
+
+        if self.method_type == 'ip':
+            npa = nocc_a*(nocc_a-1)//2
+            npb = nocc_b*(nocc_b-1)//2
+            s = np.cumsum([0, nocc_a, nocc_b, nvir_a*npa,
+                           nvir_b*nocc_a*nocc_b, nvir_a*nocc_b*nocc_a,
+                           nvir_b*npb]).astype(int)
+
+            def proj(vec):
+                out = [vec[:s[2]]]
+                for lo, hi, nv, S in ((s[2], s[3], nvir_a, Sa),
+                                      (s[3], s[4], nvir_b, Sb),
+                                      (s[4], s[5], nvir_a, Sa),
+                                      (s[5], s[6], nvir_b, Sb)):
+                    v2 = S.T.dot(vec[lo:hi].reshape(nv, -1)).reshape(-1)
+                    out.append(v2)
+                return np.concatenate(out)
+
+        elif self.method_type == 'ea':
+            vpa = nvir_a*(nvir_a-1)//2
+            vpb = nvir_b*(nvir_b-1)//2
+            s = np.cumsum([0, nvir_a, nvir_b, nocc_a*vpa,
+                           nocc_b*nvir_a*nvir_b, nocc_a*nvir_b*nvir_a,
+                           nocc_b*vpb]).astype(int)
+
+            def proj(vec):
+                out = [Sa.T.dot(vec[s[0]:s[1]]), Sb.T.dot(vec[s[1]:s[2]])]
+                for lo, hi, no, nv, S in ((s[2], s[3], nocc_a, nvir_a, Sa),
+                                          (s[5], s[6], nocc_b, nvir_b, Sb)):
+                    v2 = unpack(vec[lo:hi].reshape(no, -1), nv)
+                    out.append(pack(np.einsum('iab,ap,bq->ipq', v2, S, S)).reshape(-1))
+                for lo, hi, no, Sp, Sq in ((s[3], s[4], nocc_b, Sa, Sb),
+                                           (s[4], s[5], nocc_a, Sb, Sa)):
+                    v2 = vec[lo:hi].reshape(no, Sp.shape[0], Sq.shape[0])
+                    out.append(np.einsum('iab,ap,bq->ipq', v2, Sp, Sq).reshape(-1))
+                return np.concatenate(out)
+
+        elif self.method_type == 'ee':
+            npa = nocc_a*(nocc_a-1)//2
+            npb = nocc_b*(nocc_b-1)//2
+            vpa = nvir_a*(nvir_a-1)//2
+            vpb = nvir_b*(nvir_b-1)//2
+            nab = nocc_a*nocc_b*nvir_a*nvir_b
+            s = np.cumsum([0, nocc_a*nvir_a, nocc_b*nvir_b,
+                           npa*vpa, nab, npb*vpb]).astype(int)
+
+            def proj(vec):
+                out = [vec[s[0]:s[1]].reshape(nocc_a, -1).dot(Sa).reshape(-1),
+                       vec[s[1]:s[2]].reshape(nocc_b, -1).dot(Sb).reshape(-1)]
+                for lo, hi, npar, nv, S in ((s[2], s[3], npa, nvir_a, Sa),
+                                            (s[4], s[5], npb, nvir_b, Sb)):
+                    v2 = unpack(vec[lo:hi].reshape(npar, -1), nv)
+                    out.append(pack(np.einsum('kab,ap,bq->kpq', v2, S, S)).reshape(-1))
+                v2 = vec[s[3]:s[4]].reshape(nocc_a, nocc_b, nvir_a, nvir_b)
+                out.append(np.einsum('ijab,ap,bq->ijpq', v2, Sa, Sb).reshape(-1))
+                return np.concatenate(out)
+
+        else:
+            raise NotImplementedError('project_guess for method_type = %s'
+                                      % self.method_type)
+
+        vps = [proj(vcol[:, r]) for r in range(vcol.shape[1])]
+        raw = np.array([np.dot(x, x) for x in vps])
+        w_lost = 1.0 - raw
+        vps = [x/np.sqrt(r) if r > 0 else x for x, r in zip(vps, raw)]
+        vp = vps[0] if single else np.column_stack(vps)
+        return vp, w_lost
 
     def kernel_gs(self, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None):
         cput0 = (logger.process_clock(), logger.perf_counter())
@@ -96,8 +193,13 @@ class UADC2FNO(uadc.UADC):
         self.make_fno(self.rdm1_ss, thresh, pct_occ, nvir_act)
         log.timer('get frozen info', *cput0)
 
-        if self.trans_guess and self.method_type == 'ip' and self.ncvs == 0:
-            self.compute_correction(self._scf, nroots, eris, guess=self.v_can)
+        if self.trans_guess and self.method_type in ('ip', 'ea', 'ee') and not self.ncvs:
+            guess_proj, w_lost = self.project_guess(self.v_can)
+            self.w_guess_lost = w_lost
+            logger.info(self, "trans_guess: canonical guesses projected onto "
+                        "the FNO basis; weight lost to frozen virtuals per root: %s",
+                        np.array2string(w_lost, precision=4))
+            self.compute_correction(self._scf, nroots, eris, guess=guess_proj)
         else:
             self.compute_correction(self._scf, nroots, eris, guess=guess)
 
@@ -113,10 +215,12 @@ class UADC2FNO(uadc.UADC):
                                                         approx_trans_moments = self.approx_trans_moments,
                                                         conv_tol = self.conv_tol,tol_residual = self.tol_residual,
                                                         max_space = self.max_space, max_cycle = self.max_cycle)
+        adc_ssfno.pick = self.pick
         if if_gs:
             _,_,_ = adc_ssfno.kernel_gs(eris)
         else:
             self.e_ssfno,self.v_ssfno,self.p_ssfno,_ = adc_ssfno.kernel(nroots,guess,eris)
+            self.ovl_guess = adc_ssfno.ovl_guess
             self.delta_e = self.e_can - self.e_ssfno
             if self.if_ref_qp and self.method_type in ('ip', 'ea'):
                 mask_fno = self.p_ssfno > self.is_qp
@@ -140,10 +244,13 @@ class UADC2FNO(uadc.UADC):
     def make_ss_rdm1(self,nroots=None,guess=None,if_gs=False):
         heri_tmp = self.if_heri_eris
         self.if_heri_eris = False
+        pick_tmp = self.pick
+        self.pick = None
         if if_gs:
             _,_,_ = uadc.UADC.kernel_gs(self)
         else:
             self.e_can,self.v_can,self.p_can,_ = uadc.UADC.kernel(self,nroots,guess)
+        self.pick = pick_tmp
         self.if_heri_eris = heri_tmp
         rdm1_gs = self.make_ref_rdm1(ao_repr=self.if_osfno)
         self.e_corr_can = self.e_corr
@@ -267,6 +374,15 @@ class UADC2FNO(uadc.UADC):
                 T_a = np.array([i < nvir_act for i in range(len(n_a))])
                 T_b = np.array([i < nvir_act for i in range(len(n_b))])
 
+            if not T_a.any() or not T_b.any():
+                logger.warn(self, "All virtual natural orbitals of one spin were "
+                            "requested to be frozen.\nAt least one virtual must be "
+                            "retained for ADC calculations.\nKeeping one automatically.")
+                if not T_a.any():
+                    T_a[0] = True
+                if not T_b.any():
+                    T_b[0] = True
+
             n_keep_a = int(np.sum(T_a))
             n_keep_b = int(np.sum(T_b))
 
@@ -279,8 +395,10 @@ class UADC2FNO(uadc.UADC):
         e_fro_a = np.diagonal(F_trunc_a[n_keep_a:, n_keep_a:]).copy()
         e_fro_b = np.diagonal(F_trunc_b[n_keep_b:, n_keep_b:]).copy()
 
-        U_vir_act_a = orbvir_a.dot(V_trunc_a[:, :n_keep_a]).dot(Z_trunc_a)
-        U_vir_act_b = orbvir_b.dot(V_trunc_b[:, :n_keep_b]).dot(Z_trunc_b)
+        self.S_vir = (V_trunc_a[:, :n_keep_a].dot(Z_trunc_a),
+                      V_trunc_b[:, :n_keep_b].dot(Z_trunc_b))
+        U_vir_act_a = orbvir_a.dot(self.S_vir[0])
+        U_vir_act_b = orbvir_b.dot(self.S_vir[1])
         U_vir_fro_a = orbvir_a.dot(V_trunc_a[:, n_keep_a:])
         U_vir_fro_b = orbvir_b.dot(V_trunc_b[:, n_keep_b:])
 
