@@ -13,6 +13,10 @@ levels are generated in a single call, with the expensive canonical MP2/ADC(2) s
 performed only once.
 The sixth case demonstrates the per-k-point FNO mode (mode='per_kpt'), which lets
 each k-point keep a different number of active virtuals instead of a common count.
+The seventh case demonstrates character-based root following: the canonical ADC(2)
+eigenvectors, projected onto the FNO basis (trans_guess), seed the truncated
+Davidson, and the overlap-ranked pick selects the converged Ritz vectors so that
+root n of the truncated calculation carries the character of canonical root n.
 '''
 
 import numpy as np
@@ -205,3 +209,41 @@ kadc_pk.verbose = 5
 kadc_pk.method = 'adc(3)'
 e_corr_pk, t1_pk, t2_pk = kadc_pk.kernel_gs()
 print('per_kpt FNO-MP3 correlation energy (eV):', (e_corr_pk + PKFG.delta_e_corr)*27.2114)
+
+# case7 Character-based root following (trans_guess + pick)
+# At aggressive truncations the energy-ordered roots of the truncated kADC run
+# may not correspond root-by-root to the canonical ones, so the root-wise
+# additive correction delta_e could pair different physical states.  Setting
+# trans_guess = True seeds the truncated ADC(2) Davidson of every k point with
+# the canonical eigenvectors projected onto the (complex, per-k-point) FNO
+# basis, and pick = True enables the overlap-ranked root selection inside the
+# solver, so root n follows the character of canonical root n.  Diagnostics:
+# w_guess_lost is the particle weight of each canonical root lost to the frozen
+# virtuals per (k, root), and ovl_guess[k] is the converged-roots x guesses
+# overlap matrix of k point k.
+RFFG = adc.KRADC2FNO(kmf)
+RFFG.method_type = 'ea'
+RFFG.approx_trans_moments = True
+RFFG.verbose = 5
+RFFG.ref_state = [[0],[0]]
+RFFG.trans_guess = True
+RFFG.pick = True
+RFFG.kernel(nroots_test, pct_occ=0.90, kptlist=[0])
+print("particle weight lost to frozen virtuals per (k, root):")
+print(RFFG.w_guess_lost)
+print("root x guess overlap matrix of k point 0 (truncated ADC(2) run):")
+print(RFFG.ovl_guess[0])
+
+kadc_rf = adc.KRADC(kmf, RFFG.frozen, RFFG.mo_coeff, RFFG.mo_occ, RFFG.mo_energy)
+kadc_rf.method_type = "ea"
+kadc_rf.approx_trans_moments = True
+kadc_rf.verbose = 5
+kadc_rf.method = "adc(3)"
+kadc_rf.pick = True
+k_e_rf, k_v_rf, k_p_rf, k_x_rf = kadc_rf.kernel(nroots_test,
+                                                guess=RFFG.v_ssfno,
+                                                kptlist=[0])
+print("root x guess overlap matrix of k point 0 (truncated ADC(3) run):")
+print(kadc_rf.ovl_guess[0])
+print("SS-FNO-EA-kADC(3) roots with root following (eV):",
+      (RFFG.correct(k_e_rf)*27.2114)[0])
