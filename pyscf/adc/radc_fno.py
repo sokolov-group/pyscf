@@ -56,8 +56,11 @@ class RADC2FNO(radc.RADC):
             is the ground state; ref_state = n is the nth root, or the nth
             quasiparticle state in IP/EA when if_ref_qp is True.
         trans_guess : bool
-            Whether to use the canonical eigenvectors as the initial guess for the FNO ADC calculation.
-            Only for IP and when the number of core-valence separation is 0. Default value is False.
+            Whether to use the canonical ADC eigenvectors, projected onto the
+            truncated FNO basis (see project_guess), as the initial guess for
+            the truncated ADC calculation.(IP/EA/EE, no CVS) Combined with 
+            pick = True for character-based root following inside the Davidson solver. 
+            Default value is False.
 
     After kernel() or kernel_gs(), frozen, mo_coeff, mo_occ, and mo_energy
     describe the truncated FNO space to be passed to a target correlated method.
@@ -65,7 +68,8 @@ class RADC2FNO(radc.RADC):
 
     _keys = radc.RADC._keys | {'delta_e', 'delta_e_corr', 'e_can', 'v_can', 'e_corr_can',
                                'rdm1_ss', 'ref_state', 'trans_guess',
-                               'p_can', 'p_ssfno', 'delta_e_qp', 'is_qp', 'if_ref_qp'}
+                               'p_can', 'p_ssfno', 'delta_e_qp', 'is_qp', 'if_ref_qp',
+                               'S_vir', 'w_guess_lost', 'ovl_guess'}
 
     def __init__(self, mf, frozen=0, mo_coeff=None, mo_occ=None, mo_energy=None):
         super().__init__(mf, frozen, mo_coeff, mo_occ, mo_energy)
@@ -82,6 +86,62 @@ class RADC2FNO(radc.RADC):
         self.ref_state = None
         self.if_ref_qp = False
         self.trans_guess = False
+        self.S_vir = None
+        self.w_guess_lost = None
+        self.ovl_guess = None
+
+    def project_guess(self, v):
+        """Project canonical-basis RADC eigenvector(s) onto the truncated FNO
+        basis: contract the particle (virtual) index of every excitation
+        block with the canonical-MO -> active-FNO transformation stored in
+        self.S_vir; occupied indices are untouched.
+
+        Args:
+            v : (ndim_canonical, nroots) array or 1D vector of canonical
+                eigenvectors, e.g. self.v_can.
+
+        Returns:
+            (v_proj, w_lost): renormalized projected vectors and the
+            particle weight lost to the frozen virtuals per root,
+            1 - |P v|^2.
+        """
+        if getattr(self, 'S_vir', None) is None:
+            raise RuntimeError('project_guess requires make_fno to have been '
+                               'called first (S_vir not set)')
+        v = np.asarray(v)
+        single = (v.ndim == 1)
+        vcol = v.reshape(v.shape[0], -1)
+
+        nocc = self._nocc
+        nvir = self._nvir
+        S = self.S_vir
+
+        if self.method_type == 'ip':
+            def proj(vec):
+                v2 = S.T.dot(vec[nocc:].reshape(nvir, -1)).reshape(-1)
+                return np.concatenate([vec[:nocc], v2])
+        elif self.method_type == 'ea':
+            def proj(vec):
+                v2 = vec[nvir:].reshape(nocc, nvir, nvir)
+                out = [S.T.dot(vec[:nvir]),
+                       np.einsum('iab,ap,bq->ipq', v2, S, S).reshape(-1)]
+                return np.concatenate(out)
+        elif self.method_type == 'ee':
+            def proj(vec):
+                v2 = vec[nocc*nvir:].reshape(nocc, nocc, nvir, nvir)
+                out = [vec[:nocc*nvir].reshape(nocc, -1).dot(S).reshape(-1),
+                       np.einsum('ijab,ap,bq->ijpq', v2, S, S).reshape(-1)]
+                return np.concatenate(out)
+        else:
+            raise NotImplementedError('project_guess for method_type = %s'
+                                      % self.method_type)
+
+        vps = [proj(vcol[:, r]) for r in range(vcol.shape[1])]
+        raw = np.array([np.dot(x, x) for x in vps])
+        w_lost = 1.0 - raw
+        vps = [x/np.sqrt(r) if r > 0 else x for x, r in zip(vps, raw)]
+        vp = vps[0] if single else np.column_stack(vps)
+        return vp, w_lost
 
     def kernel_gs(self, eris=None, thresh = 1e-4, pct_occ=None, nvir_act=None):
         cput0 = (logger.process_clock(), logger.perf_counter())
@@ -118,8 +178,13 @@ class RADC2FNO(radc.RADC):
         self.make_fno(self.rdm1_ss, self._scf, thresh, pct_occ, nvir_act)
         log.timer('get frozen info', *cput0)
 
-        if self.trans_guess and self.method_type == 'ip' and self.ncvs == 0:
-            self.compute_correction(self._scf, nroots, eris, guess=self.v_can)
+        if self.trans_guess and self.method_type in ('ip', 'ea', 'ee') and not self.ncvs:
+            guess_proj, w_lost = self.project_guess(self.v_can)
+            self.w_guess_lost = w_lost
+            logger.info(self, "trans_guess: canonical guesses projected onto "
+                        "the FNO basis; weight lost to frozen virtuals per root: %s",
+                        np.array2string(w_lost, precision=4))
+            self.compute_correction(self._scf, nroots, eris, guess=guess_proj)
         else:
             self.compute_correction(self._scf, nroots, eris, guess)
 
@@ -134,10 +199,12 @@ class RADC2FNO(radc.RADC):
                                                         approx_trans_moments = self.approx_trans_moments,
                                                         conv_tol = self.conv_tol,tol_residual = self.tol_residual,
                                                         max_space = self.max_space, max_cycle = self.max_cycle)
+        adc_ssfno.pick = self.pick
         if if_gs:
             _,_,_ = adc_ssfno.kernel_gs(eris)
         else:
             self.e_ssfno,self.v_ssfno,self.p_ssfno,_ = adc_ssfno.kernel(nroots,guess,eris)
+            self.ovl_guess = adc_ssfno.ovl_guess
             self.delta_e = self.e_can - self.e_ssfno
             if self.if_ref_qp and self.method_type in ('ip', 'ea'):
                 mask_fno = self.p_ssfno > self.is_qp
@@ -161,10 +228,13 @@ class RADC2FNO(radc.RADC):
     def make_ss_rdm1(self,nroots,guess,if_gs=False):
         heri_tmp = self.if_heri_eris
         self.if_heri_eris = False
+        pick_tmp = self.pick
+        self.pick = None
         if if_gs:
             _,_,_ = radc.RADC.kernel_gs(self)
         else:
             self.e_can,self.v_can,self.p_can,_ = radc.RADC.kernel(self,nroots,guess)
+        self.pick = pick_tmp
         self.if_heri_eris = heri_tmp
         rdm1_gs = self.make_ref_rdm1()
         self.e_corr_can = self.e_corr
@@ -199,6 +269,12 @@ class RADC2FNO(radc.RADC):
         else:
             T = np.array([i < nvir_act for i in range(len(n))])
 
+        if not T.any():
+            logger.warn(self, "All virtual natural orbitals were requested to be "
+                        "frozen.\nAt least one virtual must be retained for ADC "
+                        "calculations.\nKeeping one automatically.")
+            T[0] = True
+
         n_keep = int(np.sum(T))
 
         moeoccfrz0, moeocc, moevir, moevirfrz0 = [mf.mo_energy[m] for m in masks]
@@ -208,7 +284,8 @@ class RADC2FNO(radc.RADC):
         e_trunc,Z_trunc = np.linalg.eigh(F_trunc[:n_keep,:n_keep])
         e_fro = np.diagonal(F_trunc[n_keep:, n_keep:]).copy()
 
-        U_vir_act = orbvir.dot(V_trunc[:,:n_keep]).dot(Z_trunc)
+        self.S_vir = V_trunc[:, :n_keep].dot(Z_trunc)
+        U_vir_act = orbvir.dot(self.S_vir)
         U_vir_fro = orbvir.dot(V_trunc[:,n_keep:])
 
         no_comp = (orboccfrz0,orbocc,U_vir_act,U_vir_fro,orbvirfrz0)
