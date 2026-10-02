@@ -253,6 +253,15 @@ class RADC2FNO(radc.RADC):
             _,_,_ = radc.RADC.kernel_gs(self)
         else:
             self.e_can,self.v_can,self.p_can,_ = radc.RADC.kernel(self,nroots,guess)
+            # the non-symmetric Davidson can return (near-)degenerate right
+            # eigenvectors that are not orthogonal to each other; the
+            # per-vector ISR renormalization in make_rdm1 does not repair
+            # this, and state averaging over a non-orthogonal set breaks
+            # the rotation invariance of the mean density. Orthonormalize
+            # the converged set before any density is formed from it
+            # (energies are unaffected: degenerate partners share the same
+            # eigenvalue and the eigenvalue estimates are not recomputed)
+            self._adc_es.U, _ = np.linalg.qr(self._adc_es.U)
         self.pick = pick_tmp
         self.if_heri_eris = heri_tmp
         rdm1_gs = self.make_ref_rdm1()
