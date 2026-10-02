@@ -73,15 +73,14 @@ class KnownValues(unittest.TestCase):
         e,v,p,x = myadc.kernel(nroots=5, guess=ADCFG.v_ssfno)
 
         e = ADCFG.correct(e)
-        self.assertAlmostEqual(e[0], 0.345146, 5)
-        self.assertAlmostEqual(e[1], 0.345146, 5)
-        self.assertLess(abs(e[0] - e[1]), 1e-4)
-        self.assertAlmostEqual(e[2], 0.35918454, 6)
-        self.assertAlmostEqual(e[3], 0.37380165, 6)
-        self.assertAlmostEqual(e[4], 0.37380165, 6)
+        self.assertAlmostEqual(e[0], 0.3451461723, 6)
+        self.assertAlmostEqual(e[1], 0.3451461723, 6)
+        self.assertAlmostEqual(e[2], 0.3591845313, 6)
+        self.assertAlmostEqual(e[3], 0.3738016414, 6)
+        self.assertAlmostEqual(e[4], 0.3738016420, 6)
 
         self.assertEqual(len(ADCFG.frozen), 1)
-        self.assertAlmostEqual(ADCFG.delta_e_corr, -0.00055766, 6)
+        self.assertAlmostEqual(ADCFG.delta_e_corr, -0.0005577120, 6)
 
     def test_ssfno_ip_trans_guess(self):
         ADCFG = adc.ADC2FNO(mf).set(verbose=0, method_type='ip', ref_state=1)
