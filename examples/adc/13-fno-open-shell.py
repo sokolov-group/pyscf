@@ -116,3 +116,32 @@ print("SS-FNO-EE-UADC(3) excitation energies with root following (eV) are")
 print(ADCFG.correct(e)*27.2114)
 print("with <S^2> values")
 print(spin)
+
+#2.6 SA-FNO-EE: state-averaged FNO over a list of states (open shell)
+
+# ref_state as a list averages the excited-state 1-RDMs of the listed
+# roots (per spin) into the FNO-generating density. Averaging over the
+# components of a degenerate target (e.g. the two Pi components of the
+# first excited state of OH) gives a component-symmetric density, which
+# avoids the arbitrary polarization a single-component SS-FNO density
+# carries.
+mf = scf.UHF(mol).set(verbose=1).run()
+ADCFG = adc.ADC2FNO(mf).set(verbose=5, method_type='ee', ref_state=[1,2])
+ADCFG.trans_guess = True
+ADCFG.pick = True
+ADCFG.kernel(nroots=4, thresh=1e-4)
+print("particle weight lost to frozen virtuals per root:")
+print(ADCFG.w_guess_lost)
+print("root x guess overlap matrix of the truncated ADC(2) run:")
+print(ADCFG.ovl_guess)
+
+myadc = adc.UADC(mf,ADCFG.frozen,ADCFG.mo_coeff,ADCFG.mo_occ,ADCFG.mo_energy)
+myadc.method = "adc(3)"
+myadc.method_type = "ee"
+myadc.pick = True
+e,v,p,x=myadc.kernel(nroots=4,guess=ADCFG.v_ssfno)
+spin = uadc_ee_get_spin_square(myadc._adc_es)[0]
+print("SA-FNO-EE-UADC(3) excitation energies (eV) are")
+print(ADCFG.correct(e)*27.2114)
+print("with <S^2> values")
+print(spin)

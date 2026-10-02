@@ -142,3 +142,28 @@ print(myadc.ovl_guess)
 
 print("SS-FNO-EE-ADC(3) excitation energies with root following (eV) are")
 print(ADCFG.correct(e)*27.2114)
+
+#1.7 SA-FNO-EE-ADC(3): state-averaged FNO over a list of states
+
+# Giving ref_state as a LIST of roots switches to the state-averaged scheme:
+# the excited-state 1-RDMs of the listed roots are averaged and added once
+# to the ground-state density, generating a single FNO space that serves
+# all selected states (Dutta et al.: SA-FNO reaches SS-FNO accuracy while
+# avoiding per-state integral transformations). Averaging a degenerate
+# pair (here the first two excited states of CO) is also the component-
+# symmetric choice for degenerate targets.
+ADCFG = adc.ADC2FNO(mf).set(verbose=5,method_type="ee",ref_state=[1,2]).density_fit('augccpvtz-ri')
+ADCFG.trans_guess=True
+ADCFG.pick=True
+ADCFG.kernel(nroots=3,thresh=10**(-4.5))
+print("SA-FNO root x guess overlap matrix of the truncated ADC(2) run:")
+print(ADCFG.ovl_guess)
+
+myadc = adc.RADC(mf,ADCFG.frozen,ADCFG.mo_coeff,mo_energy=ADCFG.mo_energy).density_fit('augccpvtz-ri')
+myadc.verbose = 5
+myadc.method_type = "ee"
+myadc.method = "adc(3)"
+myadc.pick = True
+e,v,p,x=myadc.kernel(nroots=3,guess=ADCFG.v_ssfno)
+print("SA-FNO-EE-ADC(3) excitation energies (eV) are")
+print(ADCFG.correct(e)*27.2114)
