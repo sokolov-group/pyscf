@@ -89,10 +89,10 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
 
     if pick is not None:
         # overlap of the converged roots with the seeded guesses
-        u_mat = np.asarray(U).T                             
+        u_mat = np.asarray(U).T
         g = np.asarray(guess).reshape(len(guess), -1)
         g = g / np.linalg.norm(g, axis=1, keepdims=True)
-        adc.ovl_guess = np.abs(g.dot(u_mat)).T             
+        adc.ovl_guess = np.abs(g.dot(u_mat)).T
         logger.info(adc, 'root-following overlaps (root x guess): %s',
                     np.array2string(adc.ovl_guess, precision=3))
 

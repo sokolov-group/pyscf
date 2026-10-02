@@ -91,41 +91,71 @@ class UADC2FNO(uadc.UADC):
         Sa, Sb = self.S_vir
         unpack, pack = self._unpack_pairs, self._pack_pairs
 
-        if self.method_type == 'ip':
-            npa = nocc_a*(nocc_a-1)//2
-            npb = nocc_b*(nocc_b-1)//2
-            s = np.cumsum([0, nocc_a, nocc_b, nvir_a*npa,
-                           nvir_b*nocc_a*nocc_b, nvir_a*nocc_b*nocc_a,
-                           nvir_b*npb]).astype(int)
+        if self.method_type == 'ip' and self.ncvs:
+            ncvs = self.ncvs
+            nval_a = nocc_a - ncvs
+            nval_b = nocc_b - ncvs
+            blocks = [(nvir_a, Sa, ncvs*(ncvs-1)//2),
+                      (nvir_a, Sa, ncvs*nval_a),
+                      (nvir_b, Sb, ncvs*ncvs),
+                      (nvir_b, Sb, ncvs*nval_a),
+                      (nvir_b, Sb, nval_b*ncvs),
+                      (nvir_a, Sa, ncvs*ncvs),
+                      (nvir_a, Sa, ncvs*nval_b),
+                      (nvir_a, Sa, nval_a*ncvs),
+                      (nvir_b, Sb, ncvs*(ncvs-1)//2),
+                      (nvir_b, Sb, ncvs*nval_b)]
 
             def proj(vec):
-                out = [vec[:s[2]]]
-                for lo, hi, nv, S in ((s[2], s[3], nvir_a, Sa),
-                                      (s[3], s[4], nvir_b, Sb),
-                                      (s[4], s[5], nvir_a, Sa),
-                                      (s[5], s[6], nvir_b, Sb)):
-                    v2 = S.T.dot(vec[lo:hi].reshape(nv, -1)).reshape(-1)
-                    out.append(v2)
+                out = [vec[:2*ncvs]]
+                s0 = 2*ncvs
+                for nv, S, nh in blocks:
+                    f0 = s0 + nv*nh
+                    out.append(S.T.dot(vec[s0:f0].reshape(nv, -1)).reshape(-1))
+                    s0 = f0
                 return np.concatenate(out)
+
+        elif self.method_type == 'ip':
+            npa = nocc_a*(nocc_a-1)//2
+            npb = nocc_b*(nocc_b-1)//2
+            s_aaa = nocc_a + nocc_b
+            f_aaa = s_aaa + nvir_a*npa
+            s_bab, f_bab = f_aaa, f_aaa + nvir_b*nocc_a*nocc_b
+            s_aba, f_aba = f_bab, f_bab + nvir_a*nocc_b*nocc_a
+            s_bbb, f_bbb = f_aba, f_aba + nvir_b*npb
+
+            def proj(vec):
+                return np.concatenate([
+                    vec[:s_aaa],
+                    Sa.T.dot(vec[s_aaa:f_aaa].reshape(nvir_a, -1)).reshape(-1),
+                    Sb.T.dot(vec[s_bab:f_bab].reshape(nvir_b, -1)).reshape(-1),
+                    Sa.T.dot(vec[s_aba:f_aba].reshape(nvir_a, -1)).reshape(-1),
+                    Sb.T.dot(vec[s_bbb:f_bbb].reshape(nvir_b, -1)).reshape(-1)])
 
         elif self.method_type == 'ea':
             vpa = nvir_a*(nvir_a-1)//2
             vpb = nvir_b*(nvir_b-1)//2
-            s = np.cumsum([0, nvir_a, nvir_b, nocc_a*vpa,
-                           nocc_b*nvir_a*nvir_b, nocc_a*nvir_b*nvir_a,
-                           nocc_b*vpb]).astype(int)
+            s_b = nvir_a
+            f_b = s_b + nvir_b
+            s_aaa, f_aaa = f_b, f_b + nocc_a*vpa
+            s_bab, f_bab = f_aaa, f_aaa + nocc_b*nvir_a*nvir_b
+            s_aba, f_aba = f_bab, f_bab + nocc_a*nvir_b*nvir_a
+            s_bbb, f_bbb = f_aba, f_aba + nocc_b*vpb
 
             def proj(vec):
-                out = [Sa.T.dot(vec[s[0]:s[1]]), Sb.T.dot(vec[s[1]:s[2]])]
-                for lo, hi, no, nv, S in ((s[2], s[3], nocc_a, nvir_a, Sa),
-                                          (s[5], s[6], nocc_b, nvir_b, Sb)):
-                    v2 = unpack(vec[lo:hi].reshape(no, -1), nv)
-                    out.append(pack(np.einsum('iab,ap,bq->ipq', v2, S, S)).reshape(-1))
-                for lo, hi, no, Sp, Sq in ((s[3], s[4], nocc_b, Sa, Sb),
-                                           (s[4], s[5], nocc_a, Sb, Sa)):
-                    v2 = vec[lo:hi].reshape(no, Sp.shape[0], Sq.shape[0])
-                    out.append(np.einsum('iab,ap,bq->ipq', v2, Sp, Sq).reshape(-1))
-                return np.concatenate(out)
+                v2 = unpack(vec[s_aaa:f_aaa].reshape(nocc_a, -1), nvir_a)
+                v3 = unpack(vec[s_bbb:f_bbb].reshape(nocc_b, -1), nvir_b)
+                return np.concatenate([
+                    Sa.T.dot(vec[:s_b]),
+                    Sb.T.dot(vec[s_b:f_b]),
+                    pack(np.einsum('iab,ap,bq->ipq', v2, Sa, Sa)).reshape(-1),
+                    np.einsum('iab,ap,bq->ipq',
+                              vec[s_bab:f_bab].reshape(nocc_b, nvir_a, nvir_b),
+                              Sa, Sb).reshape(-1),
+                    np.einsum('iab,ap,bq->ipq',
+                              vec[s_aba:f_aba].reshape(nocc_a, nvir_b, nvir_a),
+                              Sb, Sa).reshape(-1),
+                    pack(np.einsum('iab,ap,bq->ipq', v3, Sb, Sb)).reshape(-1)])
 
         elif self.method_type == 'ee':
             npa = nocc_a*(nocc_a-1)//2
@@ -133,19 +163,23 @@ class UADC2FNO(uadc.UADC):
             vpa = nvir_a*(nvir_a-1)//2
             vpb = nvir_b*(nvir_b-1)//2
             nab = nocc_a*nocc_b*nvir_a*nvir_b
-            s = np.cumsum([0, nocc_a*nvir_a, nocc_b*nvir_b,
-                           npa*vpa, nab, npb*vpb]).astype(int)
+            s_b = nocc_a*nvir_a
+            f_b = s_b + nocc_b*nvir_b
+            s_aaaa, f_aaaa = f_b, f_b + npa*vpa
+            s_ab, f_ab = f_aaaa, f_aaaa + nab
+            s_bbbb, f_bbbb = f_ab, f_ab + npb*vpb
 
             def proj(vec):
-                out = [vec[s[0]:s[1]].reshape(nocc_a, -1).dot(Sa).reshape(-1),
-                       vec[s[1]:s[2]].reshape(nocc_b, -1).dot(Sb).reshape(-1)]
-                for lo, hi, npar, nv, S in ((s[2], s[3], npa, nvir_a, Sa),
-                                            (s[4], s[5], npb, nvir_b, Sb)):
-                    v2 = unpack(vec[lo:hi].reshape(npar, -1), nv)
-                    out.append(pack(np.einsum('kab,ap,bq->kpq', v2, S, S)).reshape(-1))
-                v2 = vec[s[3]:s[4]].reshape(nocc_a, nocc_b, nvir_a, nvir_b)
-                out.append(np.einsum('ijab,ap,bq->ijpq', v2, Sa, Sb).reshape(-1))
-                return np.concatenate(out)
+                v2 = unpack(vec[s_aaaa:f_aaaa].reshape(npa, -1), nvir_a)
+                v3 = unpack(vec[s_bbbb:f_bbbb].reshape(npb, -1), nvir_b)
+                return np.concatenate([
+                    vec[:s_b].reshape(nocc_a, -1).dot(Sa).reshape(-1),
+                    vec[s_b:f_b].reshape(nocc_b, -1).dot(Sb).reshape(-1),
+                    pack(np.einsum('kab,ap,bq->kpq', v2, Sa, Sa)).reshape(-1),
+                    np.einsum('ijab,ap,bq->ijpq',
+                              vec[s_ab:f_ab].reshape(nocc_a, nocc_b, nvir_a, nvir_b),
+                              Sa, Sb).reshape(-1),
+                    pack(np.einsum('kab,ap,bq->kpq', v3, Sb, Sb)).reshape(-1)])
 
         else:
             raise NotImplementedError('project_guess for method_type = %s'
@@ -193,7 +227,7 @@ class UADC2FNO(uadc.UADC):
         self.make_fno(self.rdm1_ss, thresh, pct_occ, nvir_act)
         log.timer('get frozen info', *cput0)
 
-        if self.trans_guess and self.method_type in ('ip', 'ea', 'ee') and not self.ncvs:
+        if self.trans_guess and self.method_type in ('ip', 'ea', 'ee'):
             guess_proj, w_lost = self.project_guess(self.v_can)
             self.w_guess_lost = w_lost
             logger.info(self, "trans_guess: canonical guesses projected onto "

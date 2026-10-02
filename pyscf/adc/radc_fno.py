@@ -58,8 +58,8 @@ class RADC2FNO(radc.RADC):
         trans_guess : bool
             Whether to use the canonical ADC eigenvectors, projected onto the
             truncated FNO basis (see project_guess), as the initial guess for
-            the truncated ADC calculation.(IP/EA/EE, no CVS) Combined with 
-            pick = True for character-based root following inside the Davidson solver. 
+            the truncated ADC calculation (IP incl. CVS, EA, EE). Combined with
+            pick = True for character-based root following inside the Davidson solver.
             Default value is False.
 
     After kernel() or kernel_gs(), frozen, mo_coeff, mo_occ, and mo_energy
@@ -116,7 +116,21 @@ class RADC2FNO(radc.RADC):
         nvir = self._nvir
         S = self.S_vir
 
-        if self.method_type == 'ip':
+        if self.method_type == 'ip' and self.ncvs:
+            nval = nocc - self.ncvs
+            s_ecc = self.ncvs
+            f_ecc = s_ecc + nvir*self.ncvs*self.ncvs
+            s_ecv, f_ecv = f_ecc, f_ecc + nvir*self.ncvs*nval
+            s_evc, f_evc = f_ecv, f_ecv + nvir*nval*self.ncvs
+
+            def proj(vec):
+                return np.concatenate([
+                    vec[:s_ecc],
+                    S.T.dot(vec[s_ecc:f_ecc].reshape(nvir, -1)).reshape(-1),
+                    S.T.dot(vec[s_ecv:f_ecv].reshape(nvir, -1)).reshape(-1),
+                    S.T.dot(vec[s_evc:f_evc].reshape(nvir, -1)).reshape(-1)])
+
+        elif self.method_type == 'ip':
             def proj(vec):
                 v2 = S.T.dot(vec[nocc:].reshape(nvir, -1)).reshape(-1)
                 return np.concatenate([vec[:nocc], v2])
@@ -178,7 +192,7 @@ class RADC2FNO(radc.RADC):
         self.make_fno(self.rdm1_ss, self._scf, thresh, pct_occ, nvir_act)
         log.timer('get frozen info', *cput0)
 
-        if self.trans_guess and self.method_type in ('ip', 'ea', 'ee') and not self.ncvs:
+        if self.trans_guess and self.method_type in ('ip', 'ea', 'ee'):
             guess_proj, w_lost = self.project_guess(self.v_can)
             self.w_guess_lost = w_lost
             logger.info(self, "trans_guess: canonical guesses projected onto "
