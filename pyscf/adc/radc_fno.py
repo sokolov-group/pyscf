@@ -51,10 +51,12 @@ class RADC2FNO(radc.RADC):
             Canonical ADC correlation energy.
         rdm1_ss : array
             State-specific one-particle reduced density matrix.
-        ref_state : int
-            Target state for the state-specific RDM1. ref_state = 0 (default)
-            is the ground state; ref_state = n is the nth root, or the nth
-            quasiparticle state in IP/EA when if_ref_qp is True.
+        ref_state : int or list of ints
+            Target state(s) for the state-specific/averaged RDM1.
+            ref_state = 0 (default) is the ground state; ref_state = n is
+            the nth root (SS-FNO), or the nth quasiparticle state in IP/EA
+            when if_ref_qp is True; ref_state = [n1, n2, ...] averages the
+            excited-state RDM1s of the listed roots (SA-FNO).
         trans_guess : bool
             Whether to use the canonical ADC eigenvectors, projected onto the
             truncated FNO basis (see project_guess), as the initial guess for
@@ -181,8 +183,11 @@ class RADC2FNO(radc.RADC):
             logger.info(self,"Do fno adc calculation")
         elif isinstance(self.ref_state, int) and 0<self.ref_state<=nroots:
             logger.info(self,f"Do ss-fno adc calculation, the specic state is {self.ref_state}")
+        elif isinstance(self.ref_state, (list, tuple)) and len(self.ref_state) > 0 and \
+                all(isinstance(s, (int, np.integer)) and 0 < s <= nroots for s in self.ref_state):
+            logger.info(self, f"Do sa-fno adc calculation, the specic states are {list(self.ref_state)}")
         else:
-            raise ValueError("ref_state should be an int type and in [0,nroots]")
+            raise ValueError("ref_state should be an int or a non-empty list of ints in [1,nroots]")
 
         if not getattr(self, 'with_df', None) and not getattr(self._scf, 'with_df', None):
             self.if_naf = False
@@ -252,13 +257,22 @@ class RADC2FNO(radc.RADC):
         self.if_heri_eris = heri_tmp
         rdm1_gs = self.make_ref_rdm1()
         self.e_corr_can = self.e_corr
-        if self.ref_state is not None and self.ref_state > 0:
-            if self.if_ref_qp and self.method_type in ('ip', 'ea'):
-                qp_idx = np.where(self.p_can > self.is_qp)[0]
-                state = qp_idx[self.ref_state - 1]
+        if self.ref_state is not None and self.ref_state != 0:
+            rdm1_es = self.make_rdm1()
+            if isinstance(self.ref_state, (list, tuple, np.ndarray)):
+                if self.if_ref_qp and self.method_type in ('ip', 'ea'):
+                    qp_idx = np.where(self.p_can > self.is_qp)[0]
+                    states = [qp_idx[s - 1] for s in self.ref_state]
+                else:
+                    states = [s - 1 for s in self.ref_state]
+                rdm1_es = np.mean([rdm1_es[st] for st in states], axis=0)
             else:
-                state = self.ref_state - 1
-            rdm1_es = self.make_rdm1()[state]
+                if self.if_ref_qp and self.method_type in ('ip', 'ea'):
+                    qp_idx = np.where(self.p_can > self.is_qp)[0]
+                    state = qp_idx[self.ref_state - 1]
+                else:
+                    state = self.ref_state - 1
+                rdm1_es = rdm1_es[state]
             self.rdm1_ss = rdm1_es + rdm1_gs
         else:
             self.rdm1_ss = rdm1_gs
