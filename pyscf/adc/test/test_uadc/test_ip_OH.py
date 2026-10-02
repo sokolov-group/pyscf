@@ -136,6 +136,17 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(rdms_test(dm1_exc[0][1],dm1_exc[1][1]), 16.848816049838934, 6)
         self.assertAlmostEqual(rdms_test(dm1_exc[0][2],dm1_exc[1][2]), 17.063649873323694, 6)
 
+    def test_ip_adc2_frozen2_spin(self):
+        myadc2_fr = adc.ADC(mf, frozen=(2,2))
+        myadc2_fr.conv_tol = 1e-12
+        myadc2_fr.tol_residual = 1e-6
+        myadc2_fr.method_type = "ip"
+        e, v, p, x = myadc2_fr.kernel(nroots=3)
+        spin = get_spin_square(myadc2_fr._adc_es)[0]
+        self.assertAlmostEqual(spin[0], 2.00471309, 5)
+        self.assertAlmostEqual(spin[1], 1.09081650, 5)
+        self.assertAlmostEqual(spin[2], 2.00440475, 5)
+
     def test_ip_adc3_frozen(self):
 
         myadc_fr.method = "adc(3)"
