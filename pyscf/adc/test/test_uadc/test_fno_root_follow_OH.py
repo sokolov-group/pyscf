@@ -117,6 +117,35 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(ADCFG.correct(e)[1], 0.1587062542, 6)
         self.assertAlmostEqual(ADCFG.correct(e)[2], 0.2602920140, 6)
 
+    def test_safno_ee_root_following(self):
+        ADCFG = adc.ADC2FNO(mf).set(verbose=0, method_type='ee', ref_state=[1, 2],
+                                    conv_tol=1e-10, tol_residual=1e-7)
+        ADCFG.trans_guess = True
+        ADCFG.pick = True
+        ADCFG.kernel(nroots=3, thresh=1e-4)
+
+        self.assertAlmostEqual(ADCFG.e_can[0], 0.0023521304, 6)
+        self.assertAlmostEqual(ADCFG.e_can[1], 0.1648082469, 6)
+        self.assertAlmostEqual(ADCFG.e_can[2], 0.2987782521, 6)
+
+        self.assertAlmostEqual(ADCFG.e_ssfno[0], 0.0023530214, 6)
+        self.assertAlmostEqual(ADCFG.e_ssfno[1], 0.1647682275, 6)
+        self.assertAlmostEqual(ADCFG.e_ssfno[2], 0.4836588090, 6)
+
+        for i in range(3):
+            self.assertGreater(ADCFG.ovl_guess[i, i], 0.9)
+
+        myadc = adc.UADC(mf, ADCFG.frozen, ADCFG.mo_coeff, ADCFG.mo_occ,
+                         ADCFG.mo_energy).set(verbose=0, method='adc(3)',
+                                              method_type='ee',
+                                              conv_tol=1e-10, tol_residual=1e-7)
+        myadc.pick = True
+        e, v, p, x = myadc.kernel(nroots=3, guess=ADCFG.v_ssfno)
+
+        self.assertAlmostEqual(ADCFG.correct(e)[0], -0.0018486943, 6)
+        self.assertAlmostEqual(ADCFG.correct(e)[1], 0.1573727720, 6)
+        self.assertAlmostEqual(ADCFG.correct(e)[2], 0.2710617763, 6)
+
 if __name__ == "__main__":
     print("FNO/OSFNO/SS-FNO calculations with character-based root following")
     unittest.main()

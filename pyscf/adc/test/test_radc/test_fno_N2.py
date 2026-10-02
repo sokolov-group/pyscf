@@ -56,6 +56,33 @@ class KnownValues(unittest.TestCase):
         _,_,_ = myadc.kernel_gs()
         self.assertAlmostEqual(ADCFG.correct_corr(myadc.e_corr), -0.3004184571, 6)
 
+    def test_safno_ee(self):
+        ADCFG = adc.ADC2FNO(mf).set(verbose=0, method_type='ee', ref_state=[1, 2],
+                                    conv_tol=1e-10, tol_residual=1e-7)
+        ADCFG.trans_guess = True
+        ADCFG.pick = True
+        ADCFG.kernel(nroots=5, thresh=1e-3)
+
+        myadc = adc.RADC(mf, ADCFG.frozen, ADCFG.mo_coeff, mo_energy=ADCFG.mo_energy)
+        myadc.verbose = 0
+        myadc.method = 'adc(3)'
+        myadc.method_type = 'ee'
+        myadc.conv_tol = 1e-10
+        myadc.tol_residual = 1e-7
+        myadc.pick = True
+        e,v,p,x = myadc.kernel(nroots=5, guess=ADCFG.v_ssfno)
+
+        e = ADCFG.correct(e)
+        self.assertAlmostEqual(e[0], 0.345146, 5)
+        self.assertAlmostEqual(e[1], 0.345146, 5)
+        self.assertLess(abs(e[0] - e[1]), 1e-4)
+        self.assertAlmostEqual(e[2], 0.35918454, 6)
+        self.assertAlmostEqual(e[3], 0.37380165, 6)
+        self.assertAlmostEqual(e[4], 0.37380165, 6)
+
+        self.assertEqual(len(ADCFG.frozen), 1)
+        self.assertAlmostEqual(ADCFG.delta_e_corr, -0.00055766, 6)
+
     def test_ssfno_ip_trans_guess(self):
         ADCFG = adc.ADC2FNO(mf).set(verbose=0, method_type='ip', ref_state=1)
         ADCFG.trans_guess = True

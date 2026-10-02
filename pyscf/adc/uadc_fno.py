@@ -216,8 +216,11 @@ class UADC2FNO(uadc.UADC):
             logger.info(self,"Do fno adc calculation")
         elif isinstance(self.ref_state, int) and 0<self.ref_state<=nroots:
             logger.info(self,f"Do ss-fno adc calculation, the specic state is {self.ref_state}")
+        elif isinstance(self.ref_state, (list, tuple)) and len(self.ref_state) > 0 and \
+                all(isinstance(s, (int, np.integer)) and 0 < s <= nroots for s in self.ref_state):
+            logger.info(self, f"Do sa-fno adc calculation, the specic states are {list(self.ref_state)}")
         else:
-            raise ValueError("ref_state should be an int type and in [0,nroots]")
+            raise ValueError("ref_state should be an int or a non-empty list of ints in [1,nroots]")
 
         if not getattr(self, 'with_df', None) and not getattr(self._scf, 'with_df', None):
             self.if_naf = False
@@ -288,17 +291,26 @@ class UADC2FNO(uadc.UADC):
         self.if_heri_eris = heri_tmp
         rdm1_gs = self.make_ref_rdm1(ao_repr=self.if_osfno)
         self.e_corr_can = self.e_corr
-        if self.ref_state is not None and self.ref_state > 0:
+        if self.ref_state is not None and self.ref_state != 0:
             rdm1_gs_a = rdm1_gs[0]
             rdm1_gs_b = rdm1_gs[1]
             rdm1_es = self.make_rdm1(ao_repr=self.if_osfno)
-            if self.if_ref_qp and self.method_type in ('ip', 'ea'):
-                qp_idx = np.where(self.p_can > self.is_qp)[0]
-                state = qp_idx[self.ref_state - 1]
+            if isinstance(self.ref_state, (list, tuple, np.ndarray)):
+                if self.if_ref_qp and self.method_type in ('ip', 'ea'):
+                    qp_idx = np.where(self.p_can > self.is_qp)[0]
+                    states = [qp_idx[s - 1] for s in self.ref_state]
+                else:
+                    states = [s - 1 for s in self.ref_state]
+                rdm1_es_a = np.mean([rdm1_es[0][st] for st in states], axis=0)
+                rdm1_es_b = np.mean([rdm1_es[1][st] for st in states], axis=0)
             else:
-                state = self.ref_state - 1
-            rdm1_es_a = rdm1_es[0][state]
-            rdm1_es_b = rdm1_es[1][state]
+                if self.if_ref_qp and self.method_type in ('ip', 'ea'):
+                    qp_idx = np.where(self.p_can > self.is_qp)[0]
+                    state = qp_idx[self.ref_state - 1]
+                else:
+                    state = self.ref_state - 1
+                rdm1_es_a = rdm1_es[0][state]
+                rdm1_es_b = rdm1_es[1][state]
             self.rdm1_ss = (rdm1_es_a + rdm1_gs_a, rdm1_es_b + rdm1_gs_b)
         else:
             self.rdm1_ss = rdm1_gs
