@@ -23823,7 +23823,7 @@ def get_spin_square(adc):
             gb_fr = dm_b[r][np.ix_(act_b, act_b)]
             S2 -= np.einsum('pc,sc,sp->', S_ac_fr, S_ac_fr, ga_fr, optimize=True)
             S2 -= np.einsum('cp,cq,pq->', S_ca_fr, S_ca_fr, gb_fr, optimize=True)
-            S2 -= np.einsum('cp,dq->', S_cc_fr, S_cc_fr, optimize=True)
+            S2 -= np.einsum('cp,cp->', S_cc_fr, S_cc_fr, optimize=True)
 
         # 1-RDM and 2-RDM contributions to the <S^2> values
         na = np.trace(dm_a[r])
