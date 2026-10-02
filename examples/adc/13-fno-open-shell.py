@@ -120,11 +120,14 @@ print(spin)
 #2.6 SA-FNO-EE: state-averaged FNO over a list of states (open shell)
 
 # ref_state as a list averages the excited-state 1-RDMs of the listed
-# roots (per spin) into the FNO-generating density. Averaging over the
-# components of a degenerate target (e.g. the two Pi components of the
-# first excited state of OH) gives a component-symmetric density, which
-# avoids the arbitrary polarization a single-component SS-FNO density
-# carries.
+# roots (per spin) into the FNO-generating density, so a single FNO space
+# serves all selected states at SS-FNO accuracy. When the selected states
+# contain degenerate partners (e.g. the two Pi components of the first
+# excited state of OH), always average over the complete degenerate
+# manifold: the averaged density is then component-symmetric and the
+# truncated pair stays exactly degenerate. (A single-component SS-FNO
+# density is polarized, but that polarization is a molecular symmetry
+# operation, so SS-FNO itself is not affected by it.)
 mf = scf.UHF(mol).set(verbose=1).run()
 ADCFG = adc.ADC2FNO(mf).set(verbose=5, method_type='ee', ref_state=[1,2])
 ADCFG.trans_guess = True
