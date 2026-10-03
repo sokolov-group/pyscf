@@ -16647,22 +16647,11 @@ def get_spin_square(adc):
     nocc_b = adc.nocc_b
 
     ovlp = adc._scf.get_ovlp(adc._scf.mol).copy()
-    delta = np.dot(adc.mo_coeff_hf[0].transpose(), np.dot(ovlp, adc.mo_coeff_hf[1]))
-    act_a = np.arange(adc.mo_coeff_hf[0].shape[1])
-    act_b = np.arange(adc.mo_coeff_hf[1].shape[1])
-    if adc.frozen is not None:
-        moidx_fr = adc.get_frozen_mask()
-        act_a = np.where(moidx_fr[0])[0]
-        act_b = np.where(moidx_fr[1])[0]
-        cor_a_fr = np.where(~moidx_fr[0][:np.count_nonzero(adc.mo_occ[0] > 0)])[0]
-        cor_b_fr = np.where(~moidx_fr[1][:np.count_nonzero(adc.mo_occ[1] > 0)])[0]
-        S_ac_fr = delta[np.ix_(act_a, cor_b_fr)]
-        S_ca_fr = delta[np.ix_(cor_a_fr, act_b)]
-        S_cc_fr = delta[np.ix_(cor_a_fr, cor_b_fr)]
-    S_oo_ab = delta[np.ix_(act_a[:nocc_a], act_b[:nocc_b])].copy()
-    S_ov_ab = delta[np.ix_(act_a[:nocc_a], act_b[nocc_b:])].copy()
-    S_vo_ab = delta[np.ix_(act_a[nocc_a:], act_b[:nocc_b])].copy()
-    S_vv_ab = delta[np.ix_(act_a[nocc_a:], act_b[nocc_b:])].copy()
+    delta = np.dot(adc.mo_coeff[0].transpose(), np.dot(ovlp, adc.mo_coeff[1]))
+    S_oo_ab = delta[:nocc_a, :nocc_b].copy()
+    S_ov_ab = delta[:nocc_a, nocc_b:].copy()
+    S_vo_ab = delta[nocc_a:, :nocc_b].copy()
+    S_vv_ab = delta[nocc_a:, nocc_b:].copy()
 
     if adc.f_ov is None:
         t1_1_a = np.zeros((adc.nocc_a, adc.nvir_a))
@@ -16696,6 +16685,17 @@ def get_spin_square(adc):
     n_doubles_aaaa = adc.nocc_a * (adc.nocc_a - 1) * adc.nvir_a * (adc.nvir_a - 1) // 4
     n_doubles_ab = adc.nocc_a * adc.nocc_b * adc.nvir_a * adc.nvir_b
     n_doubles_bbbb = adc.nocc_b * (adc.nocc_b - 1) * adc.nvir_b * (adc.nvir_b - 1) // 4
+
+    if adc.frozen is not None:
+        moidx_fr = adc.get_frozen_mask()
+        act_a = np.where(moidx_fr[0])[0]
+        act_b = np.where(moidx_fr[1])[0]
+        cor_a_fr = np.where(~moidx_fr[0][:np.count_nonzero(adc.mo_occ[0] > 0)])[0]
+        cor_b_fr = np.where(~moidx_fr[1][:np.count_nonzero(adc.mo_occ[1] > 0)])[0]
+        delta_fr = np.dot(adc.mo_coeff_hf[0].transpose(), np.dot(ovlp, adc.mo_coeff_hf[1]))
+        S_ac_fr = delta_fr[np.ix_(act_a, cor_b_fr)]
+        S_ca_fr = delta_fr[np.ix_(cor_a_fr, act_b)]
+        S_cc_fr = delta_fr[np.ix_(cor_a_fr, cor_b_fr)]
 
     ij_ind_a = np.tril_indices(adc.nocc_a, k=-1)
     ij_ind_b = np.tril_indices(adc.nocc_b, k=-1)
