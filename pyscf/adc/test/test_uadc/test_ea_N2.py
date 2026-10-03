@@ -111,8 +111,10 @@ class KnownValues(unittest.TestCase):
     def test_ea_adc3(self):
 
         myadc.method = "adc(3)"
+        myadc.compute_spin_square = True
         e, t_amp1, t_amp2 = myadc.kernel_gs()
         self.assertAlmostEqual(e, -0.31694173142858517 , 6)
+        self.assertAlmostEqual(myadc.gs_spin_square, 0.0, 6)
 
         myadcea = adc.uadc_ea.UADCEA(myadc)
         e,v,p,x = myadcea.kernel(nroots=3)
