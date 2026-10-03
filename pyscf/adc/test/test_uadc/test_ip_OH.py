@@ -62,6 +62,10 @@ class KnownValues(unittest.TestCase):
 
     def test_ip_adc2(self):
 
+        myadc.compute_spin_square = True
+        e, t_amp1, t_amp2 = myadc.kernel_gs()
+        self.assertAlmostEqual(myadc.gs_spin_square, 0.75142400, 6)
+
         e,v,p,x = myadc.kernel(nroots=3)
         spin = get_spin_square(myadc._adc_es)[0]
         e_corr = myadc.e_corr
@@ -150,8 +154,10 @@ class KnownValues(unittest.TestCase):
     def test_ip_adc3_frozen(self):
 
         myadc_fr.method = "adc(3)"
+        myadc_fr.compute_spin_square = True
         e, t_amp1, t_amp2 = myadc_fr.kernel_gs()
         self.assertAlmostEqual(e, -0.17416890784191427, 6)
+        self.assertAlmostEqual(myadc_fr.gs_spin_square, 0.75003920, 6)
 
         myadc_fr.method_type = "ip"
         e,v,p,x = myadc_fr.kernel(nroots=3)
