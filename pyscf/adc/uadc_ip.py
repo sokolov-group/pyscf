@@ -2051,12 +2051,10 @@ def get_spin_square(adc):
 
     if adc.frozen is not None:
         moidx_fr = adc.get_frozen_mask()
-        nocc_a_fr = np.count_nonzero(adc.mo_occ[0] > 0)
-        nocc_b_fr = np.count_nonzero(adc.mo_occ[1] > 0)
         act_a_fr = np.where(moidx_fr[0])[0]
         act_b_fr = np.where(moidx_fr[1])[0]
-        cor_a_fr = np.where(~moidx_fr[0][:nocc_a_fr])[0]
-        cor_b_fr = np.where(~moidx_fr[1][:nocc_b_fr])[0]
+        cor_a_fr = np.where(~moidx_fr[0][:np.count_nonzero(adc.mo_occ[0] > 0)])[0]
+        cor_b_fr = np.where(~moidx_fr[1][:np.count_nonzero(adc.mo_occ[1] > 0)])[0]
         delta_fr = np.dot(adc.mo_coeff_hf[0].transpose(), np.dot(ovlp, adc.mo_coeff_hf[1]))
         S_ac_fr = delta_fr[np.ix_(act_a_fr, cor_b_fr)]
         S_ca_fr = delta_fr[np.ix_(cor_a_fr, act_b_fr)]
