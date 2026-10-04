@@ -16667,6 +16667,13 @@ def get_spin_square(adc):
         t1_2_a = np.zeros((adc.nocc_a, adc.nvir_a))
         t1_2_b = np.zeros((adc.nocc_b, adc.nvir_b))
 
+    if adc.t1[1][0] is not None:
+        t1_3_a = adc.t1[1][0][:]
+        t1_3_b = adc.t1[1][1][:]
+    else:
+        t1_3_a = np.zeros((adc.nocc_a, adc.nvir_a))
+        t1_3_b = np.zeros((adc.nocc_b, adc.nvir_b))
+
     t2_1_a = adc.t2[0][0][:]
     t2_1_ab = adc.t2[0][1][:]
     t2_1_b = adc.t2[0][2][:]
@@ -18141,6 +18148,8 @@ def get_spin_square(adc):
                 t2_1_ab, optimize=True)
             S2 -= 2 * np.einsum('ia,jb,ck,de,ke,lida,ljcb', L_bb, R_bb, S_vo_ab, S_vv_ab, t1_1_b, t2_1_ab,
                 t2_1_ab, optimize=True)
+            S2 -= 2 * np.einsum('ia,ib,aj,bc,jc', L_aa, R_aa, S_vo_ab, S_vv_ab, t1_3_b, optimize=True)
+            S2 -= 2 * np.einsum('ia,jb,ci,ba,jc', L_bb, R_aa, S_vo_ab, S_vv_ab, t1_3_a, optimize=True)
             # block AjdJ
             S2 -= np.einsum('ia,ia,jk,bc,jb,kc', L_aa, R_aa, S_oo_ab, S_vv_ab, t1_1_a, t1_2_b, optimize=True)
             S2 += np.einsum('ia,ib,jk,bc,ja,kc', L_aa, R_aa, S_oo_ab, S_vv_ab, t1_1_a, t1_2_b, optimize=True)
@@ -19192,6 +19201,8 @@ def get_spin_square(adc):
                 t2_1_b, optimize=True)
             S2 -= 2 * np.einsum('ia,jb,kc,de,lc,kjdb,ilae', L_bb, R_bb, S_ov_ab, S_vv_ab, t1_1_b, t2_1_ab,
                 t2_1_b, optimize=True)
+            S2 -= 2 * np.einsum('ia,jb,ic,ab,jc', L_aa, R_bb, S_ov_ab, S_vv_ab, t1_3_b, optimize=True)
+            S2 -= 2 * np.einsum('ia,ib,ja,cb,jc', L_bb, R_bb, S_ov_ab, S_vv_ab, t1_3_a, optimize=True)
             # block IbdJ
             S2 -= 2 * np.einsum('ia,ia,jb,jc,kb,kc', L_aa, R_aa, t1_1_b, t1_2_b, S_ov_ab, S_ov_ab, optimize=True)
             S2 += np.einsum('ia,ja,kb,kc,ib,jc', L_aa, R_aa, t1_1_b, t1_2_b, S_ov_ab, S_ov_ab, optimize=True)
@@ -21503,6 +21514,12 @@ def get_spin_square(adc):
                 t2_1_b, optimize=True)
             S2 += 4/3 * np.einsum('ia,jb,kl,kc,mc,imad,jlbd', L_bb, R_bb, S_oo_ab, S_ov_ab, t1_1_b, t2_1_b,
                 t2_1_b, optimize=True)
+            S2 -= 2 * np.einsum('ia,ia,jk,jb,kb', L_aa, R_aa, S_oo_ab, S_ov_ab, t1_3_b, optimize=True)
+            S2 += 2 * np.einsum('ia,ja,jk,ib,kb', L_aa, R_aa, S_oo_ab, S_ov_ab, t1_3_b, optimize=True)
+            S2 += 2 * np.einsum('ia,jb,ji,ka,kb', L_bb, R_aa, S_oo_ab, S_ov_ab, t1_3_a, optimize=True)
+            S2 -= 2 * np.einsum('ia,ia,jk,jb,kb', L_bb, R_bb, S_oo_ab, S_ov_ab, t1_3_b, optimize=True)
+            S2 += 2 * np.einsum('ia,ib,jk,ja,kb', L_bb, R_bb, S_oo_ab, S_ov_ab, t1_3_b, optimize=True)
+            S2 += 2 * np.einsum('ia,ja,ki,kb,jb', L_bb, R_bb, S_oo_ab, S_ov_ab, t1_3_b, optimize=True)
             # block IjlB & AjlJ
             S2 -= np.einsum('ia,ia,jk,bk,lc,jlbc', L_aa, R_aa, S_oo_ab, S_vo_ab, t1_1_a, t2_2_a, optimize=True)
             S2 += np.einsum('ia,ib,jk,ak,lc,jlbc', L_aa, R_aa, S_oo_ab, S_vo_ab, t1_1_a, t2_2_a, optimize=True)
@@ -22211,6 +22228,12 @@ def get_spin_square(adc):
                 t2_1_b, optimize=True)
             S2 += 2 * np.einsum('ia,jb,kl,cm,md,kjcb,ilad', L_bb, R_bb, S_oo_ab, S_vo_ab, t1_1_b, t2_1_ab,
                 t2_1_b, optimize=True)
+            S2 -= 2 * np.einsum('ia,ia,jk,bk,jb', L_aa, R_aa, S_oo_ab, S_vo_ab, t1_3_a, optimize=True)
+            S2 += 2 * np.einsum('ia,ib,jk,ak,jb', L_aa, R_aa, S_oo_ab, S_vo_ab, t1_3_a, optimize=True)
+            S2 += 2 * np.einsum('ia,ja,ik,bk,jb', L_aa, R_aa, S_oo_ab, S_vo_ab, t1_3_a, optimize=True)
+            S2 += 2 * np.einsum('ia,jb,ij,ak,kb', L_aa, R_bb, S_oo_ab, S_vo_ab, t1_3_b, optimize=True)
+            S2 -= 2 * np.einsum('ia,ia,jk,bk,jb', L_bb, R_bb, S_oo_ab, S_vo_ab, t1_3_a, optimize=True)
+            S2 += 2 * np.einsum('ia,ja,kj,bi,kb', L_bb, R_bb, S_oo_ab, S_vo_ab, t1_3_a, optimize=True)
             # block IjlJ
             S2 += 2 * np.einsum('ia,ia,jb,kb,jl,kl', L_aa, R_aa, t1_1_a, t1_2_a, S_oo_ab, S_oo_ab, optimize=True)
             S2 -= np.einsum('ia,ib,ja,kb,jl,kl', L_aa, R_aa, t1_1_a, t1_2_a, S_oo_ab, S_oo_ab, optimize=True)
