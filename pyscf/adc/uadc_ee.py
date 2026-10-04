@@ -26732,7 +26732,7 @@ class UADCEE(uadc.UADC):
         'nocc_a', 'nocc_b', 'nvir_a', 'nvir_b', 'nmo_a', 'nmo_b', 'mol', 'transform_integrals',
         'with_df', 'spec_factor_print_tol', 'evec_print_tol',
         'compute_properties', 'approx_trans_moments', 'E', 'U', 'P', 'X',
-        'if_naf', 'naux', '_make_rdm1', 'frozen', 'mo_occ'
+        'if_naf', 'naux', '_make_rdm1', 'frozen', 'mo_occ', 'f_ov'
     }
 
     def __init__(self, adc):
@@ -26746,6 +26746,7 @@ class UADCEE(uadc.UADC):
         self.tol_residual = adc.tol_residual
         self.t1 = adc.t1
         self.t2 = adc.t2
+        self.f_ov = adc.f_ov
         self.imds = adc.imds
         self.e_corr = adc.e_corr
         self.method = adc.method
