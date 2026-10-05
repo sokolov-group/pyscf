@@ -167,11 +167,11 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
             t3_ce = np.zeros((nocc, nvir))
 
         #### OCC-OCC ###
-        w_ij = np.zeros((nocc, nocc))
-        w_ij -= 2 * lib.einsum('Iiab,Jiab->IJ',
+        temp = np.zeros((nocc, nocc))
+        temp -= 2 * lib.einsum('Iiab,Jiab->IJ',
                                t1_ccee, t2_ccee, optimize = einsum_type)
-        w_ij += lib.einsum('Iiab,Jiba->IJ', t1_ccee, t2_ccee, optimize = einsum_type)
-        OPDM[:nocc, :nocc] += w_ij + w_ij.T
+        temp += lib.einsum('Iiab,Jiba->IJ', t1_ccee, t2_ccee, optimize = einsum_type)
+        OPDM[:nocc, :nocc] += temp + temp.T
 
         ##### OCC-VIR ### ####
         OPDM[:nocc, nocc:]  += lib.einsum('IA->IA', t3_ce, optimize = einsum_type).copy()
@@ -180,11 +180,11 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
             lib.einsum('iIAa,ia->IA', t1_ccee, t2_ce, optimize = einsum_type)
 
         ##### VIR-VIR ###
-        w_ab = np.zeros((nvir, nvir))
-        w_ab += 2 * lib.einsum('ijAa,ijBa->AB',
+        temp = np.zeros((nvir, nvir))
+        temp += 2 * lib.einsum('ijAa,ijBa->AB',
                                t1_ccee, t2_ccee, optimize = einsum_type)
-        w_ab -= lib.einsum('ijAa,jiBa->AB', t1_ccee, t2_ccee, optimize = einsum_type)
-        OPDM[nocc:, nocc:] += w_ab + w_ab.T
+        temp -= lib.einsum('ijAa,jiBa->AB', t1_ccee, t2_ccee, optimize = einsum_type)
+        OPDM[nocc:, nocc:] += temp + temp.T
 
     ### VIR-OCC ###
     OPDM[nocc:, :nocc] = OPDM[:nocc, nocc:].T
