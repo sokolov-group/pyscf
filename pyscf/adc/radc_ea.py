@@ -841,19 +841,19 @@ def make_rdm1_eigenvectors(adc, L, R):
     rdm1[:nocc, :nocc] -= 4 * einsum('a,a,Iibc,Jibc->IJ', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
     rdm1[:nocc, :nocc] += 2 * einsum('a,a,Iibc,Jicb->IJ', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
     rdm1[:nocc, :nocc] += 2 * einsum('a,b,Iiac,Jibc->IJ', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
-    w_ij = np.zeros((nocc, nocc))
-    w_ij -= einsum('a,b,Iiac,Jicb->IJ', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
-    rdm1[:nocc, :nocc] += w_ij + w_ij.T
+    temp = np.zeros((nocc, nocc))
+    temp -= einsum('a,b,Iiac,Jicb->IJ', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+    rdm1[:nocc, :nocc] += temp + temp.T
     rdm1[:nocc, :nocc] += 2 * einsum('a,b,Iica,Jicb->IJ', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
 
 ############# block- ab
     ### 000 ###
     rdm1[nocc:, nocc:] += einsum('B,A->AB', L1, R1, optimize = einsum_type)
-    w_ab = np.zeros((nvir, nvir))
-    w_ab -= einsum('A,a,ijab,ijBb->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
-    w_ab += 1/2 * einsum('A,a,ijab,jiBb->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
-    w_ab -= einsum('iAa,iaB->AB', R2, R2, optimize = einsum_type)
-    rdm1[nocc:, nocc:] += w_ab + w_ab.T
+    temp = np.zeros((nvir, nvir))
+    temp -= einsum('A,a,ijab,ijBb->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+    temp += 1/2 * einsum('A,a,ijab,jiBb->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
+    temp -= einsum('iAa,iaB->AB', R2, R2, optimize = einsum_type)
+    rdm1[nocc:, nocc:] += temp + temp.T
     rdm1[nocc:, nocc:] += 4 * einsum('a,a,ijAb,ijBb->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
     rdm1[nocc:, nocc:] -= 2 * einsum('a,a,ijAb,jiBb->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
     rdm1[nocc:, nocc:] -= 2 * einsum('a,b,ijBa,ijAb->AB', L1, R1, t1_ccee, t1_ccee, optimize = einsum_type)
@@ -894,39 +894,39 @@ def make_rdm1_eigenvectors(adc, L, R):
 
 ############# block- ij
         # 120 #
-        w_ij = np.zeros((nocc, nocc))
-        w_ij -= 2 * einsum('Jab,a,Ib->IJ', L2, R1, t2_ce, optimize = einsum_type)
-        w_ij += einsum('Jab,b,Ia->IJ', L2, R1, t2_ce, optimize = einsum_type)
-        rdm1[:nocc, :nocc] += w_ij + w_ij.T
+        temp = np.zeros((nocc, nocc))
+        temp -= 2 * einsum('Jab,a,Ib->IJ', L2, R1, t2_ce, optimize = einsum_type)
+        temp += einsum('Jab,b,Ia->IJ', L2, R1, t2_ce, optimize = einsum_type)
+        rdm1[:nocc, :nocc] += temp + temp.T
 
         # 030 #
-        w_ij = np.zeros((nocc, nocc))
-        w_ij -= 4 * einsum('a,a,Iibc,Jibc->IJ', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
-        w_ij += 2 * einsum('a,a,Iibc,Jicb->IJ', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
-        w_ij += 2 * einsum('a,b,Iibc,Jiac->IJ', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
-        w_ij -= einsum('a,b,Iibc,Jica->IJ', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
-        w_ij -= einsum('a,b,Iicb,Jiac->IJ', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
-        w_ij += 2 * einsum('a,b,Iicb,Jica->IJ', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
-        rdm1[:nocc, :nocc] += w_ij + w_ij.T
+        temp = np.zeros((nocc, nocc))
+        temp -= 4 * einsum('a,a,Iibc,Jibc->IJ', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
+        temp += 2 * einsum('a,a,Iibc,Jicb->IJ', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
+        temp += 2 * einsum('a,b,Iibc,Jiac->IJ', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
+        temp -= einsum('a,b,Iibc,Jica->IJ', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
+        temp -= einsum('a,b,Iicb,Jiac->IJ', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
+        temp += 2 * einsum('a,b,Iicb,Jica->IJ', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
+        rdm1[:nocc, :nocc] += temp + temp.T
 
 ############# block- ab
         # 120 #
-        w_ab = np.zeros((nvir, nvir))
-        w_ab -= einsum('iAa,a,iB->AB', L2, R1, t2_ce, optimize = einsum_type)
-        w_ab += 2 * einsum('iaA,a,iB->AB', L2, R1, t2_ce, optimize = einsum_type)
-        rdm1[nocc:, nocc:] += w_ab + w_ab.T
+        temp = np.zeros((nvir, nvir))
+        temp -= einsum('iAa,a,iB->AB', L2, R1, t2_ce, optimize = einsum_type)
+        temp += 2 * einsum('iaA,a,iB->AB', L2, R1, t2_ce, optimize = einsum_type)
+        rdm1[nocc:, nocc:] += temp + temp.T
 
         # 030 #
-        w_ab = np.zeros((nvir, nvir))
-        w_ab -= einsum('B,a,ijAb,ijab->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
-        w_ab += 1/2 * einsum('B,a,ijAb,jiab->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
-        w_ab -= einsum('B,a,ijab,ijAb->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
-        w_ab += 1/2 * einsum('B,a,ijab,jiAb->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
-        w_ab += 4 * einsum('a,a,ijAb,ijBb->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
-        w_ab -= 2 * einsum('a,a,ijAb,jiBb->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
-        w_ab -= 2 * einsum('a,b,ijAa,ijBb->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
-        w_ab += einsum('a,b,ijAa,jiBb->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
-        rdm1[nocc:, nocc:] += w_ab + w_ab.T
+        temp = np.zeros((nvir, nvir))
+        temp -= einsum('B,a,ijAb,ijab->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
+        temp += 1/2 * einsum('B,a,ijAb,jiab->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
+        temp -= einsum('B,a,ijab,ijAb->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
+        temp += 1/2 * einsum('B,a,ijab,jiAb->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
+        temp += 4 * einsum('a,a,ijAb,ijBb->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
+        temp -= 2 * einsum('a,a,ijAb,jiBb->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
+        temp -= 2 * einsum('a,b,ijAa,ijBb->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
+        temp += einsum('a,b,ijAa,jiBb->AB', L1, R1, t1_ccee, t2_ccee, optimize = einsum_type)
+        rdm1[nocc:, nocc:] += temp + temp.T
 
 ############# block- ia
         # 120 #
