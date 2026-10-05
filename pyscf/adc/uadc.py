@@ -296,26 +296,22 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
             t1_3_b = np.zeros((nocc_b, nvir_b))
 
         #### OCC-OCC ###
-        w_ij = np.zeros((nocc_a, nocc_a))
-        w_ij -= einsum('Ia,Ja->IJ', t1_1_a, t1_2_a, optimize = einsum_type)
-        w_ij -= 1/2 * einsum('Iiab,Jiab->IJ', t2_1_a, t2_2_a, optimize = einsum_type)
-        w_ij -= einsum('Iiab,Jiab->IJ', t2_1_ab, t2_2_ab, optimize = einsum_type)
-        w_ij -= 1/2 * \
-            einsum('Ia,ib,Jiab->IJ', t1_1_a, t1_1_b, t2_1_ab, optimize = einsum_type)
-        w_ij += 1/2 * \
-            einsum('Iiab,ia,Jb->IJ', t2_1_a, t1_1_a, t1_1_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, :nocc_a] += w_ij + w_ij.T
+        temp = np.zeros((nocc_a, nocc_a))
+        temp -= einsum('Ia,Ja->IJ', t1_1_a, t1_2_a, optimize = einsum_type)
+        temp -= 1/2 * einsum('Iiab,Jiab->IJ', t2_1_a, t2_2_a, optimize = einsum_type)
+        temp -= einsum('Iiab,Jiab->IJ', t2_1_ab, t2_2_ab, optimize = einsum_type)
+        temp -= 1/2 * einsum('Ia,ib,Jiab->IJ', t1_1_a, t1_1_b, t2_1_ab, optimize = einsum_type)
+        temp += 1/2 *einsum('Iiab,ia,Jb->IJ', t2_1_a, t1_1_a, t1_1_a, optimize = einsum_type)
+        rdm1_a[:nocc_a, :nocc_a] += temp + temp.T
 
 
-        w_ij = np.zeros((nocc_b, nocc_b))
-        w_ij -= einsum('Ia,Ja->IJ', t1_1_b, t1_2_b, optimize = einsum_type)
-        w_ij -= einsum('iIab,iJab->IJ', t2_1_ab, t2_2_ab, optimize = einsum_type)
-        w_ij -= 1/2 * einsum('Iiab,Jiab->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
-        w_ij -= 1/2 * \
-            einsum('ia,Ib,iJab->IJ', t1_1_a, t1_1_b, t2_1_ab, optimize = einsum_type)
-        w_ij += 1/2 * \
-            einsum('Iiab,ia,Jb->IJ', t2_1_b, t1_1_b, t1_1_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, :nocc_b] += w_ij + w_ij.T
+        temp = np.zeros((nocc_b, nocc_b))
+        temp -= einsum('Ia,Ja->IJ', t1_1_b, t1_2_b, optimize = einsum_type)
+        temp -= einsum('iIab,iJab->IJ', t2_1_ab, t2_2_ab, optimize = einsum_type)
+        temp -= 1/2 * einsum('Iiab,Jiab->IJ', t2_1_b, t2_2_b, optimize = einsum_type)
+        temp -= 1/2 * einsum('ia,Ib,iJab->IJ', t1_1_a, t1_1_b, t2_1_ab, optimize = einsum_type)
+        temp += 1/2 * einsum('Iiab,ia,Jb->IJ', t2_1_b, t1_1_b, t1_1_b, optimize = einsum_type)
+        rdm1_b[:nocc_b, :nocc_b] += temp + temp.T
 
         ##### OCC-VIR ### ####
         rdm1_a[:nocc_a, nocc_a:] += einsum('IA->IA', t1_3_a, optimize = einsum_type).copy()
@@ -324,45 +320,29 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
         rdm1_a[:nocc_a, nocc_a:] += 1/2 * einsum('ia,IiAa->IA', t1_1_a, t2_2_a, optimize = einsum_type)
         rdm1_a[:nocc_a, nocc_a:] += 1/2 * einsum('ia,IiAa->IA', t1_1_b, t2_2_ab, optimize = einsum_type)
         rdm1_a[:nocc_a, nocc_a:] -= 2/3 * einsum('Ia,iA,ia->IA', t1_1_a, t1_1_a, t1_1_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, nocc_a:] -= 1/3 * \
-            einsum('Ia,ijab,ijAb->IA', t1_1_a, t2_1_a, t2_1_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, nocc_a:] -= 1/3 * \
-            einsum('iA,ijab,Ijab->IA', t1_1_a, t2_1_a, t2_1_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, nocc_a:] += 1/6 * \
-            einsum('ia,ijab,IjAb->IA', t1_1_a, t2_1_a, t2_1_a, optimize = einsum_type)
-        rdm1_a[:nocc_a, nocc_a:] -= 2/3 * \
-            einsum('Ia,ijab,ijAb->IA', t1_1_a, t2_1_ab, t2_1_ab, optimize = einsum_type)
-        rdm1_a[:nocc_a, nocc_a:] -= 2/3 * \
-            einsum('iA,ijab,Ijab->IA', t1_1_a, t2_1_ab, t2_1_ab, optimize = einsum_type)
-        rdm1_a[:nocc_a, nocc_a:] += 1/6 * \
-            einsum('ia,ijab,IjAb->IA', t1_1_a, t2_1_ab, t2_1_ab, optimize = einsum_type)
-        rdm1_a[:nocc_a, nocc_a:] += 1/6 * \
-            einsum('ia,IjAb,jiba->IA', t1_1_b, t2_1_a, t2_1_ab, optimize = einsum_type)
-        rdm1_a[:nocc_a, nocc_a:] += 1/6 * \
-            einsum('ia,IjAb,ijab->IA', t1_1_b, t2_1_ab, t2_1_b, optimize = einsum_type)
+        rdm1_a[:nocc_a, nocc_a:] -= 1/3 * einsum('Ia,ijab,ijAb->IA', t1_1_a, t2_1_a, t2_1_a, optimize = einsum_type)
+        rdm1_a[:nocc_a, nocc_a:] -= 1/3 * einsum('iA,ijab,Ijab->IA', t1_1_a, t2_1_a, t2_1_a, optimize = einsum_type)
+        rdm1_a[:nocc_a, nocc_a:] += 1/6 * einsum('ia,ijab,IjAb->IA', t1_1_a, t2_1_a, t2_1_a, optimize = einsum_type)
+        rdm1_a[:nocc_a, nocc_a:] -= 2/3 * einsum('Ia,ijab,ijAb->IA', t1_1_a, t2_1_ab, t2_1_ab, optimize = einsum_type)
+        rdm1_a[:nocc_a, nocc_a:] -= 2/3 * einsum('iA,ijab,Ijab->IA', t1_1_a, t2_1_ab, t2_1_ab, optimize = einsum_type)
+        rdm1_a[:nocc_a, nocc_a:] += 1/6 * einsum('ia,ijab,IjAb->IA', t1_1_a, t2_1_ab, t2_1_ab, optimize = einsum_type)
+        rdm1_a[:nocc_a, nocc_a:] += 1/6 * einsum('ia,IjAb,jiba->IA', t1_1_b, t2_1_a, t2_1_ab, optimize = einsum_type)
+        rdm1_a[:nocc_a, nocc_a:] += 1/6 * einsum('ia,IjAb,ijab->IA', t1_1_b, t2_1_ab, t2_1_b, optimize = einsum_type)
 
         rdm1_b[:nocc_b, nocc_b:] += einsum('IA->IA', t1_3_b, optimize = einsum_type).copy()
         rdm1_b[:nocc_b, nocc_b:] += 1/2 * einsum('ia,iIaA->IA', t1_2_a, t2_1_ab, optimize = einsum_type)
         rdm1_b[:nocc_b, nocc_b:] += 1/2 * einsum('ia,IiAa->IA', t1_2_b, t2_1_b, optimize = einsum_type)
         rdm1_b[:nocc_b, nocc_b:] += 1/2 * einsum('ia,iIaA->IA', t1_1_a, t2_2_ab, optimize = einsum_type)
         rdm1_b[:nocc_b, nocc_b:] += 1/2 * einsum('ia,IiAa->IA', t1_1_b, t2_2_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, nocc_b:] += 1/6 * \
-            einsum('ia,ijab,jIbA->IA', t1_1_a, t2_1_a, t2_1_ab, optimize = einsum_type)
-        rdm1_b[:nocc_b, nocc_b:] += 1/6 * \
-            einsum('ia,ijab,IjAb->IA', t1_1_a, t2_1_ab, t2_1_b, optimize = einsum_type)
+        rdm1_b[:nocc_b, nocc_b:] += 1/6 * einsum('ia,ijab,jIbA->IA', t1_1_a, t2_1_a, t2_1_ab, optimize = einsum_type)
+        rdm1_b[:nocc_b, nocc_b:] += 1/6 * einsum('ia,ijab,IjAb->IA', t1_1_a, t2_1_ab, t2_1_b, optimize = einsum_type)
         rdm1_b[:nocc_b, nocc_b:] -= 2/3 * einsum('Ia,iA,ia->IA', t1_1_b, t1_1_b, t1_1_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, nocc_b:] -= 2/3 * \
-            einsum('Ia,ijba,ijbA->IA', t1_1_b, t2_1_ab, t2_1_ab, optimize = einsum_type)
-        rdm1_b[:nocc_b, nocc_b:] -= 2/3 * \
-            einsum('iA,jiab,jIab->IA', t1_1_b, t2_1_ab, t2_1_ab, optimize = einsum_type)
-        rdm1_b[:nocc_b, nocc_b:] += 1/6 * \
-            einsum('ia,jiba,jIbA->IA', t1_1_b, t2_1_ab, t2_1_ab, optimize = einsum_type)
-        rdm1_b[:nocc_b, nocc_b:] -= 1/3 * \
-            einsum('Ia,ijab,ijAb->IA', t1_1_b, t2_1_b, t2_1_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, nocc_b:] -= 1/3 * \
-            einsum('iA,ijab,Ijab->IA', t1_1_b, t2_1_b, t2_1_b, optimize = einsum_type)
-        rdm1_b[:nocc_b, nocc_b:] += 1/6 * \
-            einsum('ia,ijab,IjAb->IA', t1_1_b, t2_1_b, t2_1_b, optimize = einsum_type)
+        rdm1_b[:nocc_b, nocc_b:] -= 2/3 * einsum('Ia,ijba,ijbA->IA', t1_1_b, t2_1_ab, t2_1_ab, optimize = einsum_type)
+        rdm1_b[:nocc_b, nocc_b:] -= 2/3 * einsum('iA,jiab,jIab->IA', t1_1_b, t2_1_ab, t2_1_ab, optimize = einsum_type)
+        rdm1_b[:nocc_b, nocc_b:] += 1/6 * einsum('ia,jiba,jIbA->IA', t1_1_b, t2_1_ab, t2_1_ab, optimize = einsum_type)
+        rdm1_b[:nocc_b, nocc_b:] -= 1/3 * einsum('Ia,ijab,ijAb->IA', t1_1_b, t2_1_b, t2_1_b, optimize = einsum_type)
+        rdm1_b[:nocc_b, nocc_b:] -= 1/3 * einsum('iA,ijab,Ijab->IA', t1_1_b, t2_1_b, t2_1_b, optimize = einsum_type)
+        rdm1_b[:nocc_b, nocc_b:] += 1/6 * einsum('ia,ijab,IjAb->IA', t1_1_b, t2_1_b, t2_1_b, optimize = einsum_type)
 
         ###### VIR-OCC ###
         rdm1_a[nocc_a:, :nocc_a] = rdm1_a[:nocc_a, nocc_a:].T
@@ -370,25 +350,21 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
         rdm1_b[nocc_b:, :nocc_b] = rdm1_b[:nocc_b, nocc_b:].T
 
         ##### VIR-VIR ###
-        w_ab = np.zeros((nvir_a, nvir_a))
-        w_ab += 1/2 * einsum('ijAa,ijBa->AB', t2_1_a, t2_2_a, optimize = einsum_type)
-        w_ab += einsum('ijAa,ijBa->AB', t2_1_ab, t2_2_ab, optimize = einsum_type)
-        w_ab += einsum('iA,iB->AB', t1_1_a, t1_2_a, optimize = einsum_type)
-        w_ab += 1/2 * \
-            einsum('iA,ja,ijBa->AB', t1_1_a, t1_1_b, t2_1_ab, optimize = einsum_type)
-        w_ab += 1/2 * \
-            einsum('ijAa,iB,ja->AB', t2_1_a, t1_1_a, t1_1_a, optimize = einsum_type)
-        rdm1_a[nocc_a:, nocc_a:] += w_ab + w_ab.T
+        temp = np.zeros((nvir_a, nvir_a))
+        temp += 1/2 * einsum('ijAa,ijBa->AB', t2_1_a, t2_2_a, optimize = einsum_type)
+        temp += einsum('ijAa,ijBa->AB', t2_1_ab, t2_2_ab, optimize = einsum_type)
+        temp += einsum('iA,iB->AB', t1_1_a, t1_2_a, optimize = einsum_type)
+        temp += 1/2 * einsum('iA,ja,ijBa->AB', t1_1_a, t1_1_b, t2_1_ab, optimize = einsum_type)
+        temp += 1/2 * einsum('ijAa,iB,ja->AB', t2_1_a, t1_1_a, t1_1_a, optimize = einsum_type)
+        rdm1_a[nocc_a:, nocc_a:] += temp + temp.T
 
-        w_ab = np.zeros((nvir_b, nvir_b))
-        w_ab += einsum('ijaA,ijaB->AB', t2_1_ab, t2_2_ab, optimize = einsum_type)
-        w_ab += 1/2 * einsum('ijAa,ijBa->AB', t2_1_b, t2_2_b, optimize = einsum_type)
-        w_ab += einsum('iA,iB->AB', t1_1_b, t1_2_b, optimize = einsum_type)
-        w_ab += 1/2 * \
-            einsum('ia,jA,ijaB->AB', t1_1_a, t1_1_b, t2_1_ab, optimize = einsum_type)
-        w_ab += 1/2 * \
-            einsum('ijAa,iB,ja->AB', t2_1_b, t1_1_b, t1_1_b, optimize = einsum_type)
-        rdm1_b[nocc_b:, nocc_b:] += w_ab + w_ab.T
+        temp = np.zeros((nvir_b, nvir_b))
+        temp += einsum('ijaA,ijaB->AB', t2_1_ab, t2_2_ab, optimize = einsum_type)
+        temp += 1/2 * einsum('ijAa,ijBa->AB', t2_1_b, t2_2_b, optimize = einsum_type)
+        temp += einsum('iA,iB->AB', t1_1_b, t1_2_b, optimize = einsum_type)
+        temp += 1/2 * einsum('ia,jA,ijaB->AB', t1_1_a, t1_1_b, t2_1_ab, optimize = einsum_type)
+        temp += 1/2 * einsum('ijAa,iB,ja->AB', t2_1_b, t1_1_b, t1_1_b, optimize = einsum_type)
+        rdm1_b[nocc_b:, nocc_b:] += temp + temp.T
 
     if with_frozen and adc.frozen is not None:
         nmo_a = adc.mo_coeff_hf[0].shape[1]

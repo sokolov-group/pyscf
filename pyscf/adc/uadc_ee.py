@@ -85,22 +85,14 @@ def get_imds(adc, eris=None):
     occ_list_b = np.array(range(nocc_b))
 
     t2_1_a = t2[0][0][:]
-    M_ia_jb_a[:, vir_list_a, :, vir_list_a] -= 0.25 * \
+    M_ia_jb_a[:, vir_list_a, :, vir_list_a] -= 0.5 * \
         lib.einsum('jmef,iefm->ij', t2_1_a, eris.ovvo, optimize=True)
-    M_ia_jb_a[:, vir_list_a, :, vir_list_a] += 0.25 * \
-        lib.einsum('jmef,ifem->ij', t2_1_a, eris.ovvo, optimize=True)
-    M_ia_jb_a[:, vir_list_a, :, vir_list_a] -= 0.25 * \
+    M_ia_jb_a[:, vir_list_a, :, vir_list_a] -= 0.5 * \
         lib.einsum('imef,jefm->ij', t2_1_a, eris.ovvo, optimize=True)
-    M_ia_jb_a[:, vir_list_a, :, vir_list_a] += 0.25 * \
-        lib.einsum('imef,jfem->ij', t2_1_a, eris.ovvo, optimize=True)
-    M_ia_jb_a[occ_list_a, :, occ_list_a, :] -= 0.25 * \
+    M_ia_jb_a[occ_list_a, :, occ_list_a, :] -= 0.5 * \
         lib.einsum('mnae,mben->ab', t2_1_a, eris.ovvo, optimize=True)
-    M_ia_jb_a[occ_list_a, :, occ_list_a, :] += 0.25 * \
-        lib.einsum('mnae,mebn->ab', t2_1_a, eris.ovvo, optimize=True)
-    M_ia_jb_a[occ_list_a, :, occ_list_a, :] -= 0.25 * \
+    M_ia_jb_a[occ_list_a, :, occ_list_a, :] -= 0.5 * \
         lib.einsum('mnbe,maen->ab', t2_1_a, eris.ovvo, optimize=True)
-    M_ia_jb_a[occ_list_a, :, occ_list_a, :] += 0.25 * \
-        lib.einsum('mnbe,mean->ab', t2_1_a, eris.ovvo, optimize=True)
     M_ia_jb_a += 0.5 * lib.einsum('jmbe,iaem->iajb',
                                   t2_1_a, eris.ovvo, optimize=True)
     M_ia_jb_a += 0.5 * lib.einsum('imae,jbem->iajb',
@@ -149,22 +141,14 @@ def get_imds(adc, eris=None):
     del t2_1_ab
 
     t2_1_b = t2[0][2][:]
-    M_ia_jb_b[:, vir_list_b, :, vir_list_b] -= 0.25 * \
+    M_ia_jb_b[:, vir_list_b, :, vir_list_b] -= 0.5 * \
         lib.einsum('jmef,iefm->ij', t2_1_b, eris.OVVO, optimize=True)
-    M_ia_jb_b[:, vir_list_b, :, vir_list_b] += 0.25 * \
-        lib.einsum('jmef,ifem->ij', t2_1_b, eris.OVVO, optimize=True)
-    M_ia_jb_b[:, vir_list_b, :, vir_list_b] -= 0.25 * \
+    M_ia_jb_b[:, vir_list_b, :, vir_list_b] -= 0.5 * \
         lib.einsum('imef,jefm->ij', t2_1_b, eris.OVVO, optimize=True)
-    M_ia_jb_b[:, vir_list_b, :, vir_list_b] += 0.25 * \
-        lib.einsum('imef,jfem->ij', t2_1_b, eris.OVVO, optimize=True)
-    M_ia_jb_b[occ_list_b, :, occ_list_b, :] -= 0.25 * \
+    M_ia_jb_b[occ_list_b, :, occ_list_b, :] -= 0.5 * \
         lib.einsum('mnae,mben->ab', t2_1_b, eris.OVVO, optimize=True)
-    M_ia_jb_b[occ_list_b, :, occ_list_b, :] += 0.25 * \
-        lib.einsum('mnae,mebn->ab', t2_1_b, eris.OVVO, optimize=True)
-    M_ia_jb_b[occ_list_b, :, occ_list_b, :] -= 0.25 * \
+    M_ia_jb_b[occ_list_b, :, occ_list_b, :] -= 0.5 * \
         lib.einsum('mnbe,maen->ab', t2_1_b, eris.OVVO, optimize=True)
-    M_ia_jb_b[occ_list_b, :, occ_list_b, :] += 0.25 * \
-        lib.einsum('mnbe,mean->ab', t2_1_b, eris.OVVO, optimize=True)
     M_ia_jb_b += 0.5 * lib.einsum('jmbe,iaem->iajb',
                                   t2_1_b, eris.OVVO, optimize=True)
     M_ia_jb_b -= 0.5 * lib.einsum('jmbe,ieam->iajb',
@@ -1671,7 +1655,7 @@ def get_imds(adc, eris=None):
                 M_030_aa[occ_list_a,
                          :,
                          occ_list_a,
-                         :] += lib.einsum('ia,iaAD->DA',
+                         :] += 2 * lib.einsum('ia,iaAD->DA',
                                           t2_ce_aa[a:b,
                                                    :],
                                           v_ceee_aaaa,
@@ -1680,14 +1664,6 @@ def get_imds(adc, eris=None):
                          :,
                          occ_list_a,
                          :] -= lib.einsum('ia,iADa->DA',
-                                          t2_ce_aa[a:b,
-                                                   :],
-                                          v_ceee_aaaa,
-                                          optimize=einsum_type)
-                M_030_aa[occ_list_a,
-                         :,
-                         occ_list_a,
-                         :] += lib.einsum('ia,iaDA->DA',
                                           t2_ce_aa[a:b,
                                                    :],
                                           v_ceee_aaaa,
@@ -1919,7 +1895,7 @@ def get_imds(adc, eris=None):
                     M_030_aa[occ_list_a,
                              :,
                              occ_list_a,
-                             :] += 1 / 2 * lib.einsum('iaAD,ijab,jb->DA',
+                             :] += lib.einsum('iaAD,ijab,jb->DA',
                                                       v_ceee_aaaa,
                                                       t1_ccee_aaaa[a:b,
                                                                    :,
@@ -1930,29 +1906,7 @@ def get_imds(adc, eris=None):
                     M_030_aa[occ_list_a,
                              :,
                              occ_list_a,
-                             :] += 1 / 2 * lib.einsum('iaAD,ijab,jb->DA',
-                                                      v_ceee_aaaa,
-                                                      t1_ccee_abab[a:b,
-                                                                   :,
-                                                                   :,
-                                                                   :],
-                                                      t1_ce_bb,
-                                                      optimize=einsum_type)
-                    M_030_aa[occ_list_a,
-                             :,
-                             occ_list_a,
-                             :] += 1 / 2 * lib.einsum('iaDA,ijab,jb->DA',
-                                                      v_ceee_aaaa,
-                                                      t1_ccee_aaaa[a:b,
-                                                                   :,
-                                                                   :,
-                                                                   :],
-                                                      t1_ce_aa,
-                                                      optimize=einsum_type)
-                    M_030_aa[occ_list_a,
-                             :,
-                             occ_list_a,
-                             :] += 1 / 2 * lib.einsum('iaDA,ijab,jb->DA',
+                             :] += lib.einsum('iaAD,ijab,jb->DA',
                                                       v_ceee_aaaa,
                                                       t1_ccee_abab[a:b,
                                                                    :,
@@ -2116,7 +2070,7 @@ def get_imds(adc, eris=None):
             M_030_aa[occ_list_a,
                      :,
                      occ_list_a,
-                     :] += lib.einsum('ia,iaAD->DA',
+                     :] += 2 * lib.einsum('ia,iaAD->DA',
                                       t2_ce_aa,
                                       v_ceee_aaaa,
                                       optimize=einsum_type)
@@ -2124,13 +2078,6 @@ def get_imds(adc, eris=None):
                      :,
                      occ_list_a,
                      :] -= lib.einsum('ia,iADa->DA',
-                                      t2_ce_aa,
-                                      v_ceee_aaaa,
-                                      optimize=einsum_type)
-            M_030_aa[occ_list_a,
-                     :,
-                     occ_list_a,
-                     :] += lib.einsum('ia,iaDA->DA',
                                       t2_ce_aa,
                                       v_ceee_aaaa,
                                       optimize=einsum_type)
@@ -2244,7 +2191,7 @@ def get_imds(adc, eris=None):
             M_030_aa[occ_list_a,
                      :,
                      occ_list_a,
-                     :] += 1 / 2 * lib.einsum('iaAD,ijab,jb->DA',
+                     :] += lib.einsum('iaAD,ijab,jb->DA',
                                               v_ceee_aaaa,
                                               t1_ccee_aaaa,
                                               t1_ce_aa,
@@ -2252,23 +2199,7 @@ def get_imds(adc, eris=None):
             M_030_aa[occ_list_a,
                      :,
                      occ_list_a,
-                     :] += 1 / 2 * lib.einsum('iaAD,ijab,jb->DA',
-                                              v_ceee_aaaa,
-                                              t1_ccee_abab,
-                                              t1_ce_bb,
-                                              optimize=einsum_type)
-            M_030_aa[occ_list_a,
-                     :,
-                     occ_list_a,
-                     :] += 1 / 2 * lib.einsum('iaDA,ijab,jb->DA',
-                                              v_ceee_aaaa,
-                                              t1_ccee_aaaa,
-                                              t1_ce_aa,
-                                              optimize=einsum_type)
-            M_030_aa[occ_list_a,
-                     :,
-                     occ_list_a,
-                     :] += 1 / 2 * lib.einsum('iaDA,ijab,jb->DA',
+                     :] += lib.einsum('iaAD,ijab,jb->DA',
                                               v_ceee_aaaa,
                                               t1_ccee_abab,
                                               t1_ce_bb,
@@ -2413,7 +2344,7 @@ def get_imds(adc, eris=None):
                 M_030_bb[occ_list_b,
                          :,
                          occ_list_b,
-                         :] += lib.einsum('jb,jbad->da',
+                         :] += 2 * lib.einsum('jb,jbad->da',
                                           t2_ce_bb[a:b,
                                                    :],
                                           v_ceee_bbbb,
@@ -2422,14 +2353,6 @@ def get_imds(adc, eris=None):
                          :,
                          occ_list_b,
                          :] -= lib.einsum('jb,jadb->da',
-                                          t2_ce_bb[a:b,
-                                                   :],
-                                          v_ceee_bbbb,
-                                          optimize=einsum_type)
-                M_030_bb[occ_list_b,
-                         :,
-                         occ_list_b,
-                         :] += lib.einsum('jb,jbda->da',
                                           t2_ce_bb[a:b,
                                                    :],
                                           v_ceee_bbbb,
@@ -2661,7 +2584,7 @@ def get_imds(adc, eris=None):
                     M_030_bb[occ_list_b,
                              :,
                              occ_list_b,
-                             :] += 1 / 2 * lib.einsum('jbad,jkbc,kc->da',
+                             :] += lib.einsum('jbad,jkbc,kc->da',
                                                       v_ceee_bbbb,
                                                       t1_ccee_bbbb[a:b,
                                                                    :,
@@ -2672,29 +2595,7 @@ def get_imds(adc, eris=None):
                     M_030_bb[occ_list_b,
                              :,
                              occ_list_b,
-                             :] += 1 / 2 * lib.einsum('jbad,kjcb,kc->da',
-                                                      v_ceee_bbbb,
-                                                      t1_ccee_abab[:,
-                                                                   a:b,
-                                                                   :,
-                                                                   :],
-                                                      t1_ce_aa,
-                                                      optimize=einsum_type)
-                    M_030_bb[occ_list_b,
-                             :,
-                             occ_list_b,
-                             :] += 1 / 2 * lib.einsum('jbda,jkbc,kc->da',
-                                                      v_ceee_bbbb,
-                                                      t1_ccee_bbbb[a:b,
-                                                                   :,
-                                                                   :,
-                                                                   :],
-                                                      t1_ce_bb,
-                                                      optimize=einsum_type)
-                    M_030_bb[occ_list_b,
-                             :,
-                             occ_list_b,
-                             :] += 1 / 2 * lib.einsum('jbda,kjcb,kc->da',
+                             :] += lib.einsum('jbad,kjcb,kc->da',
                                                       v_ceee_bbbb,
                                                       t1_ccee_abab[:,
                                                                    a:b,
@@ -2859,19 +2760,13 @@ def get_imds(adc, eris=None):
                                    t2_ce_bb, v_ceee_bbbb, optimize=einsum_type)
             M_030_bb[occ_list_b,
                      :,
-                     occ_list_b] += lib.einsum('jb,jbad->da',
+                     occ_list_b] += 2 * lib.einsum('jb,jbad->da',
                                                t2_ce_bb,
                                                v_ceee_bbbb,
                                                optimize=einsum_type)
             M_030_bb[occ_list_b,
                      :,
                      occ_list_b] -= lib.einsum('jb,jadb->da',
-                                               t2_ce_bb,
-                                               v_ceee_bbbb,
-                                               optimize=einsum_type)
-            M_030_bb[occ_list_b,
-                     :,
-                     occ_list_b] += lib.einsum('jb,jbda->da',
                                                t2_ce_bb,
                                                v_ceee_bbbb,
                                                optimize=einsum_type)
@@ -2984,7 +2879,7 @@ def get_imds(adc, eris=None):
             M_030_bb[occ_list_b,
                      :,
                      occ_list_b,
-                     :] += 1 / 2 * lib.einsum('jbad,jkbc,kc->da',
+                     :] += lib.einsum('jbad,jkbc,kc->da',
                                               v_ceee_bbbb,
                                               t1_ccee_bbbb,
                                               t1_ce_bb,
@@ -2992,23 +2887,7 @@ def get_imds(adc, eris=None):
             M_030_bb[occ_list_b,
                      :,
                      occ_list_b,
-                     :] += 1 / 2 * lib.einsum('jbad,kjcb,kc->da',
-                                              v_ceee_bbbb,
-                                              t1_ccee_abab,
-                                              t1_ce_aa,
-                                              optimize=einsum_type)
-            M_030_bb[occ_list_b,
-                     :,
-                     occ_list_b,
-                     :] += 1 / 2 * lib.einsum('jbda,jkbc,kc->da',
-                                              v_ceee_bbbb,
-                                              t1_ccee_bbbb,
-                                              t1_ce_bb,
-                                              optimize=einsum_type)
-            M_030_bb[occ_list_b,
-                     :,
-                     occ_list_b,
-                     :] += 1 / 2 * lib.einsum('jbda,kjcb,kc->da',
+                     :] += lib.einsum('jbad,kjcb,kc->da',
                                               v_ceee_bbbb,
                                               t1_ccee_abab,
                                               t1_ce_aa,
@@ -4228,7 +4107,7 @@ def get_imds(adc, eris=None):
         M_030_aa[:,
                  vir_list_a,
                  :,
-                 vir_list_a] -= lib.einsum('ia,iaIL->IL',
+                 vir_list_a] -= 2 * lib.einsum('ia,iaIL->IL',
                                            t2_ce_aa,
                                            v_cecc_aaaa,
                                            optimize=einsum_type)
@@ -4236,13 +4115,6 @@ def get_imds(adc, eris=None):
                  vir_list_a,
                  :,
                  vir_list_a] += lib.einsum('ia,LaiI->IL',
-                                           t2_ce_aa,
-                                           v_cecc_aaaa,
-                                           optimize=einsum_type)
-        M_030_aa[:,
-                 vir_list_a,
-                 :,
-                 vir_list_a] -= lib.einsum('ia,iaLI->IL',
                                            t2_ce_aa,
                                            v_cecc_aaaa,
                                            optimize=einsum_type)
@@ -5948,7 +5820,7 @@ def get_imds(adc, eris=None):
             M_030_aa[:,
                      vir_list_a,
                      :,
-                     vir_list_a] -= 1 / 2 * lib.einsum('iaIL,ijab,jb->IL',
+                     vir_list_a] -= lib.einsum('iaIL,ijab,jb->IL',
                                                        v_cecc_aaaa,
                                                        t1_ccee_aaaa,
                                                        t1_ce_aa,
@@ -5956,23 +5828,7 @@ def get_imds(adc, eris=None):
             M_030_aa[:,
                      vir_list_a,
                      :,
-                     vir_list_a] -= 1 / 2 * lib.einsum('iaIL,ijab,jb->IL',
-                                                       v_cecc_aaaa,
-                                                       t1_ccee_abab,
-                                                       t1_ce_bb,
-                                                       optimize=einsum_type)
-            M_030_aa[:,
-                     vir_list_a,
-                     :,
-                     vir_list_a] -= 1 / 2 * lib.einsum('iaLI,ijab,jb->IL',
-                                                       v_cecc_aaaa,
-                                                       t1_ccee_aaaa,
-                                                       t1_ce_aa,
-                                                       optimize=einsum_type)
-            M_030_aa[:,
-                     vir_list_a,
-                     :,
-                     vir_list_a] -= 1 / 2 * lib.einsum('iaLI,ijab,jb->IL',
+                     vir_list_a] -= lib.einsum('iaIL,ijab,jb->IL',
                                                        v_cecc_aaaa,
                                                        t1_ccee_abab,
                                                        t1_ce_bb,
@@ -6124,7 +5980,7 @@ def get_imds(adc, eris=None):
             M_030_aa[:,
                      vir_list_a,
                      :,
-                     vir_list_a] -= lib.einsum('Iabi,La,ib->IL',
+                     vir_list_a] -= 2 * lib.einsum('Iabi,La,ib->IL',
                                                v_ceec_aaaa,
                                                t1_ce_aa,
                                                t1_ce_aa,
@@ -6148,14 +6004,6 @@ def get_imds(adc, eris=None):
             M_030_aa[:,
                      vir_list_a,
                      :,
-                     vir_list_a] -= lib.einsum('Iabi,La,ib->IL',
-                                               v_ceec_aaaa,
-                                               t1_ce_aa,
-                                               t1_ce_aa,
-                                               optimize=einsum_type)
-            M_030_aa[:,
-                     vir_list_a,
-                     :,
                      vir_list_a] += lib.einsum('Iaij,Liab,jb->IL',
                                                v_cecc_aabb,
                                                t1_ccee_abab,
@@ -6164,15 +6012,7 @@ def get_imds(adc, eris=None):
             M_030_aa[:,
                      vir_list_a,
                      :,
-                     vir_list_a] -= lib.einsum('Iabi,La,ib->IL',
-                                               v_ceec_aabb,
-                                               t1_ce_aa,
-                                               t1_ce_bb,
-                                               optimize=einsum_type)
-            M_030_aa[:,
-                     vir_list_a,
-                     :,
-                     vir_list_a] -= lib.einsum('Iabi,La,ib->IL',
+                     vir_list_a] -= 2 * lib.einsum('Iabi,La,ib->IL',
                                                v_ceec_aabb,
                                                t1_ce_aa,
                                                t1_ce_bb,
@@ -6228,7 +6068,7 @@ def get_imds(adc, eris=None):
             M_030_aa[:,
                      vir_list_a,
                      :,
-                     vir_list_a] -= lib.einsum('Labi,Ia,ib->IL',
+                     vir_list_a] -= 2 * lib.einsum('Labi,Ia,ib->IL',
                                                v_ceec_aaaa,
                                                t1_ce_aa,
                                                t1_ce_aa,
@@ -6244,14 +6084,6 @@ def get_imds(adc, eris=None):
             M_030_aa[:,
                      vir_list_a,
                      :,
-                     vir_list_a] -= lib.einsum('Labi,Ia,ib->IL',
-                                               v_ceec_aaaa,
-                                               t1_ce_aa,
-                                               t1_ce_aa,
-                                               optimize=einsum_type)
-            M_030_aa[:,
-                     vir_list_a,
-                     :,
                      vir_list_a] += lib.einsum('Laij,Iiab,jb->IL',
                                                v_cecc_aabb,
                                                t1_ccee_abab,
@@ -6260,15 +6092,7 @@ def get_imds(adc, eris=None):
             M_030_aa[:,
                      vir_list_a,
                      :,
-                     vir_list_a] -= lib.einsum('Labi,Ia,ib->IL',
-                                               v_ceec_aabb,
-                                               t1_ce_aa,
-                                               t1_ce_bb,
-                                               optimize=einsum_type)
-            M_030_aa[:,
-                     vir_list_a,
-                     :,
-                     vir_list_a] -= lib.einsum('Labi,Ia,ib->IL',
+                     vir_list_a] -= 2 * lib.einsum('Labi,Ia,ib->IL',
                                                v_ceec_aabb,
                                                t1_ce_aa,
                                                t1_ce_bb,
@@ -6308,15 +6132,7 @@ def get_imds(adc, eris=None):
             M_030_aa[occ_list_a,
                      :,
                      occ_list_a,
-                     :] -= lib.einsum('iAaj,iD,ja->DA',
-                                      v_ceec_aaaa,
-                                      t1_ce_aa,
-                                      t1_ce_aa,
-                                      optimize=einsum_type)
-            M_030_aa[occ_list_a,
-                     :,
-                     occ_list_a,
-                     :] -= lib.einsum('iAaj,iD,ja->DA',
+                     :] -= 2 * lib.einsum('iAaj,iD,ja->DA',
                                       v_ceec_aaaa,
                                       t1_ce_aa,
                                       t1_ce_aa,
@@ -6340,15 +6156,7 @@ def get_imds(adc, eris=None):
             M_030_aa[occ_list_a,
                      :,
                      occ_list_a,
-                     :] -= lib.einsum('iAaj,iD,ja->DA',
-                                      v_ceec_aabb,
-                                      t1_ce_aa,
-                                      t1_ce_bb,
-                                      optimize=einsum_type)
-            M_030_aa[occ_list_a,
-                     :,
-                     occ_list_a,
-                     :] -= lib.einsum('iAaj,iD,ja->DA',
+                     :] -= 2 * lib.einsum('iAaj,iD,ja->DA',
                                       v_ceec_aabb,
                                       t1_ce_aa,
                                       t1_ce_bb,
@@ -6372,15 +6180,7 @@ def get_imds(adc, eris=None):
             M_030_aa[occ_list_a,
                      :,
                      occ_list_a,
-                     :] -= lib.einsum('iDaj,iA,ja->DA',
-                                      v_ceec_aaaa,
-                                      t1_ce_aa,
-                                      t1_ce_aa,
-                                      optimize=einsum_type)
-            M_030_aa[occ_list_a,
-                     :,
-                     occ_list_a,
-                     :] -= lib.einsum('iDaj,iA,ja->DA',
+                     :] -= 2 * lib.einsum('iDaj,iA,ja->DA',
                                       v_ceec_aaaa,
                                       t1_ce_aa,
                                       t1_ce_aa,
@@ -6404,15 +6204,7 @@ def get_imds(adc, eris=None):
             M_030_aa[occ_list_a,
                      :,
                      occ_list_a,
-                     :] -= lib.einsum('iDaj,iA,ja->DA',
-                                      v_ceec_aabb,
-                                      t1_ce_aa,
-                                      t1_ce_bb,
-                                      optimize=einsum_type)
-            M_030_aa[occ_list_a,
-                     :,
-                     occ_list_a,
-                     :] -= lib.einsum('iDaj,iA,ja->DA',
+                     :] -= 2 * lib.einsum('iDaj,iA,ja->DA',
                                       v_ceec_aabb,
                                       t1_ce_aa,
                                       t1_ce_bb,
@@ -7115,7 +6907,7 @@ def get_imds(adc, eris=None):
         M_030_bb[:,
                  vir_list_b,
                  :,
-                 vir_list_b] -= lib.einsum('jb,jbil->il',
+                 vir_list_b] -= 2 * lib.einsum('jb,jbil->il',
                                            t2_ce_bb,
                                            v_cecc_bbbb,
                                            optimize=einsum_type)
@@ -7123,13 +6915,6 @@ def get_imds(adc, eris=None):
                  vir_list_b,
                  :,
                  vir_list_b] += lib.einsum('jb,lbji->il',
-                                           t2_ce_bb,
-                                           v_cecc_bbbb,
-                                           optimize=einsum_type)
-        M_030_bb[:,
-                 vir_list_b,
-                 :,
-                 vir_list_b] -= lib.einsum('jb,jbli->il',
                                            t2_ce_bb,
                                            v_cecc_bbbb,
                                            optimize=einsum_type)
@@ -8860,7 +8645,7 @@ def get_imds(adc, eris=None):
             M_030_bb[:,
                      vir_list_b,
                      :,
-                     vir_list_b] -= 1 / 2 * lib.einsum('jbil,jkbc,kc->il',
+                     vir_list_b] -= lib.einsum('jbil,jkbc,kc->il',
                                                        v_cecc_bbbb,
                                                        t1_ccee_bbbb,
                                                        t1_ce_bb,
@@ -8868,23 +8653,7 @@ def get_imds(adc, eris=None):
             M_030_bb[:,
                      vir_list_b,
                      :,
-                     vir_list_b] -= 1 / 2 * lib.einsum('jbil,kjcb,kc->il',
-                                                       v_cecc_bbbb,
-                                                       t1_ccee_abab,
-                                                       t1_ce_aa,
-                                                       optimize=einsum_type)
-            M_030_bb[:,
-                     vir_list_b,
-                     :,
-                     vir_list_b] -= 1 / 2 * lib.einsum('jbli,jkbc,kc->il',
-                                                       v_cecc_bbbb,
-                                                       t1_ccee_bbbb,
-                                                       t1_ce_bb,
-                                                       optimize=einsum_type)
-            M_030_bb[:,
-                     vir_list_b,
-                     :,
-                     vir_list_b] -= 1 / 2 * lib.einsum('jbli,kjcb,kc->il',
+                     vir_list_b] -= lib.einsum('jbil,kjcb,kc->il',
                                                        v_cecc_bbbb,
                                                        t1_ccee_abab,
                                                        t1_ce_aa,
@@ -8972,15 +8741,7 @@ def get_imds(adc, eris=None):
             M_030_bb[:,
                      vir_list_b,
                      :,
-                     vir_list_b] -= lib.einsum('ibcj,lb,jc->il',
-                                               v_ceec_bbaa,
-                                               t1_ce_bb,
-                                               t1_ce_aa,
-                                               optimize=einsum_type)
-            M_030_bb[:,
-                     vir_list_b,
-                     :,
-                     vir_list_b] -= lib.einsum('ibcj,lb,jc->il',
+                     vir_list_b] -= 2 * lib.einsum('ibcj,lb,jc->il',
                                                v_ceec_bbaa,
                                                t1_ce_bb,
                                                t1_ce_aa,
@@ -9012,7 +8773,7 @@ def get_imds(adc, eris=None):
             M_030_bb[:,
                      vir_list_b,
                      :,
-                     vir_list_b] -= lib.einsum('ibcj,lb,jc->il',
+                     vir_list_b] -= 2 * lib.einsum('ibcj,lb,jc->il',
                                                v_ceec_bbbb,
                                                t1_ce_bb,
                                                t1_ce_bb,
@@ -9029,14 +8790,6 @@ def get_imds(adc, eris=None):
                      vir_list_b,
                      :,
                      vir_list_b] += lib.einsum('ibcl,jb,jc->il',
-                                               v_ceec_bbbb,
-                                               t1_ce_bb,
-                                               t1_ce_bb,
-                                               optimize=einsum_type)
-            M_030_bb[:,
-                     vir_list_b,
-                     :,
-                     vir_list_b] -= lib.einsum('ibcj,lb,jc->il',
                                                v_ceec_bbbb,
                                                t1_ce_bb,
                                                t1_ce_bb,
@@ -9092,15 +8845,7 @@ def get_imds(adc, eris=None):
             M_030_bb[:,
                      vir_list_b,
                      :,
-                     vir_list_b] -= lib.einsum('lbcj,ib,jc->il',
-                                               v_ceec_bbaa,
-                                               t1_ce_bb,
-                                               t1_ce_aa,
-                                               optimize=einsum_type)
-            M_030_bb[:,
-                     vir_list_b,
-                     :,
-                     vir_list_b] -= lib.einsum('lbcj,ib,jc->il',
+                     vir_list_b] -= 2 * lib.einsum('lbcj,ib,jc->il',
                                                v_ceec_bbaa,
                                                t1_ce_bb,
                                                t1_ce_aa,
@@ -9116,7 +8861,7 @@ def get_imds(adc, eris=None):
             M_030_bb[:,
                      vir_list_b,
                      :,
-                     vir_list_b] -= lib.einsum('lbcj,ib,jc->il',
+                     vir_list_b] -= 2 * lib.einsum('lbcj,ib,jc->il',
                                                v_ceec_bbbb,
                                                t1_ce_bb,
                                                t1_ce_bb,
@@ -9125,14 +8870,6 @@ def get_imds(adc, eris=None):
                      vir_list_b,
                      :,
                      vir_list_b] += lib.einsum('lbcj,jb,ic->il',
-                                               v_ceec_bbbb,
-                                               t1_ce_bb,
-                                               t1_ce_bb,
-                                               optimize=einsum_type)
-            M_030_bb[:,
-                     vir_list_b,
-                     :,
-                     vir_list_b] -= lib.einsum('lbcj,ib,jc->il',
                                                v_ceec_bbbb,
                                                t1_ce_bb,
                                                t1_ce_bb,
@@ -9164,15 +8901,7 @@ def get_imds(adc, eris=None):
             M_030_bb[occ_list_b,
                      :,
                      occ_list_b,
-                     :] -= lib.einsum('jabk,jd,kb->da',
-                                      v_ceec_bbaa,
-                                      t1_ce_bb,
-                                      t1_ce_aa,
-                                      optimize=einsum_type)
-            M_030_bb[occ_list_b,
-                     :,
-                     occ_list_b,
-                     :] -= lib.einsum('jabk,jd,kb->da',
+                     :] -= 2 * lib.einsum('jabk,jd,kb->da',
                                       v_ceec_bbaa,
                                       t1_ce_bb,
                                       t1_ce_aa,
@@ -9196,15 +8925,7 @@ def get_imds(adc, eris=None):
             M_030_bb[occ_list_b,
                      :,
                      occ_list_b,
-                     :] -= lib.einsum('jabk,jd,kb->da',
-                                      v_ceec_bbbb,
-                                      t1_ce_bb,
-                                      t1_ce_bb,
-                                      optimize=einsum_type)
-            M_030_bb[occ_list_b,
-                     :,
-                     occ_list_b,
-                     :] -= lib.einsum('jabk,jd,kb->da',
+                     :] -= 2 * lib.einsum('jabk,jd,kb->da',
                                       v_ceec_bbbb,
                                       t1_ce_bb,
                                       t1_ce_bb,
@@ -9236,15 +8957,7 @@ def get_imds(adc, eris=None):
             M_030_bb[occ_list_b,
                      :,
                      occ_list_b,
-                     :] -= lib.einsum('jdbk,ja,kb->da',
-                                      v_ceec_bbaa,
-                                      t1_ce_bb,
-                                      t1_ce_aa,
-                                      optimize=einsum_type)
-            M_030_bb[occ_list_b,
-                     :,
-                     occ_list_b,
-                     :] -= lib.einsum('jdbk,ja,kb->da',
+                     :] -= 2 * lib.einsum('jdbk,ja,kb->da',
                                       v_ceec_bbaa,
                                       t1_ce_bb,
                                       t1_ce_aa,
@@ -9260,15 +8973,7 @@ def get_imds(adc, eris=None):
             M_030_bb[occ_list_b,
                      :,
                      occ_list_b,
-                     :] -= lib.einsum('jdbk,ja,kb->da',
-                                      v_ceec_bbbb,
-                                      t1_ce_bb,
-                                      t1_ce_bb,
-                                      optimize=einsum_type)
-            M_030_bb[occ_list_b,
-                     :,
-                     occ_list_b,
-                     :] -= lib.einsum('jdbk,ja,kb->da',
+                     :] -= 2 * lib.einsum('jdbk,ja,kb->da',
                                       v_ceec_bbbb,
                                       t1_ce_bb,
                                       t1_ce_bb,
@@ -10610,12 +10315,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
             for a,b in lib.prange(0,nocc_a,chnk_size):
                 eris_ovvv = dfadc.get_ovvv_spin_df(
                     adc, eris.Lov, eris.Lvv, a, chnk_size).reshape(-1, nvir_a, nvir_a, nvir_a)
-                s[s_a:f_a] += 0.5 * lib.einsum('imef,mfea->ia',
-                                               r2_a[:,
-                                                    a:b],
-                                               eris_ovvv,
-                                               optimize=True).reshape(-1)
-                s[s_a:f_a] -= 0.5 * lib.einsum('imef,mefa->ia',
+                s[s_a:f_a] += lib.einsum('imef,mfea->ia',
                                                r2_a[:,
                                                     a:b],
                                                eris_ovvv,
@@ -10638,10 +10338,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
             del temp_a
         else:
             eris_ovvv = uadc_ao2mo.unpack_eri_1(eris.ovvv, nvir_a)
-            s[s_a:f_a] += 0.5 * \
-                lib.einsum('imef,mfea->ia', r2_a, eris_ovvv, optimize=True).reshape(-1)
-            s[s_a:f_a] -= 0.5 * \
-                lib.einsum('imef,mefa->ia', r2_a, eris_ovvv, optimize=True).reshape(-1)
+            s[s_a:f_a] += lib.einsum('imef,mfea->ia', r2_a, eris_ovvv, optimize=True).reshape(-1)
             temp_a = -lib.einsum('ie,jabe->ijab', r1_a_ov,
                                  eris_ovvv, optimize=True)
             temp_a += lib.einsum('ie,jbae->ijab', r1_a_ov,
@@ -10697,12 +10394,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
                 eris_OVVV = dfadc.get_ovvv_spin_df(
                     adc, eris.LOV, eris.LVV, a, chnk_size).reshape(-1, nvir_b, nvir_b, nvir_b)
                 k = eris_OVVV.shape[0]
-                s[s_b:f_b] += 0.5 * lib.einsum('imef,mfea->ia',
-                                               r2_b[:,
-                                                    a:b],
-                                               eris_OVVV,
-                                               optimize=True).reshape(-1)
-                s[s_b:f_b] -= 0.5 * lib.einsum('imef,mefa->ia',
+                s[s_b:f_b] += lib.einsum('imef,mfea->ia',
                                                r2_b[:,
                                                     a:b],
                                                eris_OVVV,
@@ -10725,10 +10417,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
             del temp_b
         else:
             eris_OVVV = uadc_ao2mo.unpack_eri_1(eris.OVVV, nvir_b)
-            s[s_b:f_b] += 0.5 * \
-                lib.einsum('imef,mfea->ia', r2_b, eris_OVVV, optimize=True).reshape(-1)
-            s[s_b:f_b] -= 0.5 * \
-                lib.einsum('imef,mefa->ia', r2_b, eris_OVVV, optimize=True).reshape(-1)
+            s[s_b:f_b] += lib.einsum('imef,mfea->ia', r2_b, eris_OVVV, optimize=True).reshape(-1)
             temp_b = -lib.einsum('ie,jabe->ijab', r1_b_ov,
                                  eris_OVVV, optimize=True)
             temp_b += lib.einsum('ie,jbae->ijab', r1_b_ov,
@@ -10773,17 +10462,11 @@ def matvec(adc, M_ia_jb=None, eris=None):
             del temp_abab
             del eris_ovVV
 
-        s[s_a:f_a] -= 0.5 * \
-            lib.einsum('mnae,neim->ia', r2_a, eris.ovoo, optimize=True).reshape(-1)
-        s[s_a:f_a] += 0.5 * \
-            lib.einsum('mnae,mein->ia', r2_a, eris.ovoo, optimize=True).reshape(-1)
+        s[s_a:f_a] -= lib.einsum('mnae,neim->ia', r2_a, eris.ovoo, optimize=True).reshape(-1)
         s[s_a:f_a] -= lib.einsum('mnae,neim->ia', r1_ab,
                                  eris.OVoo, optimize=True).reshape(-1)
 
-        s[s_b:f_b] -= 0.5 * \
-            lib.einsum('mnae,neim->ia', r2_b, eris.OVOO, optimize=True).reshape(-1)
-        s[s_b:f_b] += 0.5 * \
-            lib.einsum('mnae,mein->ia', r2_b, eris.OVOO, optimize=True).reshape(-1)
+        s[s_b:f_b] -= lib.einsum('mnae,neim->ia', r2_b, eris.OVOO, optimize=True).reshape(-1)
         s[s_b:f_b] -= lib.einsum('mnea,mein->ia', r1_ab,
                                  eris.ovOO, optimize=True).reshape(-1)
 
@@ -10897,10 +10580,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
             interim_a -= lib.einsum('jmae,ibem->ijab',
                                     r1_ab, eris.ovVO, optimize=True)
 
-            interim_a += 0.5 * \
-                lib.einsum('mnab,minj->ijab', r2_a, eris.oooo, optimize=True)
-            interim_a -= 0.5 * \
-                lib.einsum('mnab,mjni->ijab', r2_a, eris.oooo, optimize=True)
+            interim_a += lib.einsum('mnab,minj->ijab', r2_a, eris.oooo, optimize=True)
 
             interim_a -= lib.einsum('imbe,jaem->ijab',
                                     r2_a, eris.ovvo, optimize=True)
@@ -10935,10 +10615,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
             interim_b -= lib.einsum('mjea,mebi->ijab',
                                     r1_ab, eris.ovVO, optimize=True)
 
-            interim_b += 0.5 * \
-                lib.einsum('mnab,minj->ijab', r2_b, eris.OOOO, optimize=True)
-            interim_b -= 0.5 * \
-                lib.einsum('mnab,mjni->ijab', r2_b, eris.OOOO, optimize=True)
+            interim_b += lib.einsum('mnab,minj->ijab', r2_b, eris.OOOO, optimize=True)
 
             interim_b -= lib.einsum('imbe,jaem->ijab',
                                     r2_b, eris.OVVO, optimize=True)
@@ -13825,7 +13502,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
                     lib.einsum('Iiab,jD,ijab->ID', Y_aaaa, h_ce_aa, t1_ccee_aaaa, optimize=einsum_type)
                 M_02Y1_aa += 1 / 2 * \
                     lib.einsum('ijDa,Ib,ijab->ID', Y_aaaa, h_ce_aa, t1_ccee_aaaa, optimize=einsum_type)
-                M_02Y1_aa += lib.einsum('IiDa,jb,iabj->ID',
+                M_02Y1_aa += 2 * lib.einsum('IiDa,jb,iabj->ID',
                                         Y_aaaa,
                                         t1_ce_aa,
                                         v_ceec_aaaa,
@@ -13835,22 +13512,12 @@ def matvec(adc, M_ia_jb=None, eris=None):
                                         t1_ce_aa,
                                         v_ccee_aaaa,
                                         optimize=einsum_type)
-                M_02Y1_aa += lib.einsum('IiDa,jb,iabj->ID',
-                                        Y_aaaa,
-                                        t1_ce_aa,
-                                        v_ceec_aaaa,
-                                        optimize=einsum_type)
                 M_02Y1_aa -= lib.einsum('IiDa,jb,ibaj->ID',
                                         Y_aaaa,
                                         t1_ce_aa,
                                         v_ceec_aaaa,
                                         optimize=einsum_type)
-                M_02Y1_aa += lib.einsum('IiDa,jb,iabj->ID',
-                                        Y_aaaa,
-                                        t1_ce_bb,
-                                        v_ceec_aabb,
-                                        optimize=einsum_type)
-                M_02Y1_aa += lib.einsum('IiDa,jb,iabj->ID',
+                M_02Y1_aa += 2 * lib.einsum('IiDa,jb,iabj->ID',
                                         Y_aaaa,
                                         t1_ce_bb,
                                         v_ceec_aabb,
@@ -14058,17 +13725,12 @@ def matvec(adc, M_ia_jb=None, eris=None):
                     lib.einsum('ijab,kd,jkab->id', Y_bbbb, h_ce_bb, t1_ccee_bbbb, optimize=einsum_type)
                 M_02Y1_bb += 1 / 2 * \
                     lib.einsum('jkda,ib,jkab->id', Y_bbbb, h_ce_bb, t1_ccee_bbbb, optimize=einsum_type)
-                M_02Y1_bb += lib.einsum('ijda,kb,jabk->id',
+                M_02Y1_bb += 2 * lib.einsum('ijda,kb,jabk->id',
                                         Y_bbbb,
                                         t1_ce_aa,
                                         v_ceec_bbaa,
                                         optimize=einsum_type)
-                M_02Y1_bb += lib.einsum('ijda,kb,jabk->id',
-                                        Y_bbbb,
-                                        t1_ce_aa,
-                                        v_ceec_bbaa,
-                                        optimize=einsum_type)
-                M_02Y1_bb += lib.einsum('ijda,kb,jabk->id',
+                M_02Y1_bb += 2 * lib.einsum('ijda,kb,jabk->id',
                                         Y_bbbb,
                                         t1_ce_bb,
                                         v_ceec_bbbb,
@@ -14077,11 +13739,6 @@ def matvec(adc, M_ia_jb=None, eris=None):
                                         Y_bbbb,
                                         t1_ce_bb,
                                         v_ccee_bbbb,
-                                        optimize=einsum_type)
-                M_02Y1_bb += lib.einsum('ijda,kb,jabk->id',
-                                        Y_bbbb,
-                                        t1_ce_bb,
-                                        v_ceec_bbbb,
                                         optimize=einsum_type)
                 M_02Y1_bb -= lib.einsum('ijda,kb,jbak->id',
                                         Y_bbbb,
@@ -14436,17 +14093,12 @@ def matvec(adc, M_ia_jb=None, eris=None):
                                         t1_ccee_abab,
                                         t1_ce_aa,
                                         optimize=einsum_type)
-                M_02Y1_aa += lib.einsum('IiDa,jb,iabj->ID',
+                M_02Y1_aa += 2 * lib.einsum('IiDa,jb,iabj->ID',
                                         Y_abab,
                                         t1_ce_aa,
                                         v_ceec_bbaa,
                                         optimize=einsum_type)
-                M_02Y1_aa += lib.einsum('IiDa,jb,iabj->ID',
-                                        Y_abab,
-                                        t1_ce_aa,
-                                        v_ceec_bbaa,
-                                        optimize=einsum_type)
-                M_02Y1_aa += lib.einsum('IiDa,jb,iabj->ID',
+                M_02Y1_aa += 2 * lib.einsum('IiDa,jb,iabj->ID',
                                         Y_abab,
                                         t1_ce_bb,
                                         v_ceec_bbbb,
@@ -14455,11 +14107,6 @@ def matvec(adc, M_ia_jb=None, eris=None):
                                         Y_abab,
                                         t1_ce_bb,
                                         v_ccee_bbbb,
-                                        optimize=einsum_type)
-                M_02Y1_aa += lib.einsum('IiDa,jb,iabj->ID',
-                                        Y_abab,
-                                        t1_ce_bb,
-                                        v_ceec_bbbb,
                                         optimize=einsum_type)
                 M_02Y1_aa -= lib.einsum('IiDa,jb,ibaj->ID',
                                         Y_abab,
@@ -14584,7 +14231,7 @@ def matvec(adc, M_ia_jb=None, eris=None):
                                         h_ce_bb,
                                         t1_ccee_abab,
                                         optimize=einsum_type)
-                M_02Y1_bb += lib.einsum('jiad,kb,jabk->id',
+                M_02Y1_bb += 2 * lib.einsum('jiad,kb,jabk->id',
                                         Y_abab,
                                         t1_ce_aa,
                                         v_ceec_aaaa,
@@ -14594,22 +14241,12 @@ def matvec(adc, M_ia_jb=None, eris=None):
                                         t1_ce_aa,
                                         v_ccee_aaaa,
                                         optimize=einsum_type)
-                M_02Y1_bb += lib.einsum('jiad,kb,jabk->id',
-                                        Y_abab,
-                                        t1_ce_aa,
-                                        v_ceec_aaaa,
-                                        optimize=einsum_type)
                 M_02Y1_bb -= lib.einsum('jiad,kb,jbak->id',
                                         Y_abab,
                                         t1_ce_aa,
                                         v_ceec_aaaa,
                                         optimize=einsum_type)
-                M_02Y1_bb += lib.einsum('jiad,kb,jabk->id',
-                                        Y_abab,
-                                        t1_ce_bb,
-                                        v_ceec_aabb,
-                                        optimize=einsum_type)
-                M_02Y1_bb += lib.einsum('jiad,kb,jabk->id',
+                M_02Y1_bb += 2 * lib.einsum('jiad,kb,jabk->id',
                                         Y_abab,
                                         t1_ce_bb,
                                         v_ceec_aabb,
@@ -14921,15 +14558,15 @@ def make_rdm1_eigenvectors(adc, L, R):
     rdm1_a[:nocc_a, :nocc_a] -= np.einsum('ia,ia,Ib,Jb->IJ', L_aa, R_aa, t1_1_a, t1_1_a, optimize = True)
     rdm1_a[:nocc_a, :nocc_a] += np.einsum('ia,ib,Ia,Jb->IJ', L_aa, R_aa, t1_1_a, t1_1_a, optimize = True)
     rdm1_a[:nocc_a, :nocc_a] -= np.einsum('ia,ia,Ib,Jb->IJ', L_bb, R_bb, t1_1_a, t1_1_a, optimize = True)
-    w_ij_a = np.zeros((nocc_a, nocc_a))
-    w_ij_a += 1/4 * np.einsum('Ja,ia,ijbc,Ijbc->IJ', L_aa, R_aa, t2_1_a, t2_1_a, optimize = True)
-    w_ij_a -= 1/2 * np.einsum('Ja,ib,Ijac,ijbc->IJ', L_aa, R_aa, t2_1_a, t2_1_a, optimize = True)
-    w_ij_a += 1/2 * np.einsum('Ja,ia,ijbc,Ijbc->IJ', L_aa, R_aa, t2_1_ab, t2_1_ab, optimize = True)
-    w_ij_a -= 1/2 * np.einsum('Ja,ib,Ijac,ijbc->IJ', L_aa, R_aa, t2_1_ab, t2_1_ab, optimize = True)
-    w_ij_a -= 1/2 * np.einsum('Ja,ib,Ijac,jicb->IJ', L_aa, R_bb, t2_1_a, t2_1_ab, optimize = True)
-    w_ij_a += np.einsum('ia,jb,Iiac,Jjcb->IJ', L_aa, R_bb, t2_1_a, t2_1_ab, optimize = True)
-    w_ij_a -= 1/2 * np.einsum('Ja,ib,Ijac,ijbc->IJ', L_aa, R_bb, t2_1_ab, t2_1_b, optimize = True)
-    rdm1_a[:nocc_a, :nocc_a] += w_ij_a + w_ij_a.T
+    temp = np.zeros((nocc_a, nocc_a))
+    temp += 1/4 * np.einsum('Ja,ia,ijbc,Ijbc->IJ', L_aa, R_aa, t2_1_a, t2_1_a, optimize = True)
+    temp -= 1/2 * np.einsum('Ja,ib,Ijac,ijbc->IJ', L_aa, R_aa, t2_1_a, t2_1_a, optimize = True)
+    temp += 1/2 * np.einsum('Ja,ia,ijbc,Ijbc->IJ', L_aa, R_aa, t2_1_ab, t2_1_ab, optimize = True)
+    temp -= 1/2 * np.einsum('Ja,ib,Ijac,ijbc->IJ', L_aa, R_aa, t2_1_ab, t2_1_ab, optimize = True)
+    temp -= 1/2 * np.einsum('Ja,ib,Ijac,jicb->IJ', L_aa, R_bb, t2_1_a, t2_1_ab, optimize = True)
+    temp += np.einsum('ia,jb,Iiac,Jjcb->IJ', L_aa, R_bb, t2_1_a, t2_1_ab, optimize = True)
+    temp -= 1/2 * np.einsum('Ja,ib,Ijac,ijbc->IJ', L_aa, R_bb, t2_1_ab, t2_1_b, optimize = True)
+    rdm1_a[:nocc_a, :nocc_a] += temp + temp.T
     rdm1_a[:nocc_a, :nocc_a] -= 1/2 * np.einsum('ia,ia,Ijbc,Jjbc->IJ', L_aa, R_aa, t2_1_a, t2_1_a, optimize = True)
     rdm1_a[:nocc_a, :nocc_a] += np.einsum('ia,ib,Ijac,Jjbc->IJ', L_aa, R_aa, t2_1_a, t2_1_a, optimize = True)
     rdm1_a[:nocc_a, :nocc_a] += 1/2 * np.einsum('ia,ja,Iibc,Jjbc->IJ', L_aa, R_aa, t2_1_a, t2_1_a, optimize = True)
@@ -14951,15 +14588,15 @@ def make_rdm1_eigenvectors(adc, L, R):
     rdm1_b[:nocc_b, :nocc_b] += np.einsum('ia,ja,iIbc,jJbc->IJ', L_aa, R_aa, t2_1_ab, t2_1_ab, optimize = True)
     rdm1_b[:nocc_b, :nocc_b] -= np.einsum('ia,jb,iIac,jJbc->IJ', L_aa, R_aa, t2_1_ab, t2_1_ab, optimize = True)
     rdm1_b[:nocc_b, :nocc_b] -= 1/2 * np.einsum('ia,ia,Ijbc,Jjbc->IJ', L_aa, R_aa, t2_1_b, t2_1_b, optimize = True)
-    w_ij_b = np.zeros((nocc_b, nocc_b))
-    w_ij_b -= 1/2 * np.einsum('ia,Ib,ijac,jJcb->IJ', L_aa, R_bb, t2_1_a, t2_1_ab, optimize = True)
-    w_ij_b -= 1/2 * np.einsum('ia,Ib,ijac,Jjbc->IJ', L_aa, R_bb, t2_1_ab, t2_1_b, optimize = True)
-    w_ij_b += np.einsum('ia,jb,iIac,Jjbc->IJ', L_aa, R_bb, t2_1_ab, t2_1_b, optimize = True)
-    w_ij_b += 1/2 * np.einsum('Ja,ia,jibc,jIbc->IJ', L_bb, R_bb, t2_1_ab, t2_1_ab, optimize = True)
-    w_ij_b -= 1/2 * np.einsum('Ja,ib,jIca,jicb->IJ', L_bb, R_bb, t2_1_ab, t2_1_ab, optimize = True)
-    w_ij_b += 1/4 * np.einsum('Ja,ia,ijbc,Ijbc->IJ', L_bb, R_bb, t2_1_b, t2_1_b, optimize = True)
-    w_ij_b -= 1/2 * np.einsum('Ja,ib,Ijac,ijbc->IJ', L_bb, R_bb, t2_1_b, t2_1_b, optimize = True)
-    rdm1_b[:nocc_b, :nocc_b] += w_ij_b + w_ij_b.T
+    temp = np.zeros((nocc_b, nocc_b))
+    temp -= 1/2 * np.einsum('ia,Ib,ijac,jJcb->IJ', L_aa, R_bb, t2_1_a, t2_1_ab, optimize = True)
+    temp -= 1/2 * np.einsum('ia,Ib,ijac,Jjbc->IJ', L_aa, R_bb, t2_1_ab, t2_1_b, optimize = True)
+    temp += np.einsum('ia,jb,iIac,Jjbc->IJ', L_aa, R_bb, t2_1_ab, t2_1_b, optimize = True)
+    temp += 1/2 * np.einsum('Ja,ia,jibc,jIbc->IJ', L_bb, R_bb, t2_1_ab, t2_1_ab, optimize = True)
+    temp -= 1/2 * np.einsum('Ja,ib,jIca,jicb->IJ', L_bb, R_bb, t2_1_ab, t2_1_ab, optimize = True)
+    temp += 1/4 * np.einsum('Ja,ia,ijbc,Ijbc->IJ', L_bb, R_bb, t2_1_b, t2_1_b, optimize = True)
+    temp -= 1/2 * np.einsum('Ja,ib,Ijac,ijbc->IJ', L_bb, R_bb, t2_1_b, t2_1_b, optimize = True)
+    rdm1_b[:nocc_b, :nocc_b] += temp + temp.T
     rdm1_b[:nocc_b, :nocc_b] -= np.einsum('ia,ia,jIbc,jJbc->IJ', L_bb, R_bb, t2_1_ab, t2_1_ab, optimize = True)
     rdm1_b[:nocc_b, :nocc_b] += np.einsum('ia,ib,jIca,jJcb->IJ', L_bb, R_bb, t2_1_ab, t2_1_ab, optimize = True)
     rdm1_b[:nocc_b, :nocc_b] -= 1/2 * np.einsum('ia,ia,Ijbc,Jjbc->IJ', L_bb, R_bb, t2_1_b, t2_1_b, optimize = True)
@@ -14993,15 +14630,15 @@ def make_rdm1_eigenvectors(adc, L, R):
     rdm1_a[nocc_a:, nocc_a:] += np.einsum('ia,ia,jA,jB->AB', L_aa, R_aa, t1_1_a, t1_1_a, optimize = True)
     rdm1_a[nocc_a:, nocc_a:] -= np.einsum('ia,ja,iB,jA->AB', L_aa, R_aa, t1_1_a, t1_1_a, optimize = True)
     rdm1_a[nocc_a:, nocc_a:] += np.einsum('ia,ia,jA,jB->AB', L_bb, R_bb, t1_1_a, t1_1_a, optimize = True)
-    w_ab_a = np.zeros((nvir_a, nvir_a))
-    w_ab_a -= 1/4 * np.einsum('iA,ia,jkab,jkBb->AB', L_aa, R_aa, t2_1_a, t2_1_a, optimize = True)
-    w_ab_a += 1/2 * np.einsum('iA,ja,ikBb,jkab->AB', L_aa, R_aa, t2_1_a, t2_1_a, optimize = True)
-    w_ab_a -= 1/2 * np.einsum('iA,ia,jkab,jkBb->AB', L_aa, R_aa, t2_1_ab, t2_1_ab, optimize = True)
-    w_ab_a += 1/2 * np.einsum('iA,ja,ikBb,jkab->AB', L_aa, R_aa, t2_1_ab, t2_1_ab, optimize = True)
-    w_ab_a += 1/2 * np.einsum('iA,ja,ikBb,kjba->AB', L_aa, R_bb, t2_1_a, t2_1_ab, optimize = True)
-    w_ab_a -= np.einsum('ia,jb,ikBa,kjAb->AB', L_aa, R_bb, t2_1_a, t2_1_ab, optimize = True)
-    w_ab_a += 1/2 * np.einsum('iA,ja,ikBb,jkab->AB', L_aa, R_bb, t2_1_ab, t2_1_b, optimize = True)
-    rdm1_a[nocc_a:, nocc_a:] += w_ab_a + w_ab_a.T
+    temp = np.zeros((nvir_a, nvir_a))
+    temp -= 1/4 * np.einsum('iA,ia,jkab,jkBb->AB', L_aa, R_aa, t2_1_a, t2_1_a, optimize = True)
+    temp += 1/2 * np.einsum('iA,ja,ikBb,jkab->AB', L_aa, R_aa, t2_1_a, t2_1_a, optimize = True)
+    temp -= 1/2 * np.einsum('iA,ia,jkab,jkBb->AB', L_aa, R_aa, t2_1_ab, t2_1_ab, optimize = True)
+    temp += 1/2 * np.einsum('iA,ja,ikBb,jkab->AB', L_aa, R_aa, t2_1_ab, t2_1_ab, optimize = True)
+    temp += 1/2 * np.einsum('iA,ja,ikBb,kjba->AB', L_aa, R_bb, t2_1_a, t2_1_ab, optimize = True)
+    temp -= np.einsum('ia,jb,ikBa,kjAb->AB', L_aa, R_bb, t2_1_a, t2_1_ab, optimize = True)
+    temp += 1/2 * np.einsum('iA,ja,ikBb,jkab->AB', L_aa, R_bb, t2_1_ab, t2_1_b, optimize = True)
+    rdm1_a[nocc_a:, nocc_a:] += temp + temp.T
     rdm1_a[nocc_a:, nocc_a:] += 1/2 * np.einsum('ia,ia,jkAb,jkBb->AB', L_aa, R_aa, t2_1_a, t2_1_a, optimize = True)
     rdm1_a[nocc_a:, nocc_a:] -= 1/2 * np.einsum('ia,ib,jkBa,jkAb->AB', L_aa, R_aa, t2_1_a, t2_1_a, optimize = True)
     rdm1_a[nocc_a:, nocc_a:] -= np.einsum('ia,ja,ikBb,jkAb->AB', L_aa, R_aa, t2_1_a, t2_1_a, optimize = True)
@@ -15023,15 +14660,15 @@ def make_rdm1_eigenvectors(adc, L, R):
     rdm1_b[nocc_b:, nocc_b:] -= np.einsum('ia,ja,ikbB,jkbA->AB', L_aa, R_aa, t2_1_ab, t2_1_ab, optimize = True)
     rdm1_b[nocc_b:, nocc_b:] += np.einsum('ia,jb,ikaB,jkbA->AB', L_aa, R_aa, t2_1_ab, t2_1_ab, optimize = True)
     rdm1_b[nocc_b:, nocc_b:] += 1/2 * np.einsum('ia,ia,jkAb,jkBb->AB', L_aa, R_aa, t2_1_b, t2_1_b, optimize = True)
-    w_ab_b = np.zeros((nvir_b, nvir_b))
-    w_ab_b += 1/2 * np.einsum('ia,jB,ikab,kjbA->AB', L_aa, R_bb, t2_1_a, t2_1_ab, optimize = True)
-    w_ab_b += 1/2 * np.einsum('ia,jB,ikab,jkAb->AB', L_aa, R_bb, t2_1_ab, t2_1_b, optimize = True)
-    w_ab_b -= np.einsum('ia,jb,ikaB,jkAb->AB', L_aa, R_bb, t2_1_ab, t2_1_b, optimize = True)
-    w_ab_b -= 1/2 * np.einsum('iA,ia,jkba,jkbB->AB', L_bb, R_bb, t2_1_ab, t2_1_ab, optimize = True)
-    w_ab_b += 1/2 * np.einsum('iA,ja,kibB,kjba->AB', L_bb, R_bb, t2_1_ab, t2_1_ab, optimize = True)
-    w_ab_b -= 1/4 * np.einsum('iA,ia,jkab,jkBb->AB', L_bb, R_bb, t2_1_b, t2_1_b, optimize = True)
-    w_ab_b += 1/2 * np.einsum('iA,ja,ikBb,jkab->AB', L_bb, R_bb, t2_1_b, t2_1_b, optimize = True)
-    rdm1_b[nocc_b:, nocc_b:] += w_ab_b + w_ab_b.T
+    temp = np.zeros((nvir_b, nvir_b))
+    temp += 1/2 * np.einsum('ia,jB,ikab,kjbA->AB', L_aa, R_bb, t2_1_a, t2_1_ab, optimize = True)
+    temp += 1/2 * np.einsum('ia,jB,ikab,jkAb->AB', L_aa, R_bb, t2_1_ab, t2_1_b, optimize = True)
+    temp -= np.einsum('ia,jb,ikaB,jkAb->AB', L_aa, R_bb, t2_1_ab, t2_1_b, optimize = True)
+    temp -= 1/2 * np.einsum('iA,ia,jkba,jkbB->AB', L_bb, R_bb, t2_1_ab, t2_1_ab, optimize = True)
+    temp += 1/2 * np.einsum('iA,ja,kibB,kjba->AB', L_bb, R_bb, t2_1_ab, t2_1_ab, optimize = True)
+    temp -= 1/4 * np.einsum('iA,ia,jkab,jkBb->AB', L_bb, R_bb, t2_1_b, t2_1_b, optimize = True)
+    temp += 1/2 * np.einsum('iA,ja,ikBb,jkab->AB', L_bb, R_bb, t2_1_b, t2_1_b, optimize = True)
+    rdm1_b[nocc_b:, nocc_b:] += temp + temp.T
     rdm1_b[nocc_b:, nocc_b:] += np.einsum('ia,ia,jkbA,jkbB->AB', L_bb, R_bb, t2_1_ab, t2_1_ab, optimize = True)
     rdm1_b[nocc_b:, nocc_b:] -= np.einsum('ia,ja,kibB,kjbA->AB', L_bb, R_bb, t2_1_ab, t2_1_ab, optimize = True)
     rdm1_b[nocc_b:, nocc_b:] += 1/2 * np.einsum('ia,ia,jkAb,jkBb->AB', L_bb, R_bb, t2_1_b, t2_1_b, optimize = True)
@@ -15178,33 +14815,33 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1_a[:nocc_a, :nocc_a] -= np.einsum('ia,ia,Jb,Ib->IJ', L_aa, R_aa, t1_1_a, t1_2_a, optimize = True)
         rdm1_a[:nocc_a, :nocc_a] += np.einsum('ia,ib,Ia,Jb->IJ', L_aa, R_aa, t1_1_a, t1_2_a, optimize = True)
         rdm1_a[:nocc_a, :nocc_a] += np.einsum('ia,ib,Jb,Ia->IJ', L_aa, R_aa, t1_1_a, t1_2_a, optimize = True)
-        w_ij_a = np.zeros((nocc_a, nocc_a))
-        w_ij_a += 1/4 * np.einsum('Ja,ia,Ijbc,ijbc->IJ', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
-        w_ij_a += 1/4 * np.einsum('Ja,ia,ijbc,Ijbc->IJ', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
-        w_ij_a -= 1/2 * np.einsum('Ja,ib,Ijac,ijbc->IJ', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
-        w_ij_a -= 1/2 * np.einsum('Ja,ib,ijbc,Ijac->IJ', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
-        w_ij_a -= 1/2 * np.einsum('ia,ia,Ijbc,Jjbc->IJ', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
-        w_ij_a += np.einsum('ia,ib,Ijac,Jjbc->IJ', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
-        w_ij_a += 1/2 * np.einsum('ia,ja,Iibc,Jjbc->IJ', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
-        w_ij_a -= np.einsum('ia,jb,Iiac,Jjbc->IJ', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
-        w_ij_a += 1/2 * np.einsum('Ja,ia,Ijbc,ijbc->IJ', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
-        w_ij_a += 1/2 * np.einsum('Ja,ia,ijbc,Ijbc->IJ', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
-        w_ij_a -= 1/2 * np.einsum('Ja,ib,Ijac,ijbc->IJ', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
-        w_ij_a -= 1/2 * np.einsum('Ja,ib,ijbc,Ijac->IJ', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
-        w_ij_a -= np.einsum('ia,ia,Ijbc,Jjbc->IJ', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
-        w_ij_a += np.einsum('ia,ib,Ijac,Jjbc->IJ', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
-        w_ij_a -= 1/2 * np.einsum('Ja,ib,Ijac,jicb->IJ', L_aa, R_bb, t2_1_a, t2_2_ab, optimize = True)
-        w_ij_a += np.einsum('ia,jb,Iiac,Jjcb->IJ', L_aa, R_bb, t2_1_a, t2_2_ab, optimize = True)
-        w_ij_a -= 1/2 * np.einsum('Ja,ib,jicb,Ijac->IJ', L_aa, R_bb, t2_1_ab, t2_2_a, optimize = True)
-        w_ij_a += np.einsum('ia,jb,Jjcb,Iiac->IJ', L_aa, R_bb, t2_1_ab, t2_2_a, optimize = True)
-        w_ij_a -= 1/2 * np.einsum('Ja,ib,Ijac,ijbc->IJ', L_aa, R_bb, t2_1_ab, t2_2_b, optimize = True)
-        w_ij_a -= 1/2 * np.einsum('Ja,ib,ijbc,Ijac->IJ', L_aa, R_bb, t2_1_b, t2_2_ab, optimize = True)
-        w_ij_a -= 1/2 * np.einsum('ia,ia,Ijbc,Jjbc->IJ', L_bb, R_bb, t2_1_a, t2_2_a, optimize = True)
-        w_ij_a -= np.einsum('ia,ia,Ijbc,Jjbc->IJ', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
-        w_ij_a += np.einsum('ia,ib,Ijca,Jjcb->IJ', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
-        w_ij_a += np.einsum('ia,ja,Iibc,Jjbc->IJ', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
-        w_ij_a -= np.einsum('ia,jb,Iica,Jjcb->IJ', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
-        rdm1_a[:nocc_a, :nocc_a] += w_ij_a + w_ij_a.T
+        temp = np.zeros((nocc_a, nocc_a))
+        temp += 1/4 * np.einsum('Ja,ia,Ijbc,ijbc->IJ', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
+        temp += 1/4 * np.einsum('Ja,ia,ijbc,Ijbc->IJ', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
+        temp -= 1/2 * np.einsum('Ja,ib,Ijac,ijbc->IJ', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
+        temp -= 1/2 * np.einsum('Ja,ib,ijbc,Ijac->IJ', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
+        temp -= 1/2 * np.einsum('ia,ia,Ijbc,Jjbc->IJ', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
+        temp += np.einsum('ia,ib,Ijac,Jjbc->IJ', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
+        temp += 1/2 * np.einsum('ia,ja,Iibc,Jjbc->IJ', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
+        temp -= np.einsum('ia,jb,Iiac,Jjbc->IJ', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
+        temp += 1/2 * np.einsum('Ja,ia,Ijbc,ijbc->IJ', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
+        temp += 1/2 * np.einsum('Ja,ia,ijbc,Ijbc->IJ', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
+        temp -= 1/2 * np.einsum('Ja,ib,Ijac,ijbc->IJ', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
+        temp -= 1/2 * np.einsum('Ja,ib,ijbc,Ijac->IJ', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
+        temp -= np.einsum('ia,ia,Ijbc,Jjbc->IJ', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
+        temp += np.einsum('ia,ib,Ijac,Jjbc->IJ', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
+        temp -= 1/2 * np.einsum('Ja,ib,Ijac,jicb->IJ', L_aa, R_bb, t2_1_a, t2_2_ab, optimize = True)
+        temp += np.einsum('ia,jb,Iiac,Jjcb->IJ', L_aa, R_bb, t2_1_a, t2_2_ab, optimize = True)
+        temp -= 1/2 * np.einsum('Ja,ib,jicb,Ijac->IJ', L_aa, R_bb, t2_1_ab, t2_2_a, optimize = True)
+        temp += np.einsum('ia,jb,Jjcb,Iiac->IJ', L_aa, R_bb, t2_1_ab, t2_2_a, optimize = True)
+        temp -= 1/2 * np.einsum('Ja,ib,Ijac,ijbc->IJ', L_aa, R_bb, t2_1_ab, t2_2_b, optimize = True)
+        temp -= 1/2 * np.einsum('Ja,ib,ijbc,Ijac->IJ', L_aa, R_bb, t2_1_b, t2_2_ab, optimize = True)
+        temp -= 1/2 * np.einsum('ia,ia,Ijbc,Jjbc->IJ', L_bb, R_bb, t2_1_a, t2_2_a, optimize = True)
+        temp -= np.einsum('ia,ia,Ijbc,Jjbc->IJ', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
+        temp += np.einsum('ia,ib,Ijca,Jjcb->IJ', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
+        temp += np.einsum('ia,ja,Iibc,Jjbc->IJ', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
+        temp -= np.einsum('ia,jb,Iica,Jjcb->IJ', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
+        rdm1_a[:nocc_a, :nocc_a] += temp + temp.T
         rdm1_a[:nocc_a, :nocc_a] -= np.einsum('ia,ia,Ib,Jb->IJ', L_bb, R_bb, t1_1_a, t1_2_a, optimize = True)
         rdm1_a[:nocc_a, :nocc_a] -= np.einsum('ia,ia,Jb,Ib->IJ', L_bb, R_bb, t1_1_a, t1_2_a, optimize = True)
         rdm1_a[:nocc_a, :nocc_a] += 1/6 * np.einsum('Ja,ia,Ib,jc,ijbc->IJ', L_aa, R_aa, t1_1_a, t1_1_b, t2_1_ab,
@@ -15289,33 +14926,33 @@ def make_rdm1_eigenvectors(adc, L, R):
             optimize = True)
         rdm1_b[:nocc_b, :nocc_b] -= np.einsum('ia,ia,Ib,Jb->IJ', L_aa, R_aa, t1_1_b, t1_2_b, optimize = True)
         rdm1_b[:nocc_b, :nocc_b] -= np.einsum('ia,ia,Jb,Ib->IJ', L_aa, R_aa, t1_1_b, t1_2_b, optimize = True)
-        w_ij_b = np.zeros((nocc_b, nocc_b))
-        w_ij_b -= np.einsum('ia,ia,jIbc,jJbc->IJ', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
-        w_ij_b += np.einsum('ia,ib,jIac,jJbc->IJ', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
-        w_ij_b += np.einsum('ia,ja,iIbc,jJbc->IJ', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
-        w_ij_b -= np.einsum('ia,jb,iIac,jJbc->IJ', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
-        w_ij_b -= 1/2 * np.einsum('ia,ia,Ijbc,Jjbc->IJ', L_aa, R_aa, t2_1_b, t2_2_b, optimize = True)
-        w_ij_b -= 1/2 * np.einsum('ia,Ib,ijac,jJcb->IJ', L_aa, R_bb, t2_1_a, t2_2_ab, optimize = True)
-        w_ij_b -= 1/2 * np.einsum('ia,Ib,jJcb,ijac->IJ', L_aa, R_bb, t2_1_ab, t2_2_a, optimize = True)
-        w_ij_b -= 1/2 * np.einsum('ia,Ib,ijac,Jjbc->IJ', L_aa, R_bb, t2_1_ab, t2_2_b, optimize = True)
-        w_ij_b += np.einsum('ia,jb,iIac,Jjbc->IJ', L_aa, R_bb, t2_1_ab, t2_2_b, optimize = True)
-        w_ij_b -= 1/2 * np.einsum('ia,Ib,Jjbc,ijac->IJ', L_aa, R_bb, t2_1_b, t2_2_ab, optimize = True)
-        w_ij_b += np.einsum('ia,jb,Jjbc,iIac->IJ', L_aa, R_bb, t2_1_b, t2_2_ab, optimize = True)
-        w_ij_b += 1/2 * np.einsum('Ja,ia,jIbc,jibc->IJ', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
-        w_ij_b += 1/2 * np.einsum('Ja,ia,jibc,jIbc->IJ', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
-        w_ij_b -= 1/2 * np.einsum('Ja,ib,jIca,jicb->IJ', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
-        w_ij_b -= 1/2 * np.einsum('Ja,ib,jicb,jIca->IJ', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
-        w_ij_b -= np.einsum('ia,ia,jIbc,jJbc->IJ', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
-        w_ij_b += np.einsum('ia,ib,jIca,jJcb->IJ', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
-        w_ij_b += 1/4 * np.einsum('Ja,ia,Ijbc,ijbc->IJ', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
-        w_ij_b += 1/4 * np.einsum('Ja,ia,ijbc,Ijbc->IJ', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
-        w_ij_b -= 1/2 * np.einsum('Ja,ib,Ijac,ijbc->IJ', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
-        w_ij_b -= 1/2 * np.einsum('Ja,ib,ijbc,Ijac->IJ', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
-        w_ij_b -= 1/2 * np.einsum('ia,ia,Ijbc,Jjbc->IJ', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
-        w_ij_b += np.einsum('ia,ib,Ijac,Jjbc->IJ', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
-        w_ij_b += 1/2 * np.einsum('ia,ja,Iibc,Jjbc->IJ', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
-        w_ij_b -= np.einsum('ia,jb,Iiac,Jjbc->IJ', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
-        rdm1_b[:nocc_b, :nocc_b] += w_ij_b + w_ij_b.T
+        temp = np.zeros((nocc_b, nocc_b))
+        temp -= np.einsum('ia,ia,jIbc,jJbc->IJ', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
+        temp += np.einsum('ia,ib,jIac,jJbc->IJ', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
+        temp += np.einsum('ia,ja,iIbc,jJbc->IJ', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
+        temp -= np.einsum('ia,jb,iIac,jJbc->IJ', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
+        temp -= 1/2 * np.einsum('ia,ia,Ijbc,Jjbc->IJ', L_aa, R_aa, t2_1_b, t2_2_b, optimize = True)
+        temp -= 1/2 * np.einsum('ia,Ib,ijac,jJcb->IJ', L_aa, R_bb, t2_1_a, t2_2_ab, optimize = True)
+        temp -= 1/2 * np.einsum('ia,Ib,jJcb,ijac->IJ', L_aa, R_bb, t2_1_ab, t2_2_a, optimize = True)
+        temp -= 1/2 * np.einsum('ia,Ib,ijac,Jjbc->IJ', L_aa, R_bb, t2_1_ab, t2_2_b, optimize = True)
+        temp += np.einsum('ia,jb,iIac,Jjbc->IJ', L_aa, R_bb, t2_1_ab, t2_2_b, optimize = True)
+        temp -= 1/2 * np.einsum('ia,Ib,Jjbc,ijac->IJ', L_aa, R_bb, t2_1_b, t2_2_ab, optimize = True)
+        temp += np.einsum('ia,jb,Jjbc,iIac->IJ', L_aa, R_bb, t2_1_b, t2_2_ab, optimize = True)
+        temp += 1/2 * np.einsum('Ja,ia,jIbc,jibc->IJ', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
+        temp += 1/2 * np.einsum('Ja,ia,jibc,jIbc->IJ', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
+        temp -= 1/2 * np.einsum('Ja,ib,jIca,jicb->IJ', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
+        temp -= 1/2 * np.einsum('Ja,ib,jicb,jIca->IJ', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
+        temp -= np.einsum('ia,ia,jIbc,jJbc->IJ', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
+        temp += np.einsum('ia,ib,jIca,jJcb->IJ', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
+        temp += 1/4 * np.einsum('Ja,ia,Ijbc,ijbc->IJ', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
+        temp += 1/4 * np.einsum('Ja,ia,ijbc,Ijbc->IJ', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
+        temp -= 1/2 * np.einsum('Ja,ib,Ijac,ijbc->IJ', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
+        temp -= 1/2 * np.einsum('Ja,ib,ijbc,Ijac->IJ', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
+        temp -= 1/2 * np.einsum('ia,ia,Ijbc,Jjbc->IJ', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
+        temp += np.einsum('ia,ib,Ijac,Jjbc->IJ', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
+        temp += 1/2 * np.einsum('ia,ja,Iibc,Jjbc->IJ', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
+        temp -= np.einsum('ia,jb,Iiac,Jjbc->IJ', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
+        rdm1_b[:nocc_b, :nocc_b] += temp + temp.T
         rdm1_b[:nocc_b, :nocc_b] += 1/2 * np.einsum('Ja,ia,Ib,ib->IJ', L_bb, R_bb, t1_1_b, t1_2_b, optimize = True)
         rdm1_b[:nocc_b, :nocc_b] += 1/2 * np.einsum('Ja,ia,ib,Ib->IJ', L_bb, R_bb, t1_1_b, t1_2_b, optimize = True)
         rdm1_b[:nocc_b, :nocc_b] += 1/2 * np.einsum('ia,Ia,Jb,ib->IJ', L_bb, R_bb, t1_1_b, t1_2_b, optimize = True)
@@ -15406,10 +15043,10 @@ def make_rdm1_eigenvectors(adc, L, R):
             optimize = True)
 
         ### 021 & 120 ###
-        w_ij_a = np.zeros((nocc_a, nocc_a))
-        w_ij_a += np.einsum('ia,Iiab,Jb->IJ', L_aa, R_aaaa_u, t1_2_a, optimize = True)
-        w_ij_a -= np.einsum('Jiab,ib,Ia->IJ', L_ab, R_bb, t1_2_a, optimize = True)
-        rdm1_a[:nocc_a, :nocc_a] += w_ij_a + w_ij_a.T
+        temp = np.zeros((nocc_a, nocc_a))
+        temp += np.einsum('ia,Iiab,Jb->IJ', L_aa, R_aaaa_u, t1_2_a, optimize = True)
+        temp -= np.einsum('Jiab,ib,Ia->IJ', L_ab, R_bb, t1_2_a, optimize = True)
+        rdm1_a[:nocc_a, :nocc_a] += temp + temp.T
         rdm1_a[:nocc_a, :nocc_a] -= 1/4 * np.einsum('Ja,ijab,Ic,ijbc->IJ', L_aa, R_aaaa_u, t1_1_a, t2_1_a,
             optimize = True)
         rdm1_a[:nocc_a, :nocc_a] += 1/2 * np.einsum('ia,Iiab,jc,Jjbc->IJ', L_aa, R_aaaa_u, t1_1_a, t2_1_a,
@@ -15456,10 +15093,10 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1_a[:nocc_a, :nocc_a] += 1/2 * np.einsum('ia,Ijba,ic,Jjbc->IJ', L_bb, R_ab, t1_1_b, t2_1_ab, optimize = True)
         rdm1_a[:nocc_a, :nocc_a] -= np.einsum('ia,ijab,Ic,Jjcb->IJ', L_bb, R_bbbb_u, t1_1_a, t2_1_ab, optimize = True)
         rdm1_a[:nocc_a, :nocc_a] -= np.einsum('ijab,ia,Jc,Ijcb->IJ', L_bbbb_u, R_bb, t1_1_a, t2_1_ab, optimize = True)
-        w_ij_b = np.zeros((nocc_b, nocc_b))
-        w_ij_b -= np.einsum('ia,iIab,Jb->IJ', L_aa, R_ab, t1_2_b, optimize = True)
-        w_ij_b += np.einsum('ia,Iiab,Jb->IJ', L_bb, R_bbbb_u, t1_2_b, optimize = True)
-        rdm1_b[:nocc_b, :nocc_b] += w_ij_b + w_ij_b.T
+        temp = np.zeros((nocc_b, nocc_b))
+        temp -= np.einsum('ia,iIab,Jb->IJ', L_aa, R_ab, t1_2_b, optimize = True)
+        temp += np.einsum('ia,Iiab,Jb->IJ', L_bb, R_bbbb_u, t1_2_b, optimize = True)
+        rdm1_b[:nocc_b, :nocc_b] += temp + temp.T
         rdm1_b[:nocc_b, :nocc_b] -= np.einsum('ia,ijab,Ic,jJbc->IJ', L_aa, R_aaaa_u, t1_1_b, t2_1_ab, optimize = True)
         rdm1_b[:nocc_b, :nocc_b] -= 1/2 * np.einsum('ia,iIab,jc,jJcb->IJ', L_aa, R_ab, t1_1_a, t2_1_ab, optimize = True)
         rdm1_b[:nocc_b, :nocc_b] += 1/2 * np.einsum('ia,iIbc,ja,jJbc->IJ', L_aa, R_ab, t1_1_a, t2_1_ab, optimize = True)
@@ -15519,33 +15156,33 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1_a[nocc_a:, nocc_a:] += np.einsum('ia,ia,jB,jA->AB', L_aa, R_aa, t1_1_a, t1_2_a, optimize = True)
         rdm1_a[nocc_a:, nocc_a:] -= np.einsum('ia,ja,iB,jA->AB', L_aa, R_aa, t1_1_a, t1_2_a, optimize = True)
         rdm1_a[nocc_a:, nocc_a:] -= np.einsum('ia,ja,jA,iB->AB', L_aa, R_aa, t1_1_a, t1_2_a, optimize = True)
-        w_ab_a = np.zeros((nvir_a, nvir_a))
-        w_ab_a -= 1/4 * np.einsum('iA,ia,jkBb,jkab->AB', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
-        w_ab_a -= 1/4 * np.einsum('iA,ia,jkab,jkBb->AB', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
-        w_ab_a += 1/2 * np.einsum('iA,ja,ikBb,jkab->AB', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
-        w_ab_a += 1/2 * np.einsum('iA,ja,jkab,ikBb->AB', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
-        w_ab_a += 1/2 * np.einsum('ia,ia,jkAb,jkBb->AB', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
-        w_ab_a -= 1/2 * np.einsum('ia,ib,jkAb,jkBa->AB', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
-        w_ab_a -= np.einsum('ia,ja,ikBb,jkAb->AB', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
-        w_ab_a += np.einsum('ia,jb,ikBa,jkAb->AB', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
-        w_ab_a -= 1/2 * np.einsum('iA,ia,jkBb,jkab->AB', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
-        w_ab_a -= 1/2 * np.einsum('iA,ia,jkab,jkBb->AB', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
-        w_ab_a += 1/2 * np.einsum('iA,ja,ikBb,jkab->AB', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
-        w_ab_a += 1/2 * np.einsum('iA,ja,jkab,ikBb->AB', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
-        w_ab_a += np.einsum('ia,ia,jkAb,jkBb->AB', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
-        w_ab_a -= np.einsum('ia,ja,ikBb,jkAb->AB', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
-        w_ab_a += 1/2 * np.einsum('iA,ja,ikBb,kjba->AB', L_aa, R_bb, t2_1_a, t2_2_ab, optimize = True)
-        w_ab_a -= np.einsum('ia,jb,ikBa,kjAb->AB', L_aa, R_bb, t2_1_a, t2_2_ab, optimize = True)
-        w_ab_a += 1/2 * np.einsum('iA,ja,kjba,ikBb->AB', L_aa, R_bb, t2_1_ab, t2_2_a, optimize = True)
-        w_ab_a -= np.einsum('ia,jb,kjAb,ikBa->AB', L_aa, R_bb, t2_1_ab, t2_2_a, optimize = True)
-        w_ab_a += 1/2 * np.einsum('iA,ja,ikBb,jkab->AB', L_aa, R_bb, t2_1_ab, t2_2_b, optimize = True)
-        w_ab_a += 1/2 * np.einsum('iA,ja,jkab,ikBb->AB', L_aa, R_bb, t2_1_b, t2_2_ab, optimize = True)
-        w_ab_a += 1/2 * np.einsum('ia,ia,jkAb,jkBb->AB', L_bb, R_bb, t2_1_a, t2_2_a, optimize = True)
-        w_ab_a += np.einsum('ia,ia,jkAb,jkBb->AB', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
-        w_ab_a -= np.einsum('ia,ib,jkAb,jkBa->AB', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
-        w_ab_a -= np.einsum('ia,ja,kiBb,kjAb->AB', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
-        w_ab_a += np.einsum('ia,jb,kiBa,kjAb->AB', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
-        rdm1_a[nocc_a:, nocc_a:] += w_ab_a + w_ab_a.T
+        temp = np.zeros((nvir_a, nvir_a))
+        temp -= 1/4 * np.einsum('iA,ia,jkBb,jkab->AB', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
+        temp -= 1/4 * np.einsum('iA,ia,jkab,jkBb->AB', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
+        temp += 1/2 * np.einsum('iA,ja,ikBb,jkab->AB', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
+        temp += 1/2 * np.einsum('iA,ja,jkab,ikBb->AB', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
+        temp += 1/2 * np.einsum('ia,ia,jkAb,jkBb->AB', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
+        temp -= 1/2 * np.einsum('ia,ib,jkAb,jkBa->AB', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
+        temp -= np.einsum('ia,ja,ikBb,jkAb->AB', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
+        temp += np.einsum('ia,jb,ikBa,jkAb->AB', L_aa, R_aa, t2_1_a, t2_2_a, optimize = True)
+        temp -= 1/2 * np.einsum('iA,ia,jkBb,jkab->AB', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
+        temp -= 1/2 * np.einsum('iA,ia,jkab,jkBb->AB', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
+        temp += 1/2 * np.einsum('iA,ja,ikBb,jkab->AB', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
+        temp += 1/2 * np.einsum('iA,ja,jkab,ikBb->AB', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
+        temp += np.einsum('ia,ia,jkAb,jkBb->AB', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
+        temp -= np.einsum('ia,ja,ikBb,jkAb->AB', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
+        temp += 1/2 * np.einsum('iA,ja,ikBb,kjba->AB', L_aa, R_bb, t2_1_a, t2_2_ab, optimize = True)
+        temp -= np.einsum('ia,jb,ikBa,kjAb->AB', L_aa, R_bb, t2_1_a, t2_2_ab, optimize = True)
+        temp += 1/2 * np.einsum('iA,ja,kjba,ikBb->AB', L_aa, R_bb, t2_1_ab, t2_2_a, optimize = True)
+        temp -= np.einsum('ia,jb,kjAb,ikBa->AB', L_aa, R_bb, t2_1_ab, t2_2_a, optimize = True)
+        temp += 1/2 * np.einsum('iA,ja,ikBb,jkab->AB', L_aa, R_bb, t2_1_ab, t2_2_b, optimize = True)
+        temp += 1/2 * np.einsum('iA,ja,jkab,ikBb->AB', L_aa, R_bb, t2_1_b, t2_2_ab, optimize = True)
+        temp += 1/2 * np.einsum('ia,ia,jkAb,jkBb->AB', L_bb, R_bb, t2_1_a, t2_2_a, optimize = True)
+        temp += np.einsum('ia,ia,jkAb,jkBb->AB', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
+        temp -= np.einsum('ia,ib,jkAb,jkBa->AB', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
+        temp -= np.einsum('ia,ja,kiBb,kjAb->AB', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
+        temp += np.einsum('ia,jb,kiBa,kjAb->AB', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
+        rdm1_a[nocc_a:, nocc_a:] += temp + temp.T
         rdm1_a[nocc_a:, nocc_a:] += np.einsum('ia,ia,jA,jB->AB', L_bb, R_bb, t1_1_a, t1_2_a, optimize = True)
         rdm1_a[nocc_a:, nocc_a:] += np.einsum('ia,ia,jB,jA->AB', L_bb, R_bb, t1_1_a, t1_2_a, optimize = True)
         rdm1_a[nocc_a:, nocc_a:] -= 1/6 * np.einsum('iA,ia,jB,kb,jkab->AB', L_aa, R_aa, t1_1_a, t1_1_b, t2_1_ab,
@@ -15630,33 +15267,33 @@ def make_rdm1_eigenvectors(adc, L, R):
             optimize = True)
         rdm1_b[nocc_b:, nocc_b:] += np.einsum('ia,ia,jA,jB->AB', L_aa, R_aa, t1_1_b, t1_2_b, optimize = True)
         rdm1_b[nocc_b:, nocc_b:] += np.einsum('ia,ia,jB,jA->AB', L_aa, R_aa, t1_1_b, t1_2_b, optimize = True)
-        w_ab_b = np.zeros((nvir_b, nvir_b))
-        w_ab_b += np.einsum('ia,ia,jkbA,jkbB->AB', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
-        w_ab_b -= np.einsum('ia,ib,jkaB,jkbA->AB', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
-        w_ab_b -= np.einsum('ia,ja,ikbB,jkbA->AB', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
-        w_ab_b += np.einsum('ia,jb,ikaB,jkbA->AB', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
-        w_ab_b += 1/2 * np.einsum('ia,ia,jkAb,jkBb->AB', L_aa, R_aa, t2_1_b, t2_2_b, optimize = True)
-        w_ab_b += 1/2 * np.einsum('ia,jB,ikab,kjbA->AB', L_aa, R_bb, t2_1_a, t2_2_ab, optimize = True)
-        w_ab_b += 1/2 * np.einsum('ia,jB,kjbA,ikab->AB', L_aa, R_bb, t2_1_ab, t2_2_a, optimize = True)
-        w_ab_b += 1/2 * np.einsum('ia,jB,ikab,jkAb->AB', L_aa, R_bb, t2_1_ab, t2_2_b, optimize = True)
-        w_ab_b -= np.einsum('ia,jb,ikaB,jkAb->AB', L_aa, R_bb, t2_1_ab, t2_2_b, optimize = True)
-        w_ab_b += 1/2 * np.einsum('ia,jB,jkAb,ikab->AB', L_aa, R_bb, t2_1_b, t2_2_ab, optimize = True)
-        w_ab_b -= np.einsum('ia,jb,jkAb,ikaB->AB', L_aa, R_bb, t2_1_b, t2_2_ab, optimize = True)
-        w_ab_b -= 1/2 * np.einsum('iA,ia,jkbB,jkba->AB', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
-        w_ab_b -= 1/2 * np.einsum('iA,ia,jkba,jkbB->AB', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
-        w_ab_b += 1/2 * np.einsum('iA,ja,kibB,kjba->AB', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
-        w_ab_b += 1/2 * np.einsum('iA,ja,kjba,kibB->AB', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
-        w_ab_b += np.einsum('ia,ia,jkbA,jkbB->AB', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
-        w_ab_b -= np.einsum('ia,ja,kibB,kjbA->AB', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
-        w_ab_b -= 1/4 * np.einsum('iA,ia,jkBb,jkab->AB', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
-        w_ab_b -= 1/4 * np.einsum('iA,ia,jkab,jkBb->AB', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
-        w_ab_b += 1/2 * np.einsum('iA,ja,ikBb,jkab->AB', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
-        w_ab_b += 1/2 * np.einsum('iA,ja,jkab,ikBb->AB', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
-        w_ab_b += 1/2 * np.einsum('ia,ia,jkAb,jkBb->AB', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
-        w_ab_b -= 1/2 * np.einsum('ia,ib,jkAb,jkBa->AB', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
-        w_ab_b -= np.einsum('ia,ja,ikBb,jkAb->AB', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
-        w_ab_b += np.einsum('ia,jb,ikBa,jkAb->AB', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
-        rdm1_b[nocc_b:, nocc_b:] += w_ab_b + w_ab_b.T
+        temp = np.zeros((nvir_b, nvir_b))
+        temp += np.einsum('ia,ia,jkbA,jkbB->AB', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
+        temp -= np.einsum('ia,ib,jkaB,jkbA->AB', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
+        temp -= np.einsum('ia,ja,ikbB,jkbA->AB', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
+        temp += np.einsum('ia,jb,ikaB,jkbA->AB', L_aa, R_aa, t2_1_ab, t2_2_ab, optimize = True)
+        temp += 1/2 * np.einsum('ia,ia,jkAb,jkBb->AB', L_aa, R_aa, t2_1_b, t2_2_b, optimize = True)
+        temp += 1/2 * np.einsum('ia,jB,ikab,kjbA->AB', L_aa, R_bb, t2_1_a, t2_2_ab, optimize = True)
+        temp += 1/2 * np.einsum('ia,jB,kjbA,ikab->AB', L_aa, R_bb, t2_1_ab, t2_2_a, optimize = True)
+        temp += 1/2 * np.einsum('ia,jB,ikab,jkAb->AB', L_aa, R_bb, t2_1_ab, t2_2_b, optimize = True)
+        temp -= np.einsum('ia,jb,ikaB,jkAb->AB', L_aa, R_bb, t2_1_ab, t2_2_b, optimize = True)
+        temp += 1/2 * np.einsum('ia,jB,jkAb,ikab->AB', L_aa, R_bb, t2_1_b, t2_2_ab, optimize = True)
+        temp -= np.einsum('ia,jb,jkAb,ikaB->AB', L_aa, R_bb, t2_1_b, t2_2_ab, optimize = True)
+        temp -= 1/2 * np.einsum('iA,ia,jkbB,jkba->AB', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
+        temp -= 1/2 * np.einsum('iA,ia,jkba,jkbB->AB', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
+        temp += 1/2 * np.einsum('iA,ja,kibB,kjba->AB', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
+        temp += 1/2 * np.einsum('iA,ja,kjba,kibB->AB', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
+        temp += np.einsum('ia,ia,jkbA,jkbB->AB', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
+        temp -= np.einsum('ia,ja,kibB,kjbA->AB', L_bb, R_bb, t2_1_ab, t2_2_ab, optimize = True)
+        temp -= 1/4 * np.einsum('iA,ia,jkBb,jkab->AB', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
+        temp -= 1/4 * np.einsum('iA,ia,jkab,jkBb->AB', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
+        temp += 1/2 * np.einsum('iA,ja,ikBb,jkab->AB', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
+        temp += 1/2 * np.einsum('iA,ja,jkab,ikBb->AB', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
+        temp += 1/2 * np.einsum('ia,ia,jkAb,jkBb->AB', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
+        temp -= 1/2 * np.einsum('ia,ib,jkAb,jkBa->AB', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
+        temp -= np.einsum('ia,ja,ikBb,jkAb->AB', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
+        temp += np.einsum('ia,jb,ikBa,jkAb->AB', L_bb, R_bb, t2_1_b, t2_2_b, optimize = True)
+        rdm1_b[nocc_b:, nocc_b:] += temp + temp.T
         rdm1_b[nocc_b:, nocc_b:] -= 1/2 * np.einsum('iA,ia,jB,ja->AB', L_bb, R_bb, t1_1_b, t1_2_b, optimize = True)
         rdm1_b[nocc_b:, nocc_b:] -= 1/2 * np.einsum('iA,ia,ja,jB->AB', L_bb, R_bb, t1_1_b, t1_2_b, optimize = True)
         rdm1_b[nocc_b:, nocc_b:] -= 1/2 * np.einsum('ia,iB,jA,ja->AB', L_bb, R_bb, t1_1_b, t1_2_b, optimize = True)
@@ -15747,10 +15384,10 @@ def make_rdm1_eigenvectors(adc, L, R):
             optimize = True)
 
         ### 021 & 120 ###
-        w_ab_a = np.zeros((nvir_a, nvir_a))
-        w_ab_a -= np.einsum('ia,ijBa,jA->AB', L_aa, R_aaaa_u, t1_2_a, optimize = True)
-        w_ab_a += np.einsum('ijAa,ja,iB->AB', L_ab, R_bb, t1_2_a, optimize = True)
-        rdm1_a[nocc_a:, nocc_a:] += w_ab_a + w_ab_a.T
+        temp = np.zeros((nvir_a, nvir_a))
+        temp -= np.einsum('ia,ijBa,jA->AB', L_aa, R_aaaa_u, t1_2_a, optimize = True)
+        temp += np.einsum('ijAa,ja,iB->AB', L_ab, R_bb, t1_2_a, optimize = True)
+        rdm1_a[nocc_a:, nocc_a:] += temp + temp.T
         rdm1_a[nocc_a:, nocc_a:] += 1/4 * np.einsum('iA,ijab,kB,jkab->AB', L_aa, R_aaaa_u, t1_1_a, t2_1_a,
             optimize = True)
         rdm1_a[nocc_a:, nocc_a:] -= 1/2 * np.einsum('ia,ijBa,kb,jkAb->AB', L_aa, R_aaaa_u, t1_1_a, t2_1_a,
@@ -15797,10 +15434,10 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1_a[nocc_a:, nocc_a:] -= 1/2 * np.einsum('ia,jkBa,ib,jkAb->AB', L_bb, R_ab, t1_1_b, t2_1_ab, optimize = True)
         rdm1_a[nocc_a:, nocc_a:] += np.einsum('ia,ijab,kB,kjAb->AB', L_bb, R_bbbb_u, t1_1_a, t2_1_ab, optimize = True)
         rdm1_a[nocc_a:, nocc_a:] += np.einsum('ijab,ia,kA,kjBb->AB', L_bbbb_u, R_bb, t1_1_a, t2_1_ab, optimize = True)
-        w_ab_b = np.zeros((nvir_b, nvir_b))
-        w_ab_b += np.einsum('ia,ijaB,jA->AB', L_aa, R_ab, t1_2_b, optimize = True)
-        w_ab_b -= np.einsum('ia,ijBa,jA->AB', L_bb, R_bbbb_u, t1_2_b, optimize = True)
-        rdm1_b[nocc_b:, nocc_b:] += w_ab_b + w_ab_b.T
+        temp = np.zeros((nvir_b, nvir_b))
+        temp += np.einsum('ia,ijaB,jA->AB', L_aa, R_ab, t1_2_b, optimize = True)
+        temp -= np.einsum('ia,ijBa,jA->AB', L_bb, R_bbbb_u, t1_2_b, optimize = True)
+        rdm1_b[nocc_b:, nocc_b:] += temp + temp.T
         rdm1_b[nocc_b:, nocc_b:] += np.einsum('ia,ijab,kB,jkbA->AB', L_aa, R_aaaa_u, t1_1_b, t2_1_ab, optimize = True)
         rdm1_b[nocc_b:, nocc_b:] += 1/2 * np.einsum('ia,ijaB,kb,kjbA->AB', L_aa, R_ab, t1_1_a, t2_1_ab, optimize = True)
         rdm1_b[nocc_b:, nocc_b:] -= 1/2 * np.einsum('ia,ijbB,ka,kjbA->AB', L_aa, R_ab, t1_1_a, t2_1_ab, optimize = True)
