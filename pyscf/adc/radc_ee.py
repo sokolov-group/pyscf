@@ -1459,9 +1459,10 @@ def make_rdm1_eigenvectors(adc, L, R):
     rdm1[:nocc, nocc:] += einsum('ijab,ib,jIAa->IA', L2, R1, t1_ccee, optimize = einsum_type)
 
     ### 020 ###
-    rdm1[:nocc, nocc:] -= einsum('ia,Ia,iA->IA', L1, R1, t2_ce, optimize = einsum_type)
-    rdm1[:nocc, nocc:] -= einsum('ia,iA,Ia->IA', L1, R1, t2_ce, optimize = einsum_type)
-    rdm1[:nocc, nocc:] += 2 * einsum('ia,ia,IA->IA', L1, R1, t2_ce, optimize = einsum_type)
+    if (adc.approx_trans_moments is False or adc.method == "adc(3)"):
+        rdm1[:nocc, nocc:] -= einsum('ia,Ia,iA->IA', L1, R1, t2_ce, optimize = einsum_type)
+        rdm1[:nocc, nocc:] -= einsum('ia,iA,Ia->IA', L1, R1, t2_ce, optimize = einsum_type)
+        rdm1[:nocc, nocc:] += 2 * einsum('ia,ia,IA->IA', L1, R1, t2_ce, optimize = einsum_type)
 
 ############# block- ai
     rdm1[nocc:,:nocc] = rdm1[:nocc,nocc:].T
@@ -1553,9 +1554,6 @@ def make_rdm1_eigenvectors(adc, L, R):
         #----------------------------------------------------------------------------------------------------------#
 ############# block- ia
         ### 030 ###
-        rdm1[:nocc, nocc:] -= einsum('ia,Ia,iA->IA', L1, R1, t3_ce, optimize = einsum_type)
-        rdm1[:nocc, nocc:] -= einsum('ia,iA,Ia->IA', L1, R1, t3_ce, optimize = einsum_type)
-        rdm1[:nocc, nocc:] += 2 * einsum('ia,ia,IA->IA', L1, R1, t3_ce, optimize = einsum_type)
         rdm1[:nocc, nocc:] -= einsum('ia,Ia,ijAb,jb->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
         rdm1[:nocc, nocc:] += 1/2 * einsum('ia,Ia,jiAb,jb->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
         rdm1[:nocc, nocc:] += 1/2 * einsum('ia,Ib,ijAa,jb->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
@@ -1570,6 +1568,11 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1[:nocc, nocc:] -= einsum('ia,jA,Iiba,jb->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
         rdm1[:nocc, nocc:] -= einsum('ia,ja,IiAb,jb->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
         rdm1[:nocc, nocc:] += 1/2 * einsum('ia,ja,iIAb,jb->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
+
+        if adc.approx_trans_moments is False:
+            rdm1[:nocc, nocc:] -= einsum('ia,Ia,iA->IA', L1, R1, t3_ce, optimize = einsum_type)
+            rdm1[:nocc, nocc:] -= einsum('ia,iA,Ia->IA', L1, R1, t3_ce, optimize = einsum_type)
+            rdm1[:nocc, nocc:] += 2 * einsum('ia,ia,IA->IA', L1, R1, t3_ce, optimize = einsum_type)
 
         ### 021 & 120 ###
         rdm1[:nocc, nocc:] -= 2 * einsum('ijab,Ia,ijAb->IA', L2, R1, t2_ccee, optimize = einsum_type)
@@ -1715,7 +1718,13 @@ class RADCEE(radc.RADC):
         self.mo_energy = adc.mo_energy
         self.nmo = adc._nmo
         self.dip_mom = adc.dip_mom
-        self.transform_integrals = adc.transform_integrals
+        self.if_heri_eris = adc.if_heri_eris
+        self.thresh_naf = adc.thresh_naf
+        self.ncvs = adc.ncvs
+        if getattr(adc.transform_integrals, '__name__', '') == 'df_transform':
+            self.transform_integrals = lambda: radc_ao2mo.transform_integrals_df(self)
+        elif getattr(adc.transform_integrals, '__name__', '') == 'outcore_transform':
+            self.transform_integrals = lambda: radc_ao2mo.transform_integrals_outcore(self)
         self.with_df = adc.with_df
         self.compute_properties = adc.compute_properties
         self.approx_trans_moments = adc.approx_trans_moments
