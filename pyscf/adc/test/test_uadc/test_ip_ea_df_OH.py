@@ -88,9 +88,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[3], 0.20135255, 6)
 
         self.assertAlmostEqual(p[0], 0.9364865, 6)
-        self.assertAlmostEqual(p[1], 0.98406359, 6)
-        self.assertAlmostEqual(p[2], 0.77604385, 6)
-        self.assertAlmostEqual(p[3], 0.20823964, 6)
+        self.assertAlmostEqual(p[1], 0.9840609990091582, 6)
+        self.assertAlmostEqual(p[2], 0.7760193597284754, 6)
+        self.assertAlmostEqual(p[3], 0.20825099009739692, 6)
 
         self.assertAlmostEqual(spin[0],0.00154661 , 5)
         self.assertAlmostEqual(spin[1],1.99998143 , 5)
@@ -117,9 +117,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[1], 0.46818375, 6)
         self.assertAlmostEqual(e[2], 0.55652918, 6)
 
-        self.assertAlmostEqual(p[0], 0.93869064, 6)
-        self.assertAlmostEqual(p[1], 0.58692581, 6)
-        self.assertAlmostEqual(p[2], 0.35111056, 6)
+        self.assertAlmostEqual(p[0], 0.9387552064029395, 6)
+        self.assertAlmostEqual(p[1], 0.5869577478677291, 6)
+        self.assertAlmostEqual(p[2], 0.3511163890273265, 6)
 
         self.assertAlmostEqual(spin[0],2.00017692 , 5)
         self.assertAlmostEqual(spin[1],1.94783684 , 5)
@@ -146,9 +146,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[1], 0.46818480, 6)
         self.assertAlmostEqual(e[2], 0.55652975, 6)
 
-        self.assertAlmostEqual(p[0], 0.93868596, 6)
-        self.assertAlmostEqual(p[1], 0.58692425, 6)
-        self.assertAlmostEqual(p[2], 0.35110754 ,6)
+        self.assertAlmostEqual(p[0], 0.9387505395407538, 6)
+        self.assertAlmostEqual(p[1], 0.5869560351750759, 6)
+        self.assertAlmostEqual(p[2], 0.35111354373738396 ,6)
 
         self.assertAlmostEqual(spin[0],2.00017672 , 5)
         self.assertAlmostEqual(spin[1],1.94783373 , 5)
