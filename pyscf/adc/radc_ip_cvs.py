@@ -159,17 +159,14 @@ def get_imds(adc, eris=None):
         del temp_t2_v_11
 
         temp_t2_v_12_cooo = lib.einsum('inde,lmde->inlm',t2_1_coee, t2_1,optimize=True)
-        temp_t2_v_12_ooco = lib.einsum('inde,lmde->inlm',t2_1, t2_1_coee,optimize=True)
         M_ij += 3/4 * lib.einsum('inlm,jlnm->ij',temp_t2_v_12_cooo, eris_cooo, optimize=True)
         M_ij -= 1/4 * lib.einsum('inlm,jmnl->ij',temp_t2_v_12_cooo, eris_cooo, optimize=True)
 
         M_ij += 3/4 * lib.einsum('inlm,jlnm->ji',temp_t2_v_12_cooo, eris_cooo, optimize=True)
         M_ij -= 1/4 * lib.einsum('inlm,jmnl->ji',temp_t2_v_12_cooo, eris_cooo, optimize=True)
         del temp_t2_v_12_cooo
-        del temp_t2_v_12_ooco
 
         temp_t2_v_13_cooo = lib.einsum('inde,mlde->inml',t2_1_coee, t2_1,optimize=True)
-        temp_t2_v_13_ooco = lib.einsum('inde,mlde->inml',t2_1, t2_1_coee,optimize=True)
         M_ij -= 1/4 * lib.einsum('inml,jlnm->ij',temp_t2_v_13_cooo, eris_cooo, optimize=True)
         M_ij += 1/4 * lib.einsum('inml,jmnl->ij',temp_t2_v_13_cooo, eris_cooo, optimize=True)
 
@@ -177,7 +174,6 @@ def get_imds(adc, eris=None):
         M_ij += 1/4 * lib.einsum('inml,jmnl->ji',temp_t2_v_13_cooo, eris_cooo, optimize=True)
 
         del temp_t2_v_13_cooo
-        del temp_t2_v_13_ooco
         del t2_1
 
     cput0 = log.timer_debug1("Completed CVS M_ij ADC(n) calculation", *cput0)

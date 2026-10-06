@@ -1839,7 +1839,8 @@ def get_trans_moments_orbital(adc, orb, spin="alpha"):
                     T[s_a:f_a] -= 1/12*lib.einsum('k,klcd,ilcd->i',t1_1_a[:,(orb-nocc_a)], t2_1_a, t2_1_a,optimize=True)
                     T[s_a:f_a] += 1/6*lib.einsum('kc,klcd,ild->i',t1_1_a, t2_1_a, t2_1_a_tmp,optimize=True)
                     T[s_a:f_a] -= 1/6*lib.einsum('ic,klcd,kld->i',t1_1_a, t2_1_ab, t2_1_ab_tmp,optimize=True)
-                    T[s_a:f_a] -= 1/6*lib.einsum('k,klcd,ilcd->i',t1_1_a[:,(orb-nocc_a)], t2_1_ab, t2_1_ab,optimize=True)
+                    T[s_a:f_a] -= 1/6*lib.einsum('k,klcd,ilcd->i',t1_1_a[:,(orb-nocc_a)], t2_1_ab, t2_1_ab,
+                                                 optimize=True)
                     T[s_a:f_a] += 1/6*lib.einsum('kc,klcd,ild->i',t1_1_a, t2_1_ab, t2_1_ab_tmp,optimize=True)
                     T[s_a:f_a] += 1/6*lib.einsum('kc,ild,lkdc->i',t1_1_b, t2_1_a_tmp, t2_1_ab,optimize=True)
                     T[s_a:f_a] += 1/6*lib.einsum('kc,ild,klcd->i',t1_1_b, t2_1_ab_tmp, t2_1_b,optimize=True)
@@ -1962,7 +1963,8 @@ def get_trans_moments_orbital(adc, orb, spin="alpha"):
                     T[s_b:f_b] += 1/6*lib.einsum('kc,klcd,ild->i',t1_1_a, t2_1_ab, t2_1_b_tmp,optimize=True)
                     T[s_b:f_b] -= 1/6*lib.einsum('ic,k,kc->i',t1_1_b, t1_1_b[:,(orb-nocc_b)], t1_1_b,optimize=True)
                     T[s_b:f_b] -= 1/6*lib.einsum('ic,kldc,kld->i',t1_1_b, t2_1_ab, t2_1_ab_tmp,optimize=True)
-                    T[s_b:f_b] -= 1/6*lib.einsum('k,lkcd,licd->i',t1_1_b[:,(orb-nocc_b)], t2_1_ab, t2_1_ab,optimize=True)
+                    T[s_b:f_b] -= 1/6*lib.einsum('k,lkcd,licd->i',t1_1_b[:,(orb-nocc_b)], t2_1_ab, t2_1_ab,
+                                                 optimize=True)
                     T[s_b:f_b] += 1/6*lib.einsum('kc,lkdc,lid->i',t1_1_b, t2_1_ab, t2_1_ab_tmp,optimize=True)
                     T[s_b:f_b] -= 1/12*lib.einsum('ic,klcd,kld->i',t1_1_b, t2_1_b, t2_1_b_tmp,optimize=True)
                     T[s_b:f_b] -= 1/12*lib.einsum('k,klcd,ilcd->i',t1_1_b[:,(orb-nocc_b)], t2_1_b, t2_1_b,optimize=True)
@@ -5361,7 +5363,7 @@ def get_spin_square(adc):
             S2 += 2 * np.einsum('i,aij,kb,cd,klcb,jlad', L_b, R_bbb_u, S_ov_ab, S_vv_ab, t2_1_ab, t2_1_b, optimize=True)
             S2 += np.einsum('i,ajk,la,bc,libd,jkcd', L_b, R_bbb_u, S_ov_ab, S_vv_ab, t2_1_ab, t2_1_b, optimize=True)
             S2 += np.einsum('i,ajk,lb,cd,licb,jkad', L_b, R_bbb_u, S_ov_ab, S_vv_ab, t2_1_ab, t2_1_b, optimize=True)
-            
+
             if t1_1_a is not None:
                 # block IjlJ
                 S2 -= 2 * np.einsum('i,aij,kb,jlab,km,lm', L_a, R_aaa_u, t1_1_a, t2_1_a, S_oo_ab, S_oo_ab,
