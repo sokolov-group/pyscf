@@ -2025,7 +2025,7 @@ def make_rdm1(adc):
     cput0 = (logger.process_clock(), logger.perf_counter())
     log = logger.Logger(adc.stdout, adc.verbose)
 
-    if (adc.method_type == "adc(3)"):
+    if (adc.method == "adc(3)"):
         logger.warn(adc,"CVS-ip-UADC(3) 1-rdm includes contributions up to ADC(2)-X only...")
 
     U = adc.U
@@ -2749,7 +2749,7 @@ class UADCIPCVS(uadc.UADC):
         self.imds = adc.imds
         self.e_corr = adc.e_corr
         self.method = adc.method
-        self.method_type = adc.method_type
+        self.method_type = "ip"
         self._scf = adc._scf
         self._nocc = adc._nocc
         self._nvir = adc._nvir
