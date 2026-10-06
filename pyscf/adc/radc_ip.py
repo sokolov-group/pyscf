@@ -983,7 +983,7 @@ class RADCIP(radc.RADC):
         self.imds = adc.imds
         self.e_corr = adc.e_corr
         self.method = adc.method
-        self.method_type = adc.method_type
+        self.method_type = "ip"
         self._scf = adc._scf
         self._nocc = adc._nocc
         self._nvir = adc._nvir
