@@ -171,6 +171,23 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(rdms_test(dm1_exc[2]), 26.54848844122685, 6)
         self.assertAlmostEqual(rdms_test(dm1_exc[3]), 28.08965198293511, 6)
 
+    def test_ee_adc2_naf(self):
+        myadc_naf = adc.ADC(mf).density_fit('cc-pvdz-ri')
+        myadc_naf.method = "adc(2)"
+        myadc_naf.method_type = "ee"
+        myadc_naf.if_naf = True
+        e,v,p,x = myadc_naf.kernel(nroots=4)
+
+        self.assertAlmostEqual(e[0],0.2964220149370157, 6)
+        self.assertAlmostEqual(e[1],0.3722187168250182, 6)
+        self.assertAlmostEqual(e[2],0.393109838357294, 6)
+        self.assertAlmostEqual(e[3],0.47071704417279236, 6)
+
+        self.assertAlmostEqual(p[0], 0.027627679230567186, 6)
+        self.assertAlmostEqual(p[1], 0.0, 6)
+        self.assertAlmostEqual(p[2], 0.09598395016300222, 6)
+        self.assertAlmostEqual(p[3], 0.07221302410713652, 6)
+
 if __name__ == "__main__":
     print("EE calculations for different ADC methods for water molecule")
     unittest.main()
