@@ -970,14 +970,16 @@ def make_rdm1_eigenvectors(adc, L, R):
         rdm1[:nocc, nocc:] += einsum('a,ibc,jIAa,ijcb->IA', L1, R2, t1_ccee, t1_ccee, optimize = einsum_type)
 
         # 030 #
-        rdm1[:nocc, nocc:] -= einsum('A,a,Ia->IA', L1, R1, t3_ce, optimize = einsum_type)
-        rdm1[:nocc, nocc:] += 2 * einsum('a,a,IA->IA', L1, R1, t3_ce, optimize = einsum_type)
         rdm1[:nocc, nocc:] -= einsum('A,a,Iiab,ib->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
         rdm1[:nocc, nocc:] += 1/2 * einsum('A,a,Iiba,ib->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
         rdm1[:nocc, nocc:] += 2 * einsum('a,a,IiAb,ib->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
         rdm1[:nocc, nocc:] -= einsum('a,a,iIAb,ib->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
         rdm1[:nocc, nocc:] -= einsum('a,b,IiAb,ia->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
         rdm1[:nocc, nocc:] += 1/2 * einsum('a,b,iIAb,ia->IA', L1, R1, t1_ccee, t2_ce, optimize = einsum_type)
+
+        if adc.approx_trans_moments is False:
+            rdm1[:nocc, nocc:] -= einsum('A,a,Ia->IA', L1, R1, t3_ce, optimize = einsum_type)
+            rdm1[:nocc, nocc:] += 2 * einsum('a,a,IA->IA', L1, R1, t3_ce, optimize = einsum_type)
 
 ############# block- ai
         # 120 #
@@ -1073,7 +1075,13 @@ class RADCEA(radc.RADC):
         self.mo_coeff_hf = adc.mo_coeff_hf
         self.mo_energy = adc.mo_energy
         self.nmo = adc._nmo
-        self.transform_integrals = adc.transform_integrals
+        self.if_heri_eris = adc.if_heri_eris
+        self.thresh_naf = adc.thresh_naf
+        self.ncvs = adc.ncvs
+        if getattr(adc.transform_integrals, '__name__', '') == 'df_transform':
+            self.transform_integrals = lambda: radc_ao2mo.transform_integrals_df(self)
+        elif getattr(adc.transform_integrals, '__name__', '') == 'outcore_transform':
+            self.transform_integrals = lambda: radc_ao2mo.transform_integrals_outcore(self)
         self.with_df = adc.with_df
         self.compute_properties = adc.compute_properties
         self.approx_trans_moments = adc.approx_trans_moments
