@@ -2189,10 +2189,12 @@ def get_trans_moments_orbital(adc, orb, spin="alpha"):
                 if t1_1_a is not None:
                     T[s_a:f_a] -= 0.5*lib.einsum('ka,k->a',t1_1_a, t1_2_a[:,(orb-nocc_a)],optimize=True)
                     T[s_a:f_a] -= 0.5*lib.einsum('k,ka->a',t1_1_a[:,(orb-nocc_a)], t1_2_a,optimize=True)
-                    T[s_a:f_a] -= 1/3*lib.einsum('ka,lc,klc->a',t1_1_a, t1_1_b, t2_1_ab[:,:,(orb-nocc_a),:],optimize=True)
+                    T[s_a:f_a] -= 1/3*lib.einsum('ka,lc,klc->a',t1_1_a, t1_1_b, t2_1_ab[:,:,(orb-nocc_a),:],
+                                                 optimize=True)
                     T[s_a:f_a] -= 1/6*lib.einsum('k,lc,klac->a',t1_1_a[:,(orb-nocc_a)], t1_1_b, t2_1_ab,optimize=True)
                     T[s_a:f_a] -= 1/6*lib.einsum('klac,k,lc->a',t2_1_a, t1_1_a[:,(orb-nocc_a)], t1_1_a,optimize=True)
-                    T[s_a:f_a] -= 1/3*lib.einsum('klc,ka,lc->a',t2_1_a[:,:,(orb-nocc_a),:], t1_1_a, t1_1_a,optimize=True)
+                    T[s_a:f_a] -= 1/3*lib.einsum('klc,ka,lc->a',t2_1_a[:,:,(orb-nocc_a),:], t1_1_a, t1_1_a,
+                                                 optimize=True)
 
                 del t2_2_a
                 del t2_2_ab
@@ -2306,10 +2308,12 @@ def get_trans_moments_orbital(adc, orb, spin="alpha"):
                 if t1_1_b is not None:
                     T[s_b:f_b] -= 0.5*lib.einsum('ka,k->a',t1_1_b, t1_2_b[:,(orb-nocc_b)],optimize=True)
                     T[s_b:f_b] -= 0.5*lib.einsum('k,ka->a',t1_1_b[:,(orb-nocc_b)], t1_2_b,optimize=True)
-                    T[s_b:f_b] -= 1/3*lib.einsum('kc,la,klc->a',t1_1_a, t1_1_b, t2_1_ab[:,:,:,(orb-nocc_b)],optimize=True)
+                    T[s_b:f_b] -= 1/3*lib.einsum('kc,la,klc->a',t1_1_a, t1_1_b, t2_1_ab[:,:,:,(orb-nocc_b)],
+                                                 optimize=True)
                     T[s_b:f_b] -= 1/6*lib.einsum('kc,l,klca->a',t1_1_a, t1_1_b[:,(orb-nocc_b)], t2_1_ab,optimize=True)
                     T[s_b:f_b] -= 1/6*lib.einsum('klac,k,lc->a',t2_1_b, t1_1_b[:,(orb-nocc_b)], t1_1_b,optimize=True)
-                    T[s_b:f_b] -= 1/3*lib.einsum('klc,ka,lc->a',t2_1_b[:,:,(orb-nocc_b),:], t1_1_b, t1_1_b,optimize=True)
+                    T[s_b:f_b] -= 1/3*lib.einsum('klc,ka,lc->a',t2_1_b[:,:,(orb-nocc_b),:], t1_1_b, t1_1_b,
+                                                 optimize=True)
 
                 del t2_2_b
                 del t2_2_ab
