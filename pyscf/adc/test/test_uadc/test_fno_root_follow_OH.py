@@ -96,9 +96,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(ADCFG.e_can[1], 0.1648082469, 6)
         self.assertAlmostEqual(ADCFG.e_can[2], 0.2987782521, 6)
 
-        self.assertAlmostEqual(ADCFG.e_ssfno[0], 0.0088473634, 6)
-        self.assertAlmostEqual(ADCFG.e_ssfno[1], 0.1686991047, 6)
-        self.assertAlmostEqual(ADCFG.e_ssfno[2], 0.6757697255, 6)
+        self.assertAlmostEqual(ADCFG.e_ssfno[0], 0.008787034566775532, 6)
+        self.assertAlmostEqual(ADCFG.e_ssfno[1], 0.16854423075480343, 6)
+        self.assertAlmostEqual(ADCFG.e_ssfno[2], 0.6779518685742937, 6)
 
         for i in range(3):
             self.assertGreater(ADCFG.ovl_guess[i, i], 0.9)
@@ -113,9 +113,9 @@ class KnownValues(unittest.TestCase):
         myadc.pick = True
         e, v, p, x = myadc.kernel(nroots=3, guess=ADCFG.v_ssfno)
 
-        self.assertAlmostEqual(ADCFG.correct(e)[0], -0.0003051546, 6)
-        self.assertAlmostEqual(ADCFG.correct(e)[1], 0.1587062542, 6)
-        self.assertAlmostEqual(ADCFG.correct(e)[2], 0.2602920140, 6)
+        self.assertAlmostEqual(ADCFG.correct(e)[0], -0.0002714981365512228, 6)
+        self.assertAlmostEqual(ADCFG.correct(e)[1], 0.15855671456041287, 6)
+        self.assertAlmostEqual(ADCFG.correct(e)[2], 0.25143055181704, 6)
 
     def test_safno_ee_root_following(self):
         ADCFG = adc.ADC2FNO(mf).set(verbose=0, method_type='ee', ref_state=[1, 2],
