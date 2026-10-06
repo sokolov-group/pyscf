@@ -171,6 +171,30 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(rdms_test(dm1_exc[0][2],dm1_exc[1][2]), 40.60157323755573, 6)
         self.assertAlmostEqual(rdms_test(dm1_exc[0][3],dm1_exc[1][3]), 40.622974140808815, 6)
 
+    def test_ee_adc2_naf(self):
+        myadc_naf = adc.ADC(mf).density_fit('cc-pvdz-ri')
+        myadc_naf.method = "adc(2)"
+        myadc_naf.method_type = "ee"
+        myadc_naf.if_naf = True
+        myadc_naf.thresh_naf = 1e-3
+        e,v,p,x = myadc_naf.kernel(nroots=4)
+        spin = get_spin_square(myadc_naf._adc_es)[0]
+
+        self.assertAlmostEqual(e[0],0.07898013289167467, 6)
+        self.assertAlmostEqual(e[1],0.0789801328916748, 6)
+        self.assertAlmostEqual(e[2],0.13972276465255035, 6)
+        self.assertAlmostEqual(e[3],0.25534785268385707, 6)
+
+        self.assertAlmostEqual(p[0],0.003386087665166727, 6)
+        self.assertAlmostEqual(p[1],0.0033860876651667276, 6)
+        self.assertAlmostEqual(p[2],0.011890199395458148, 6)
+        self.assertAlmostEqual(p[3],0.005986552520652376, 6)
+
+        self.assertAlmostEqual(spin[0],0.8875164202744701, 5)
+        self.assertAlmostEqual(spin[1],0.8875164202744665, 5)
+        self.assertAlmostEqual(spin[2],1.1016265497526874, 5)
+        self.assertAlmostEqual(spin[3],2.6666909740781417, 5)
+
 if __name__ == "__main__":
     print("EE calculations for different ADC methods for CN molecule")
     unittest.main()
