@@ -174,18 +174,28 @@ def get_imds(adc, eris=None):
                 einsum_type)
                 M_ab[:,:,:,a:a+k] += einsum('AaDb,Iiac,Licb->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
                 M_ab[:,:,:,a:a+k] += einsum('AaDb,Iica,Libc->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[:,:,:,a:a+k] -= 2 * einsum('AaDb,Iica,Licb->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[:,:,:,a:a+k] += 4 * einsum('AbaD,Iibc,Liac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[:,:,:,a:a+k] -= 2 * einsum('AbaD,Iibc,Lica->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[:,:,:,a:a+k] -= 2 * einsum('AbaD,Iicb,Liac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
+                M_ab[:,:,:,a:a+k] -= 2 * einsum('AaDb,Iica,Licb->IDLA', v_eeee, t1_ccee, t1_ccee,
+                                                optimize = einsum_type)
+                M_ab[:,:,:,a:a+k] += 4 * einsum('AbaD,Iibc,Liac->IDLA', v_eeee, t1_ccee, t1_ccee,
+                                                optimize = einsum_type)
+                M_ab[:,:,:,a:a+k] -= 2 * einsum('AbaD,Iibc,Lica->IDLA', v_eeee, t1_ccee, t1_ccee,
+                                                optimize = einsum_type)
+                M_ab[:,:,:,a:a+k] -= 2 * einsum('AbaD,Iicb,Liac->IDLA', v_eeee, t1_ccee, t1_ccee,
+                                                optimize = einsum_type)
                 M_ab[:,:,:,a:a+k] += einsum('AbaD,Iicb,Lica->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[:,:,:,a:a+k] += 4 * einsum('Abac,IiDb,Liac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[:,:,:,a:a+k] -= 2 * einsum('Abac,IiDb,Lica->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[:,:,:,a:a+k] -= 2 * einsum('Abac,iIDb,Liac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
+                M_ab[:,:,:,a:a+k] += 4 * einsum('Abac,IiDb,Liac->IDLA', v_eeee, t1_ccee, t1_ccee,
+                                                optimize = einsum_type)
+                M_ab[:,:,:,a:a+k] -= 2 * einsum('Abac,IiDb,Lica->IDLA', v_eeee, t1_ccee, t1_ccee,
+                                                optimize = einsum_type)
+                M_ab[:,:,:,a:a+k] -= 2 * einsum('Abac,iIDb,Liac->IDLA', v_eeee, t1_ccee, t1_ccee,
+                                                optimize = einsum_type)
                 M_ab[:,:,:,a:a+k] += einsum('Abac,iIDb,Lica->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[:,a:a+k,:,:] += 4 * einsum('Dbac,LiAb,Iiac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[:,a:a+k,:,:] -= 2 * einsum('Dbac,LiAb,Iica->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
-                M_ab[:,a:a+k,:,:] -= 2 * einsum('Dbac,iLAb,Iiac->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
+                M_ab[:,a:a+k,:,:] += 4 * einsum('Dbac,LiAb,Iiac->IDLA', v_eeee, t1_ccee, t1_ccee,
+                                                optimize = einsum_type)
+                M_ab[:,a:a+k,:,:] -= 2 * einsum('Dbac,LiAb,Iica->IDLA', v_eeee, t1_ccee, t1_ccee,
+                                                optimize = einsum_type)
+                M_ab[:,a:a+k,:,:] -= 2 * einsum('Dbac,iLAb,Iiac->IDLA', v_eeee, t1_ccee, t1_ccee,
+                                                optimize = einsum_type)
                 M_ab[:,a:a+k,:,:] += einsum('Dbac,iLAb,Iica->IDLA', v_eeee, t1_ccee, t1_ccee, optimize = einsum_type)
                 M_ab[:,vir_list,:,vir_list] -= 2 * einsum('acbd,Iiac,Libd->IL', v_eeee, t1_ccee[:,:,a:a+k,:], t1_ccee,
                 optimize = einsum_type)

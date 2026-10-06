@@ -256,19 +256,29 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
             rdm1_a[:nocc_a, nocc_a:] -= 1/3 * einsum('Ia,ijab,ijAb->IA', t1_1_a, t2_1_a, t2_1_a, optimize = einsum_type)
             rdm1_a[:nocc_a, nocc_a:] -= 1/3 * einsum('iA,ijab,Ijab->IA', t1_1_a, t2_1_a, t2_1_a, optimize = einsum_type)
             rdm1_a[:nocc_a, nocc_a:] += 1/6 * einsum('ia,ijab,IjAb->IA', t1_1_a, t2_1_a, t2_1_a, optimize = einsum_type)
-            rdm1_a[:nocc_a, nocc_a:] -= 2/3 * einsum('Ia,ijab,ijAb->IA', t1_1_a, t2_1_ab, t2_1_ab, optimize = einsum_type)
-            rdm1_a[:nocc_a, nocc_a:] -= 2/3 * einsum('iA,ijab,Ijab->IA', t1_1_a, t2_1_ab, t2_1_ab, optimize = einsum_type)
-            rdm1_a[:nocc_a, nocc_a:] += 1/6 * einsum('ia,ijab,IjAb->IA', t1_1_a, t2_1_ab, t2_1_ab, optimize = einsum_type)
-            rdm1_a[:nocc_a, nocc_a:] += 1/6 * einsum('ia,IjAb,jiba->IA', t1_1_b, t2_1_a, t2_1_ab, optimize = einsum_type)
-            rdm1_a[:nocc_a, nocc_a:] += 1/6 * einsum('ia,IjAb,ijab->IA', t1_1_b, t2_1_ab, t2_1_b, optimize = einsum_type)
+            rdm1_a[:nocc_a, nocc_a:] -= 2/3 * einsum('Ia,ijab,ijAb->IA', t1_1_a, t2_1_ab, t2_1_ab,
+                                                     optimize = einsum_type)
+            rdm1_a[:nocc_a, nocc_a:] -= 2/3 * einsum('iA,ijab,Ijab->IA', t1_1_a, t2_1_ab, t2_1_ab,
+                                                     optimize = einsum_type)
+            rdm1_a[:nocc_a, nocc_a:] += 1/6 * einsum('ia,ijab,IjAb->IA', t1_1_a, t2_1_ab, t2_1_ab,
+                                                     optimize = einsum_type)
+            rdm1_a[:nocc_a, nocc_a:] += 1/6 * einsum('ia,IjAb,jiba->IA', t1_1_b, t2_1_a, t2_1_ab,
+                                                     optimize = einsum_type)
+            rdm1_a[:nocc_a, nocc_a:] += 1/6 * einsum('ia,IjAb,ijab->IA', t1_1_b, t2_1_ab, t2_1_b,
+                                                     optimize = einsum_type)
             rdm1_b[:nocc_b, nocc_b:] += 1/2 * einsum('ia,iIaA->IA', t1_1_a, t2_2_ab, optimize = einsum_type)
             rdm1_b[:nocc_b, nocc_b:] += 1/2 * einsum('ia,IiAa->IA', t1_1_b, t2_2_b, optimize = einsum_type)
-            rdm1_b[:nocc_b, nocc_b:] += 1/6 * einsum('ia,ijab,jIbA->IA', t1_1_a, t2_1_a, t2_1_ab, optimize = einsum_type)
-            rdm1_b[:nocc_b, nocc_b:] += 1/6 * einsum('ia,ijab,IjAb->IA', t1_1_a, t2_1_ab, t2_1_b, optimize = einsum_type)
+            rdm1_b[:nocc_b, nocc_b:] += 1/6 * einsum('ia,ijab,jIbA->IA', t1_1_a, t2_1_a, t2_1_ab,
+                                                     optimize = einsum_type)
+            rdm1_b[:nocc_b, nocc_b:] += 1/6 * einsum('ia,ijab,IjAb->IA', t1_1_a, t2_1_ab, t2_1_b,
+                                                     optimize = einsum_type)
             rdm1_b[:nocc_b, nocc_b:] -= 2/3 * einsum('Ia,iA,ia->IA', t1_1_b, t1_1_b, t1_1_b, optimize = einsum_type)
-            rdm1_b[:nocc_b, nocc_b:] -= 2/3 * einsum('Ia,ijba,ijbA->IA', t1_1_b, t2_1_ab, t2_1_ab, optimize = einsum_type)
-            rdm1_b[:nocc_b, nocc_b:] -= 2/3 * einsum('iA,jiab,jIab->IA', t1_1_b, t2_1_ab, t2_1_ab, optimize = einsum_type)
-            rdm1_b[:nocc_b, nocc_b:] += 1/6 * einsum('ia,jiba,jIbA->IA', t1_1_b, t2_1_ab, t2_1_ab, optimize = einsum_type)
+            rdm1_b[:nocc_b, nocc_b:] -= 2/3 * einsum('Ia,ijba,ijbA->IA', t1_1_b, t2_1_ab, t2_1_ab,
+                                                     optimize = einsum_type)
+            rdm1_b[:nocc_b, nocc_b:] -= 2/3 * einsum('iA,jiab,jIab->IA', t1_1_b, t2_1_ab, t2_1_ab,
+                                                     optimize = einsum_type)
+            rdm1_b[:nocc_b, nocc_b:] += 1/6 * einsum('ia,jiba,jIbA->IA', t1_1_b, t2_1_ab, t2_1_ab,
+                                                     optimize = einsum_type)
             rdm1_b[:nocc_b, nocc_b:] -= 1/3 * einsum('Ia,ijab,ijAb->IA', t1_1_b, t2_1_b, t2_1_b, optimize = einsum_type)
             rdm1_b[:nocc_b, nocc_b:] -= 1/3 * einsum('iA,ijab,Ijab->IA', t1_1_b, t2_1_b, t2_1_b, optimize = einsum_type)
             rdm1_b[:nocc_b, nocc_b:] += 1/6 * einsum('ia,ijab,IjAb->IA', t1_1_b, t2_1_b, t2_1_b, optimize = einsum_type)
