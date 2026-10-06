@@ -174,10 +174,12 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
         OPDM[:nocc, :nocc] += temp + temp.T
 
         ##### OCC-VIR ### ####
-        OPDM[:nocc, nocc:]  += lib.einsum('IA->IA', t3_ce, optimize = einsum_type).copy()
         OPDM[:nocc, nocc:] +=  lib.einsum('IiAa,ia->IA', t1_ccee, t2_ce, optimize = einsum_type)
         OPDM[:nocc, nocc:] -= 1/2 * \
             lib.einsum('iIAa,ia->IA', t1_ccee, t2_ce, optimize = einsum_type)
+
+        if adc.approx_trans_moments is False:
+            OPDM[:nocc, nocc:] += lib.einsum('IA->IA', t3_ce, optimize = einsum_type).copy()
 
         ##### VIR-VIR ###
         temp = np.zeros((nvir, nvir))
@@ -356,7 +358,7 @@ class RADC(lib.StreamObject):
         self.method_type = "ip"
         self.with_df = None
         self.compute_properties = True
-        self.approx_trans_moments = False
+        self.approx_trans_moments = True
         self.evec_print_tol = 0.1
         self.spec_factor_print_tol = 0.1
         self.ncvs = None

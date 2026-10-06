@@ -178,9 +178,9 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
         rdm1_b[:nocc_b, :nocc_b] -= einsum('Ia,Ja->IJ', t1_1_b, t1_1_b, optimize = einsum_type)
 
     ### OCC-VIR ###
-    rdm1_a[:nocc_a, nocc_a:] += einsum('IA->IA', t1_2_a, optimize = einsum_type)
-
-    rdm1_b[:nocc_b, nocc_b:] += einsum('IA->IA', t1_2_b, optimize = einsum_type)
+    if (adc.approx_trans_moments is False or adc.method == "adc(3)"):
+        rdm1_a[:nocc_a, nocc_a:] += einsum('IA->IA', t1_2_a, optimize = einsum_type)
+        rdm1_b[:nocc_b, nocc_b:] += einsum('IA->IA', t1_2_b, optimize = einsum_type)
 
     if isinstance(adc._scf, scf.rohf.ROHF):
         rdm1_a[:nocc_a, nocc_a:] += einsum('IA->IA', t1_1_a, optimize = einsum_type)
@@ -239,13 +239,15 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
         rdm1_b[:nocc_b, :nocc_b] += temp + temp.T
 
         ##### OCC-VIR ### ####
-        rdm1_a[:nocc_a, nocc_a:] += einsum('IA->IA', t1_3_a, optimize = einsum_type).copy()
         rdm1_a[:nocc_a, nocc_a:] += 1/2 * einsum('ia,IiAa->IA', t1_2_a, t2_1_a, optimize = einsum_type)
         rdm1_a[:nocc_a, nocc_a:] += 1/2 * einsum('ia,IiAa->IA', t1_2_b, t2_1_ab, optimize = einsum_type)
 
-        rdm1_b[:nocc_b, nocc_b:] += einsum('IA->IA', t1_3_b, optimize = einsum_type).copy()
         rdm1_b[:nocc_b, nocc_b:] += 1/2 * einsum('ia,iIaA->IA', t1_2_a, t2_1_ab, optimize = einsum_type)
         rdm1_b[:nocc_b, nocc_b:] += 1/2 * einsum('ia,IiAa->IA', t1_2_b, t2_1_b, optimize = einsum_type)
+
+        if adc.approx_trans_moments is False:
+            rdm1_a[:nocc_a, nocc_a:] += einsum('IA->IA', t1_3_a, optimize = einsum_type).copy()
+            rdm1_b[:nocc_b, nocc_b:] += einsum('IA->IA', t1_3_b, optimize = einsum_type).copy()
 
         if isinstance(adc._scf, scf.rohf.ROHF):
             rdm1_a[:nocc_a, nocc_a:] += 1/2 * einsum('ia,IiAa->IA', t1_1_a, t2_2_a, optimize = einsum_type)
@@ -397,12 +399,6 @@ def get_ref_spin_square(adc):
     S2 += np.einsum('ij,kj,ilab,klab', S_oo_ab, S_oo_ab, t2_1_ab, t2_1_ab, optimize=True)
     S2 -= np.einsum('ij,kl,ilab,kjab', S_oo_ab, S_oo_ab, t2_1_ab, t2_1_ab, optimize=True)
     S2 += 1/2 * np.einsum('ij,ik,jlab,klab', S_oo_ab, S_oo_ab, t2_1_b, t2_1_b, optimize=True)
-    # block IjlB & AjlJ
-    S2 -= 2 * np.einsum('ij,aj,ia', S_oo_ab, S_vo_ab, t1_2_a, optimize=True)
-    # block IjdJ & IblJ
-    S2 -= 2 * np.einsum('ij,ia,ja', S_oo_ab, S_ov_ab, t1_2_b, optimize=True)
-    # block IjdB & AblJ
-    S2 -= 2 * np.einsum('ia,bj,ijba', S_ov_ab, S_vo_ab, t2_2_ab, optimize=True)
     # block IblB & AjdJ
     S2 -= 2 * np.einsum('ij,ab,ikac,kjcb', S_oo_ab, S_vv_ab, t2_1_a, t2_1_ab, optimize=True)
     S2 -= 2 * np.einsum('ij,ab,ikac,jkbc', S_oo_ab, S_vv_ab, t2_1_ab, t2_1_b, optimize=True)
@@ -416,6 +412,14 @@ def get_ref_spin_square(adc):
     S2 += np.einsum('ai,bj,kiac,kjbc', S_vo_ab, S_vo_ab, t2_1_ab, t2_1_ab, optimize=True)
     # block AbdB
     S2 -= np.einsum('ab,cd,ijad,ijcb', S_vv_ab, S_vv_ab, t2_1_ab, t2_1_ab, optimize=True)
+
+    if (adc.approx_trans_moments is False or adc.method == "adc(3)"):
+        # block IjlB & AjlJ
+        S2 -= 2 * np.einsum('ij,aj,ia', S_oo_ab, S_vo_ab, t1_2_a, optimize=True)
+        # block IjdJ & IblJ
+        S2 -= 2 * np.einsum('ij,ia,ja', S_oo_ab, S_ov_ab, t1_2_b, optimize=True)
+        # block IjdB & AblJ
+        S2 -= 2 * np.einsum('ia,bj,ijba', S_ov_ab, S_vo_ab, t2_2_ab, optimize=True)
 
     if isinstance(adc._scf, scf.rohf.ROHF):
         # block IjlJ
@@ -451,12 +455,10 @@ def get_ref_spin_square(adc):
         S2 -= 2 * np.einsum('ijab,klab,il,kj', t2_1_ab, t2_2_ab, S_oo_ab, S_oo_ab, optimize=True)
         S2 += np.einsum('ijab,ikab,lj,lk', t2_1_b, t2_2_b, S_oo_ab, S_oo_ab, optimize=True)
         # block IjlB & AjlJ
-        S2 -= 2 * np.einsum('ij,aj,ia', S_oo_ab, S_vo_ab, t1_3_a, optimize=True)
         S2 -= np.einsum('ij,aj,kb,ikab', S_oo_ab, S_vo_ab, t1_2_a, t2_1_a, optimize=True)
         S2 -= np.einsum('ij,aj,kb,ikab', S_oo_ab, S_vo_ab, t1_2_b, t2_1_ab, optimize=True)
         S2 += 2 * np.einsum('ij,ak,jb,ikab', S_oo_ab, S_vo_ab, t1_2_b, t2_1_ab, optimize=True)
         # block IjdJ & IblJ
-        S2 -= 2 * np.einsum('ij,ia,ja', S_oo_ab, S_ov_ab, t1_3_b, optimize=True)
         S2 -= np.einsum('ij,ia,kb,kjba', S_oo_ab, S_ov_ab, t1_2_a, t2_1_ab, optimize=True)
         S2 += 2 * np.einsum('ij,ka,ib,kjba', S_oo_ab, S_ov_ab, t1_2_a, t2_1_ab, optimize=True)
         S2 -= np.einsum('ij,ia,kb,jkab', S_oo_ab, S_ov_ab, t1_2_b, t2_1_b, optimize=True)
@@ -494,6 +496,12 @@ def get_ref_spin_square(adc):
         S2 -= 2 * np.einsum('ai,bc,jb,jiac', S_vo_ab, S_vv_ab, t1_2_a, t2_1_ab, optimize=True)
         # block AbdB
         S2 -= 2 * np.einsum('ijab,ijcd,ad,cb', t2_1_ab, t2_2_ab, S_vv_ab, S_vv_ab, optimize=True)
+
+        if adc.approx_trans_moments is False:
+            # block IjlB & AjlJ
+            S2 -= 2 * np.einsum('ij,aj,ia', S_oo_ab, S_vo_ab, t1_3_a, optimize=True)
+            # block IjdJ & IblJ
+            S2 -= 2 * np.einsum('ij,ia,ja', S_oo_ab, S_ov_ab, t1_3_b, optimize=True)
 
         if isinstance(adc._scf, scf.rohf.ROHF):
             # block IjlJ
@@ -879,7 +887,7 @@ class UADC(lib.StreamObject):
         self.method_type = "ip"
         self.with_df = None
         self.compute_properties = True
-        self.approx_trans_moments = False
+        self.approx_trans_moments = True
         self.evec_print_tol = 0.1
         self.spec_factor_print_tol = 0.1
         self.ncvs = None
