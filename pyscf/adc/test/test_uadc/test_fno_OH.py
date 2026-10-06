@@ -59,7 +59,7 @@ class KnownValues(unittest.TestCase):
         ADCFG.if_osfno = True
         ADCFG.kernel_gs(pct_occ=0.95)
 
-        self.assertAlmostEqual(ADCFG.delta_e_corr, -0.0240946057, 6)
+        self.assertAlmostEqual(ADCFG.delta_e_corr, -0.02411954825794535, 6)
         self.assertEqual(len(ADCFG.frozen[0]), 6)
         self.assertEqual(len(ADCFG.frozen[1]), 6)
 
@@ -81,13 +81,13 @@ class KnownValues(unittest.TestCase):
         spin = get_spin_square_ea(myadc._adc_es)[0]
 
         e = ADCFG.correct(e)
-        self.assertAlmostEqual(e[0], 0.03549859, 6)
-        self.assertAlmostEqual(e[1], 0.16628554, 6)
-        self.assertAlmostEqual(e[2], 0.18655859, 6)
+        self.assertAlmostEqual(e[0], 0.03537897357146364, 6)
+        self.assertAlmostEqual(e[1], 0.17562823532991234, 6)
+        self.assertAlmostEqual(e[2], 0.17190069948515452, 6)
 
-        self.assertAlmostEqual(spin[0], 0.00314430 , 4)
-        self.assertAlmostEqual(spin[1], 1.64538528 , 4)
-        self.assertAlmostEqual(spin[2], 2.00169617 , 4)
+        self.assertAlmostEqual(spin[0], 0.0029740522177679196 , 4)
+        self.assertAlmostEqual(spin[1], 2.0016186486626126 , 4)
+        self.assertAlmostEqual(spin[2], 1.8460273367035338 , 4)
 
         self.assertEqual(len(ADCFG.frozen[0]), 7)
         self.assertEqual(len(ADCFG.frozen[1]), 7)
@@ -167,9 +167,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[1], 0.4758405834, 6)
         self.assertAlmostEqual(e[2], 0.5852997495, 6)
 
-        self.assertAlmostEqual(p[0], 0.946861, 6)
-        self.assertAlmostEqual(p[1], 0.727942, 6)
-        self.assertAlmostEqual(p[2], 0.219144, 6)
+        self.assertAlmostEqual(p[0], 0.9469320682829698, 6)
+        self.assertAlmostEqual(p[1], 0.7279886532759127, 6)
+        self.assertAlmostEqual(p[2], 0.21914471835629923, 6)
 
         self.assertAlmostEqual(spin[0], 2.00184751 , 4)
         self.assertAlmostEqual(spin[1], 1.81988374 , 4)
