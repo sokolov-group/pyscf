@@ -161,7 +161,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual=adc.tol_residual,
         pick=pick)
 
-    if pick is not None:
+    if adc.pick is not None:
         xs = np.asarray(U).T
         g = np.asarray(guess).reshape(len(guess), -1)
         g = g / np.linalg.norm(g, axis=1, keepdims=True)
