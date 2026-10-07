@@ -80,6 +80,8 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
     pick = lib.linalg_helper.pick_real_eigs
     if adc.pick is True or (isinstance(adc.pick, str) and adc.pick.lower() == 'overlap'):
         pick = make_overlap_pick(guess)
+    elif adc.pick is not None:
+        pick = adc.pick
 
     conv, adc.E, U = lib.linalg_helper.davidson_nosym1(
         lambda xs : [matvec(x) for x in xs],
@@ -87,12 +89,11 @@ def kernel(adc, nroots=1, guess=None, eris=None, verbose=None):
         max_cycle=adc.max_cycle, max_space=adc.max_space, tol_residual=adc.tol_residual,
         pick=pick)
 
-    if pick is not None:
-        # overlap of the converged roots with the seeded guesses
-        u_mat = np.asarray(U).T
+    if adc.pick is not None:
+        xs = np.asarray(U).T
         g = np.asarray(guess).reshape(len(guess), -1)
         g = g / np.linalg.norm(g, axis=1, keepdims=True)
-        adc.ovl_guess = np.abs(g.dot(u_mat)).T
+        adc.ovl_guess = np.abs(g.dot(xs)).T
         logger.info(adc, 'root-following overlaps (root x guess): %s',
                     np.array2string(adc.ovl_guess, precision=3))
 
