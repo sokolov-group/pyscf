@@ -839,18 +839,13 @@ def get_imds(adc, eris=None):
             temp = lib.einsum('i,ijAa,ia,jB->AB', e_occ_b, t2_1_b, t1_1_b, t1_1_b, optimize=True)
             M_ab_b -= 1/2 * (temp + temp.T)
 
-            if eris.vvvv_p is not None:
+            if isinstance(eris.vvvv_p, np.ndarray):
                 va = adc.mo_coeff[0][:, nocc_a:]
                 vb = adc.mo_coeff[1][:, nocc_b:]
                 v_eeee_aaaa = ao2mo.general(adc._scf._eri, (va, va, va, va), compact=False).reshape(nvir_a,
                     nvir_a, nvir_a, nvir_a)
-                v_eeee_aabb = ao2mo.general(adc._scf._eri, (va, va, vb, vb), compact=False).reshape(nvir_a,
-                    nvir_a, nvir_b, nvir_b)
-                v_eeee_bbbb = ao2mo.general(adc._scf._eri, (vb, vb, vb, vb), compact=False).reshape(nvir_b,
-                    nvir_b, nvir_b, nvir_b)
                 M_ab_a += lib.einsum('ABab,ia,ib->AB', v_eeee_aaaa, t1_1_a, t1_1_a, optimize=True)
                 M_ab_a -= lib.einsum('AabB,ib,ia->AB', v_eeee_aaaa, t1_1_a, t1_1_a, optimize=True)
-                M_ab_a += lib.einsum('ABab,ia,ib->AB', v_eeee_aabb, t1_1_b, t1_1_b, optimize=True)
                 M_ab_a += 1/2 *  lib.einsum('ABab,ijac,ijbc->AB', v_eeee_aaaa, t2_1_a, t2_1_a, optimize=True)
                 M_ab_a -= 1/2 *  lib.einsum('AabB,ijbc,ijac->AB', v_eeee_aaaa, t2_1_a, t2_1_a, optimize=True)
                 temp = lib.einsum('Aabc,ijBb,ijac->AB', v_eeee_aaaa, t2_1_a, t2_1_a, optimize=True)
@@ -858,27 +853,92 @@ def get_imds(adc, eris=None):
                 temp = lib.einsum('Aabc,ijBb,ijca->AB', v_eeee_aaaa, t2_1_a, t2_1_a, optimize=True)
                 M_ab_a += 1/4 * (temp + temp.T)
                 M_ab_a += lib.einsum('ABab,ijac,ijbc->AB', v_eeee_aaaa, t2_1_ab, t2_1_ab, optimize=True)
-                M_ab_a += lib.einsum('ABab,ijca,ijcb->AB', v_eeee_aabb, t2_1_ab, t2_1_ab, optimize=True)
                 M_ab_a -= lib.einsum('AabB,ijbc,ijac->AB', v_eeee_aaaa, t2_1_ab, t2_1_ab, optimize=True)
+                del v_eeee_aaaa
+                v_eeee_aabb = ao2mo.general(adc._scf._eri, (va, va, vb, vb), compact=False).reshape(nvir_a,
+                    nvir_a, nvir_b, nvir_b)
+                M_ab_a += lib.einsum('ABab,ia,ib->AB', v_eeee_aabb, t1_1_b, t1_1_b, optimize=True)
+                M_ab_a += lib.einsum('ABab,ijca,ijcb->AB', v_eeee_aabb, t2_1_ab, t2_1_ab, optimize=True)
                 temp = lib.einsum('Aabc,ijBb,ijac->AB', v_eeee_aabb, t2_1_ab, t2_1_ab, optimize=True)
                 M_ab_a -= temp + temp.T
                 M_ab_a += 1/2 *  lib.einsum('ABab,ijac,ijbc->AB', v_eeee_aabb, t2_1_b, t2_1_b, optimize=True)
                 M_ab_b += lib.einsum('abAB,ia,ib->AB', v_eeee_aabb, t1_1_a, t1_1_a, optimize=True)
-                M_ab_b += lib.einsum('ABab,ia,ib->AB', v_eeee_bbbb, t1_1_b, t1_1_b, optimize=True)
-                M_ab_b -= lib.einsum('AabB,ib,ia->AB', v_eeee_bbbb, t1_1_b, t1_1_b, optimize=True)
                 M_ab_b += 1/2 *  lib.einsum('abAB,ijac,ijbc->AB', v_eeee_aabb, t2_1_a, t2_1_a, optimize=True)
                 M_ab_b += lib.einsum('abAB,ijac,ijbc->AB', v_eeee_aabb, t2_1_ab, t2_1_ab, optimize=True)
-                M_ab_b += lib.einsum('ABab,ijca,ijcb->AB', v_eeee_bbbb, t2_1_ab, t2_1_ab, optimize=True)
-                M_ab_b -= lib.einsum('AabB,ijcb,ijca->AB', v_eeee_bbbb, t2_1_ab, t2_1_ab, optimize=True)
                 temp = lib.einsum('bcAa,ijbB,ijca->AB', v_eeee_aabb, t2_1_ab, t2_1_ab, optimize=True)
                 M_ab_b -= temp + temp.T
+                del v_eeee_aabb
+                v_eeee_bbbb = ao2mo.general(adc._scf._eri, (vb, vb, vb, vb), compact=False).reshape(nvir_b,
+                    nvir_b, nvir_b, nvir_b)
+                M_ab_b += lib.einsum('ABab,ia,ib->AB', v_eeee_bbbb, t1_1_b, t1_1_b, optimize=True)
+                M_ab_b -= lib.einsum('AabB,ib,ia->AB', v_eeee_bbbb, t1_1_b, t1_1_b, optimize=True)
+                M_ab_b += lib.einsum('ABab,ijca,ijcb->AB', v_eeee_bbbb, t2_1_ab, t2_1_ab, optimize=True)
+                M_ab_b -= lib.einsum('AabB,ijcb,ijca->AB', v_eeee_bbbb, t2_1_ab, t2_1_ab, optimize=True)
                 M_ab_b += 1/2 *  lib.einsum('ABab,ijac,ijbc->AB', v_eeee_bbbb, t2_1_b, t2_1_b, optimize=True)
                 M_ab_b -= 1/2 *  lib.einsum('AabB,ijbc,ijac->AB', v_eeee_bbbb, t2_1_b, t2_1_b, optimize=True)
                 temp = lib.einsum('Aabc,ijBb,ijac->AB', v_eeee_bbbb, t2_1_b, t2_1_b, optimize=True)
                 M_ab_b -= 1/4 * (temp + temp.T)
                 temp = lib.einsum('Aabc,ijBb,ijca->AB', v_eeee_bbbb, t2_1_b, t2_1_b, optimize=True)
                 M_ab_b += 1/4 * (temp + temp.T)
-            else:
+                del v_eeee_bbbb
+            elif isinstance(eris.vvvv_p, list):
+                mol = adc.mol
+                va = adc.mo_coeff[0][:, nocc_a:]
+                vb = adc.mo_coeff[1][:, nocc_b:]
+                chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
+                for p, q in lib.prange(0, nvir_a, chnk_size):
+                    v_eeee_aaaa = ao2mo.general(mol, (va[:, p:q], va, va, va),
+                        compact=False).reshape(q-p, nvir_a, nvir_a, nvir_a)
+                    M_ab_a[p:q] += lib.einsum('ABab,ia,ib->AB', v_eeee_aaaa, t1_1_a, t1_1_a, optimize=True)
+                    M_ab_a[p:q] -= lib.einsum('AabB,ib,ia->AB', v_eeee_aaaa, t1_1_a, t1_1_a, optimize=True)
+                    M_ab_a[p:q] += 1/2 *  lib.einsum('ABab,ijac,ijbc->AB', v_eeee_aaaa, t2_1_a, t2_1_a, optimize=True)
+                    M_ab_a[p:q] -= 1/2 *  lib.einsum('AabB,ijbc,ijac->AB', v_eeee_aaaa, t2_1_a, t2_1_a, optimize=True)
+                    temp = lib.einsum('Aabc,ijBb,ijac->AB', v_eeee_aaaa, t2_1_a, t2_1_a, optimize=True)
+                    M_ab_a[p:q] -= 1/4 * temp
+                    M_ab_a[:, p:q] -= 1/4 * temp.T
+                    temp = lib.einsum('Aabc,ijBb,ijca->AB', v_eeee_aaaa, t2_1_a, t2_1_a, optimize=True)
+                    M_ab_a[p:q] += 1/4 * temp
+                    M_ab_a[:, p:q] += 1/4 * temp.T
+                    M_ab_a[p:q] += lib.einsum('ABab,ijac,ijbc->AB', v_eeee_aaaa, t2_1_ab, t2_1_ab, optimize=True)
+                    M_ab_a[p:q] -= lib.einsum('AabB,ijbc,ijac->AB', v_eeee_aaaa, t2_1_ab, t2_1_ab, optimize=True)
+                    del v_eeee_aaaa
+                for p, q in lib.prange(0, nvir_a, chnk_size):
+                    v_eeee_aabb = ao2mo.general(mol, (va[:, p:q], va, vb, vb),
+                        compact=False).reshape(q-p, nvir_a, nvir_b, nvir_b)
+                    M_ab_a[p:q] += lib.einsum('ABab,ia,ib->AB', v_eeee_aabb, t1_1_b, t1_1_b, optimize=True)
+                    M_ab_a[p:q] += lib.einsum('ABab,ijca,ijcb->AB', v_eeee_aabb, t2_1_ab, t2_1_ab, optimize=True)
+                    temp = lib.einsum('Aabc,ijBb,ijac->AB', v_eeee_aabb, t2_1_ab, t2_1_ab, optimize=True)
+                    M_ab_a[p:q] -= temp
+                    M_ab_a[:, p:q] -= temp.T
+                    M_ab_a[p:q] += 1/2 *  lib.einsum('ABab,ijac,ijbc->AB', v_eeee_aabb, t2_1_b, t2_1_b, optimize=True)
+                    del v_eeee_aabb
+                for p, q in lib.prange(0, nvir_b, chnk_size):
+                    v_eeee_aabb = ao2mo.general(mol, (va, va, vb[:, p:q], vb),
+                        compact=False).reshape(nvir_a, nvir_a, q-p, nvir_b)
+                    M_ab_b[p:q] += lib.einsum('abAB,ia,ib->AB', v_eeee_aabb, t1_1_a, t1_1_a, optimize=True)
+                    M_ab_b[p:q] += 1/2 *  lib.einsum('abAB,ijac,ijbc->AB', v_eeee_aabb, t2_1_a, t2_1_a, optimize=True)
+                    M_ab_b[p:q] += lib.einsum('abAB,ijac,ijbc->AB', v_eeee_aabb, t2_1_ab, t2_1_ab, optimize=True)
+                    temp = lib.einsum('bcAa,ijbB,ijca->AB', v_eeee_aabb, t2_1_ab, t2_1_ab, optimize=True)
+                    M_ab_b[p:q] -= temp
+                    M_ab_b[:, p:q] -= temp.T
+                    del v_eeee_aabb
+                for p, q in lib.prange(0, nvir_b, chnk_size):
+                    v_eeee_bbbb = ao2mo.general(mol, (vb[:, p:q], vb, vb, vb),
+                        compact=False).reshape(q-p, nvir_b, nvir_b, nvir_b)
+                    M_ab_b[p:q] += lib.einsum('ABab,ia,ib->AB', v_eeee_bbbb, t1_1_b, t1_1_b, optimize=True)
+                    M_ab_b[p:q] -= lib.einsum('AabB,ib,ia->AB', v_eeee_bbbb, t1_1_b, t1_1_b, optimize=True)
+                    M_ab_b[p:q] += lib.einsum('ABab,ijca,ijcb->AB', v_eeee_bbbb, t2_1_ab, t2_1_ab, optimize=True)
+                    M_ab_b[p:q] -= lib.einsum('AabB,ijcb,ijca->AB', v_eeee_bbbb, t2_1_ab, t2_1_ab, optimize=True)
+                    M_ab_b[p:q] += 1/2 *  lib.einsum('ABab,ijac,ijbc->AB', v_eeee_bbbb, t2_1_b, t2_1_b, optimize=True)
+                    M_ab_b[p:q] -= 1/2 *  lib.einsum('AabB,ijbc,ijac->AB', v_eeee_bbbb, t2_1_b, t2_1_b, optimize=True)
+                    temp = lib.einsum('Aabc,ijBb,ijac->AB', v_eeee_bbbb, t2_1_b, t2_1_b, optimize=True)
+                    M_ab_b[p:q] -= 1/4 * temp
+                    M_ab_b[:, p:q] -= 1/4 * temp.T
+                    temp = lib.einsum('Aabc,ijBb,ijca->AB', v_eeee_bbbb, t2_1_b, t2_1_b, optimize=True)
+                    M_ab_b[p:q] += 1/4 * temp
+                    M_ab_b[:, p:q] += 1/4 * temp.T
+                    del v_eeee_bbbb
+            elif eris.vvvv_p is None:
                 lad_aaaa = contract_ladder(adc, t2_1_a, (eris.Lvv, eris.Lvv))
                 lad_aabb = contract_ladder(adc, t2_1_ab, (eris.Lvv, eris.LVV))
                 lad_bbbb = contract_ladder(adc, t2_1_b, (eris.LVV, eris.LVV))
@@ -945,7 +1005,6 @@ def get_imds(adc, eris=None):
         del t2_1_a
         del t2_1_b
         del t2_1_ab
-
 
     M_ab = (M_ab_a, M_ab_b)
 
@@ -1712,6 +1771,13 @@ def matvec(adc, M_ab=None, eris=None):
                 temp  = lib.einsum('lxd,ilyd->ixy',temp_1_3,t2_1_ab,optimize=True)
                 s[s_aba:f_aba] += temp.reshape(-1)
 
+                del temp_2_1
+                del temp_1_3
+                del temp_1_4
+                del temp_1_1
+                del temp_1_2
+                del temp_2_3
+
             else:
                 t2_1_a = adc.t2[0][0][:]
                 t2_1_ab = adc.t2[0][1][:]
@@ -2023,30 +2089,81 @@ def matvec(adc, M_ab=None, eris=None):
                 s[s_bbb:f_bbb] -= lib.einsum('a,i,ia,AiBC->ABC', r_b, e_occ_b, t1_1_b, t2_1_b, optimize=True)[:,
                     ab_ind_b[0], ab_ind_b[1]].reshape(-1)
 
-                if eris.vvvv_p is not None:
+                if isinstance(eris.vvvv_p, np.ndarray):
                     va = adc.mo_coeff[0][:, nocc_a:]
                     vb = adc.mo_coeff[1][:, nocc_b:]
                     v_eeee_aaaa = ao2mo.general(adc._scf._eri, (va, va, va, va),
                         compact=False).reshape(nvir_a, nvir_a, nvir_a, nvir_a)
-                    v_eeee_aabb = ao2mo.general(adc._scf._eri, (va, va, vb, vb),
-                        compact=False).reshape(nvir_a, nvir_a, nvir_b, nvir_b)
-                    v_eeee_bbbb = ao2mo.general(adc._scf._eri, (vb, vb, vb, vb),
-                        compact=False).reshape(nvir_b, nvir_b, nvir_b, nvir_b)
                     s[s_a:f_a] += lib.einsum('iab,ic,Aacb->A', r_aaa_, t1_1_a, v_eeee_aaaa, optimize=True)
-                    s[s_a:f_a] += lib.einsum('iab,ic,Aacb->A', r_bab, t1_1_b, v_eeee_aabb, optimize=True)
-                    s[s_b:f_b] += lib.einsum('iab,ic,cbAa->A', r_aba, t1_1_a, v_eeee_aabb, optimize=True)
-                    s[s_b:f_b] += lib.einsum('iab,ic,Aacb->A', r_bbb_, t1_1_b, v_eeee_bbbb, optimize=True)
                     s[s_aaa:f_aaa] += lib.einsum('a,Ab,BaCb->ABC', r_a, t1_1_a, v_eeee_aaaa, optimize=True)[:,
                         ab_ind_a[0], ab_ind_a[1]].reshape(-1)
                     s[s_aaa:f_aaa] -= lib.einsum('a,Ab,BbCa->ABC', r_a, t1_1_a, v_eeee_aaaa, optimize=True)[:,
                         ab_ind_a[0], ab_ind_a[1]].reshape(-1)
+                    del v_eeee_aaaa
+                    v_eeee_aabb = ao2mo.general(adc._scf._eri, (va, va, vb, vb),
+                        compact=False).reshape(nvir_a, nvir_a, nvir_b, nvir_b)
+                    s[s_a:f_a] += lib.einsum('iab,ic,Aacb->A', r_bab, t1_1_b, v_eeee_aabb, optimize=True)
+                    s[s_b:f_b] += lib.einsum('iab,ic,cbAa->A', r_aba, t1_1_a, v_eeee_aabb, optimize=True)
                     s[s_bab:f_bab] += lib.einsum('a,Ab,BaCb->ABC', r_a, t1_1_b, v_eeee_aabb, optimize=True).reshape(-1)
                     s[s_aba:f_aba] += lib.einsum('a,Ab,CbBa->ABC', r_b, t1_1_a, v_eeee_aabb, optimize=True).reshape(-1)
+                    del v_eeee_aabb
+                    v_eeee_bbbb = ao2mo.general(adc._scf._eri, (vb, vb, vb, vb),
+                        compact=False).reshape(nvir_b, nvir_b, nvir_b, nvir_b)
+                    s[s_b:f_b] += lib.einsum('iab,ic,Aacb->A', r_bbb_, t1_1_b, v_eeee_bbbb, optimize=True)
                     s[s_bbb:f_bbb] += lib.einsum('a,Ab,BaCb->ABC', r_b, t1_1_b, v_eeee_bbbb, optimize=True)[:,
                         ab_ind_b[0], ab_ind_b[1]].reshape(-1)
                     s[s_bbb:f_bbb] -= lib.einsum('a,Ab,BbCa->ABC', r_b, t1_1_b, v_eeee_bbbb, optimize=True)[:,
                         ab_ind_b[0], ab_ind_b[1]].reshape(-1)
-                else:
+                    del v_eeee_bbbb
+                elif isinstance(eris.vvvv_p, list):
+                    mol = adc.mol
+                    va = adc.mo_coeff[0][:, nocc_a:]
+                    vb = adc.mo_coeff[1][:, nocc_b:]
+                    chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
+                    s_aaa_view = s[s_aaa:f_aaa].reshape(nocc_a, -1)
+                    s_bab_view = s[s_bab:f_bab].reshape(nocc_b, nvir_a, nvir_b)
+                    s_aba_view = s[s_aba:f_aba].reshape(nocc_a, nvir_b, nvir_a)
+                    s_bbb_view = s[s_bbb:f_bbb].reshape(nocc_b, -1)
+                    for p, q in lib.prange(0, nvir_a, chnk_size):
+                        v_eeee_aaaa = ao2mo.general(mol, (va[:, p:q], va, va, va),
+                            compact=False).reshape(q-p, nvir_a, nvir_a, nvir_a)
+                        s[s_a+p:s_a+q] += lib.einsum('iab,ic,Aacb->A', r_aaa_, t1_1_a, v_eeee_aaaa, optimize=True)
+                        p0 = p*(p-1)//2
+                        q0 = q*(q-1)//2
+                        rows = ab_ind_a[0][p0:q0] - p
+                        cols = ab_ind_a[1][p0:q0]
+                        temp = lib.einsum('a,Ab,BaCb->ABC', r_a, t1_1_a, v_eeee_aaaa, optimize=True)
+                        s_aaa_view[:, p0:q0] += temp[:, rows, cols]
+                        temp = lib.einsum('a,Ab,BbCa->ABC', r_a, t1_1_a, v_eeee_aaaa, optimize=True)
+                        s_aaa_view[:, p0:q0] -= temp[:, rows, cols]
+                        del v_eeee_aaaa
+                    for p, q in lib.prange(0, nvir_a, chnk_size):
+                        v_eeee_aabb = ao2mo.general(mol, (va[:, p:q], va, vb, vb),
+                            compact=False).reshape(q-p, nvir_a, nvir_b, nvir_b)
+                        s[s_a+p:s_a+q] += lib.einsum('iab,ic,Aacb->A', r_bab, t1_1_b, v_eeee_aabb, optimize=True)
+                        s_bab_view[:, p:q] += lib.einsum('a,Ab,BaCb->ABC', r_a, t1_1_b, v_eeee_aabb, optimize=True)
+                        s_aba_view[:, :, p:q] += lib.einsum('a,Ab,CbBa->ABC', r_b, t1_1_a, v_eeee_aabb,
+                            optimize=True)
+                        del v_eeee_aabb
+                    for p, q in lib.prange(0, nvir_b, chnk_size):
+                        v_eeee_aabb = ao2mo.general(mol, (va, va, vb[:, p:q], vb),
+                            compact=False).reshape(nvir_a, nvir_a, q-p, nvir_b)
+                        s[s_b+p:s_b+q] += lib.einsum('iab,ic,cbAa->A', r_aba, t1_1_a, v_eeee_aabb, optimize=True)
+                        del v_eeee_aabb
+                    for p, q in lib.prange(0, nvir_b, chnk_size):
+                        v_eeee_bbbb = ao2mo.general(mol, (vb[:, p:q], vb, vb, vb),
+                            compact=False).reshape(q-p, nvir_b, nvir_b, nvir_b)
+                        s[s_b+p:s_b+q] += lib.einsum('iab,ic,Aacb->A', r_bbb_, t1_1_b, v_eeee_bbbb, optimize=True)
+                        p0 = p*(p-1)//2
+                        q0 = q*(q-1)//2
+                        rows = ab_ind_b[0][p0:q0] - p
+                        cols = ab_ind_b[1][p0:q0]
+                        temp = lib.einsum('a,Ab,BaCb->ABC', r_b, t1_1_b, v_eeee_bbbb, optimize=True)
+                        s_bbb_view[:, p0:q0] += temp[:, rows, cols]
+                        temp = lib.einsum('a,Ab,BbCa->ABC', r_b, t1_1_b, v_eeee_bbbb, optimize=True)
+                        s_bbb_view[:, p0:q0] -= temp[:, rows, cols]
+                        del v_eeee_bbbb
+                elif eris.vvvv_p is None:
                     temp = lib.einsum('ic,Pcb->iPb', t1_1_a, eris.Lvv, optimize=True)
                     temp = lib.einsum('iab,iPb->Pab', r_aaa_, temp, optimize=True)
                     s[s_a:f_a] += lib.einsum('PAa,Pab->A', eris.Lvv, temp, optimize=True)
@@ -2086,16 +2203,8 @@ def matvec(adc, M_ab=None, eris=None):
             del t2_1_b
             del t2_1_ab
 
-
         cput0 = log.timer_debug1("completed sigma vector calculation", *cput0)
         return s
-
-        del temp_2_1
-        del temp_1_3
-        del temp_1_4
-        del temp_1_1
-        del temp_1_2
-        del temp_2_3
 
     return sigma_
 
