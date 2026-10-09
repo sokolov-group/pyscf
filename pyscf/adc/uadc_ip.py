@@ -631,11 +631,10 @@ def get_imds(adc, eris=None):
                 M_ij_a += 1/4 *  lib.einsum('abcd,Aiac,Bibd->AB', v_eeee_aaaa, t2_1_a, t2_1_a, optimize=True)
                 M_ij_a -= 1/4 *  lib.einsum('abcd,Aiac,Bidb->AB', v_eeee_aaaa, t2_1_a, t2_1_a, optimize=True)
                 del v_eeee_aaaa
-                v_eeee_aabb = np.ascontiguousarray(
-                    eris.vVvV_p.reshape(nvir_a, nvir_b, nvir_a, nvir_b).transpose(0, 2, 1, 3))
-                M_ij_a += lib.einsum('abcd,Aiac,Bibd->AB', v_eeee_aabb, t2_1_ab, t2_1_ab, optimize=True)
-                M_ij_b += lib.einsum('abcd,iAac,iBbd->AB', v_eeee_aabb, t2_1_ab, t2_1_ab, optimize=True)
-                del v_eeee_aabb
+                v_eeee_abab = eris.vVvV_p.reshape(nvir_a, nvir_b, nvir_a, nvir_b)
+                M_ij_a += lib.einsum('acbd,Aiac,Bibd->AB', v_eeee_abab, t2_1_ab, t2_1_ab, optimize=True)
+                M_ij_b += lib.einsum('acbd,iAac,iBbd->AB', v_eeee_abab, t2_1_ab, t2_1_ab, optimize=True)
+                del v_eeee_abab
                 v_eeee_bbbb = ao2mo.general(adc._scf._eri, (vb, vb, vb, vb), compact=False).reshape(nvir_b,
                     nvir_b, nvir_b, nvir_b)
                 M_ij_b += 1/4 *  lib.einsum('abcd,Aiac,Bibd->AB', v_eeee_bbbb, t2_1_b, t2_1_b, optimize=True)
@@ -658,12 +657,11 @@ def get_imds(adc, eris=None):
                 p = 0
                 for dataset in eris.vVvV_p:
                     k = dataset.shape[0]
-                    v_eeee_aabb = np.ascontiguousarray(
-                        dataset[:].reshape(k, nvir_b, nvir_a, nvir_b).transpose(0, 2, 1, 3))
+                    v_eeee_abab = dataset[:].reshape(k, nvir_b, nvir_a, nvir_b)
                     t2_1_ab_chunk = t2_1_ab[:, :, p:p+k, :]
-                    M_ij_a += lib.einsum('abcd,Aiac,Bibd->AB', v_eeee_aabb, t2_1_ab_chunk, t2_1_ab, optimize=True)
-                    M_ij_b += lib.einsum('abcd,iAac,iBbd->AB', v_eeee_aabb, t2_1_ab_chunk, t2_1_ab, optimize=True)
-                    del v_eeee_aabb
+                    M_ij_a += lib.einsum('acbd,Aiac,Bibd->AB', v_eeee_abab, t2_1_ab_chunk, t2_1_ab, optimize=True)
+                    M_ij_b += lib.einsum('acbd,iAac,iBbd->AB', v_eeee_abab, t2_1_ab_chunk, t2_1_ab, optimize=True)
+                    del v_eeee_abab
                     p += k
                 for p, q in lib.prange(0, nvir_b, chnk_size):
                     v_eeee_bbbb = ao2mo.general(mol, (vb[:, p:q], vb, vb, vb),
