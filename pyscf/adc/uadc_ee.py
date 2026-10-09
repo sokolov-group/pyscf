@@ -983,6 +983,19 @@ def get_imds(adc, eris=None):
             del temp_1
             del interm
 
+            int_1 = lib.einsum("Iiac,Libc->ILab", t1_ccee_abab, t1_ccee_abab, optimize=einsum_type)
+            temp_1 = np.zeros((nocc_a, nvir_a, nocc_a, nvir_a))
+            for a,b in lib.prange(0,nvir_a,chnk_size):
+                v_eeee_aaaa = dfadc.get_vVvV_df(adc, eris.Lvv, eris.Lvv, a, chnk_size)
+
+                temp_1[:,:,:,a:b] -= lib.einsum('AaDb,ILab->IDLA', v_eeee_aaaa, int_1, optimize=einsum_type)
+                temp_1[:,:,:,a:b] += lib.einsum('AabD,ILab->IDLA', v_eeee_aaaa, int_1, optimize=einsum_type)
+
+                del v_eeee_aaaa
+            M_030_aa += temp_1
+            del temp_1
+            del int_1
+
             t_v_con = np.zeros((nocc_b, nvir_b, nocc_b, nvir_b))
 
             interm = 2.0 * adc.imds.t2_1_vvvv[2][:]
@@ -1524,10 +1537,13 @@ def get_imds(adc, eris=None):
             temp_b = np.zeros((nocc_b, nvir_b, nocc_b, nvir_b))
             temp_aabb = np.zeros((nocc_a, nvir_a, nocc_b, nvir_b))
 
+            int_1 = lib.einsum("Iica,Licb->ILab", t1_ccee_abab, t1_ccee_abab, optimize=einsum_type)
             chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
             for a,b in lib.prange(0,nvir_a,chnk_size):
                 vVvV = dfadc.get_vVvV_df(adc, eris.Lvv, eris.LVV, a, chnk_size)
                 v_eeee_abab = vVvV
+
+                temp_a[:,:,:,a:b] -= lib.einsum('AaDb,ILab->IDLA', v_eeee_abab, int_1, optimize=einsum_type)
 
                 temp_a[occ_list_a,
                        :,
@@ -1622,6 +1638,7 @@ def get_imds(adc, eris=None):
                                                optimize=einsum_type)
 
                 del v_eeee_abab
+            del int_1
             M_030_aa += temp_a
             M_030_bb += temp_b
             M_030_aabb += temp_aabb
@@ -10538,14 +10555,14 @@ def matvec(adc, M_ia_jb=None, eris=None):
 
             # Save intermediate for DF-ADC(3)/ROHF
             elif isinstance(adc._scf, scf.rohf.ROHF) and (eris.vvvv_p is None) and method == "adc(3)":
-                ladder_int_a = uadc_amplitudes.contract_ladder(
-                    adc, r2_a, (eris.Lvv, eris.Lvv), pack=False)
+                ladder_int_a = uadc_amplitudes.contract_ladder_antisym(
+                    adc, r2_a, eris.Lvv, pack=False)
                 pack = ladder_int_a[:, :, ab_ind_a[0], ab_ind_a[1]]
                 pack = pack[ij_ind_a[0], ij_ind_a[1]].reshape(n_doubles_aaaa)
                 s[s_aaaa:f_aaaa] += pack
                 del pack
             else:
-                s[s_aaaa:f_aaaa] += uadc_amplitudes.contract_ladder(adc, r2_a, (eris.Lvv, eris.Lvv), pack=True)[
+                s[s_aaaa:f_aaaa] += uadc_amplitudes.contract_ladder_antisym(adc, r2_a, eris.Lvv)[
                     ij_ind_a[0], ij_ind_a[1]].reshape(n_doubles_aaaa)
 
             if isinstance(eris.vVvV_p, np.ndarray):
@@ -10571,14 +10588,14 @@ def matvec(adc, M_ia_jb=None, eris=None):
 
             # Save intermediate for DF-ADC(3)/ROHF
             elif isinstance(adc._scf, scf.rohf.ROHF) and (eris.vvvv_p is None) and method == "adc(3)":
-                ladder_int_b = uadc_amplitudes.contract_ladder(
-                    adc, r2_b, (eris.LVV, eris.LVV), pack=False)
+                ladder_int_b = uadc_amplitudes.contract_ladder_antisym(
+                    adc, r2_b, eris.LVV, pack=False)
                 pack = ladder_int_b[:, :, ab_ind_b[0], ab_ind_b[1]]
                 pack = pack[ij_ind_b[0], ij_ind_b[1]].reshape(n_doubles_bbbb)
                 s[s_bbbb:f_bbbb] += pack
                 del pack
             else:
-                s[s_bbbb:f_bbbb] += uadc_amplitudes.contract_ladder(adc, r2_b, (eris.LVV, eris.LVV), pack=True)[
+                s[s_bbbb:f_bbbb] += uadc_amplitudes.contract_ladder_antisym(adc, r2_b, eris.LVV)[
                     ij_ind_b[0], ij_ind_b[1]].reshape(n_doubles_bbbb)
 
             interim_a = lib.einsum(
@@ -10731,111 +10748,53 @@ def matvec(adc, M_ia_jb=None, eris=None):
 
 ######################more m_030 terms##########################
 
-            if eris.vvvv_p is None:
-                int_1 = lib.einsum(
-                    "Iiac,Libc->ILab",
-                    t1_ccee_abab,
-                    t1_ccee_abab,
-                    optimize=einsum_type)
-                temp_1 = np.zeros((nocc_a, nvir_a, nocc_a, nvir_a))
+            if (eris.vvvv_p is None) and isinstance(adc._scf, scf.rohf.ROHF):
                 array_1 = np.zeros((nocc_a, nocc_a, nvir_a, nvir_a))
                 chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
                 for a,b in lib.prange(0,nvir_a,chnk_size):
                     v_eeee_aaaa = dfadc.get_vVvV_df(
                         adc, eris.Lvv, eris.Lvv, a, chnk_size)
 
-                    temp_1[:,
-                           :,
-                           :,
-                           a:b] += -lib.einsum('AaDb,ILab->IDLA',
-                                                   v_eeee_aaaa,
-                                                   int_1,
-                                                   optimize=einsum_type)
-                    temp_1[:,
-                           :,
-                           :,
-                           a:b] += lib.einsum('AabD,ILab->IDLA',
-                                                  v_eeee_aaaa,
-                                                  int_1,
-                                                  optimize=einsum_type)
-
-                    if isinstance(adc._scf, scf.rohf.ROHF):
-
-                        array_1[:,
-                                :,
-                                a:b,
-                                :] += lib.einsum('Ia,Jb,CDab->IJCD',
+                    array_1[:,
+                            :,
+                            a:b,
+                            :] += lib.einsum('Ia,Jb,CDab->IJCD',
                                                  Y_aa,
                                                  t1_ce_aa,
                                                  v_eeee_aaaa,
                                                  optimize=einsum_type)
-                        array_1[:,
-                                :,
-                                a:b,
-                                :] -= lib.einsum('Ja,Ib,CDab->IJCD',
+                    array_1[:,
+                            :,
+                            a:b,
+                            :] -= lib.einsum('Ja,Ib,CDab->IJCD',
                                                  Y_aa,
                                                  t1_ce_aa,
                                                  v_eeee_aaaa,
                                                  optimize=einsum_type)
 
-                        array_1[:,
-                                :,
-                                a:b,
-                                :] -= lib.einsum('Ia,Jb,CDba->IJCD',
+                    array_1[:,
+                            :,
+                            a:b,
+                            :] -= lib.einsum('Ia,Jb,CDba->IJCD',
                                                  Y_aa,
                                                  t1_ce_aa,
                                                  v_eeee_aaaa,
                                                  optimize=einsum_type)
-                        array_1[:,
-                                :,
-                                a:b,
-                                :] += lib.einsum('Ja,Ib,CDba->IJCD',
+                    array_1[:,
+                            :,
+                            a:b,
+                            :] += lib.einsum('Ja,Ib,CDba->IJCD',
                                                  Y_aa,
                                                  t1_ce_aa,
                                                  v_eeee_aaaa,
                                                  optimize=einsum_type)
 
                     del v_eeee_aaaa
-                temp_1 = temp_1.reshape(n_singles_a, n_singles_a)
-                s[s_a:f_a] += lib.einsum('ab,b->a',
-                                         temp_1, r1_a, optimize=True)
-                del temp_1
-                del int_1
-                if isinstance(adc._scf, scf.rohf.ROHF):
-                    M_12Y0_aa = array_1
-                    M_02Y1_aa = lib.einsum(
-                        'IiDc,ic->ID', ladder_int_a, t1_ce_aa, optimize=einsum_type)
-                    del array_1
-                    del ladder_int_a
-
-            if eris.vvvv_p is None:
-                temp_a = np.zeros((nocc_a, nvir_a, nocc_a, nvir_a))
-                int_1 = lib.einsum(
-                    "Iica,Licb->ILab",
-                    t1_ccee_abab,
-                    t1_ccee_abab,
-                    optimize=einsum_type)
-
-                chnk_size = uadc_ao2mo.calculate_chunk_size(adc)
-                for a,b in lib.prange(0,nvir_a,chnk_size):
-                    vVvV = dfadc.get_vVvV_df(
-                        adc, eris.Lvv, eris.LVV, a, chnk_size)
-                    v_eeee_abab = vVvV
-
-                    temp_a[:,
-                           :,
-                           :,
-                           a:b] += -lib.einsum('AaDb,ILab->IDLA',
-                                                   v_eeee_abab,
-                                                   int_1,
-                                                   optimize=einsum_type)
-
-                    del v_eeee_abab
-                temp_a = temp_a.reshape(n_singles_a, n_singles_a)
-                s[s_a:f_a] += lib.einsum('ab,b->a',
-                                         temp_a, r1_a, optimize=True)
-                del temp_a
-                del int_1
+                M_12Y0_aa = array_1
+                M_02Y1_aa = lib.einsum(
+                    'IiDc,ic->ID', ladder_int_a, t1_ce_aa, optimize=einsum_type)
+                del array_1
+                del ladder_int_a
 
             int_1 = lib.einsum(
                 'ijAb,LA->ijLb',

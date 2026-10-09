@@ -142,5 +142,5 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(rdms_test(dm1_exc[0][3],dm1_exc[1][3]), 40.39555409523689, 6)
 
 if __name__ == "__main__":
-    print("EE calculations for different ADC methods for water molecule")
+    print("EE calculations for different ADC methods for F2 molecule")
     unittest.main()

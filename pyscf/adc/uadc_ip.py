@@ -631,8 +631,8 @@ def get_imds(adc, eris=None):
                 M_ij_a += 1/4 *  lib.einsum('abcd,Aiac,Bibd->AB', v_eeee_aaaa, t2_1_a, t2_1_a, optimize=True)
                 M_ij_a -= 1/4 *  lib.einsum('abcd,Aiac,Bidb->AB', v_eeee_aaaa, t2_1_a, t2_1_a, optimize=True)
                 del v_eeee_aaaa
-                v_eeee_aabb = ao2mo.general(adc._scf._eri, (va, va, vb, vb), compact=False).reshape(nvir_a,
-                    nvir_a, nvir_b, nvir_b)
+                v_eeee_aabb = np.ascontiguousarray(
+                    eris.vVvV_p.reshape(nvir_a, nvir_b, nvir_a, nvir_b).transpose(0, 2, 1, 3))
                 M_ij_a += lib.einsum('abcd,Aiac,Bibd->AB', v_eeee_aabb, t2_1_ab, t2_1_ab, optimize=True)
                 M_ij_b += lib.einsum('abcd,iAac,iBbd->AB', v_eeee_aabb, t2_1_ab, t2_1_ab, optimize=True)
                 del v_eeee_aabb
@@ -655,13 +655,16 @@ def get_imds(adc, eris=None):
                     M_ij_a -= 1/4 *  lib.einsum('abcd,Aiac,Bidb->AB', v_eeee_aaaa, t2_1_a_chunk, t2_1_a,
                         optimize=True)
                     del v_eeee_aaaa
-                for p, q in lib.prange(0, nvir_a, chnk_size):
-                    v_eeee_aabb = ao2mo.general(mol, (va[:, p:q], va, vb, vb),
-                        compact=False).reshape(q-p, nvir_a, nvir_b, nvir_b)
-                    t2_1_ab_chunk = t2_1_ab[:, :, p:q, :]
+                p = 0
+                for dataset in eris.vVvV_p:
+                    k = dataset.shape[0]
+                    v_eeee_aabb = np.ascontiguousarray(
+                        dataset[:].reshape(k, nvir_b, nvir_a, nvir_b).transpose(0, 2, 1, 3))
+                    t2_1_ab_chunk = t2_1_ab[:, :, p:p+k, :]
                     M_ij_a += lib.einsum('abcd,Aiac,Bibd->AB', v_eeee_aabb, t2_1_ab_chunk, t2_1_ab, optimize=True)
                     M_ij_b += lib.einsum('abcd,iAac,iBbd->AB', v_eeee_aabb, t2_1_ab_chunk, t2_1_ab, optimize=True)
                     del v_eeee_aabb
+                    p += k
                 for p, q in lib.prange(0, nvir_b, chnk_size):
                     v_eeee_bbbb = ao2mo.general(mol, (vb[:, p:q], vb, vb, vb),
                         compact=False).reshape(q-p, nvir_b, nvir_b, nvir_b)
