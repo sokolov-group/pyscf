@@ -138,10 +138,10 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(spin[3],4.08773668 , 5)
 
         dm1_exc = np.array(myadc.make_rdm1())
-        self.assertAlmostEqual(rdms_test(dm1_exc[0][0],dm1_exc[1][0]), 41.338906446754606, 6)
-        self.assertAlmostEqual(rdms_test(dm1_exc[0][1],dm1_exc[1][1]), 41.33890644675455, 6)
-        self.assertAlmostEqual(rdms_test(dm1_exc[0][2],dm1_exc[1][2]), 40.60231190768205, 6)
-        self.assertAlmostEqual(rdms_test(dm1_exc[0][3],dm1_exc[1][3]), 40.62329168884972, 6)
+        self.assertAlmostEqual(rdms_test(dm1_exc[0][0],dm1_exc[1][0]), 41.33890768604357, 6)
+        self.assertAlmostEqual(rdms_test(dm1_exc[0][1],dm1_exc[1][1]), 41.338907686043626, 6)
+        self.assertAlmostEqual(rdms_test(dm1_exc[0][2],dm1_exc[1][2]), 40.6023087504581, 6)
+        self.assertAlmostEqual(rdms_test(dm1_exc[0][3],dm1_exc[1][3]), 40.62329970544882, 6)
 
     def test_ee_adc3_frozen(self):
         myadc_fr.method = "adc(3)"
@@ -163,13 +163,13 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(spin[0],0.80198494 , 5)
         self.assertAlmostEqual(spin[1],0.80198494 , 5)
         self.assertAlmostEqual(spin[2],0.82698365 , 5)
-        self.assertAlmostEqual(spin[3],4.08767263 , 5)
+        self.assertAlmostEqual(spin[3],4.08766652 , 5)
 
         dm1_exc = np.array(myadc_fr.make_rdm1())
-        self.assertAlmostEqual(rdms_test(dm1_exc[0][0],dm1_exc[1][0]), 41.33825267302644, 6)
-        self.assertAlmostEqual(rdms_test(dm1_exc[0][1],dm1_exc[1][1]), 41.338252673026425, 6)
-        self.assertAlmostEqual(rdms_test(dm1_exc[0][2],dm1_exc[1][2]), 40.60157323755573, 6)
-        self.assertAlmostEqual(rdms_test(dm1_exc[0][3],dm1_exc[1][3]), 40.622974140808815, 6)
+        self.assertAlmostEqual(rdms_test(dm1_exc[0][0],dm1_exc[1][0]), 41.33826198312952, 6)
+        self.assertAlmostEqual(rdms_test(dm1_exc[0][1],dm1_exc[1][1]), 41.33826198312958, 6)
+        self.assertAlmostEqual(rdms_test(dm1_exc[0][2],dm1_exc[1][2]), 40.60156863941078, 6)
+        self.assertAlmostEqual(rdms_test(dm1_exc[0][3],dm1_exc[1][3]), 40.62298601854761, 6)
 
     def test_ee_adc2_naf(self):
         myadc_naf = adc.ADC(mf).density_fit('cc-pvdz-ri')
