@@ -6504,14 +6504,14 @@ def matvec(adc, M_ia_jb=None, eris=None):
 
             # Save intermediate for DF-ADC(3)/ROHF
             elif isinstance(adc._scf, scf.rohf.ROHF) and (eris.vvvv_p is None) and method == "adc(3)":
-                ladder_int_a = uadc_amplitudes.contract_ladder_antisym(
-                    adc, r2_a, eris.Lvv, pack=False)
+                ladder_int_a = uadc_amplitudes.contract_ladder(
+                    adc, r2_a, (eris.Lvv, eris.Lvv), pack=False)
                 pack = ladder_int_a[:, :, ab_ind_a[0], ab_ind_a[1]]
                 pack = pack[ij_ind_a[0], ij_ind_a[1]].reshape(n_doubles_aaaa)
                 s[s_aaaa:f_aaaa] += pack
                 del pack
             else:
-                s[s_aaaa:f_aaaa] += uadc_amplitudes.contract_ladder_antisym(adc, r2_a, eris.Lvv)[
+                s[s_aaaa:f_aaaa] += uadc_amplitudes.contract_ladder(adc, r2_a, (eris.Lvv, eris.Lvv), pack=True)[
                     ij_ind_a[0], ij_ind_a[1]].reshape(n_doubles_aaaa)
 
             if isinstance(eris.vVvV_p, np.ndarray):
@@ -6537,14 +6537,14 @@ def matvec(adc, M_ia_jb=None, eris=None):
 
             # Save intermediate for DF-ADC(3)/ROHF
             elif isinstance(adc._scf, scf.rohf.ROHF) and (eris.vvvv_p is None) and method == "adc(3)":
-                ladder_int_b = uadc_amplitudes.contract_ladder_antisym(
-                    adc, r2_b, eris.LVV, pack=False)
+                ladder_int_b = uadc_amplitudes.contract_ladder(
+                    adc, r2_b, (eris.LVV, eris.LVV), pack=False)
                 pack = ladder_int_b[:, :, ab_ind_b[0], ab_ind_b[1]]
                 pack = pack[ij_ind_b[0], ij_ind_b[1]].reshape(n_doubles_bbbb)
                 s[s_bbbb:f_bbbb] += pack
                 del pack
             else:
-                s[s_bbbb:f_bbbb] += uadc_amplitudes.contract_ladder_antisym(adc, r2_b, eris.LVV)[
+                s[s_bbbb:f_bbbb] += uadc_amplitudes.contract_ladder(adc, r2_b, (eris.LVV, eris.LVV), pack=True)[
                     ij_ind_b[0], ij_ind_b[1]].reshape(n_doubles_bbbb)
 
             temp = lib.einsum('imae,jbem->ijab', r2_a, eris.ovvo, optimize=True)
