@@ -18,7 +18,7 @@
 
 import time
 import numpy as np
-import pyscf.ao2mo as ao2mo
+from pyscf import ao2mo
 import pyscf.adc
 import pyscf.adc.radc
 from pyscf.adc import radc_ao2mo
@@ -66,7 +66,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None):
     if eris is None:
         eris = adc.transform_integrals()
 
-    size, size_int = adc.vector_size()
+    size = adc.vector_size()
     nroots = min(nroots, size)
     nkpts = adc.nkpts
     nmo = adc.nmo
@@ -110,7 +110,7 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None):
 
         evals_k = evals_k.real
         evals[k] = evals_k
-        evecs[k, :, :size_int] += evecs_k
+        evecs[k, :, :size] += evecs_k
         conv[k] = conv_k.real
 
         U = np.array(evecs[k]).T.copy()
@@ -490,6 +490,19 @@ class RADC(pyscf.adc.radc.RADC):
         if self.if_heri_eris:
             self.eris = eris
         return e_exc, v_exc, spec_fac, x
+
+    def _close_amp_scratch(self):
+        # close the HDF5 scratch file backing the on-disk amplitudes
+        for attr in ('_amp_h5file', '_amp_tmpfile'):
+            fh = getattr(self, attr, None)
+            if fh is not None:
+                try:
+                    fh.close()
+                except (AttributeError, OSError, ValueError):
+                    pass
+
+    def __del__(self):
+        self._close_amp_scratch()
 
     def ip_adc(self, nroots=1, guess=None, eris=None, kptlist=None):
         from pyscf.pbc.adc import kadc_rhf_ip

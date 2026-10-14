@@ -17,7 +17,7 @@
 #
 import time
 import numpy as np
-import pyscf.ao2mo as ao2mo
+from pyscf import ao2mo
 import pyscf.adc
 import pyscf.adc.radc
 from pyscf.adc import radc_ao2mo
@@ -38,7 +38,7 @@ from pyscf.pbc.mp.kmp2 import (get_nocc, get_nmo, padding_k_idx, _padding_k_idx,
 from pyscf.pbc.cc.kccsd_rhf import _get_epq
 from pyscf.pbc.cc.kccsd_t_rhf import _get_epqr
 from pyscf.pbc.lib import kpts_helper
-from pyscf.lib.parameters import LOOSE_ZERO_TOL, LARGE_DENOM  # noqa
+from pyscf.lib.parameters import LOOSE_ZERO_TOL, LARGE_DENOM
 
 from pyscf.pbc import tools
 import h5py
@@ -53,11 +53,9 @@ def vector_size(adc):
 
     n_singles = nvir
     n_doubles = nkpts * nkpts * nocc * nvir * nvir
-    n_doubles_int = nkpts * nkpts * nocc * nvir * nvir
     size = n_singles + n_doubles
-    size_int = n_singles + n_doubles_int
 
-    return size, size_int
+    return size
 
 
 def get_imds(adc, eris=None):
@@ -152,10 +150,9 @@ def get_imds(adc, eris=None):
             kb = ka
             for kl in range(nkpts):
 
-                if isinstance(eris.ovvv, type(None)):
+                if eris.ovvv is None:
                     chnk_size = adc.chnk_size
-                    if chnk_size > nocc:
-                        chnk_size = nocc
+                    chnk_size = min(chnk_size, nocc)
                     a = 0
                     for p in range(0, nocc, chnk_size):
                         kd = kconserv[ka, kb, kl]
@@ -403,10 +400,9 @@ def get_imds(adc, eris=None):
                             'lmdf,lmed->ef', t2_1[kl, km, kd], t2_1[kl, km, ke].conj(), optimize=True)
                         temp_t2_vv_5 = lib.einsum(
                             'mlfd,mled->ef', t2_1[km, kl, kf], t2_1[km, kl, ke].conj(), optimize=True)
-                        if isinstance(eris.vvvv, type(None)):
+                        if eris.vvvv is None:
                             chnk_size = adc.chnk_size
-                            if chnk_size > nvir:
-                                chnk_size = nvir
+                            chnk_size = min(chnk_size, nvir)
                             a = 0
                             for p in range(0, nvir, chnk_size):
                                 eris_vvvv = dfadc.get_vvvv_df(
@@ -453,8 +449,7 @@ def get_imds(adc, eris=None):
                             M_ab[ka] -= lib.einsum('ef,aefb->ab', temp_t2_vv_5, eris_vvvv[ka, ke, kf], optimize=True)
                         else:
                             chnk_size = adc.chnk_size
-                            if chnk_size > nvir:
-                                chnk_size = nvir
+                            chnk_size = min(chnk_size, nvir)
                             a = 0
                             for p in range(0, nvir, chnk_size):
                                 eris_vvvv = eris.vvvv[kb, ke, ka, p:p + chnk_size]
@@ -588,7 +583,6 @@ def matvec(adc, kshift, M_ab=None, eris=None):
     def sigma_(r):
         cput0 = (time.process_time(), time.time())
         log = logger.Logger(adc.stdout, adc.verbose)
-        nvir = adc.nmo - adc.nocc
 
         r1 = r[s_singles:f_singles]
         r2 = r[s_doubles:f_doubles]
@@ -605,40 +599,37 @@ def matvec(adc, kshift, M_ab=None, eris=None):
 
 ########### ADC(2) coupling blocks #########################
 
-        nvir_c = adc.nmo - adc.nocc
         for kb in range(nkpts):
             for kc in range(nkpts):
                 ki = kconserv[kb, kshift, kc]
-                if isinstance(eris.ovvv, type(None)):
+                if eris.ovvv is None:
                     chnk_size = adc.chnk_size
-                    if chnk_size > nocc:
-                        chnk_size = nocc
+                    chnk_size = min(chnk_size, nocc)
                     a = 0
                     for p in range(0, nocc, chnk_size):
                         eris_ovvv = dfadc.get_ovvv_df(
                             adc, eris.Lov[ki, kc], eris.Lvv[kshift, kb], p, chnk_size).reshape(
-                                -1, nvir_c, nvir_c, nvir_c) / nkpts
+                                -1, nvir, nvir, nvir) / nkpts
                         k = eris_ovvv.shape[0]
-                        s1 += 2. * lib.einsum('icab,ibc->a', eris_ovvv[:, :nvir, :, :nvir].conj(),
+                        s1 += 2. * lib.einsum('icab,ibc->a', eris_ovvv.conj(),
                                               r2[ki, kb, a:a + k], optimize=True)
-                        s2[ki, kb, a:a + k] += lib.einsum('icab,a->ibc', eris_ovvv[:,
-                                                          :nvir, :, :nvir], r1, optimize=True)
+                        s2[ki, kb, a:a + k] += lib.einsum('icab,a->ibc', eris_ovvv, r1, optimize=True)
                         del eris_ovvv
 
                         eris_ovvv = dfadc.get_ovvv_df(
                             adc, eris.Lov[ki, kb], eris.Lvv[kshift, kc], p, chnk_size).reshape(
-                                -1, nvir_c, nvir_c, nvir_c) / nkpts
-                        s1 -= lib.einsum('ibac,ibc->a', eris_ovvv[:, :nvir, :, :nvir].conj(),
+                                -1, nvir, nvir, nvir) / nkpts
+                        s1 -= lib.einsum('ibac,ibc->a', eris_ovvv.conj(),
                                          r2[ki, kb, a:a + k], optimize=True)
                         del eris_ovvv
                         a += k
                 else:
                     eris_ovvv = eris.ovvv[:]
                     s1 += 2. * lib.einsum('icab,ibc->a',
-                                          eris_ovvv[ki, kc, kshift][:, :nvir, :, :nvir].conj(),
+                                          eris_ovvv[ki, kc, kshift].conj(),
                                           r2[ki, kb], optimize=True)
                     s2[ki, kb] += lib.einsum('icab,a->ibc',
-                                             eris_ovvv[ki, kc, kshift][:, :nvir, :, :nvir],
+                                             eris_ovvv[ki, kc, kshift],
                                              r1, optimize=True)
                     del eris_ovvv
 
@@ -652,7 +643,6 @@ def matvec(adc, kshift, M_ab=None, eris=None):
 ################ ADC(3) ajk - bil block ############################
 
         if (method == "adc(2)-x" or method == "adc(3)"):
-            nvir = adc.nmo - adc.nocc
             eris_oovv = eris.oovv
             eris_ovvo = eris.ovvo
 
@@ -667,7 +657,7 @@ def matvec(adc, kshift, M_ab=None, eris=None):
                             r2_1 = r2.reshape(nkpts, nkpts, nocc, nvir * nvir)
                             s2[ki, kx] += np.dot(r2_1[ki, kw], eris_vvvv[kx, ky,
                                                  kw].T.conj()).reshape(nocc, nvir, nvir)
-                        elif isinstance(eris.vvvv, type(None)):
+                        elif eris.vvvv is None:
                             s2[ki, kx] += ea_contract_r_vvvv(adc, r2[ki, kw], eris.Lvv, kx, ky, kw)
                         else:
                             s2[ki, kx] += ea_contract_r_vvvv(adc, r2[ki, kw], eris.vvvv, kx, ky, kw)
@@ -769,10 +759,9 @@ def matvec(adc, kshift, M_ab=None, eris=None):
                         temp_t2_r2_4 = lib.einsum(
                             'jldw,jwz->lzd', t2_1[kj, kl, kd], r2[kj, kw], optimize=True)
 
-                        if isinstance(eris.ovvv, type(None)):
+                        if eris.ovvv is None:
                             chnk_size = adc.chnk_size
-                            if chnk_size > nocc:
-                                chnk_size = nocc
+                            chnk_size = min(chnk_size, nocc)
                             a = 0
                             for p in range(0, nocc, chnk_size):
                                 ka = kconserv[kz, kd, kl]
@@ -843,10 +832,9 @@ def matvec(adc, kshift, M_ab=None, eris=None):
                         temp_t2_r2_3 = -lib.einsum('ljzd,jzw->lwd', t2_1_ljz, r2[kj, kz], optimize=True)
                         del t2_1_ljz
 
-                        if isinstance(eris.ovvv, type(None)):
+                        if eris.ovvv is None:
                             chnk_size = adc.chnk_size
-                            if chnk_size > nocc:
-                                chnk_size = nocc
+                            chnk_size = min(chnk_size, nocc)
                             a = 0
                             for p in range(0, nocc, chnk_size):
 
@@ -896,10 +884,9 @@ def matvec(adc, kshift, M_ab=None, eris=None):
                         temp = np.zeros((nocc, nvir, nvir), dtype=np.complex128)
                         temp_1_1 = np.zeros((nocc, nvir, nvir), dtype=np.complex128)
                         temp_2_1 = np.zeros((nocc, nvir, nvir), dtype=np.complex128)
-                        if isinstance(eris.ovvv, type(None)):
+                        if eris.ovvv is None:
                             chnk_size = adc.chnk_size
-                            if chnk_size > nocc:
-                                chnk_size = nocc
+                            chnk_size = min(chnk_size, nocc)
                             a = 0
                             for p in range(0, nocc, chnk_size):
                                 kd = kconserv[kl, kshift, kx]
@@ -1691,8 +1678,7 @@ def ea_contract_r_vvvv(adc, r2, vvvv, ka, kb, kc):
     r2 = np.ascontiguousarray(r2.reshape(nocc, -1))
     r2_vvvv = np.zeros((nvir, nvir, nocc), dtype=r2.dtype)
     chnk_size = adc.chnk_size
-    if chnk_size > nvir:
-        chnk_size = nvir
+    chnk_size = min(chnk_size, nvir)
 
     a = 0
     if isinstance(vvvv, np.ndarray):

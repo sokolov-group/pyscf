@@ -87,7 +87,7 @@ def get_imds(adc, eris=None):
 
         eris_oovv = eris.oovv
 
-        if isinstance(eris.ovvv, type(None)):
+        if eris.ovvv is None:
             chnk_size = radc_ao2mo.calculate_chunk_size(adc)
             for a,b in lib.prange(0,nocc,chnk_size):
                 eris_ovvv = dfadc.get_ovvv_df(adc, eris.Lov, eris.Lvv,
@@ -420,7 +420,7 @@ def matvec(adc, M_ab=None, eris=None):
 ############## ADC(2) a - ibc and ibc - a coupling blocks #########################
 
         temp_doubles = np.zeros((nocc,nvir,nvir))
-        if isinstance(eris.ovvv, type(None)):
+        if eris.ovvv is None:
             chnk_size = radc_ao2mo.calculate_chunk_size(adc)
             for a,b in lib.prange(0,nocc,chnk_size):
                 eris_ovvv = dfadc.get_ovvv_df(adc, eris.Lov, eris.Lvv,
@@ -527,7 +527,7 @@ def matvec(adc, M_ab=None, eris=None):
             temp = np.zeros((nocc,nvir,nvir))
             temp_1_1 = np.zeros((nocc,nvir,nvir))
             temp_2_1 = np.zeros((nocc,nvir,nvir))
-            if isinstance(eris.ovvv, type(None)):
+            if eris.ovvv is None:
                 chnk_size = radc_ao2mo.calculate_chunk_size(adc)
                 for a,b in lib.prange(0,nocc,chnk_size):
                     eris_ovvv = dfadc.get_ovvv_df(
@@ -1045,7 +1045,7 @@ def make_rdm1_eigenvectors(adc, L, R):
 
     ####### ADC(3) SPIN ADAPTED EXCITED STATE OPDM WITH SQA ################
     if adc.method == "adc(3)":
-        ### Redudant Variables used for names from SQA
+        ### Redundant Variables used for names from SQA
         einsum_type = True
         t2_ccee = adc.t2[1][:]
 
