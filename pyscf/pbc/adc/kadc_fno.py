@@ -378,19 +378,20 @@ class RADC2FNO(kadc_rhf.RADC):
                 T.append(n > thresh)
 
         # "min": union the per-kpt masks so every k-point keeps the same count
+        n_keep_union = None
         if self.mode.lower() == "min":
-            T_min = np.logical_or.reduce(np.stack(T), axis=0)
-            n_keep = int(np.sum(T_min))
-            if n_keep == 0:
+            n_keep_union = max(int(np.sum(t)) for t in T)
+            if n_keep_union == 0:
                 log.warn("All virtual orbitals were requested to be frozen.\n"
                          "At least one virtual orbital must be retained for ADC calculations.\n"
                          "Keeping one virtual orbital automatically.")
-                n_keep += 1
-                T_min[0] = True
+                n_keep_union = 1
 
         for kpt in range(self.nkpts):
             V_trunc_k = V_trunc[kpt]
-            if self.mode.lower() != "min":
+            if n_keep_union is not None:
+                n_keep = min(n_keep_union, V_trunc_k.shape[1])
+            else:
                 n_keep = int(np.sum(T[kpt]))
                 if n_keep == 0:
                     log.warn("All virtual orbitals frozen at kpt %d; keeping one." % kpt)

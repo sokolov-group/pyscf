@@ -41,6 +41,7 @@ from pyscf.pbc.cc.kccsd_t_rhf import _get_epqr
 from pyscf.pbc.lib import kpts_helper
 from pyscf.lib.parameters import LOOSE_ZERO_TOL, LARGE_DENOM  # noqa
 from pyscf.data.nist import HARTREE2EV
+from pyscf.pbc.scf.hf import INVALID_ORBITAL_ENERGY
 
 import h5py
 import tempfile
@@ -273,6 +274,22 @@ def mo_splitter(myadc):
     return masks
 
 
+def orbital_number_lists(myadc):
+    nocc_fr, nocc_ar, nvir_ar, nvir_fr, nremoved = [], [], [], [], []
+    for kpt, (frz_occ, act_occ, act_vir, frz_vir) in enumerate(mo_splitter(myadc)):
+        if getattr(myadc, 'mo_energy', None) is not None:
+            valid_k = np.asarray(myadc.mo_energy[kpt]) != INVALID_ORBITAL_ENERGY
+        else:
+            valid_k = np.ones(frz_vir.size, dtype=bool)
+        nocc_fr.append(np.count_nonzero(frz_occ))
+        nocc_ar.append(np.count_nonzero(act_occ))
+        nvir_ar.append(np.count_nonzero(act_vir))
+        nvir_fr.append(np.count_nonzero(frz_vir & valid_k))
+        nremoved.append(np.count_nonzero(~valid_k))
+    return (np.array(nocc_fr), np.array(nocc_ar),
+            np.array(nvir_ar), np.array(nvir_fr), np.array(nremoved))
+
+
 class RADC(pyscf.adc.radc.RADC):
     _keys = pyscf.adc.radc.RADC._keys | {
         'kpts', 'khelper', 'exxdiv', 'cell',
@@ -380,17 +397,15 @@ class RADC(pyscf.adc.radc.RADC):
         mem_incore *= 4
         mem_incore *= 16 / 1e6
         mem_now = lib.current_memory()[0]
-        nocc_arr = np.array(self.get_nocc(per_kpoint=True))
-        nmo_arr = np.array(self.get_nmo(per_kpoint=True))
-        nvir_arr = nmo_arr - nocc_arr
-        nocc_fr = np.array(self._scf.mol.nelectron // 2) - nocc_arr
-        nvir_fr = np.array([len(self.mo_occ[ikpt]) for ikpt in range(nkpts)]) - nmo_arr - nocc_fr
+        nocc_fr, nocc_arr, nvir_arr, nvir_fr, nremoved = orbital_number_lists(self)
 
         logger.info(self, '******** ADC Orbital Information ********')
         logger.info(self, 'Number list of Frozen Occupied Orbitals: %s', nocc_fr)
         logger.info(self, 'Number list of Frozen Virtual Orbitals: %s', nvir_fr)
         logger.info(self, 'Number list of Active Occupied Orbitals: %s', nocc_arr)
         logger.info(self, 'Number list of Active Virtual Orbitals: %s', nvir_arr)
+        if np.any(nremoved):
+            logger.info(self, 'Number list of Removed Orbitals (SCF linear-dep treatment): %s', nremoved)
         if hasattr(self.frozen, '__len__') and isinstance(self.frozen[0], (list, np.ndarray)):
             logger.info(self, 'Frozen Orbital List: %s', self.frozen)
         logger.info(self, '*****************************************')
@@ -440,17 +455,15 @@ class RADC(pyscf.adc.radc.RADC):
         mem_incore *= 4
         mem_incore *= 16 / 1e6
         mem_now = lib.current_memory()[0]
-        nocc_arr = np.array(self.get_nocc(per_kpoint=True))
-        nmo_arr = np.array(self.get_nmo(per_kpoint=True))
-        nvir_arr = nmo_arr - nocc_arr
-        nocc_fr = np.array(self._scf.mol.nelectron // 2) - nocc_arr
-        nvir_fr = np.array([len(self.mo_occ[ikpt]) for ikpt in range(nkpts)]) - nmo_arr - nocc_fr
+        nocc_fr, nocc_arr, nvir_arr, nvir_fr, nremoved = orbital_number_lists(self)
 
         logger.info(self, '******** ADC Orbital Information ********')
         logger.info(self, 'Number list of Frozen Occupied Orbitals: %s', nocc_fr)
         logger.info(self, 'Number list of Frozen Virtual Orbitals: %s', nvir_fr)
         logger.info(self, 'Number list of Active Occupied Orbitals: %s', nocc_arr)
         logger.info(self, 'Number list of Active Virtual Orbitals: %s', nvir_arr)
+        if np.any(nremoved):
+            logger.info(self, 'Number list of Removed Orbitals (SCF linear-dep treatment): %s', nremoved)
         if hasattr(self.frozen, '__len__') and isinstance(self.frozen[0], (list, np.ndarray)):
             logger.info(self, 'Frozen Orbital List: %s', self.frozen)
         logger.info(self, '*****************************************')
