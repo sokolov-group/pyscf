@@ -354,7 +354,7 @@ class RADC2FNO(kadc_rhf.RADC):
 
     def make_fno(self, rdm1_ss, mf, log, thresh=None, pct_occ=None, nvir_act=None):
         """Build the FNO virtual space: diagonalize the virtual 1-RDM, truncate, and semicanonicalize."""
-        nocc = mf.mol.nelectron // 2
+        nocc = self.nocc
         masks = kadc_rhf.mo_splitter(self)
         no_coeff = []
         no_frozen = []
@@ -364,7 +364,11 @@ class RADC2FNO(kadc_rhf.RADC):
 
         T = []
         for kpt in range(self.nkpts):
-            rdm1_ss_comp = rdm1_ss[kpt][np.ix_(padding_convention[kpt], padding_convention[kpt])]
+            if self.frozen is None:
+                idx_k = padding_convention[kpt]
+            else:
+                idx_k = np.where(masks[kpt][1] | masks[kpt][2])[0]
+            rdm1_ss_comp = rdm1_ss[kpt][np.ix_(idx_k, idx_k)]
             n, V_k = np.linalg.eigh(rdm1_ss_comp[nocc:, nocc:])
             idx = np.argsort(n)[::-1]
             n, V_k = n[idx], V_k[:, idx]

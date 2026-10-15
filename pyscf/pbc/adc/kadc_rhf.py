@@ -233,7 +233,7 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
         OPDM[ki] += OPDM[ki].conj().T
 
     if with_frozen and adc.frozen is not None:
-        nmo = adc.mo_occ[0].size
+        nmo = max(mo_occ_k.size for mo_occ_k in adc.mo_occ)
         nocc = np.count_nonzero(adc.mo_occ[0] > 0)
         mask = get_frozen_mask(adc)
         dm = np.zeros((nkpts, nmo, nmo), dtype=np.complex128)
@@ -246,9 +246,12 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
             dm[k][moidx[:, None], moidx] = OPDM[k][p_k_idx[k][:, None], p_k_idx[k]]
         OPDM = dm
         if ao_repr:
-            mo = adc.mo_coeff
             for k in k_idx:
-                OPDM[k] = lib.einsum('pI,IJ,qJ->pq', mo[k], OPDM[k], mo[k].conj())
+                mo_k = np.asarray(adc.mo_coeff[k])
+                npad = nmo - mo_k.shape[1]
+                if npad > 0:
+                    mo_k = np.hstack((mo_k, np.zeros((mo_k.shape[0], npad), dtype=mo_k.dtype)))
+                OPDM[k] = lib.einsum('pI,IJ,qJ->pq', mo_k, OPDM[k], mo_k.conj())
 
     elif ao_repr:
         mo = padded_mo_coeff(adc, adc.mo_coeff)
@@ -563,7 +566,7 @@ class RADC(pyscf.adc.radc.RADC):
         rdm1 = self._adc_es.make_rdm1(nroots, kptlist, K_idx, if_ss)
 
         if with_frozen and self.frozen is not None:
-            nmo = self.mo_occ[0].size
+            nmo = max(mo_occ_k.size for mo_occ_k in self.mo_occ)
             nocc = np.count_nonzero(self.mo_occ[0] > 0)
             mask = get_frozen_mask(self)
             dm = np.zeros((len(K_idx), len(nroots), self.nkpts, nmo, nmo), dtype=np.complex128)
@@ -584,9 +587,15 @@ class RADC(pyscf.adc.radc.RADC):
                         dm[kj][i][ki][moidx[:, None], moidx] = rdm1[kj][i][ki][p_k_idx[ki][:, None], p_k_idx[ki]]
             rdm1 = dm
             if ao_repr:
-                mo = self.mo_coeff
-                mo_H = [c.conj() for c in mo]
-                rdm1 = lib.einsum('kpI,KSkIJ,kqJ->KSkpq', mo, rdm1, mo_H)
+                mo = []
+                for k in range(self.nkpts):
+                    mo_k = np.asarray(self.mo_coeff[k])
+                    npad = nmo - mo_k.shape[1]
+                    if npad > 0:
+                        mo_k = np.hstack((mo_k, np.zeros((mo_k.shape[0], npad), dtype=mo_k.dtype)))
+                    mo.append(mo_k)
+                mo = np.stack(mo)
+                rdm1 = lib.einsum('kpI,KSkIJ,kqJ->KSkpq', mo, rdm1, mo.conj())
         elif ao_repr:
             mo = padded_mo_coeff(self, self.mo_coeff)
             mo_H = [c.conj() for c in mo]
