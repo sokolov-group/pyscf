@@ -309,6 +309,12 @@ class RADC(pyscf.adc.radc.RADC):
         if mo_energy is None:
             mo_energy = mf.mo_energy
 
+        if mo_coeff is mf.mo_coeff and np.any(np.asarray(mo_energy) == INVALID_ORBITAL_ENERGY):
+            valid = np.asarray(mo_energy) != INVALID_ORBITAL_ENERGY
+            mo_coeff = [np.asarray(c)[:, v] for c, v in zip(mo_coeff, valid)]
+            mo_occ = [np.asarray(o)[v] for o, v in zip(mo_occ, valid)]
+            mo_energy = [e[v] for e, v in zip(mo_energy, valid)]
+
         self._scf = mf
         self.kpts = self._scf.kpts
         self.exxdiv = self._scf.exxdiv

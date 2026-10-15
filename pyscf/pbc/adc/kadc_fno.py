@@ -398,8 +398,8 @@ class RADC2FNO(kadc_rhf.RADC):
                     n_keep += 1
                     T[kpt][0] = True
 
-            moeoccfrz0, moeocc, moevir, moevirfrz0 = [mf.mo_energy[kpt][m] for m in masks[kpt]]
-            orboccfrz0, orbocc, orbvir, orbvirfrz0 = [mf.mo_coeff[kpt][:, m] for m in masks[kpt]]
+            moeoccfrz0, moeocc, moevir, moevirfrz0 = [self.mo_energy[kpt][m] for m in masks[kpt]]
+            orboccfrz0, orbocc, orbvir, orbvirfrz0 = [self.mo_coeff[kpt][:, m] for m in masks[kpt]]
             F_can = np.diag(moevir)
             F_trunc = V_trunc_k.T.conj().dot(F_can).dot(V_trunc_k)
             e_trunc, Z_trunc = np.linalg.eigh(F_trunc[:n_keep, :n_keep])
