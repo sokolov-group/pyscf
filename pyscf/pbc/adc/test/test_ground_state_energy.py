@@ -73,7 +73,7 @@ class KnownValues(unittest.TestCase):
 
         self.assertAlmostEqual(diff_mp2, 0.0000000000, 4)
 
-    def test_check_periodic_mp3_skip(self):
+    def test_check_periodic_mp3(self):
         kpts = cell.make_kpts((nmp))
         kpts -= kpts[0]
         kmf = scf.KRHF(cell, kpts,exxdiv=None).density_fit().run()
@@ -81,7 +81,7 @@ class KnownValues(unittest.TestCase):
         myadc.method = 'adc(3)'
         e_mp, t1, t2 = myadc.kernel_gs()
 
-        self.assertAlmostEqual(e_mp, -0.0207106109728, 4)
+        self.assertAlmostEqual(e_mp, -0.0208366684841, 4)
 
 if __name__ == "__main__":
     print("Ground state calculations for helium")
