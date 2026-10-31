@@ -1,6 +1,6 @@
 import pyscf.pbc.tools.make_test_cell as make_test_cell
 from pyscf.pbc.tools.pbc import super_cell
-from pyscf.pbc import gto, scf, adc
+from pyscf.pbc import gto, scf, adc, df
 import unittest
 
 def setUpModule():
@@ -48,6 +48,27 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[0][0],-1.1740951190044178, 4)
         self.assertAlmostEqual(e[0][1],-1.1536065878793587, 4)
         self.assertAlmostEqual(e[0][2],-1.153606584783398, 4)
+
+    def test_nonuniform_df_naux(self):
+        mf = scf.KRHF(cell, kmf.kpts, exxdiv=None).density_fit()
+        mf.with_df.auxbasis = 'aug-cc-pvtz-ri'
+        mf.conv_tol = 1e-10
+        mf.verbose = 0
+        mf.run()
+
+        with df.df._load3c(mf.with_df._cderi, 'j3c') as fload:
+            naux = [[fload(ki, kj).shape[0] for kj in range(len(mf.kpts))]
+                    for ki in range(len(mf.kpts))]
+        print('naux per (ki,kj):', naux)
+        self.assertNotEqual(naux[0][0], naux[0][1])
+
+        myadc = adc.KRADC(mf)
+        e_mp2, t1, t2 = myadc.kernel_gs()
+        self.assertAlmostEqual(e_mp2, -0.12092627319588528, 4)
+
+        myadc.if_naf = True
+        e_naf, t1, t2 = myadc.kernel_gs()
+        self.assertAlmostEqual(e_naf, -0.12060164981527909, 4)
 
 if __name__ == '__main__':
     print("kadc_ip_basic tests")
