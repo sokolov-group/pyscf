@@ -83,7 +83,10 @@ def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None):
     P = np.zeros((len(kptlist), nroots), np.float64)
     X = np.zeros((len(kptlist), nmo, nroots), dtype)
 
-    imds = adc.get_imds(eris)
+    # EE intermediates depend on kshift and are built in gen_matvec.
+    imds = None
+    if adc.method_type in ("ip", "ea"):
+        imds = adc.get_imds(eris)
     guess_type = None
     if guess is None:
         pass
