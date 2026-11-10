@@ -81,6 +81,7 @@ def get_imds(adc, kshift, eris=None):
     e_extern = [mo_energy[k][ncore:] for k in range(nkpts)]
     
     
+
     kshift_ia = kconserv[:,kshift,0].copy()
     kshift_ld = kconserv[:,kshift,0].copy()
 
@@ -116,69 +117,111 @@ def get_imds(adc, kshift, eris=None):
             M_[kI,kL] += 2*einsum('LADI->IDLA', v_ceec[kL,kA,kD], optimize = einsum_type)
             M_[kI,kL] += -einsum('ILAD->IDLA', v_ccee[kI,kL,kA].conj(), optimize = einsum_type)
             for ki in range(nkpts):
-                ka = kshift_ia[ki]
-
-                M_[kI,kL]  = 2 * einsum('IiDa,LAia->IDLA', t1_ccee, v_cece, optimize = einsum_type)
-                M_[kI,kL] -= einsum('IiDa,iALa->IDLA', t1_ccee, v_cece, optimize = einsum_type)
-                M_[kI,kL] -= einsum('iIDa,LAia->IDLA', t1_ccee, v_cece, optimize = einsum_type)
-                M_[kI,kL] += einsum('iIDa,iALa->IDLA', t1_ccee, v_cece, optimize = einsum_type)
-                M_[kI,kL] += 2 * einsum('LiAa,IDia->IDLA', t1d_ccee, v_cece, optimize = einsum_type)
-                M_[kI,kL] -= einsum('LiAa,iDIa->IDLA', t1d_ccee, v_cece, optimize = einsum_type)
-                M_[kI,kL] -= einsum('iLAa,IDia->IDLA', t1d_ccee, v_cece, optimize = einsum_type)
-                M_[kI,kL] += einsum('iLAa,iDIa->IDLA', t1d_ccee, v_cece, optimize = einsum_type)
-                M_[kI,kL] += einsum('A,IiDa,LiAa->IDLA', e_extern, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= 1/2 * einsum('A,IiDa,iLAa->IDLA', e_extern, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= 1/2 * einsum('A,iIDa,LiAa->IDLA', e_extern, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] += 1/2 * einsum('A,iIDa,iLAa->IDLA', e_extern, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] += einsum('D,IiDa,LiAa->IDLA', e_extern, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= 1/2 * einsum('D,IiDa,iLAa->IDLA', e_extern, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= 1/2 * einsum('D,iIDa,LiAa->IDLA', e_extern, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] += 1/2 * einsum('D,iIDa,iLAa->IDLA', e_extern, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= einsum('I,IiDa,LiAa->IDLA', e_core, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] += 1/2 * einsum('I,IiDa,iLAa->IDLA', e_core, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] += 1/2 * einsum('I,iIDa,LiAa->IDLA', e_core, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= 1/2 * einsum('I,iIDa,iLAa->IDLA', e_core, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= einsum('L,IiDa,LiAa->IDLA', e_core, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] += 1/2 * einsum('L,IiDa,iLAa->IDLA', e_core, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] += 1/2 * einsum('L,iIDa,LiAa->IDLA', e_core, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= 1/2 * einsum('L,iIDa,iLAa->IDLA', e_core, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] += 2 * einsum('a,IiDa,LiAa->IDLA', e_extern, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= einsum('a,IiDa,iLAa->IDLA', e_extern, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= einsum('a,iIDa,LiAa->IDLA', e_extern, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] += einsum('a,iIDa,iLAa->IDLA', e_extern, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= 2 * einsum('i,IiDa,LiAa->IDLA', e_core, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] += einsum('i,IiDa,iLAa->IDLA', e_core, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] += einsum('i,iIDa,LiAa->IDLA', e_core, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= einsum('i,iIDa,iLAa->IDLA', e_core, t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= 2 * einsum('AD,Iiab,Laib->IDLA', np.identity(nextern), t1_ccee, v_cece, optimize = einsum_type)
-                M_[kI,kL] += einsum('AD,Iiab,Lbia->IDLA', np.identity(nextern), t1_ccee, v_cece, optimize = einsum_type)
-                M_[kI,kL] -= 2 * einsum('IL,ijDa,iAja->IDLA', np.identity(ncore), t1_ccee, v_cece, optimize = einsum_type)
-                M_[kI,kL] += einsum('IL,ijDa,jAia->IDLA', np.identity(ncore), t1_ccee, v_cece, optimize = einsum_type)
-                M_[kI,kL] -= 2 * einsum('AD,Liab,Iaib->IDLA', np.identity(nextern), t1d_ccee, v_cece, optimize = einsum_type)
-                M_[kI,kL] += einsum('AD,Liab,Ibia->IDLA', np.identity(nextern), t1d_ccee, v_cece, optimize = einsum_type)
-                M_[kI,kL] -= 2 * einsum('IL,ijAa,iDja->IDLA', np.identity(ncore), t1d_ccee, v_cece, optimize = einsum_type)
-                M_[kI,kL] += einsum('IL,ijAa,jDia->IDLA', np.identity(ncore), t1d_ccee, v_cece, optimize = einsum_type)
-                M_[kI,kL] -= einsum('A,IL,ijDa,ijAa->IDLA', e_extern, np.identity(ncore), t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] += 1/2 * einsum('A,IL,ijDa,jiAa->IDLA', e_extern, np.identity(ncore), t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= einsum('D,IL,ijDa,ijAa->IDLA', e_extern, np.identity(ncore), t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] += 1/2 * einsum('D,IL,ijDa,jiAa->IDLA', e_extern, np.identity(ncore), t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] += einsum('I,AD,Iiab,Liab->IDLA', e_core, np.identity(nextern), t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= 1/2 * einsum('I,AD,Iiab,Liba->IDLA', e_core, np.identity(nextern), t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] += einsum('L,AD,Iiab,Liab->IDLA', e_core, np.identity(nextern), t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= 1/2 * einsum('L,AD,Iiab,Liba->IDLA', e_core, np.identity(nextern), t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= 2 * einsum('a,AD,Iiab,Liab->IDLA', e_extern, np.identity(nextern), t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] += einsum('a,AD,Iiab,Liba->IDLA', e_extern, np.identity(nextern), t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] += einsum('a,AD,Iiba,Liab->IDLA', e_extern, np.identity(nextern), t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= 2 * einsum('a,AD,Iiba,Liba->IDLA', e_extern, np.identity(nextern), t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= 2 * einsum('a,IL,ijDa,ijAa->IDLA', e_extern, np.identity(ncore), t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] += einsum('a,IL,ijDa,jiAa->IDLA', e_extern, np.identity(ncore), t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] += 2 * einsum('i,AD,Iiab,Liab->IDLA', e_core, np.identity(nextern), t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= einsum('i,AD,Iiab,Liba->IDLA', e_core, np.identity(nextern), t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] += 2 * einsum('i,IL,ijDa,ijAa->IDLA', e_core, np.identity(ncore), t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= einsum('i,IL,ijDa,jiAa->IDLA', e_core, np.identity(ncore), t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] -= einsum('i,IL,jiDa,ijAa->IDLA', e_core, np.identity(ncore), t1_ccee, t1d_ccee, optimize = einsum_type)
-                M_[kI,kL] += 2 * einsum('i,IL,jiDa,jiAa->IDLA', e_core, np.identity(ncore), t1_ccee, t1d_ccee, optimize = einsum_type)
-
+                M_[kI,kL] += 2 * einsum('IiDa,LAia->IDLA', t1_ccee[kI,ki,kD], v_cece[kL,kA,ki], optimize = einsum_type)
+                M_[kI,kL] -= einsum('IiDa,iALa->IDLA', t1_ccee[kI,ki,kD], v_cece[ki,kA,kL], optimize = einsum_type)
+                M_[kI,kL] -= einsum('iIDa,LAia->IDLA', t1_ccee[ki,kI,kD], v_cece[kL,kA,ki], optimize = einsum_type)
+                M_[kI,kL] += einsum('iIDa,iALa->IDLA', t1_ccee[ki,kI,kD], v_cece[ki,kA,kL], optimize = einsum_type)
+                M_[kI,kL] += 2 * einsum('LiAa,IDia->IDLA', t1d_ccee[kL,ki,kA].conj(), v_cece[kI,kD,ki].conj(), optimize = einsum_type)
+                M_[kI,kL] -= einsum('LiAa,iDIa->IDLA', t1d_ccee[kL,ki,kA].conj(), v_cece[ki,kD,kI].conj(), optimize = einsum_type)
+                M_[kI,kL] -= einsum('iLAa,IDia->IDLA', t1d_ccee[ki,kL,kA].conj(), v_cece[kI,kD,ki].conj(), optimize = einsum_type)
+                M_[kI,kL] += einsum('iLAa,iDIa->IDLA', t1d_ccee[ki,kL,kA].conj(), v_cece[ki,kD,kI].conj(), optimize = einsum_type)
+                M_[kI,kL] += einsum('A,IiDa,LiAa->IDLA', e_extern[kA], t1_ccee[kI,ki,kD], t1d_ccee[kL,ki,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] -= 1/2 * einsum('A,IiDa,iLAa->IDLA', e_extern[kA], t1_ccee[kI,ki,kD], t1d_ccee[ki,kL,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] -= 1/2 * einsum('A,iIDa,LiAa->IDLA', e_extern[kA], t1_ccee[ki,kI,kD], t1d_ccee[kL,ki,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] += 1/2 * einsum('A,iIDa,iLAa->IDLA', e_extern[kA], t1_ccee[ki,kI,kD], t1d_ccee[ki,kL,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] += einsum('D,IiDa,LiAa->IDLA', e_extern[kD], t1_ccee[kI,ki,kD], t1d_ccee[kL,ki,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] -= 1/2 * einsum('D,IiDa,iLAa->IDLA', e_extern[kD], t1_ccee[kI,ki,kD], t1d_ccee[ki,kL,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] -= 1/2 * einsum('D,iIDa,LiAa->IDLA', e_extern[kD], t1_ccee[ki,kI,kD], t1d_ccee[kL,ki,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] += 1/2 * einsum('D,iIDa,iLAa->IDLA', e_extern[kD], t1_ccee[ki,kI,kD], t1d_ccee[ki,kL,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] -= einsum('I,IiDa,LiAa->IDLA', e_core[kI], t1_ccee[kI,ki,kD], t1d_ccee[kL,ki,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] += 1/2 * einsum('I,IiDa,iLAa->IDLA', e_core[kI], t1_ccee[kI,ki,kD], t1d_ccee[ki,kL,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] += 1/2 * einsum('I,iIDa,LiAa->IDLA', e_core[kI], t1_ccee[ki,kI,kD], t1d_ccee[kL,ki,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] -= 1/2 * einsum('I,iIDa,iLAa->IDLA', e_core[kI], t1_ccee[ki,kI,kD], t1d_ccee[ki,kL,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] -= einsum('L,IiDa,LiAa->IDLA', e_core[kL], t1_ccee[kI,ki,kD], t1d_ccee[kL,ki,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] += 1/2 * einsum('L,IiDa,iLAa->IDLA', e_core[kL], t1_ccee[kI,ki,kD], t1d_ccee[ki,kL,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] += 1/2 * einsum('L,iIDa,LiAa->IDLA', e_core[kL], t1_ccee[ki,kI,kD], t1d_ccee[kL,ki,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] -= 1/2 * einsum('L,iIDa,iLAa->IDLA', e_core[kL], t1_ccee[ki,kI,kD], t1d_ccee[ki,kL,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] += 2 * einsum('a,IiDa,LiAa->IDLA', e_extern[kA], t1_ccee[kI,ki,kD], t1d_ccee[kL,ki,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] -= einsum('a,IiDa,iLAa->IDLA', e_extern[kA], t1_ccee[kI,ki,kD], t1d_ccee[ki,kL,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] -= einsum('a,iIDa,LiAa->IDLA', e_extern[kA], t1_ccee[ki,kI,kD], t1d_ccee[kL,ki,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] += einsum('a,iIDa,iLAa->IDLA', e_extern[kA], t1_ccee[ki,kI,kD], t1d_ccee[ki,kL,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] -= 2 * einsum('i,IiDa,LiAa->IDLA', e_core[ki], t1_ccee[kI,ki,kD], t1d_ccee[kL,ki,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] += einsum('i,IiDa,iLAa->IDLA', e_core[ki], t1_ccee[kI,ki,kD], t1d_ccee[ki,kL,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] += einsum('i,iIDa,LiAa->IDLA', e_core[ki], t1_ccee[ki,kI,kD], t1d_ccee[kL,ki,kA].conj(), optimize = einsum_type)
+                M_[kI,kL] -= einsum('i,iIDa,iLAa->IDLA', e_core[ki], t1_ccee[ki,kI,kD], t1d_ccee[ki,kL,kA].conj(), optimize = einsum_type)
+                for kA in range(nkpts):
+                    if kA == kD:
+                        M_[kI,kL] -= 2 * einsum('AD,Iiab,Laib->IDLA',np.identity(nextern), t1_ccee[kI,ki,kA], v_cece[kL,kA,ki], optimize = einsum_type)
+                        M_[kI,kL] -= 2 * einsum('AD,Liab,Iaib->IDLA', np.identity(nextern), t1d_ccee[kL,ki,kA].conj(), v_cece[kI,kA,ki].conj(), optimize = einsum_type)
+                        M_[kI,kL] += einsum('AD,Iiab,iaLb->IDLA', np.identity(nextern), t1_ccee[kI,ki,kA], v_cece[ki,kA,kL], optimize = einsum_type)
+                        M_[kI,kL] += einsum('AD,Liab,iaIb->IDLA', np.identity(nextern), t1d_ccee[kL,ki,kA].conj(), v_cece[ki,kA,kI].conj(), optimize = einsum_type)
+                    #for kj in range(nkpts):
+                    #    if kI == kL:
+                    #        M_[kI,kL] -= 2 * einsum('IL,ijDa,iAja->IDLA', np.identity(ncore), t1_ccee[ki,kj,kD], v_cece[ki,kA,kj], optimize = einsum_type)
+                    #        M_[kI,kL] += einsum('IL,ijDa,jAia->IDLA', np.identity(ncore), t1_ccee[ki,kj,kD], v_cece[kj,kA,ki], optimize = einsum_type)
+                    #        M_[kI,kL] -= 2 * einsum('IL,ijAa,iDja->IDLA', np.identity(ncore), t1d_ccee[ki,kj,kA].conj(), v_cece[ki,kD,kj].conj(), optimize = einsum_type)
+                    #        M_[kI,kL] += einsum('IL,ijAa,jDia->IDLA', np.identity(ncore), t1d_ccee[ki,kj,kA].conj(), v_cece[kj,kD,ki].conj(), optimize = einsum_type)
+#                   # # #for kA in range(nkpts):
+#                   # # t1_ccee = adc.t2[0][kI,ki,kD]
+#                   # # M_[kI,kL] += 2 * einsum('IiDa,LAia->IDLA', t1_ccee, v_cece[kL,kA,ki], optimize = einsum_type)
+#                   # # M_[kI,kL] -= einsum('IiDa,iALa->IDLA', t1_ccee, v_cece[ki,kA,kL], optimize = einsum_type)
+#
+#                   # t1d_ccee = adc.t2[0]
+#                   # # del t1_ccee
+#
+#                   # # t1_ccee = adc.t2[0][kL,ki,kA].conj()
+#
+#                   # # M_[kI,kL] += 2 * einsum('LiAa,IDia->IDLA', t1_ccee, v_cece[kI,kD,ki].conj(), optimize = einsum_type)
+#                   # # M_[kI,kL] -= einsum('LiAa,iDIa->IDLA', t1_ccee, v_cece[ki,kD,kI].conj(), optimize = einsum_type)
+#
+#                   # # del t1_ccee
+#
+#                   # # t1_ccee = adc.t2[0][ki,kI,kD]
+#                   # # M_[kI,kL] -= einsum('iIDa,LAia->IDLA', t1_ccee, v_cece[kL,kA,ki], optimize = einsum_type)
+#                   # # M_[kI,kL] += einsum('iIDa,iALa->IDLA', t1_ccee, v_cece[ki,kA,kL], optimize = einsum_type)
+#
+#                   # # del t1_ccee
+#
+#                   # # t1_ccee = adc.t2[0][ki,kL,kA].conj()
+#
+#                   # # M_[kI,kL] -= einsum('iLAa,IDia->IDLA', t1_ccee, v_cece[kI,kD,ki].conj(), optimize = einsum_type)
+#                   # # M_[kI,kL] += einsum('iLAa,iDIa->IDLA', t1_ccee, v_cece[ki,kD,kI].conj(), optimize = einsum_type)
+#
+#
+#
+#                   # # M_[kI,kL] += einsum('A,LiAa,IiDa->IDLA', e_extern[kA], t1_ccee, t1_ccee, optimize = einsum_type)
+#                   # # M_[kI,kL] += [kI,kL] -= 1/2 * einsum('A,LiAa,iIDa->IDLA', e_extern[kA], t1_ccee, t1_ccee, optimize = einsum_type)
+#
+#
+#
+#
+#
+#
+#
+#                   # M_[kI,kL] -= einsum('A,IL,ijDa,ijAa->IDLA', e_extern[kA], np.identity(ncore), t1_ccee[ki,kj,kD], t1d_ccee[ki,kj,kA].conj(), optimize = einsum_type)
+#                   # M_[kI,kL] += 1/2 * einsum('A,IL,ijDa,jiAa->IDLA', e_extern[kA], np.identity(ncore), t1_ccee[ki,kj,kD], t1d_ccee[kj,ki,kA].conj(), optimize = einsum_type)
+#                   # M_[kI,kL] -= einsum('D,IL,ijDa,ijAa->IDLA', e_extern[kD], np.identity(ncore), t1_ccee[ki,kj,kD], t1d_ccee[ki,kj,kA].conj(), optimize = einsum_type)
+#                   # M_[kI,kL] += 1/2 * einsum('D,IL,ijDa,jiAa->IDLA', e_extern[kD], np.identity(ncore), t1_ccee[ki,kj,kD], t1d_ccee[kj,ki,kA].conj(), optimize = einsum_type)
+#                   # M_[kI,kL] -= 2 * einsum('a,IL,ijDa,ijAa->IDLA', e_extern[kA], np.identity(ncore), t1_ccee[ki,kj,kD], t1d_ccee[ki,kj,kA].conj(), optimize = einsum_type)
+#                   # M_[kI,kL] += 2 * einsum('i,IL,ijDa,ijAa->IDLA', e_core[ki], np.identity(ncore), t1_ccee[ki,kj,kD], t1d_ccee[ki,kj,kA].conj(), optimize = einsum_type)
+#                   # M_[kI,kL] -= einsum('i,IL,ijDa,jiAa->IDLA', e_core[ki], np.identity(ncore), t1_ccee[ki,kj,kD], t1d_ccee[kj,ki,kA].conj(), optimize = einsum_type)
+#                   # M_[kI,kL] -= einsum('i,IL,jiDa,ijAa->IDLA', e_core[ki], np.identity(ncore), t1_ccee[kj,ki,kD], t1d_ccee[ki,kj,kA].conj(), optimize = einsum_type)
+#                   # M_[kI,kL] += 2 * einsum('i,IL,jiDa,jiAa->IDLA', e_core[ki], np.identity(ncore), t1_ccee[kj,ki,kD], t1d_ccee[kj,ki,kA].conj(), optimize = einsum_type)
+#                   # M_[kI,kL] += einsum('a,IL,ijDa,jiAa->IDLA', e_extern[kA], np.identity(ncore), t1_ccee[ki,kj,kD], t1d_ccee[kj,ki,kA].conj(), optimize = einsum_type)
+#                   # M_[kI,kL] -= 1/2 * einsum('I,AD,Iiab,Liba->IDLA', e_core[kI], np.identity(nextern), t1_ccee[kI,ki,kA], t1d_ccee[kL,ki,kb].conj(), optimize = einsum_type)
+#                   # M_[kI,kL] -= 2 * einsum('a,AD,Iiba,Liba->IDLA', e_extern[kA], np.identity(nextern), t1_ccee[kI,ki,kb], t1d_ccee[kL,ki,kb].conj(), optimize = einsum_type)
+#
+#
+#
+#                   # M_[kI,kL] += einsum('I,AD,Iiab,Liab->IDLA', e_core[kI], np.identity(nextern), t1_ccee[kI,ki,kA], t1d_ccee[kL,ki,kA].conj(), optimize = einsum_type)
+#                   # M_[kI,kL] += einsum('L,AD,Iiab,Liab->IDLA', e_core[kL], np.identity(nextern), t1_ccee[kI,ki,kA], t1d_ccee[kL,ki,kA].conj(), optimize = einsum_type)
+#                   # M_[kI,kL] -= 1/2 * einsum('L,AD,Iiab,Liba->IDLA', e_core[kL], np.identity(nextern), t1_ccee[kI,ki,kA], t1d_ccee[kL,ki,kb].conj(), optimize = einsum_type)
+#                   # M_[kI,kL] -= 2 * einsum('a,AD,Iiab,Liab->IDLA', e_extern[kA], np.identity(nextern), t1_ccee[kI,ki,kA], t1d_ccee[kL,ki,kA].conj(), optimize = einsum_type)
+#                   # M_[kI,kL] += einsum('a,AD,Iiab,Liba->IDLA', e_extern[kA], np.identity(nextern), t1_ccee[kI,ki,kA], t1d_ccee[kL,ki,kb].conj(), optimize = einsum_type)
+#                   # M_[kI,kL] += einsum('a,AD,Iiba,Liab->IDLA', e_extern[kA], np.identity(nextern), t1_ccee[kI,ki,kb], t1d_ccee[kL,ki,kA].conj(), optimize = einsum_type)
+#                   # M_[kI,kL] += 2 * einsum('i,AD,Iiab,Liab->IDLA', e_core[ki], np.identity(nextern), t1_ccee[kI,ki,kA], t1d_ccee[kL,ki,kA].conj(), optimize = einsum_type)
+#                   # M_[kI,kL] -= einsum('i,AD,Iiab,Liba->IDLA', e_core[ki], np.identity(nextern), t1_ccee[kI,ki,kA], t1d_ccee[kL,ki,kb].conj(), optimize = einsum_type)
+#
 
 
 
@@ -186,9 +229,8 @@ def get_imds(adc, kshift, eris=None):
 
 
     H = M_.reshape(nkpts, nkpts, ncore, nextern, ncore, nextern).transpose(0,2,3,1,4,5).reshape(nkpts*ncore*nextern, nkpts*ncore*nextern)
-#    e, v = np.linalg.eig(H)
-    print("H norm", np.linalg.norm(H))
-    exit()
+    e, v = np.linalg.eig(H)
+    print("e",e)
     
     return H
 
@@ -567,19 +609,20 @@ def renormalize_eigenvectors(adc, kshift, U, nroots=1):
     nkpts = adc.nkpts
     nocc = adc.t2[0].shape[3]
     nvir = adc.nmo - adc.nocc
-    n_singles = nvir
+    n_singles = nkpts * nocc * nvir
 
     for I in range(U.shape[1]):
         U1 = U[:n_singles,I]
-        U2 = U[n_singles:,I].reshape(nkpts,nkpts,nocc,nvir,nvir)
-        UdotU = np.dot(U1.conj().ravel(),U1.ravel())
+        U2 = U[n_singles:,I].reshape((nkpts,)*3 + (nocc,)*2 + (nvir,)*2)
+        breakpoint()
+        UdotU = np.dot(U1.conj().ravel(), U1.ravel())
         for ka in range(nkpts):
             for kb in range(nkpts):
-                ki = adc.khelper.kconserv[kb,kshift, ka]
-                UdotU +=  2.*np.dot(U2[ki,ka].conj().ravel(), U2[ki,ka].ravel()) - \
-                                    np.dot(U2[ki,ka].conj().ravel(),
-                                           U2[ki,kb].transpose(0,2,1).ravel())
-        U[:,I] /= np.sqrt(UdotU)
+                ki = adc.khelper.kconserv[kb, kshift, ka]
+                UdotU += 2. * np.dot(U2[ki, ka].conj().ravel(), U2[ki, ka].ravel()) - \
+                    np.dot(U2[ki, ka].conj().ravel(),
+                           U2[ki, kb].transpose(0, 2, 1).ravel())
+        U[:, I] /= np.sqrt(UdotU)
 
     U = U.reshape(-1,nroots)
 
@@ -673,7 +716,6 @@ class RADCEE(kadc_rhf.RADC):
         self.nkop_chk = adc.nkop_chk
         self.kop_npick = adc.kop_npick
 
-        self.t2 = adc.t2
         self.e_corr = adc.e_corr
         self.mo_energy = adc.mo_energy
         self.imds = adc.imds
@@ -693,23 +735,46 @@ class RADCEE(kadc_rhf.RADC):
     renormalize_eigenvectors = renormalize_eigenvectors
     get_properties = get_properties
 
-    def get_init_guess(self, nroots=1, diag=None, ascending=True):
-        if diag is None :
-            diag = self.get_diag()
-        idx = None
-        dtype = getattr(diag, 'dtype', np.complex128)
-        if ascending:
-            idx = np.argsort(diag)
+    def get_init_guess(self, nroots=1, diag=None, ascending=True, type=None, ini=None, kshift=None):
+        ncore = self.nocc
+        nextern = self.nmo - ncore
+        nkpts = self.nkpts
+        n_singles = nkpts * ncore * nextern
+        n_doubles = nkpts**3 * ncore**2 * nextern**2
+        dim = n_singles + n_doubles
+        if (type == "read"):
+            logger.info(self, "obtain initial guess from input variable")
+            g = ini.T
+            if g.shape[0] != dim or g.shape[1] != nroots:
+                raise ValueError(f"Shape of guess each k point should be ({dim},{nroots})")
         else:
-            idx = np.argsort(diag)[::-1]
-        guess = np.zeros((diag.shape[0], nroots), dtype=dtype)
-        min_shape = min(diag.shape[0], nroots)
-        guess[:min_shape,:min_shape] = np.identity(min_shape)
-        g = np.zeros((diag.shape[0], nroots), dtype=dtype)
-        g[idx] = guess.copy()
+            if diag is None:
+                diag = self.get_diag()
+            idx = None
+            dtype = getattr(diag, 'dtype', np.complex128)
+            g = np.zeros((diag.shape[0], nroots), dtype=dtype)
+            if ascending:
+                idx = np.argsort(diag)
+            else:
+                idx = np.argsort(diag)[::-1]
+            guess = np.zeros((diag.shape[0], nroots), dtype=dtype)
+            min_shape = min(diag.shape[0], nroots)
+            guess[:min_shape, :min_shape] = np.identity(min_shape)
+            g[idx] = guess.copy()
+
         guess = []
         for p in range(g.shape[1]):
-            guess.append(g[:,p])
+            if (self.frozen is not None) or (not np.all([x.shape[1] == self.nmo for x in self.mo_coeff])) \
+                    or (type == "read"):
+                guess_norm = np.linalg.norm(g[:, p])
+                guess_norm_tol = LOOSE_ZERO_TOL
+                if guess_norm < guess_norm_tol:
+                    raise ValueError('Guess vector for root %d with norm %.4g is below threshold %.4g.\n'
+                                     'This could possibly be due to freezing orbitals.\n'
+                                     'Check your guess vector to make sure it has sufficiently large norm.'
+                                     % (p, guess_norm, guess_norm_tol))
+
+            guess.append(g[:, p])
         return guess
 
     def gen_matvec(self,kshift,imds=None, eris=None):
