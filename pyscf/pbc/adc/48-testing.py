@@ -40,7 +40,7 @@ cell.a = '''
 '''
 cell.build()
 
-ncopies = [1,2,2]
+ncopies = [1,1,2]
 kptlist = np.arange(np.prod(ncopies)) # [0, 1, 2, 3] if ncopies = [1, 2, 2]
 nroots_test = 2
 
