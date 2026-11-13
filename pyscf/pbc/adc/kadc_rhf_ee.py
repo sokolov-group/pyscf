@@ -58,8 +58,7 @@ def vector_size(adc):
     return size
 
 
-def get_imds(adc, kshift, eris=None):
-
+def get_imds(adc, eris=None, kshift=0):
     cput0 = (time.process_time(), time.time())
     log = logger.Logger(adc.stdout, adc.verbose)
 
@@ -111,12 +110,16 @@ def get_imds(adc, kshift, eris=None):
         kD = kshift_ia[kI]
         for kL in range(nkpts):
             kA = kshift_ia[kL]
+            # ADC(1)
             if kI == kL and kA == kD:
                M_[kI,kL] += einsum('A,AD,IL->IDLA', e_vir[kA], np.identity(nvir), np.identity(nocc), optimize = einsum_type)
                M_[kI,kL] -= einsum('L,AD,IL->IDLA', e_occ[kL], np.identity(nvir), np.identity(nocc), optimize = einsum_type)
             M_[kI,kL] += 2*einsum('LADI->IDLA', v_ceec[kL,kA,kD], optimize = einsum_type)
             M_[kI,kL] += -einsum('ILAD->IDLA', v_ccee[kI,kL,kA].conj(), optimize = einsum_type)
             for ki in range(nkpts):
+                ka = kshift_ia[ki]
+
+            # ADC(2)
                 M_[kI,kL] += 2 * einsum('IiDa,LAia->IDLA', t1_ccee[kI,ki,kD], v_cece[kL,kA,ki], optimize = einsum_type)
                 M_[kI,kL] -= einsum('IiDa,iALa->IDLA', t1_ccee[kI,ki,kD], v_cece[ki,kA,kL], optimize = einsum_type)
                 M_[kI,kL] -= einsum('iIDa,LAia->IDLA', t1_ccee[ki,kI,kD], v_cece[kL,kA,ki], optimize = einsum_type)
@@ -155,6 +158,8 @@ def get_imds(adc, kshift, eris=None):
                         M_[kI,kL] -= 2 * einsum('AD,Liab,Iaib->IDLA', np.identity(nvir), t1d_ccee[kL,ki,kA].conj(), v_cece[kI,kA,ki].conj(), optimize = einsum_type)
                         M_[kI,kL] += einsum('AD,Iiab,iaLb->IDLA', np.identity(nvir), t1_ccee[kI,ki,kA], v_cece[ki,kA,kL], optimize = einsum_type)
                         M_[kI,kL] += einsum('AD,Liab,iaIb->IDLA', np.identity(nvir), t1d_ccee[kL,ki,kA].conj(), v_cece[ki,kA,kI].conj(), optimize = einsum_type)
+
+
                     #for kj in range(nkpts):
                     #    if kI == kL:
                     #        M_[kI,kL] -= 2 * einsum('IL,ijDa,iAja->IDLA', np.identity(nocc), t1_ccee[ki,kj,kD], v_cece[ki,kA,kj], optimize = einsum_type)
@@ -222,15 +227,13 @@ def get_imds(adc, kshift, eris=None):
 #                   # M_[kI,kL] += 2 * einsum('i,AD,Iiab,Liab->IDLA', e_occ[ki], np.identity(nvir), t1_ccee[kI,ki,kA], t1d_ccee[kL,ki,kA].conj(), optimize = einsum_type)
 #                   # M_[kI,kL] -= einsum('i,AD,Iiab,Liba->IDLA', e_occ[ki], np.identity(nvir), t1_ccee[kI,ki,kA], t1d_ccee[kL,ki,kb].conj(), optimize = einsum_type)
 #
-
-
-
-
-
-
     H = M_.reshape(nkpts, nkpts, nocc, nvir, nocc, nvir).transpose(0,2,3,1,4,5).reshape(nkpts*nocc*nvir, nkpts*nocc*nvir)
+
+    # Debug information. Please delete them.
     e, v = np.linalg.eig(H)
-    print("e",e)
+    # breakpoint()
+    e_real = np.sort(e.real.ravel())
+    print(e_real)
     
     return H
 
@@ -613,7 +616,6 @@ def renormalize_eigenvectors(adc, kshift, U, nroots=1):
     for I in range(U.shape[1]):
         U1 = U[:n_singles,I]
         U2 = U[n_singles:,I].reshape((nkpts,)*3 + (nocc,)*2 + (nvir,)*2)
-        breakpoint()
         UdotU = np.dot(U1.conj().ravel(), U1.ravel())
         for ka in range(nkpts):
             for kb in range(nkpts):
@@ -778,8 +780,8 @@ class RADCEE(kadc_rhf.RADC):
         return guess
 
     def gen_matvec(self,kshift,imds=None, eris=None):
-        #if imds is None:
-        imds = self.get_imds(kshift,eris)
+        if imds is None:
+            imds = self.get_imds(eris, kshift)
         diag = self.get_diag(kshift, imds, eris)
         matvec = self.matvec(kshift, imds, eris)
         return matvec, diag

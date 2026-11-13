@@ -769,6 +769,9 @@ def get_imds(adc, eris=None):
 
     M_ab = M_ab.reshape(n_singles, n_singles)
 
+    # Debug Information. Please remove it.
+    energy, coeff = np.linalg.eigh(M_ab)
+    print(energy)
     return M_ab
 
 

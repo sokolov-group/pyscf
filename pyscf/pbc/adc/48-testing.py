@@ -6,7 +6,7 @@
 #
 
 # --- Options ---
-method_type = 'ee'
+method_type = 'ea'
 method = 'adc(2)'
 # --- End of Options ---
 
@@ -40,7 +40,7 @@ cell.a = '''
 '''
 cell.build()
 
-ncopies = [1,1,2]
+ncopies = [1, 1, 2]
 kptlist = np.arange(np.prod(ncopies)) # [0, 1, 2, 3] if ncopies = [1, 2, 2]
 nroots_test = 2
 
@@ -63,13 +63,6 @@ scell = super_cell(cell, ncopies)
 # PBC Gamma-point RHF based on supercell
 mf = scf.RHF(scell, exxdiv=None).density_fit()
 erhf = mf.kernel()
-
-# # TDA
-# from pyscf.pbc import tdscf
-# mytda = tdscf.TDA(mf)
-# mytda.nstates = nroots_test
-# mytda.run()
-# print(mytda.e)
 
 # Molecular ADC
 myadc = mol_adc.RADC(mf)
