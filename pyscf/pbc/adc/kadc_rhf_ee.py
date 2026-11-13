@@ -197,12 +197,6 @@ def get_imds(adc, eris=None, kshift=0):
 
     H = M_.reshape(nkpts, nkpts, nocc, nvir, nocc, nvir).transpose(0,2,3,1,4,5).reshape(nkpts*nocc*nvir, nkpts*nocc*nvir)
 
-    # Debug information. Please delete them.
-    e, v = np.linalg.eig(H)
-    # breakpoint()
-    e_real = np.sort(e.real.ravel())
-    print(e_real)
-    
     return H
 
 
@@ -623,7 +617,7 @@ class RADCEE(kadc_rhf.RADC):
             Print level.  Default value equals to :class:`Mole.verbose`
         max_memory : float or int
             Allowed memory in MB.  Default value equals to :class:`Mole.max_memory`
-        inocc_complete : bool
+        incore_complete : bool
             Avoid all I/O. Default is False.
         method : string
             nth-order ADC method. Options are : ADC(2), ADC(2)-X, ADC(3). Default is ADC(2).
@@ -665,7 +659,10 @@ class RADCEE(kadc_rhf.RADC):
         self.method = adc.method
         self.method_type = adc.method_type
         self._scf = adc._scf
-        self.compute_properties = adc.compute_properties
+        if adc.compute_properties:
+            logger.warn(adc, 'Properties are not implemented for k-point EE-ADC; '
+                        'setting compute_properties = False.')
+        self.compute_properties = False
         self.approx_trans_moments = adc.approx_trans_moments
 
         self.kpts = adc._scf.kpts

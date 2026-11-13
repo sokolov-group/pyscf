@@ -6,7 +6,7 @@
 #
 
 # --- Options ---
-method_type = 'ea'
+method_type = 'ee'
 method = 'adc(2)'
 # --- End of Options ---
 

@@ -342,7 +342,7 @@ class RADC(pyscf.adc.radc.RADC):
         self.mo_occ = mo_occ
         self.mo_energy = mo_energy
         self.frozen = frozen
-        self.compute_properties = False
+        self.compute_properties = True
         self.approx_trans_moments = True
 
         self._nocc = None
