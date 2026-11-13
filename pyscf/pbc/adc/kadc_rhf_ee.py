@@ -62,7 +62,7 @@ def get_imds(adc, eris=None, kshift=0):
     cput0 = (time.process_time(), time.time())
     log = logger.Logger(adc.stdout, adc.verbose)
 
-    if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
+    if adc.method != "adc(2)":
         raise NotImplementedError(adc.method)
 
     method = adc.method
@@ -155,7 +155,7 @@ def get_diag(adc,kshift,M_ab=None,eris=None):
 
     log = logger.Logger(adc.stdout, adc.verbose)
 
-    if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
+    if adc.method != "adc(2)":
         raise NotImplementedError(adc.method)
 
     if M_ab is None:
@@ -247,7 +247,7 @@ def get_diag(adc,kshift,M_ab=None,eris=None):
 
 def matvec(adc, kshift, M_ab=None, eris=None):
 
-    if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
+    if adc.method != "adc(2)":
         raise NotImplementedError(adc.method)
 
     nkpts = adc.nkpts
