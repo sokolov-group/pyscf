@@ -159,7 +159,7 @@ def get_diag(adc,kshift,M_ab=None,eris=None):
         raise NotImplementedError(adc.method)
 
     if M_ab is None:
-        M_ab = adc.get_imds()
+        M_ab = adc.get_imds(eris, kshift)
     M_ = M_ab
 
 
@@ -229,7 +229,7 @@ def get_diag(adc,kshift,M_ab=None,eris=None):
         kconserv_r2[mask] = N
 
     for ki, kj, ka in kpts_helper.loop_kkk(nkpts):
-        kb = kconserv_r2[ki,kj,ka]
+        kb = kconserv_r2[ki,ka,kj]
 
         d_ij = e_occ[ki][:,None]+e_occ[kj]
         d_ab = e_vir[ka][:,None]+e_vir[kb]
@@ -249,9 +249,6 @@ def matvec(adc, kshift, M_ab=None, eris=None):
 
     if adc.method not in ("adc(2)", "adc(2)-x", "adc(3)"):
         raise NotImplementedError(adc.method)
-
-    method = adc.method
-
 
     nkpts = adc.nkpts
     nocc = adc.nocc
@@ -275,20 +272,24 @@ def matvec(adc, kshift, M_ab=None, eris=None):
     e_vir = np.array(e_vir)
     e_occ = np.array(e_occ)
 
-    v_ccee = eris.oovv
-    v_ceec = eris.ovvo
-    v_cccc = eris.oooo
     v_cecc = eris.ovoo
-    v_ceee = eris.ovvv
-    
+    if eris.ovvv is None:
+        v_ceee = np.empty((nkpts, nkpts, nkpts, nocc, nvir, nvir, nvir), dtype=eris.Lov.dtype)
+        for kp, kq, kr in kpts_helper.loop_kkk(nkpts):
+            ks = kconserv[kp, kq, kr]
+            v_ceee[kp, kq, kr] = lib.einsum('Lpq,Lrs->pqrs', eris.Lov[kp, kq], eris.Lvv[kr, ks]) / nkpts
+    else:
+        v_ceee = eris.ovvv
+
+    # particle k-point of a singles with hole at k, and its inverse
     kshift_ia = kconserv[:,kshift,0].copy()
-    kshift_ld = kconserv[:,kshift,0].copy()
+    kshift_ai = np.empty_like(kshift_ia)
+    kshift_ai[kshift_ia] = np.arange(nkpts)
 
     cell = adc.cell
     kpts = adc.kpts
-    nkpts = kpts.shape[0]
     a = cell.lattice_vectors() / (2 * np.pi)
- 
+
     kconserv_r2 = np.zeros((nkpts, nkpts, nkpts), dtype=int)
     kvKLM = kpts[:, None, None, :] - kpts[:, None, :] + kpts
     # Apply k shift
@@ -301,56 +302,49 @@ def matvec(adc, kshift, M_ab=None, eris=None):
         kconserv_r2[mask] = N
 
     if M_ab is None:
-        M_ab = adc.get_imds()
+        M_ab = adc.get_imds(eris, kshift)
+
+    einsum = lib.einsum
+    einsum_type = True
 
     # Calculate sigma vector
     def sigma_(r):
         cput0 = (time.process_time(), time.time())
         log = logger.Logger(adc.stdout, adc.verbose)
 
-        s1 = np.zeros((nkpts*nocc*nvir), dtype=np.complex128)
-        r1 = r[s_singles:f_singles]
-        #r1_s = r[s_singles:f_singles].reshape(nkpts,nocc*nvir)
-        r2 = r[s_doubles:f_doubles]
-        r2 = r2.reshape(nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir)
-        s2 = np.zeros((nkpts,nkpts,nkpts,nocc,nocc,nvir,nvir), dtype=np.complex128)
-        cell = adc.cell
-        kpts = adc.kpts
-        madelung = tools.madelung(cell, kpts)
+        r1 = r[s_singles:f_singles].reshape(nkpts, nocc, nvir)
+        r2 = r[s_doubles:f_doubles].reshape(nkpts, nkpts, nkpts, nocc, nocc, nvir, nvir)
 
-############ ADC(2) block ############################
+        s1 = lib.einsum('ab,b->a', M_ab, r[s_singles:f_singles]).reshape(nkpts, nocc, nvir)
+        s2 = np.zeros((nkpts, nkpts, nkpts, nocc, nocc, nvir, nvir), dtype=np.complex128)
 
-#        einsum = lib.einsum
-#        einsum_type = True
-#
+        # doubles rows: holes I, J at kI, kJ; particles C, D at kC, kD
+        for kI, kJ, kC in kpts_helper.loop_kkk(nkpts):
+            kD = kconserv_r2[kI, kC, kJ]
 
-        #for ki in range(nkpts):
-        s1 = lib.einsum('ab,b->a',M_ab,r1)
+            d_ij = e_occ[kI][:,None] + e_occ[kJ]
+            d_ab = e_vir[kC][:,None] + e_vir[kD]
+            s2[kI,kJ,kC] += (d_ab[None,None,:,:] - d_ij[:,:,None,None]) * r2[kI,kJ,kC]
 
-#        for ki, kj, ka in kpts_helper.loop_kkk(nkpts):
-#
-#            kb = kconserv_r2[ki,ka,kj]
-#
-#            d_ij = e_occ[ki][:,None]+e_occ[kj]
-#            d_ab = e_vir[ka][:,None]+e_vir[kb]
-#
-#            D_ijab = (-d_ij.reshape(-1,1) + d_ab.reshape(-1))
-#            interm = D_ijab.reshape(-1)*r2[ki,ka,kj].reshape(-1)
-#            s2[ki,kj,ka] += interm.reshape(nocc,nocc,nvir,nvir)
+            s2[kI,kJ,kC] += einsum('Ia,JDaC->IJCD', r1[kI], v_ceee[kJ,kD,kshift_ia[kI]].conj(), optimize = einsum_type)
+            s2[kI,kJ,kC] += einsum('Ja,ICaD->IJCD', r1[kJ], v_ceee[kI,kC,kshift_ia[kJ]].conj(), optimize = einsum_type)
+            s2[kI,kJ,kC] -= einsum('iC,JDIi->IJCD', r1[kshift_ai[kC]], v_cecc[kJ,kD,kI].conj(), optimize = einsum_type)
+            s2[kI,kJ,kC] -= einsum('iD,ICJi->IJCD', r1[kshift_ai[kD]], v_cecc[kI,kC,kJ].conj(), optimize = einsum_type)
 
-#                    s2[kb,ki] += einsum('Ia,JDaC->IJCD', Y, v_ceee[ki,kj,kshift], optimize = einsum_type)
-#                    s2[kb,ki] += einsum('Ja,ICaD->IJCD', Y, v_ceee[ki,kj,kshift], optimize = einsum_type)
-#                    s2[kb,ki] -= einsum('iC,JDIi->IJCD', Y, v_cecc[ki,kj,kshift], optimize = einsum_type)
-#                    s2[kb,ki] -= einsum('iD,ICJi->IJCD', Y, v_cecc[ki,kj,kshift], optimize = einsum_type)
-#
-#                    s1 -= einsum('Iiab,iabD->ID', r2[kb,ki], v_ceee[ki,kj,kshift], optimize = einsum_type).reshape(-1)
-#                    s1 += 2*einsum('Iiab,ibDa->ID', r2[kb,ki], v_ceee[ki,kj,kshift], optimize = einsum_type).reshape(-1)
-#                    s1 -= 2*einsum('ijDa,jaiI->ID', r2[kb,ki], v_cecc[ki,kj,kshift], optimize = einsum_type).reshape(-1)
-#                    s1 += einsum('ijDa,iajI->ID', r2[kb,ki], v_cecc[ki,kj,kshift], optimize = einsum_type).reshape(-1)
-        s2 = s2.reshape(-1)
-        s = np.hstack((s1, s2))
-        del s1
-        del s2
+        # singles rows: hole I at kI, particle D at kD
+        for kI in range(nkpts):
+            kD = kshift_ia[kI]
+            for ki in range(nkpts):
+                for ka in range(nkpts):
+                    kb = kconserv_r2[kI, ka, ki]
+                    s1[kI] -= einsum('Iiab,iaDb->ID', r2[kI,ki,ka], v_ceee[ki,ka,kD], optimize = einsum_type)
+                    s1[kI] += 2 * einsum('Iiab,ibDa->ID', r2[kI,ki,ka], v_ceee[ki,kb,kD], optimize = einsum_type)
+                for kj in range(nkpts):
+                    ka = kconserv_r2[ki, kD, kj]
+                    s1[kI] -= 2 * einsum('ijDa,jaiI->ID', r2[ki,kj,kD], v_cecc[kj,ka,ki], optimize = einsum_type)
+                    s1[kI] += einsum('ijDa,iajI->ID', r2[ki,kj,kD], v_cecc[ki,ka,kj], optimize = einsum_type)
+
+        s = np.hstack((s1.reshape(-1), s2.reshape(-1)))
 
         cput0 = log.timer_debug1("completed sigma vector calculation", *cput0)
 
