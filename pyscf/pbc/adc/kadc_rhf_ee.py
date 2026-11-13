@@ -192,8 +192,9 @@ def get_diag(adc,kshift,M_ab=None,eris=None):
     e_vir = np.array(e_vir)
     e_occ = np.array(e_occ)
 
-    diag = np.zeros((dim), dtype=np.complex128)
-    doubles = np.zeros((nkpts,nkpts,nkpts,nocc*nocc*nvir*nvir),dtype=np.complex128)
+    dtype = np.result_type(adc.t2[0])
+    diag = np.zeros((dim), dtype=dtype)
+    doubles = np.zeros((nkpts,nkpts,nkpts,nocc*nocc*nvir*nvir), dtype=dtype)
     singles = np.zeros((nkpts*nocc*nvir),dtype=np.complex128)
 
     kshift_ia = kconserv[:,kshift,0].copy()
@@ -239,7 +240,7 @@ def get_diag(adc,kshift,M_ab=None,eris=None):
 
     diag[s2:f2] += doubles.reshape(-1) 
 
-    diag[s1:f1] += singles
+    diag[s1:f1] += singles.real
     log.timer_debug1("Completed ee_diag calculation")
 
     return diag
@@ -316,7 +317,7 @@ def matvec(adc, kshift, M_ab=None, eris=None):
         r2 = r[s_doubles:f_doubles].reshape(nkpts, nkpts, nkpts, nocc, nocc, nvir, nvir)
 
         s1 = lib.einsum('ab,b->a', M_ab, r[s_singles:f_singles]).reshape(nkpts, nocc, nvir)
-        s2 = np.zeros((nkpts, nkpts, nkpts, nocc, nocc, nvir, nvir), dtype=np.complex128)
+        s2 = np.zeros((nkpts, nkpts, nkpts, nocc, nocc, nvir, nvir), dtype=np.result_type(adc.t2[0], r))
 
         # doubles rows: holes I, J at kI, kJ; particles C, D at kC, kD
         for kI, kJ, kC in kpts_helper.loop_kkk(nkpts):
