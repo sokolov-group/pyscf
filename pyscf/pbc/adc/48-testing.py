@@ -40,9 +40,9 @@ cell.a = '''
 '''
 cell.build()
 
-ncopies = [1, 1, 2]
+ncopies = [2, 2, 2]
 kptlist = np.arange(np.prod(ncopies)) # [0, 1, 2, 3] if ncopies = [1, 2, 2]
-nroots_test = 2
+nroots_test = 4
 
 # KRHF
 kpoints = cell.make_kpts(ncopies)
@@ -151,6 +151,16 @@ def tprint_compare(col_title1, arr1, col_title2, arr2, title=None) -> None:
     tprint(mydict, title)
 
 # Print and Compare
-k_e_ee_ravel = np.sort(k_e_ee.ravel())
+# Only states below every run's highest root are present in both lists.
+# The 1e-6 margin keeps a degenerate set at the cutoff out of both lists.
+cutoff = min(np.max(k_e_ee, axis=1).min(), np.max(mol_e_ee))
+k_e_ee_low = np.sort(k_e_ee.ravel())
+k_e_ee_low = k_e_ee_low[k_e_ee_low < cutoff - 1e-6]
+mol_e_ee_low = np.sort(mol_e_ee)
+mol_e_ee_low = mol_e_ee_low[mol_e_ee_low < cutoff - 1e-6]
+n_compare = min(len(k_e_ee_low), len(mol_e_ee_low))
 tabtitle = (method_type + '-' + method).upper()
-tprint_compare('PBC', k_e_ee_ravel, 'Mol', mol_e_ee, tabtitle)
+tprint_compare('PBC', k_e_ee_low[:n_compare], 'Mol', mol_e_ee_low[:n_compare], tabtitle)
+print(f'Compared the {n_compare} states below {cutoff:.6f} Eh, the lowest highest root of all runs.')
+if len(k_e_ee_low) != len(mol_e_ee_low):
+    print(f'FLAG: different number of states below the cutoff: PBC {len(k_e_ee_low)}, Mol {len(mol_e_ee_low)}')
