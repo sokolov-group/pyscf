@@ -54,7 +54,9 @@ class KnownValues(unittest.TestCase):
         kpts -= kpts[0]
         kmf = scf.KRHF(cell, kpts,exxdiv=None).density_fit().run()
         myadc  = adc.KRADC(kmf)
-        e_mp, t1, t2 = myadc.kernel_gs()
+        e_mp = myadc.ground_state_energy()
+        t1 = myadc.t1
+        t2 = myadc.t2
 
         self.assertAlmostEqual(e_mp, -0.02095766698, 4)
 
@@ -64,7 +66,9 @@ class KnownValues(unittest.TestCase):
         kpts -= kpts[0]
         kmf = scf.KRHF(cell, kpts,exxdiv=None).density_fit().run()
         myadc  = adc.KRADC(kmf)
-        e_mp2_1, t1, t2 = myadc.kernel_gs()
+        e_mp2_1 = myadc.ground_state_energy()
+        t1 = myadc.t1
+        t2 = myadc.t2
 
         mp2 = mp.KMP2(kmf)
         e_mp2_2 = mp2.kernel()[0]
@@ -79,7 +83,9 @@ class KnownValues(unittest.TestCase):
         kmf = scf.KRHF(cell, kpts,exxdiv=None).density_fit().run()
         myadc  = adc.KRADC(kmf)
         myadc.method = 'adc(3)'
-        e_mp, t1, t2 = myadc.kernel_gs()
+        e_mp = myadc.ground_state_energy()
+        t1 = myadc.t1
+        t2 = myadc.t2
 
         self.assertAlmostEqual(e_mp, -0.0208366684841, 4)
 

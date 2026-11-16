@@ -58,16 +58,16 @@ def _fno(pct_occ=None, thresh=None, nvir_act=None, mode=None):
     fg.verbose = 0
     if mode is not None:
         fg.mode = mode
-    fg.kernel_gs(pct_occ=pct_occ, thresh=thresh, nvir_act=nvir_act)
+    fg.ground_state_energy(pct_occ=pct_occ, thresh=thresh, nvir_act=nvir_act)
     return fg
 
 
-def _fno_es(method_type, ref_state, pct_occ):
+def _fno_es(type_, ref_state, pct_occ):
     """Excited-state SS/SA-FNO generator."""
     fg = adc.KRADC2FNO(kmf)
     fg.approx_trans_moments = True
     fg.verbose = 0
-    fg.method_type = method_type
+    fg.type_ = type_
     fg.ref_state = ref_state
     fg.kernel(nroots, pct_occ=pct_occ, kptlist=[0])
     return fg
@@ -82,10 +82,10 @@ def _gs_corr(fg, i=None):
     k = adc.KRADC(kmf, frozen, mo_coeff, mo_occ, mo_energy)
     k.verbose = 0
     k.method = 'adc(3)'
-    return fg.correct_corr(k.kernel_gs()[0], i)
+    return fg.correct_corr(k.ground_state_energy(), i)
 
 
-def _es_corr(fg, method_type, i=None):
+def _es_corr(fg, type_, i=None):
     """Corrected ADC(3) root-0 excitation energy in the FNO space."""
     frozen = fg.frozen[i] if i is not None else fg.frozen
     mo_coeff = fg.mo_coeff[i] if i is not None else fg.mo_coeff
@@ -95,7 +95,7 @@ def _es_corr(fg, method_type, i=None):
     k = adc.KRADC(kmf, frozen, mo_coeff, mo_occ, mo_energy)
     k.verbose = 0
     k.method = 'adc(3)'
-    k.method_type = method_type
+    k.type_ = type_
     e, v, p, _ = k.kernel(nroots, guess=guess, kptlist=[0])
     return fg.correct(e, i)[0][0]
 
@@ -106,9 +106,9 @@ class KnownValues(unittest.TestCase):
         # Canonical references (no FNO truncation).
         k = adc.KRADC(kmf)
         k.verbose = 0
-        e_mp2 = k.kernel_gs()[0]
+        e_mp2 = k.ground_state_energy()
         k.method = 'adc(3)'
-        e_mp3 = k.kernel_gs()[0]
+        e_mp3 = k.ground_state_energy()
         self.assertAlmostEqual(e_mp2, -0.1490009409, 4)
         self.assertAlmostEqual(e_mp3, -0.1191959948, 4)
 

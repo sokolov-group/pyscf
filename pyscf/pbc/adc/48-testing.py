@@ -6,7 +6,7 @@
 #
 
 # --- Options ---
-method_type = 'ee'
+type_ = 'ee'
 method = 'adc(2)'
 # --- End of Options ---
 
@@ -40,7 +40,7 @@ cell.a = '''
 '''
 cell.build()
 
-ncopies = [2, 2, 2]
+ncopies = [1, 1, 2]
 kptlist = np.arange(np.prod(ncopies)) # [0, 1, 2, 3] if ncopies = [1, 2, 2]
 nroots_test = 4
 
@@ -53,8 +53,9 @@ ekrhf = kmf.kernel()
 kadc  = adc.KRADC(kmf)
 
 # EE-KRADC
-kadc.method_type = method_type
+kadc.type_ = type_
 kadc.method = method
+kadc.approx_trans_moments = False
 k_e_ee, v_e_ee, k_p_ee, k_x_ee = kadc.kernel(nroots_test,kptlist=kptlist)
 
 # Supercell
@@ -68,7 +69,7 @@ erhf = mf.kernel()
 myadc = mol_adc.RADC(mf)
 
 # Molecular EE-ADC
-myadc.method_type = method_type
+myadc.method_type = type_
 myadc.method = method
 mol_e_ee,mol_v_ee,mol_p_ee,mol_x_ee = myadc.kernel(nroots_test*np.prod(ncopies))
 
@@ -159,8 +160,13 @@ k_e_ee_low = k_e_ee_low[k_e_ee_low < cutoff - 1e-6]
 mol_e_ee_low = np.sort(mol_e_ee)
 mol_e_ee_low = mol_e_ee_low[mol_e_ee_low < cutoff - 1e-6]
 n_compare = min(len(k_e_ee_low), len(mol_e_ee_low))
-tabtitle = (method_type + '-' + method).upper()
+tabtitle = (type_ + '-' + method).upper()
 tprint_compare('PBC', k_e_ee_low[:n_compare], 'Mol', mol_e_ee_low[:n_compare], tabtitle)
 print(f'Compared the {n_compare} states below {cutoff:.6f} Eh, the lowest highest root of all runs.')
 if len(k_e_ee_low) != len(mol_e_ee_low):
     print(f'FLAG: different number of states below the cutoff: PBC {len(k_e_ee_low)}, Mol {len(mol_e_ee_low)}')
+
+# Fail the regression check when the supercell comparison disagrees.
+assert n_compare > 0, 'No common EE roots were available for comparison.'
+assert len(k_e_ee_low) == len(mol_e_ee_low), 'EE state counts differ.'
+np.testing.assert_allclose(k_e_ee_low, mol_e_ee_low, atol=1e-6, rtol=0)

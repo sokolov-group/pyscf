@@ -52,7 +52,7 @@ def setUpModule():
     kpts -= kpts[0]
     kmf = scf.KRHF(cell, kpts,exxdiv=None).density_fit().run()
     kadc  = adc.KRADC(kmf)
-    kadc.method_type = 'ea'
+    kadc.type_ = 'ea'
 
 def tearDownModule():
     global cell, myadc, kadc

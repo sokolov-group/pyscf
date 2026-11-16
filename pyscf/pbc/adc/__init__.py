@@ -14,16 +14,18 @@
 # limitations under the License.
 
 from pyscf.pbc import scf
-from pyscf.pbc.adc import kadc_rhf
-from pyscf.pbc.adc import kadc_rhf_ip
-from pyscf.pbc.adc import kadc_rhf_ea
-from pyscf.pbc.adc import kadc_fno
+from pyscf.pbc.adc import kadc_fno, kadc_rhf, kadc_rhf_ea, kadc_rhf_ip
 
 
 def KRADC(mf, frozen=None, mo_coeff=None, mo_occ=None, mo_energy=None):
+    """Create a restricted periodic ADC driver from a k-point SCF reference.
+
+    See :class:`kadc_rhf.KRADC` for orbital overrides and frozen spaces.
+    ``ground_state_energy()`` returns e_corr; amplitudes stay on the driver.
+    """
     if not isinstance(mf, scf.khf.KRHF):
         mf = mf.to_rhf()
-    return kadc_rhf.RADC(mf, frozen, mo_coeff, mo_occ, mo_energy)
+    return kadc_rhf.KRADC(mf, frozen, mo_coeff, mo_occ, mo_energy)
 
 
 def KRADC2FNO(mf, frozen=None, mo_coeff=None, mo_occ=None):

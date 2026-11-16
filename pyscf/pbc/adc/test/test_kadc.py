@@ -26,7 +26,9 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(ehf2, -6.1729762695142645, 4)
 
         myadc  = adc.KRADC(kmf)
-        e_mp2, t1, t2 = myadc.kernel_gs()
+        e_mp2 = myadc.ground_state_energy()
+        t1 = myadc.t1
+        t2 = myadc.t2
         self.assertAlmostEqual(e_mp2, -0.11464808675651168, 4)
 
         # IP-ADC(2)

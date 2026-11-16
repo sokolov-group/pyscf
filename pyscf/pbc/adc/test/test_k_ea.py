@@ -44,7 +44,7 @@ def setUpModule():
     kpts -= kpts[0]
     kmf = scf.KRHF(cell, kpts, exxdiv=None).density_fit().run()
     kadc  = adc.KRADC(kmf)
-    kadc.method_type = 'ea'
+    kadc.type_ = 'ea'
 
 def tearDownModule():
     global cell, kadc
@@ -72,7 +72,7 @@ class KnownValues(unittest.TestCase):
         kmf = scf.KRHF(cell, kpts,exxdiv=None).density_fit().run()
         kadc  = adc.KRADC(kmf)
         kadc.method = 'adc(2)-x'
-        kadc.method_type = 'ea'
+        kadc.type_ = 'ea'
         e, v, p, x = kadc.kernel(nroots=3,kptlist=[0])
 
         self.assertAlmostEqual(e[0][0], 0.82483536, 4)
