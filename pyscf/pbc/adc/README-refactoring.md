@@ -3,17 +3,17 @@
 The production modules share integral storage, backend selection,
 optimized tensor contractions and charged-sector initial guesses. The
 primary reference class is `kadc_rhf.KRADC`, returned by `adc.KRADC(kmf)`.
-IP and EA numerical routines belong to `RADCIP` and `RADCEA`. Molecular
+IP and EA numerical routines belong to `KRADCIP` and `KRADCEA`. Molecular
 implementations under `pyscf/adc` retain their own APIs and are unchanged.
 
 ## Reference calculations and API names
 
 ```python
-kadc = adc.KRADC(kmf)
-kadc.type_ = 'ee'  # ip, ea, or ee
-energy = kadc.ground_state_energy()
-singles, doubles = kadc.t1, kadc.t2
-assert energy == kadc.e_corr
+mykradc = adc.KRADC(kmf)
+mykradc.type_ = 'ee'  # ip, ea, or ee
+energy = mykradc.ground_state_energy()
+singles, doubles = mykradc.t1, mykradc.t2
+assert energy == mykradc.e_corr
 ```
 
 `ground_state_energy()` returns the correlation contribution per primitive
@@ -27,7 +27,9 @@ used internally.
 return scalar `e_corr`, and clear stale E/U/P/X/T and convergence results.
 They do not enter the excitation solver or validate excitation-only
 arguments such as kptlist. Positive root counts retain the E/U/P/X tuple
-interface. FNO's `ground_state_energy()` returns the active-space
+interface for compatibility. New user code should call kernel() and read
+E, U, P and X from driver attributes instead of unpacking its return value.
+FNO's `ground_state_energy()` returns the active-space
 correlation energy (or a list for multiple thresholds); additive
 corrections remain available through `correct_corr`.
 
@@ -36,6 +38,7 @@ Compatibility entry points remain for external callers:
 | Earlier name | Primary API |
 | --- | --- |
 | `kadc_rhf.RADC` | `kadc_rhf.KRADC` |
+| `RADCIP` / `RADCEA` / `RADCEE` | `KRADCIP` / `KRADCEA` / `KRADCEE` |
 | `method_type` | `type_` |
 | `kernel_gs()` | `ground_state_energy()` |
 | `transform_integrals()` | `ao2mo()` |
@@ -43,13 +46,22 @@ Compatibility entry points remain for external callers:
 | `_orbital_data()` | `padded_coeff`, `e_occ`, `e_vir` properties |
 | `compute_amplitudes()` | `amplitudes()` and instance attributes |
 | `compute_energy()` | `correlation_energy()` |
+| `get_init_guess(..., type=...)` | Sector helper with `type_`, described below |
 
 The earlier base `kernel_gs()` still returns its tuple with a
 DeprecationWarning; callers should migrate to the scalar API and instance
-fields. The earlier `compute_*` methods also warn. Compatibility modules
-contain forwarding imports/adapters, not copies of the numerical code.
-Periodic examples and tests use the new names. Molecular reference calls
-keep their existing PySCF names.
+fields. The earlier `compute_*` methods and the driver
+`transform_integrals()` method also emit DeprecationWarning. Earlier sector
+class names remain aliases of their canonical K-point class names. Periodic
+examples and tests use the new names. Molecular reference calls keep their
+existing PySCF names.
+
+The shared solver calls `_charged_init_guess` for IP/EA and
+`_neutral_init_guess` for EE. Both use `type_=None` for diagonal unit guesses
+and `type_='read'` for supplied vectors. The inherited `get_init_guess`
+adapter emits a DeprecationWarning and accepts the earlier `type` keyword.
+User guesses have shape `(nsectors, nroots, vector_size)` at the kernel
+boundary, and `(nroots, vector_size)` for one sector's helper.
 
 ## Integral transformation and layout
 
@@ -61,7 +73,7 @@ container; a Python initializer itself does not return the backend result.
 ```python
 from pyscf.pbc.adc.kadc_ao2mo import AO2MO
 
-context = AO2MO(kadc, backend='density_fit')
+context = AO2MO(mykradc, backend='density_fit')
 with context() as eris:
     block = eris.ovvv_blocks[0, 0, 0]
     virtual_block = eris.vvvv_blocks[0, 0, 0]
@@ -83,9 +95,8 @@ does not expand a dense tensor. The raw `ovvv` and `vvvv` attributes remain
 None for DF storage so existing backend decisions stay explicit.
 `close()` and context-manager support provide scratch cleanup.
 
-DF reconstruction helpers now belong to `_ChemistsERIs` as `ovvv_df` and
-`vvvv_df`; the former `dfadc` module forwards to these implementations.
-The old `kadc_eris` module re-exports the same owning class.
+DF reconstruction helpers belong to `_ChemistsERIs` as `ovvv_df` and
+`vvvv_df`.
 
 Four-index blocks have three leading k axes and use chemists' ordering,
 except `vvvv`, which uses particle-particle ordering for ladder
@@ -99,6 +110,16 @@ complex orbital phases and charged-excitation backend comparisons.
 validation, and comma-separated table formatting. Tensor identifiers use
 occupied/virtual labels (o/v) and dimensions use nocc/nvir throughout the
 periodic implementation. Repeated independent k loops use product loops.
+`mo_splitter(mykradc, kpt=0)` returns a flat list of four one-dimensional
+boolean masks for one selected k point: frozen occupied, active occupied,
+active virtual and frozen virtual. Call it separately for each k point;
+this supports different MO counts across the mesh. Orbital counting and
+FNO construction use the same interface.
+
+Short einsum calls stay on one line. Longer calls put the contraction
+subscripts on their own line, followed by the operands together when they
+fit, or one operand per line otherwise. Reference, orbital-partition and
+logging docstrings include executable examples with locally checked values.
 
 ```python
 from pyscf.pbc.adc import lib as adc_lib
@@ -113,11 +134,20 @@ messages use formatted strings; numerical modulo operations are retained.
 
 ## Neutral excitations
 
-`RADCEE` supports singlet `adc(2)`, `adc(2)-x`, and `adc(3)`. The ADC(2)
+`KRADCEE` supports singlet `adc(2)`, `adc(2)-x`, and `adc(3)`. The ADC(2)
 loops remain specialized. Higher-order contractions are listed in
 `kadc_ee_terms.py`, with coefficients combined from the molecular
 `pyscf.adc.radc_ee` reference. Third-order ground-state singles needed for
 full transition moments are also implemented.
+
+The singles effective Hamiltonian is assembled by `_get_adc1_ham`,
+`_get_adc2_ham` and `_get_adc3_ham`. The first includes zeroth-/first-order
+terms; the latter two return corrections or accumulate into an existing
+tensor. The orbital-energy term updates a writable diagonal view instead
+of constructing identity matrices and four-index energy temporaries.
+The EE Davidson preconditioner uses the full singles diagonal and
+zeroth-order doubles energy differences, so it omits higher-order doubles
+interactions in ADC(2)-x and ADC(3).
 
 `lib.MomentumContractions` assigns momenta to orbital labels,
 enforces each tensor's conservation law, and orients complex conjugates
@@ -143,14 +173,15 @@ With that approximation, absent higher-order amplitudes are omitted,
 following the molecular reference's behavior.
 
 ```python
-kadc = adc.KRADC(kmf)
-kadc.type_ = 'ee'
-kadc.method = 'adc(3)'
-kadc.approx_trans_moments = False
-kadc.compute_properties = True
-kadc.density_gv = np.zeros(3)  # Cartesian reciprocal vector, inverse Bohr
-energies, U, P, X = kadc.kernel(nroots=4, kptlist=[0, 1])
-T = kadc.T
+mykradc = adc.KRADC(kmf)
+mykradc.type_ = 'ee'
+mykradc.method = 'adc(3)'
+mykradc.approx_trans_moments = False
+mykradc.compute_properties = True
+mykradc.density_gv = np.zeros(3)  # Cartesian reciprocal vector, inverse Bohr
+mykradc.kernel(nroots=4, kptlist=[0, 1])
+energies, U, P, X = mykradc.E, mykradc.U, mykradc.P, mykradc.X
+T = mykradc.T
 ```
 
 For `nq` requested sectors, `nr` roots, `nk` k points, and padded active
@@ -189,17 +220,57 @@ form factors.
 
 ## Validation
 
+Every function and class in the active Python modules, comparison script
+and tests has a docstring, including constructors, property setters,
+compatibility adapters and nested contraction helpers. The scientific
+interfaces document equations, tensor shapes and ordering, k-point
+normalization, units, mutation and scratch-file ownership. Class docstrings
+describe their configuration and result attributes.
+
+Each worked docstring example includes its imports and setup. Numerical
+examples construct their own two-k-point helium `kmf`; pure helpers supply
+their own small input arrays or models. No example needs variables from
+another docstring or an existing SCF calculation.
+
+Use a Python environment with NumPy and this built PySCF checkout, including
+`pyscf.pbc.adc`, importable. Enter the code after `>>>` and `...` in order;
+unprefixed lines show expected output. Each example block, including blocks
+separated by explanatory prose, can start in a fresh Python session. The
+comparison-script helpers show
+their explicit loader; the first import of that script also runs its small
+helium regression, with diagnostic output captured in the example.
+
+The documentation test reads the source docstrings and runs every example
+block in an empty namespace. It supplies no module globals, imported
+functions, NumPy alias or shared reference. Run it on its own with:
+
+```bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m unittest \
+  test.test_kadc_api.Documentation -v
+```
+
 Run the focused tests with one BLAS/OpenMP thread for reproducibility:
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python -m unittest \
   test.test_kadc_api test.test_k_ee test.test_k_ee_orders \
-  test.test_kadc_integrals
+  test.test_kadc_integrals test.test_kadc test.test_ground_state_energy \
+  test.test_k_vs_supercell_ea test.test_k_vs_supercell_ip \
+  test.test_k_ea test.test_k_ip test.test_kadc_fno
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python 48-testing.py
 ```
 
+The separate `test_k_vs_supercell_{ea,ip}_highcost` modules are optional
+larger-system benchmarks and are not included in this command.
+
 API tests check scalar energies, state-only amplitudes, legacy warnings,
 zero-root behavior, lazy integral properties, cached chunking and logging.
+They execute the worked docstring examples and check reference-density AO
+conversion with frozen orbitals, complex MO phases and rectangular active
+coefficient matrices. AO conversion now allocates an AO-sized result and
+works without a frozen-space branch. The optimized first-order EE block is
+also checked against the identity-tensor prototype with unequal occupied
+and virtual dimensions.
 The numerical tests compare Gamma amplitudes, singles blocks, arbitrary
 matrix-vector products, and transition densities against molecular implementations for
 all three EE methods. Supercell checks compare energies and summed
@@ -211,6 +282,15 @@ refactor. `48-testing.py` now asserts its energy comparison and uses full
 transition moments.
 
 ## References and scope
+
+The default EE Davidson starting guesses can still miss the lowest roots
+in symmetric crystals while reporting convergence. A separate dense-matrix
+audit of ADC(2), four roots, at Gamma for diamond C (a = 3.567 Angstrom)
+and Si (a = 5.431 Angstrom), using GTH-SZV/GTH-PADE, Gaussian density
+fitting and exxdiv=None, found maximum differences of 2.61e-4 and 6.43e-3
+Hartree, respectively. The existing regression suite passes but does not
+cover these root-completeness cases. A robust initial-guess strategy and
+permanent dense-versus-Davidson regressions remain to be implemented.
 
 The molecular working equations in `pyscf/adc/radc_ee.py` and
 `radc_amplitudes.py` are the direct implementation references. The supplied

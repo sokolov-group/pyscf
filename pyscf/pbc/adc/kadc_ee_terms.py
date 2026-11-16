@@ -17,11 +17,36 @@
 #         Alexander Sokolov <alexander.y.sokolov@gmail.com>
 #
 
-"""Spin-free EE contraction terms, transcribed from pyscf.adc.radc_ee.
+r"""Spin-free EE-ADC contraction tables adapted from pyscf.adc.radc_ee.
 
-Each entry is (coefficient, orbital einsum, operand names). K-point loops
-and complex conjugation are handled by the momentum contraction layer.
-Terms repeated in the molecular implementation are combined here.
+Each term is a triple (coefficient, orbital_einsum, operand_names). The
+labels describe orbital indices only; independent k sums, phase-oriented
+complex conjugations and 1/nkpts-normalized ERIs are handled by
+lib.MomentumContractions. Repeated contributions in the molecular working
+equations are combined into their total coefficient here.
+
+Attributes:
+    SINGLES_3 (dict): Third-order singles-Hamiltonian terms under ss.
+        Output labels IDLA, IL and DA distinguish full and identity-lifted
+        occupied/virtual contributions.
+    SIGMA_2X (dict): Extended-second-order doubles action under s2.
+    SIGMA_3 (dict): Third-order matrix-vector terms under s1 and s2.
+    TRANSITION_2, TRANSITION_2X, TRANSITION_3 (dict): Transition-density
+        corrections grouped by molecular TY occupied/virtual target block.
+        Their tensors are evaluated on the response roots by KRADCEE.
+    SINGLES_AMPLITUDES_3 (tuple): Third-order ground-state singles terms
+        used when full transition moments require that perturbative order.
+
+Operand names refer to energies eo/ev, ground singles t1_2/t1_3, ground
+doubles t2_1/t2_2, response amplitudes r1/r2, or integral blocks. Uppercase
+and lowercase labels distinguish contraction indices, not orbital spaces
+by themselves; operand tensor signatures define each index's role.
+
+Examples:
+    >>> from pyscf.pbc.adc.kadc_ee_terms import SINGLES_3
+    >>> coefficient, equation, names = SINGLES_3['ss'][0]
+    >>> coefficient, equation, names
+    (2.0, 'Ia,LADa->IDLA', ('t1_2', 'ovvv'))
 """
 
 SINGLES_3 = {

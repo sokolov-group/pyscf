@@ -50,13 +50,15 @@ kmf = scf.KRHF(cell, kpts=kpoints, exxdiv=None).density_fit()
 ekrhf = kmf.kernel()
 
 # KADC
-kadc  = adc.KRADC(kmf)
+mykradc  = adc.KRADC(kmf)
 
 # EE-KRADC
-kadc.type_ = type_
-kadc.method = method
-kadc.approx_trans_moments = False
-k_e_ee, v_e_ee, k_p_ee, k_x_ee = kadc.kernel(nroots_test,kptlist=kptlist)
+mykradc.type_ = type_
+mykradc.method = method
+mykradc.approx_trans_moments = False
+mykradc.kernel(nroots_test, kptlist=kptlist)
+k_e_ee, v_e_ee = mykradc.E, mykradc.U
+k_p_ee, k_x_ee = mykradc.P, mykradc.X
 
 # Supercell
 scell = super_cell(cell, ncopies)
@@ -71,34 +73,55 @@ myadc = mol_adc.RADC(mf)
 # Molecular EE-ADC
 myadc.method_type = type_
 myadc.method = method
-mol_e_ee,mol_v_ee,mol_p_ee,mol_x_ee = myadc.kernel(nroots_test*np.prod(ncopies))
+mol_e_ee,mol_v_ee,mol_p_ee,mol_x_ee = myadc.kernel(
+    nroots_test * np.prod(ncopies))
 
 def tprint(data: dict, title=None, num_header=None) -> None:
-    '''
-    Print Tables
-    Input: 
-            data: dict. consisting of { 'col_title': content: array_like }
-            title: str. The title of the whole table.
-            num_header: str, The title of the No. column.
-            wlist: list, The width per column.
-    Print: A table separated with comma ','
+    r"""Print a numbered comparison table to standard output.
+
+    Args:
+        data (dict[str, sequence]): Nonempty ordered mapping from column
+            headings to values. Unequal columns are extended with None.
+            Floating values use five digits after the decimal point; other
+            values are converted with str().
+        title (str, optional): Centered star-filled heading and matching
+            End of <title> footer. Omit both when title is false.
+        num_header (str, optional): Heading for the one-based row-number
+            column. Its width is at least three; data columns use width eleven.
+
+    Returns:
+        None: Print comma-separated centered headings and rows. Widths are
+        minimum field widths, so long headings or values can extend a line.
+        This helper is local to the regression example; production ADC tables
+        are formatted by pyscf.pbc.adc.lib.table_lines().
+
     Examples:
-    >>> title = 'Sample'
-    >>> header_1 = 'Name'; arr_1 = ['Amy', 'Tom']
-    >>> header_2 = 'Age'; arr_2 = [19, 20]
-    >>> tprint(data = {
-            header_1: arr_1,
-            header_2: arr_2,
-            }, 
-            title=title,
-            num_header=''
-            )
-    ***********Sample***********
-       ,   Name    ,    Age
-     1 ,    Amy    ,    19
-     2 ,    Tom    ,    20
-    *******End of Sample********
-    '''
+        The helper lives in the executable 48-testing.py example. Its first
+        import also runs the small helium regression; capture that diagnostic
+        output before formatting a separate table below.
+
+        >>> import importlib
+        >>> import io
+        >>> from contextlib import redirect_stdout
+        >>> with redirect_stdout(io.StringIO()):
+        ...     comparison = importlib.import_module(
+        ...         'pyscf.pbc.adc.48-testing')
+        >>> tprint = comparison.tprint
+        >>> output = io.StringIO()
+        >>> with redirect_stdout(output):
+        ...     tprint({'E': [1.0, 2.0]}, title='ADC')
+        >>> print(output.getvalue(), end='')  # doctest: +NORMALIZE_WHITESPACE
+        ******ADC*******
+           ,     E
+         1 ,  1.00000
+         2 ,  2.00000
+        ***End of ADC***
+        >>> lines = output.getvalue().splitlines()
+        >>> lines[0], lines[-1], len(lines)
+        ('******ADC*******', '***End of ADC***', 5)
+        >>> [cell.strip() for cell in lines[2].split(',')]
+        ['1', '1.00000']
+    """
     COL_WIDTH = 11
     NUM_COL_WIDTH = 3
     FLOAT_PRECISION = 5
@@ -138,12 +161,52 @@ def tprint(data: dict, title=None, num_header=None) -> None:
             row_out += val_str
         print(row_out)
     # Title: end of table.
-    if title: print(f'{'End of '+title :*^{LINE_WIDTH}}')
+    if title: print(f"{'End of ' + title:*^{LINE_WIDTH}}")
 
 def tprint_compare(col_title1, arr1, col_title2, arr2, title=None) -> None:
-    '''
-    Compare two arrays and print list.
-    '''
+    r"""Print two numerical arrays and their elementwise second-minus-first
+    difference.
+
+    Args:
+        col_title1 (str): Heading for the first numerical column.
+        arr1 (ndarray): First one-dimensional comparison array.
+        col_title2 (str): Heading for the second numerical column.
+        arr2 (ndarray): Second array, with shape compatible with arr1.
+        title (str, optional): Heading/footer passed to tprint().
+
+    Returns:
+        None: Print the two arrays and a Diff column containing arr2-arr1.
+        Inputs must support subtraction; numeric formatting and row numbering
+        follow tprint(). No tolerance or numerical assertion is applied here;
+        the regression script checks energies separately.
+
+    Examples:
+        The helper lives in the executable 48-testing.py example. Its first
+        import also runs the small helium regression; capture that diagnostic
+        output before formatting a separate table below.
+
+        >>> import importlib
+        >>> import io
+        >>> import numpy as np
+        >>> from contextlib import redirect_stdout
+        >>> with redirect_stdout(io.StringIO()):
+        ...     comparison = importlib.import_module(
+        ...         'pyscf.pbc.adc.48-testing')
+        >>> tprint_compare = comparison.tprint_compare
+        >>> output = io.StringIO()
+        >>> with redirect_stdout(output):
+        ...     tprint_compare(
+        ...         'PBC', np.array([1.0]), 'Mol', np.array([1.0]), title='ADC'
+        ...     )
+        >>> print(output.getvalue(), end='')  # doctest: +NORMALIZE_WHITESPACE
+        ******************ADC*******************
+           ,    PBC    ,    Mol    ,   Diff
+         1 ,  1.00000  ,  1.00000  ,  0.00000
+        ***************End of ADC***************
+        >>> row = output.getvalue().splitlines()[2]
+        >>> [cell.strip() for cell in row.split(',')]
+        ['1', '1.00000', '1.00000', '0.00000']
+    """
     mydict = {
             col_title1: arr1,
             col_title2: arr2,
@@ -161,12 +224,14 @@ mol_e_ee_low = np.sort(mol_e_ee)
 mol_e_ee_low = mol_e_ee_low[mol_e_ee_low < cutoff - 1e-6]
 n_compare = min(len(k_e_ee_low), len(mol_e_ee_low))
 tabtitle = (type_ + '-' + method).upper()
-tprint_compare('PBC', k_e_ee_low[:n_compare], 'Mol', mol_e_ee_low[:n_compare], tabtitle)
+tprint_compare(
+    'PBC', k_e_ee_low[:n_compare], 'Mol', mol_e_ee_low[:n_compare], tabtitle)
 print(f'Compared the {n_compare} states below {cutoff:.6f} Eh, the lowest highest root of all runs.')
 if len(k_e_ee_low) != len(mol_e_ee_low):
-    print(f'FLAG: different number of states below the cutoff: PBC {len(k_e_ee_low)}, Mol {len(mol_e_ee_low)}')
+    print(f'FLAG: different number of states below the cutoff: PBC {len(
+        k_e_ee_low)}, Mol {len(mol_e_ee_low)}')
 
 # Fail the regression check when the supercell comparison disagrees.
 assert n_compare > 0, 'No common EE roots were available for comparison.'
 assert len(k_e_ee_low) == len(mol_e_ee_low), 'EE state counts differ.'
-np.testing.assert_allclose(k_e_ee_low, mol_e_ee_low, atol=1e-6, rtol=0)
+np.testing.assert_allclose(k_e_ee_low, mol_e_ee_low, atol=1e-06, rtol=0)
