@@ -73,7 +73,7 @@ def _fno(pct_occ=None, thresh=None, nvir_act=None, mode=None):
         mode (str, optional): Common-count or per-k truncation mode override.
 
     Returns:
-        RADC2FNO: Driver containing FNO orbitals, canonical MP2 reference
+        KRADCIPFNO: Driver containing FNO orbitals, canonical MP2 reference
         information and additive correlation corrections. ADC(3) is evaluated
         separately by _gs_corr(), rather than by this helper.
     """
@@ -87,22 +87,21 @@ def _fno(pct_occ=None, thresh=None, nvir_act=None, mode=None):
     return mykradc_fno
 
 
-def _fno_es(type_, ref_state, pct_occ):
+def _fno_es(solver_type, ref_state, pct_occ):
     r"""Generate charged state-specific/state-averaged ADC(2) FNO data.
 
     Args:
-        type_ (str): 'ip' or 'ea' excitation sector.
+        solver_type (type): KRADCIP or KRADCEA.
         ref_state: Explicit selected root/sector lists for the FNO density.
         pct_occ (float): Cumulative virtual occupation criterion.
 
     Returns:
-        RADC2FNO: Driver with sector-zero canonical/FNO roots, their vectors
+        KRADCIPFNO: Driver with sector-zero canonical/FNO roots, their vectors
         and additive ADC(2) corrections, using module-level nroots.
     """
-    mykradc_fno = adc.KRADC2FNO(kmf)
+    mykradc_fno = adc.KRADC2FNO(solver_type(kmf))
     mykradc_fno.approx_trans_moments = True
     mykradc_fno.verbose = 0
-    mykradc_fno.type_ = type_
     mykradc_fno.ref_state = ref_state
     mykradc_fno.kernel(nroots, pct_occ=pct_occ, kptlist=[0])
     return mykradc_fno
@@ -112,33 +111,35 @@ def _gs_corr(fg, i=None):
     r"""Compute an ADC(3) reference energy with a selected FNO correction.
 
     Args:
-        fg (RADC2FNO): Generator holding FNO orbitals and ADC(2) correction
+        fg (KRADCIPFNO): Generator holding FNO orbitals and ADC(2) correction
             data.
         i (int, optional): Run index for a multi-threshold generator.
 
     Returns:
         float: Per-cell ADC(3) correlation contribution in Hartree plus the
-        selected canonical-minus-FNO MP2 correction. A separate KRADC driver
-        uses the selected coefficients, energies, occupations and frozen list.
+        selected canonical-minus-FNO MP2 correction. A separate KRADCBase
+        driver uses the selected coefficients, energies, occupations and frozen
+        list.
     """
     frozen = fg.frozen[i] if i is not None else fg.frozen
     mo_coeff = fg.mo_coeff[i] if i is not None else fg.mo_coeff
     mo_energy = fg.mo_energy[i] if i is not None else fg.mo_energy
     mo_occ = fg.mo_occ[i] if (i is not None and isinstance(
         fg.mo_coeff, list)) else fg.mo_occ
-    mykradc = adc.KRADC(kmf, frozen, mo_coeff, mo_occ, mo_energy)
+    mykradc = adc.KRADCIP(kmf, frozen, mo_coeff, mo_occ, mo_energy)
     mykradc.verbose = 0
     mykradc.method = 'adc(3)'
     return fg.correct_corr(mykradc.ground_state_energy(), i)
 
 
-def _es_corr(fg, type_, i=None):
+def _es_corr(fg, solver_type, i=None):
     r"""Compute the first corrected ADC(3) charged excitation in an FNO space.
 
     Args:
-        fg (RADC2FNO): Generator with FNO orbitals, initial root vectors and
+        solver_type (type): KRADCIP or KRADCEA.
+        fg (KRADCIPFNO): Generator with FNO orbitals, initial root vectors and
             additive ADC(2) excitation corrections.
-        type_ (str): 'ip' or 'ea' for the ADC(3) calculation.
+
         i (int, optional): Run index for multi-threshold data.
 
     Returns:
@@ -151,11 +152,10 @@ def _es_corr(fg, type_, i=None):
         fg.mo_coeff, list)) else fg.mo_occ
     mo_energy = fg.mo_energy[i] if i is not None else fg.mo_energy
     guess = fg.v_ssfno[i] if i is not None else fg.v_ssfno
-    mykradc = adc.KRADC(kmf, frozen, mo_coeff, mo_occ, mo_energy)
+    mykradc = solver_type(kmf, frozen, mo_coeff, mo_occ, mo_energy)
     mykradc.verbose = 0
     mykradc.method = 'adc(3)'
-    mykradc.type_ = type_
-    e, v, p, _ = mykradc.kernel(nroots, guess=guess, kptlist=[0])
+    e, v, p, x = mykradc.kernel(nroots, guess=guess, kptlist=[0])
     return fg.correct(e, i)[0][0]
 
 
@@ -183,7 +183,7 @@ class KnownValues(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        mykradc = adc.KRADC(kmf)
+        mykradc = adc.KRADCIP(kmf)
         mykradc.verbose = 0
         e_mp2 = mykradc.ground_state_energy()
         mykradc.method = 'adc(3)'
@@ -272,7 +272,7 @@ class KnownValues(unittest.TestCase):
             fails.
         """
         self.assertAlmostEqual(
-            _es_corr(_fno_es('ea', [[0], [0]], 0.9), 'ea'), 1.0069869404, 4)
+            _es_corr(_fno_es(adc.KRADCEA, [[0], [0]], 0.9), adc.KRADCEA), 1.0069869404, 4)
 
     def test_sa_fno_ea(self):
         r"""Check corrected EA-ADC(3) with a two-state averaged FNO density.
@@ -285,7 +285,7 @@ class KnownValues(unittest.TestCase):
             fails.
         """
         self.assertAlmostEqual(
-            _es_corr(_fno_es('ea', [[0, 1], [0]], 0.9), 'ea'), 0.9951643793, 4)
+            _es_corr(_fno_es(adc.KRADCEA, [[0, 1], [0]], 0.9), adc.KRADCEA), 0.9951643793, 4)
 
     def test_ss_fno_ip(self):
         r"""Check the first corrected IP-ADC(3) root in a state-specific FNO
@@ -299,7 +299,7 @@ class KnownValues(unittest.TestCase):
             fails.
         """
         self.assertAlmostEqual(
-            _es_corr(_fno_es('ip', [[0], [0]], 0.9), 'ip'), -0.7491959409, 4)
+            _es_corr(_fno_es(adc.KRADCIP, [[0], [0]], 0.9), adc.KRADCIP), -0.7491959409, 4)
 
 
 if __name__ == '__main__':

@@ -7,7 +7,7 @@ import numpy as np
 
 from pyscf.adc import radc_ee
 from pyscf.pbc import adc, gto, scf
-from pyscf.pbc.adc.kadc_rhf_ee import KRADCEE
+from pyscf.pbc.adc.kadc_rhf import KRADCEE
 
 
 def setUpModule():
@@ -29,8 +29,7 @@ def setUpModule():
     cell.build()
     mf = scf.KRHF(cell, cell.make_kpts([1, 1, 2]), exxdiv=None).density_fit()
     mf.kernel()
-    mykradc = adc.KRADC(mf)
-    mykradc.type_ = 'ee'
+    mykradc = adc.KRADCEE(mf)
     mykradc.compute_properties = False
     mykradc.ground_state_energy()
     eris = mykradc.ao2mo()
@@ -89,7 +88,7 @@ class KnownValues(unittest.TestCase):
             oovv=complex_tensor((nk,) * 3 + (no, no, nv, nv)))
         for shift in range(nk):
             with self.subTest(kshift=shift):
-                ia, _, _ = model._momentum_maps(shift)
+                ia, ai, doubles = model._momentum_maps(shift)
                 expected = np.zeros((nk, nk, no, nv, no, nv), complex)
                 for ki in range(nk):
                     kd = ia[ki]
@@ -122,7 +121,7 @@ class KnownValues(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        energies, vectors, _, _ = mykradcee.kernel(4, eris=eris)
+        energies, vectors, strengths, densities = mykradcee.kernel(4, eris=eris)
         np.testing.assert_allclose(
             np.sort(energies.ravel())[:6],
             [1.40629, 1.49977, 1.6711, 1.73389, 1.75824, 1.82029],

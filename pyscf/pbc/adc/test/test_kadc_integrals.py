@@ -34,17 +34,16 @@ class KnownValues(unittest.TestCase):
             verbose=0)
         mf = scf.KRHF(
             cell, cell.make_kpts([1, 1, 2]), exxdiv=None).density_fit().run()
-        for sector in ('ip', 'ea'):
+        for solver_type in (adc.KRADCIP, adc.KRADCEA):
             for method in ('adc(2)', 'adc(2)-x', 'adc(3)'):
-                with self.subTest(sector=sector, method=method):
+                with self.subTest(sector=solver_type.__name__, method=method):
                     results = []
                     for backend in ('density_fit', 'incore', 'outcore'):
-                        mykradc = adc.KRADC(mf)
+                        mykradc = solver_type(mf)
                         mykradc.method = method
-                        mykradc.type_ = sector
                         mykradc.integral_backend = backend
                         results.append(mykradc.kernel(1, kptlist=[0]))
-                    for energies, _, strengths, _ in results[1:]:
+                    for energies, vectors, strengths, amplitudes in results[1:]:
                         np.testing.assert_allclose(
                             energies, results[0][0], atol=1e-10)
                         np.testing.assert_allclose(
@@ -72,9 +71,8 @@ class KnownValues(unittest.TestCase):
         cell.build()
         mf = scf.KRHF(
             cell, cell.make_kpts([1, 1, 3]), exxdiv=None).density_fit().run()
-        mykradc = adc.KRADC(mf)
+        mykradc = adc.KRADCEE(mf)
         mykradc.method = 'adc(3)'
-        mykradc.type_ = 'ee'
         # Complex MO phases catch conjugation/storage ordering mistakes.
         mykradc.mo_coeff = np.asarray(mykradc.mo_coeff, dtype=complex)
         phase = np.exp(1j * np.array([[0.3, 0.6], [0.8, -0.2], [-0.7, 0.2]]))

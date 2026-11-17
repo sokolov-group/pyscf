@@ -94,15 +94,15 @@ def check_implemented(method, supported=IMPLEMENTED_METHODS):
 
 
 def validate(adc):
-    r"""Normalize method/sector settings and run verbosity-aware sanity checks.
+    r"""Normalize the ADC approximation and run verbosity-aware sanity checks.
 
     Args:
-        adc (KRADC): Driver with method, type_ and verbose attributes, and a
+        adc (KRADCBase): Driver with method and verbose attributes, and a
             check_sanity() method. Only the method is checked against the
-            implemented list here; sector dispatch validates type_ later.
+            implemented list here.
 
     Returns:
-        None: Lowercase method and type_ are stored back on adc. Invoke
+        None: The lowercase method is stored back on adc. Invoke
         check_sanity() only when verbose is at least logger.WARN.
 
     Raises:
@@ -111,13 +111,12 @@ def validate(adc):
     Examples:
         >>> from pyscf.pbc.adc.lib import validate
         >>> from types import SimpleNamespace
-        >>> model = SimpleNamespace(method='ADC(2)', type_='EE', verbose=0)
+        >>> model = SimpleNamespace(method='ADC(2)', verbose=0)
         >>> validate(model)
-        >>> model.method, model.type_
-        ('adc(2)', 'ee')
+        >>> model.method
+        'adc(2)'
     """
     adc.method = check_implemented(adc.method)
-    adc.type_ = adc.type_.lower()
     if adc.verbose >= logger.WARN:
         adc.check_sanity()
 
@@ -293,7 +292,7 @@ class MomentumContractions:
     intermediates across repeated Davidson-vector applications.
 
     Args:
-        adc (KRADC): Reference supplying the k mesh, active energies,
+        adc (KRADCBase): Reference supplying the k mesh, active energies,
             amplitudes
             and max_memory. A momentum mesh with index zero as its origin is
             assumed by the addition/negation tables.
@@ -326,14 +325,13 @@ class MomentumContractions:
         ...     basis=[[0, (1.0, 1.0)], [0, (0.5, 1.0)]],
         ...     verbose=0)
         >>> kmf = scf.KRHF(
-        ...     cell, cell.make_kpts([1, 1, 2]), exxdiv=None).density_fit()
-        >>> _ = kmf.kernel()
-        >>> mykradc = kadc_rhf.KRADC(kmf)
-        >>> _ = mykradc.ground_state_energy()
-        >>> context = MomentumContractions(mykradc)
+        ...     cell, cell.make_kpts([1, 1, 2]),
+        ...     exxdiv=None).density_fit().run()
+        >>> mykradcbase = kadc_rhf.KRADCBase(kmf).run(0)
+        >>> context = MomentumContractions(mykradcbase)
         >>> term = (1., 'I->I', ('eo',))
         >>> value = context.contract(term, {'I': 0}, (0,))
-        >>> value.shape, bool(np.allclose(value, mykradc.e_occ[0]))
+        >>> value.shape, bool(np.allclose(value, mykradcbase.e_occ[0]))
         ((1,), True)
     """
 
@@ -342,7 +340,7 @@ class MomentumContractions:
         caches.
 
         Args:
-            adc (KRADC): Reference with initialized amplitude tuples and
+            adc (KRADCBase): Reference with initialized amplitude tuples and
                 energies.
             eris (_ChemistsERIs, optional): Shared integrals; required only for
                 contraction terms that contain integral operands.
@@ -366,11 +364,11 @@ class MomentumContractions:
         self.add = self.kconserv[:, 0, :]
         self.neg = self.kconserv[0, :, 0]
         if hasattr(adc, 'padded_coeff'):
-            _, eo, ev = (adc.padded_coeff,
+            coefficients, eo, ev = (adc.padded_coeff,
                 adc.e_occ, adc.e_vir)
         else:
             from pyscf.pbc.mp.kmp2 import _add_padding
-            _, energy = _add_padding(adc, adc.mo_coeff, adc.mo_energy)
+            coefficients, energy = _add_padding(adc, adc.mo_coeff, adc.mo_energy)
             eo = np.asarray(energy)[:, :adc.nocc]
             ev = np.asarray(energy)[:, adc.nocc:]
         t1 = adc.t1 if t1 is None else t1
@@ -403,7 +401,7 @@ class MomentumContractions:
         """
         value = 0
         for index, coefficient in terms:
-            for _ in range(abs(coefficient)):
+            for term_index in range(abs(coefficient)):
                 value = self.add[value, index if coefficient > 0
                                  else self.neg[index]]
         return value
@@ -486,7 +484,7 @@ class MomentumContractions:
             missing = labels - known.keys()
             if missing:
                 label = max(sorted(missing), key=lambda x: sum(
-                    x in coefficients for coefficients, _ in equations))
+                    x in coefficients for coefficients, operands in equations))
                 for kpt in range(self.nkpts):
                     solve(dict(known, **{label: kpt}))
             else:
@@ -499,7 +497,7 @@ class MomentumContractions:
         limit = self._cache_limit // 4
         if cost <= limit:
             while self._plans and self._plans_bytes + cost > limit:
-                _, (_, old_cost) = self._plans.popitem(last=False)
+                equation_key, (path, old_cost) = self._plans.popitem(last=False)
                 self._plans_bytes -= old_cost
             self._plans[key] = plans, cost
             self._plans_bytes += cost
@@ -531,7 +529,7 @@ class MomentumContractions:
             return value
         while (self._cache and
                self._cache_bytes + value.nbytes > self._cache_limit):
-            _, old = self._cache.popitem(last=False)
+            cache_key, old = self._cache.popitem(last=False)
             self._cache_bytes -= old.nbytes
         self._cache[key] = value
         self._cache_bytes += value.nbytes
@@ -621,11 +619,10 @@ class MomentumContractions:
             ...     basis=[[0, (1.0, 1.0)], [0, (0.5, 1.0)]],
             ...     verbose=0)
             >>> kmf = scf.KRHF(
-            ...     cell, cell.make_kpts([1, 1, 2]), exxdiv=None).density_fit()
-            >>> _ = kmf.kernel()
-            >>> mykradc = kadc_rhf.KRADC(kmf)
-            >>> _ = mykradc.ground_state_energy()
-            >>> context = MomentumContractions(mykradc)
+            ...     cell, cell.make_kpts([1, 1, 2]),
+            ...     exxdiv=None).density_fit().run()
+            >>> mykradcbase = kadc_rhf.KRADCBase(kmf).run(0)
+            >>> context = MomentumContractions(mykradcbase)
             >>> context.contract((2.0, 'I->I', ('eo',)), {'I': 0}, (0,)).shape
             (1,)
         """

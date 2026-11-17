@@ -8,7 +8,7 @@ import numpy as np
 from pyscf import adc as molecular_adc
 from pyscf.adc import radc_ee, radc_amplitudes
 from pyscf.pbc import adc, gto, scf
-from pyscf.pbc.adc.kadc_rhf_ee import KRADCEE
+from pyscf.pbc.adc.kadc_rhf import KRADCEE
 from pyscf.pbc.df import ft_ao
 from pyscf.pbc.tools.pbc import super_cell
 
@@ -62,8 +62,7 @@ class KnownValues(unittest.TestCase):
         """
         for method in ('adc(2)', 'adc(2)-x', 'adc(3)'):
             with self.subTest(method=method):
-                mykradc = adc.KRADC(mf)
-                mykradc.type_ = 'ee'
+                mykradc = adc.KRADCEE(mf)
                 mykradc.method = method
                 mykradc.approx_trans_moments = False
                 mykradc.ground_state_energy()
@@ -88,7 +87,7 @@ class KnownValues(unittest.TestCase):
                 reference.stdout = mykradc.stdout
                 reference.method_type = 'ee'
                 reference.approx_trans_moments = False
-                ref_t1, ref_t2, _ = radc_amplitudes.compute_amplitudes(
+                ref_t1, ref_t2, virtual_ladder = radc_amplitudes.compute_amplitudes(
                     reference, ref_eris)
                 for actual_amp, expected_amp in zip(reference.t1, ref_t1):
                     if expected_amp is not None:
@@ -169,8 +168,7 @@ class KnownValues(unittest.TestCase):
         smf = scf.RHF(scell, exxdiv=None).density_fit().run()
         for method in ('adc(2)', 'adc(2)-x', 'adc(3)'):
             with self.subTest(method=method):
-                mykradc = adc.KRADC(kmf)
-                mykradc.type_ = 'ee'
+                mykradc = adc.KRADCEE(kmf)
                 mykradc.method = method
                 mykradc.approx_trans_moments = False
                 molecular = molecular_adc.RADC(smf)
@@ -178,8 +176,8 @@ class KnownValues(unittest.TestCase):
                 molecular.method = method
                 mykradc.conv_tol = molecular.conv_tol = 1e-10
                 mykradc.tol_residual = molecular.tol_residual = 1e-8
-                ke, _, kp, _ = mykradc.kernel(4)
-                me, _, _, mx = molecular.kernel(4 * len(kpoints))
+                ke, kv, kp, kx = mykradc.kernel(4)
+                me, mv, mp, mx = molecular.kernel(4 * len(kpoints))
                 cutoff = min(ke.max(axis=1).min(), me.max()) - 1e-6
                 np.testing.assert_allclose(
                     np.sort(ke[ke < cutoff]),
@@ -210,8 +208,7 @@ class KnownValues(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        mykradc = adc.KRADC(mf)
-        mykradc.type_ = 'ee'
+        mykradc = adc.KRADCEE(mf)
         energies, vectors, weights, densities = mykradc.kernel(3)
         self.assertEqual(densities.shape, (1, 3, 1, mykradc.nmo, mykradc.nmo))
         np.testing.assert_allclose(weights, 0, atol=1e-12)

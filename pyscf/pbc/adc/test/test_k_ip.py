@@ -50,7 +50,7 @@ def setUpModule():
     kpts = cell.make_kpts(nmp)
     kpts -= kpts[0]
     kmf = scf.KRHF(cell, kpts, exxdiv=None).density_fit().run()
-    mykradc  = adc.KRADC(kmf)
+    mykradc  = adc.KRADCIP(kmf)
 
 def tearDownModule():
     r"""Release shared helium cell and charged ADC fixture references.
@@ -110,7 +110,7 @@ class KnownValues(unittest.TestCase):
         kpts = cell.make_kpts(nmp)
         kpts -= kpts[0]
         kmf = scf.KRHF(cell, kpts, exxdiv=None).density_fit().run()
-        mykradc  = adc.KRADC(kmf)
+        mykradc  = adc.KRADCIP(kmf)
         mykradc.method = 'adc(2)-x'
         e, v, p, x = mykradc.kernel(nroots=3, kptlist=[0])
 
@@ -135,7 +135,7 @@ class KnownValues(unittest.TestCase):
             fails.
         """
         kmf = scf.KRHF(cell, kpts, exxdiv=None).run()
-        mykradc  = adc.KRADC(kmf)
+        mykradc  = adc.KRADCIP(kmf)
         mykradc.method = 'adc(3)'
         e, v, p, x = mykradc.kernel(nroots=3, kptlist=[0])
 

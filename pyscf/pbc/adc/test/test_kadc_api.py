@@ -5,8 +5,10 @@ from types import SimpleNamespace
 import ast
 import doctest
 import io
+import gc
 import unittest
 import warnings
+import weakref
 
 import numpy as np
 
@@ -21,8 +23,8 @@ def setUpModule():
 
     Returns:
         None: Store mf as a density-fitted KRHF reference with two s basis
-        functions, one occupied and one virtual MO at each k point. This is
-        the same reproducible system constructed by the KRADC class example.
+        functions, one occupied and one virtual MO at each k point. This is the
+        same reproducible system constructed by the KRADCBase class example.
     """
     global mf
     cell = gto.M(
@@ -51,14 +53,315 @@ class DriverAPI(unittest.TestCase):
             excitation sector. Earlier RADC spellings must remain aliases
             of the same class, preserving existing importing applications.
         """
-        mykradc = adc.KRADC(mf)
+        mykradc = adc.KRADCIP(mf)
         for module, suffix in ((kadc_rhf_ip, 'IP'), (kadc_rhf_ea, 'EA'),
                                (kadc_rhf_ee, 'EE')):
             canonical = getattr(module, 'KRADC' + suffix)
             self.assertEqual(canonical.__name__, 'KRADC' + suffix)
             self.assertIs(getattr(module, 'RADC' + suffix), canonical)
-            self.assertIsInstance(canonical(mykradc), kadc_rhf.KRADC)
-            self.assertEqual(canonical(mykradc).type_, suffix.lower())
+            self.assertIsInstance(canonical(mykradc), kadc_rhf.KRADCBase)
+            self.assertIs(type(canonical(mykradc)), canonical)
+            self.assertFalse(hasattr(canonical(mykradc), 'type_'))
+
+    def test_adc_conversion_reference_ownership(self):
+        r"""Convert between all periodic ADC classes without sharing sector
+        state.
+
+        Returns:
+            None: Preserve reference settings and disk-backed amplitudes, copy
+            mutable bookkeeping, clear every root/cache, and keep the old
+            amplitude generation readable after its source recomputes.
+        """
+        classes = (adc.KRADCBase, adc.KRADCIP, adc.KRADCEA, adc.KRADCEE)
+        for source_type in classes:
+            source = source_type(mf).set(method='adc(3)',
+                                         approx_trans_moments=False)
+            source.chunk_size = 2
+            source.density_gv = np.array([0.1, 0.2, 0.3])
+            source.ground_state_energy()
+            amplitude = np.asarray(source.t2[0]).copy()
+            source.E = source.P = np.ones((1, 1))
+            source.U = source.X = source.T = np.ones((1, 1, 1))
+            source.converged = np.ones((1, 1), dtype=bool)
+            source._ee_momentum[0] = 'old momentum map'
+            source._transition_cache[0] = 'old transition density'
+            source.sector_specific_result = 'do not copy'
+            converted = []
+            for target_type in classes:
+                with self.subTest(source=source_type, target=target_type):
+                    target = target_type(source)
+                    converted.append(target)
+                    self.assertIs(type(target), target_type)
+                    self.assertIs(target._scf, source._scf)
+                    self.assertIs(target.mo_coeff, source.mo_coeff)
+                    self.assertIs(target.t2, source.t2)
+                    self.assertIs(target._amp_storage, source._amp_storage)
+                    self.assertIsNot(target.imds, source.imds)
+                    self.assertEqual(target.method, source.method)
+                    self.assertEqual(target.e_corr, source.e_corr)
+                    self.assertEqual(target.chunk_size, 2)
+                    self.assertTrue(target._chunk_size_manual)
+                    self.assertFalse(target.approx_trans_moments)
+                    self.assertFalse(hasattr(target, 'type_'))
+                    self.assertFalse(hasattr(target, 'sector_specific_result'))
+                    self.assertNotIn('_amp_h5file', target.__dict__)
+                    for name in ('E', 'U', 'P', 'X', 'T', 'converged'):
+                        self.assertIsNone(getattr(target, name))
+                    self.assertEqual(target._ee_momentum, {})
+                    self.assertEqual(target._transition_cache, {})
+                    target.density_gv[0] = 1.0
+                    self.assertEqual(source.density_gv[0], 0.1)
+            source.ground_state_energy()
+            for target in converted:
+                np.testing.assert_array_equal(target.t2[0], amplitude)
+            # Orbital/frozen-space overrides cannot retain old amplitudes.
+            changed = adc.KRADCEA(source, frozen=0)
+            self.assertEqual(changed.frozen, 0)
+            self.assertIsNone(changed.t2)
+            self.assertIsNone(changed.e_corr)
+
+        temporary = adc.KRADCIP(mf)
+        temporary.ground_state_energy()
+        amplitude = np.asarray(temporary.t2[0]).copy()
+        retained = adc.KRADCEA(temporary)
+        source_reference = weakref.ref(temporary)
+        del temporary
+        gc.collect()
+        self.assertIsNone(source_reference())
+        np.testing.assert_array_equal(retained.t2[0], amplitude)
+
+    def test_lazy_cell_inputs_and_stream_methods(self):
+        r"""Accept raw Cells and unrun KRHF references with StreamObject
+        chaining.
+
+        Returns:
+            None: Construction/conversion performs no SCF, Cell inputs select
+            Gamma or an explicit mesh, and reference-only run() returns the
+            same object with a checked scalar energy. The base has no molecular
+            RADC dependency and requires a concrete class for positive roots.
+        """
+        from pyscf import lib as pyscf_lib
+        from pyscf.adc.radc import RADC as MolecularRADC
+
+        mykradcbase = adc.KRADCBase(mf)
+        self.assertIsInstance(mykradcbase, pyscf_lib.StreamObject)
+        self.assertNotIsInstance(mykradcbase, MolecularRADC)
+        with self.assertRaisesRegex(NotImplementedError, 'Choose KRADCIP'):
+            mykradcbase.kernel(1)
+        for solver_type in (adc.KRADCIP, adc.KRADCEA, adc.KRADCEE):
+            pending = solver_type(mf.cell)
+            self.assertIsNone(pending.mo_coeff)
+            self.assertEqual(pending.kpts.shape, (1, 3))
+            with mock.patch.object(pending._scf, 'kernel',
+                                   side_effect=AssertionError('SCF in constructor')):
+                converted = adc.KRADCEA(pending)
+                self.assertIsNone(converted.mo_coeff)
+                self.assertIsNone(converted._chunk_size)
+            explicit = solver_type(mf.cell, kpts=mf.kpts)
+            self.assertIs(explicit.set(compute_properties=False), explicit)
+            self.assertIs(explicit.run(0), explicit)
+            self.assertAlmostEqual(explicit.e_corr, -0.00416766, 8)
+            self.assertIsNotNone(explicit.mo_coeff)
+        unrun = scf.KRHF(mf.cell, mf.kpts, exxdiv=None).density_fit()
+        mykradcee = adc.KRADCEE(unrun)
+        self.assertIsNone(mykradcee.mo_coeff)
+        mykradcee.kernel(1, kptlist=[0])
+        self.assertAlmostEqual(mykradcee.E[0, 0], 1.756312, 6)
+        with self.assertRaisesRegex(ValueError, 'only with a Cell'):
+            adc.KRADCEE(mf, kpts=mf.kpts)
+        with self.assertRaises(TypeError):
+            adc.KRADCEE(object())
+
+    def test_typed_fno_construction(self):
+        r"""Select the FNO sector by concrete class, including converted
+        inputs.
+
+        Returns:
+            None: Match every sector to its FNO subclass, preserve common
+            settings and clear FNO/excitation results on conversion. Reject
+            unavailable state-specific EE densities before running ADC.
+        """
+        for solver_type, fno_type in ((adc.KRADCIP, adc.KRADCIPFNO),
+                                      (adc.KRADCEA, adc.KRADCEAFNO),
+                                      (adc.KRADCEE, adc.KRADCEEFNO)):
+            source = solver_type(mf).set(method='adc(3)')
+            fno = adc.KRADC2FNO(source)
+            self.assertIs(type(fno), fno_type)
+            self.assertIsInstance(fno, solver_type)
+            self.assertEqual(fno.method, 'adc(3)')
+            fno.ref_state = [[0], [0]]
+            fno.e_can = np.ones((1, 1))
+            converted = adc.KRADC2FNO(fno)
+            self.assertIs(type(converted), fno_type)
+            self.assertIsNone(converted.ref_state)
+            self.assertIsNone(converted.e_can)
+        with self.assertRaisesRegex(NotImplementedError, 'ref_state=None'):
+            adc.KRADCEEFNO(mf).set(ref_state=1).kernel(1)
+
+    def test_charged_hamiltonian_order_helpers(self):
+        r"""Check correction-only and accumulation contracts for IP/EA helpers.
+
+        Returns:
+            None: Verify orbital-energy signs, ADC(2)-x singles equivalence,
+            independent output allocation, in-place accumulation into nonzero
+            targets, and third-order composition without changing amplitudes.
+        """
+        for solver_type in (adc.KRADCIP, adc.KRADCEA):
+            solver = solver_type(mf).set(method='adc(3)')
+            solver.ground_state_energy()
+            amplitudes = np.asarray(solver.t2[0]).copy()
+            with solver.ao2mo() as eris:
+                zeroth = solver._get_adc0_ham()
+                energies = solver.e_occ if solver_type is adc.KRADCIP else solver.e_vir
+                np.testing.assert_allclose(
+                    np.diagonal(zeroth, axis1=1, axis2=2), energies)
+                second = solver._get_adc2_ham(eris)
+                third = solver._get_adc3_ham(eris)
+                for helper, correction in ((solver._get_adc2_ham, second),
+                                            (solver._get_adc3_ham, third)):
+                    target = np.full_like(correction, 0.7)
+                    self.assertIs(helper(eris, target), target)
+                    np.testing.assert_allclose(target, correction + 0.7,
+                                               atol=1e-13)
+                np.testing.assert_allclose(solver.get_imds(eris),
+                                           zeroth + second + third, atol=1e-13)
+                solver.method = 'adc(2)'
+                adc2 = solver.get_imds(eris)
+                solver.method = 'adc(2)-x'
+                np.testing.assert_array_equal(solver.get_imds(eris), adc2)
+                np.testing.assert_array_equal(solver.t2[0], amplitudes)
+
+    def test_charged_density_root_selection_and_ao(self):
+        r"""Restore frozen orbitals for several roots and arbitrary sector
+        order.
+
+        Returns:
+            None: Check all saved roots when their count differs from the
+            sector count, independent ragged selections, and AO transformation
+            against explicit coefficient contractions for both charged sectors.
+        """
+        cell = gto.M(atom='He 0 0 0', a=np.eye(3) * 3,
+                     basis=[[0, (1., 1.)], [0, (.5, 1.)], [0, (.2, 1.)]],
+                     verbose=0)
+        reference = scf.KRHF(cell, cell.make_kpts([1, 1, 2]),
+                             exxdiv=None).density_fit().run()
+        for solver_type in (adc.KRADCIP, adc.KRADCEA):
+            solver = solver_type(reference, frozen=[2])
+            solver.kernel(3, kptlist=[1, 0])
+            density = solver.make_rdm1()
+            self.assertEqual(density.shape, (2, 3, 2, 3, 3))
+            ao_density = solver.make_rdm1(ao_repr=True)
+            expected = np.einsum('kpi,skij,kqj->skpq',
+                                  solver.mo_coeff, density[0],
+                                  np.conj(solver.mo_coeff))
+            np.testing.assert_allclose(ao_density[0], expected, atol=1e-12)
+            selected = solver.make_rdm1(root=np.array([[0, 2], [1, 0]]))
+            np.testing.assert_allclose(selected[0], density[0, [0, 2]])
+            np.testing.assert_allclose(selected[1], density[1, [1, 0]])
+            ragged = solver.make_rdm1(root=[[0], [1, 2]], K_idx=[0, 1])
+            self.assertIsInstance(ragged, list)
+            self.assertEqual([len(dm) for dm in ragged], [1, 2])
+            np.testing.assert_allclose(ragged[0][0], density[1, 0])
+            np.testing.assert_allclose(ragged[1], density[0, [1, 2]])
+
+    def test_charged_diagonal_values_and_dtypes(self):
+        r"""Check charged diagonals against explicit orbital/momentum loops.
+
+        Returns:
+            None: Verify C-order layout, every momentum sector, real/complex
+            single/double precision, and unchanged input intermediates with
+            unequal occupied/virtual dimensions. No SCF or integrals are
+            needed.
+        """
+        nkpts, nocc, nvir = 3, 2, 3
+        kconserv = np.fromfunction(
+            lambda p, q, r: (p - q + r) % nkpts,
+            (nkpts, nkpts, nkpts), dtype=int)
+        random = np.random.default_rng(15)
+        for solver_type in (adc.KRADCIP, adc.KRADCEA):
+            ionization = solver_type is adc.KRADCIP
+            n_singles = nocc if ionization else nvir
+            shape = ((nkpts, nkpts, nvir, nocc, nocc) if ionization else
+                     (nkpts, nkpts, nocc, nvir, nvir))
+            vector_size = n_singles + int(np.prod(shape))
+            for dtype in (np.float32, np.float64, np.complex64, np.complex128):
+                real_dtype = np.empty((), dtype=dtype).real.dtype
+                e_occ = random.uniform(-1.0, -0.2, (nkpts, nocc)).astype(
+                    real_dtype)
+                e_vir = random.uniform(0.1, 1.0, (nkpts, nvir)).astype(
+                    real_dtype)
+                intermediate = random.normal(
+                    size=(nkpts, n_singles, n_singles)).astype(dtype)
+                if np.issubdtype(dtype, np.complexfloating):
+                    intermediate += 1j * random.normal(
+                        size=intermediate.shape).astype(real_dtype)
+                original = intermediate.copy()
+                model = SimpleNamespace(
+                    method='ADC(2)', verbose=0, stdout=None, nkpts=nkpts,
+                    n_singles=n_singles, doubles_shape=shape,
+                    vector_size=lambda: vector_size,
+                    e_occ=e_occ, e_vir=e_vir,
+                    khelper=SimpleNamespace(kconserv=kconserv),
+                    nmo=nocc+nvir, frozen=None,
+                    mo_coeff=[np.eye(nocc+nvir)] * nkpts)
+                for kshift in range(nkpts):
+                    with self.subTest(sector=solver_type.__name__,
+                                      dtype=dtype, kshift=kshift):
+                        expected = np.empty(vector_size, dtype=dtype)
+                        expected[:n_singles] = np.diagonal(
+                            intermediate[kshift]) * (-1 if ionization else 1)
+                        doubles = expected[n_singles:].reshape(shape)
+                        # Explicit loops are independent of the slab broadcast.
+                        for k1, k2, p, q, r in np.ndindex(shape):
+                            if ionization:
+                                kj = kconserv[kshift, k2, k1]
+                                doubles[k1, k2, p, q, r] = (
+                                    e_vir[k1, p] - e_occ[k2, q] - e_occ[kj, r])
+                            else:
+                                kb = kconserv[kshift, k2, k1]
+                                doubles[k1, k2, p, q, r] = (
+                                    e_vir[k2, q] + e_vir[kb, r] - e_occ[k1, p])
+                        actual = solver_type.get_diag(model, kshift, intermediate)
+                        self.assertEqual(actual.dtype, np.dtype(dtype))
+                        tolerance = (5e-7 if real_dtype == np.dtype(np.float32)
+                                     else 1e-13)
+                        np.testing.assert_allclose(actual, expected,
+                                                   atol=tolerance, rtol=0)
+                np.testing.assert_array_equal(intermediate, original)
+
+    def test_charged_diagonal_padding_and_integral_reuse(self):
+        r"""Preserve frozen-padding sentinels and reuse supplied integral
+        owners.
+
+        Returns:
+            None: Check unequal active virtual spaces, positive inactive
+            diagonals, the saved block layout and eris forwarding when the
+            singles intermediate is built on demand.
+        """
+        from pyscf.lib.parameters import LARGE_DENOM
+
+        cell = gto.M(atom='He 0 0 0', a=np.eye(3) * 3,
+                     basis=[[0, (1., 1.)], [0, (.5, 1.)], [0, (.2, 1.)]],
+                     verbose=0)
+        reference = scf.KRHF(cell, cell.make_kpts([1, 1, 2]),
+                             exxdiv=None).density_fit().run()
+        for solver_type in (adc.KRADCIP, adc.KRADCEA):
+            solver = solver_type(reference, frozen=[[2], []]).run(0)
+            with solver.ao2mo() as eris:
+                intermediate = solver.get_imds(eris)
+                with mock.patch.object(solver, 'get_imds',
+                                       return_value=intermediate) as get_imds:
+                    diagonal = solver.get_diag(0, eris=eris)
+                get_imds.assert_called_once_with(eris=eris)
+                physical = np.ones(solver.vector_size())
+                singles, doubles = solver._mask_frozen(
+                    physical[:solver.n_singles],
+                    physical[solver.n_singles:].reshape(solver.doubles_shape),
+                    0, const=0)
+                mask = np.concatenate((singles, doubles.ravel())).astype(bool)
+                self.assertTrue(np.any(~mask))
+                np.testing.assert_array_equal(diagonal[~mask], LARGE_DENOM)
+                self.assertTrue(np.all(diagonal[mask].real < LARGE_DENOM / 2))
 
     def test_transform_integrals_deprecation(self):
         r"""Check the earlier integral method warning and backend forwarding.
@@ -67,7 +370,7 @@ class DriverAPI(unittest.TestCase):
             None: Preserve the returned integral owner and backend selection
             while directing callers to ao2mo() with DeprecationWarning.
         """
-        mykradc = adc.KRADC(mf)
+        mykradc = adc.KRADCIP(mf)
         with mock.patch.object(
             mykradc, 'ao2mo', return_value=mock.sentinel.eris) as transform:
             with self.assertWarns(DeprecationWarning) as warning:
@@ -127,8 +430,8 @@ class DriverAPI(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        mykradc = adc.KRADC(mf)
-        self.assertIs(type(mykradc), kadc_rhf.KRADC)
+        mykradc = adc.KRADCIP(mf)
+        self.assertIs(type(mykradc), adc.KRADCIP)
         energy = mykradc.ground_state_energy()
         self.assertIsInstance(energy, float)
         self.assertIsNotNone(mykradc.t2[0])
@@ -155,16 +458,15 @@ class DriverAPI(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        for sector in ('ip', 'ea', 'ee'):
-            with self.subTest(sector=sector):
-                mykradc = adc.KRADC(mf)
-                mykradc.type_ = sector
+        for solver_type in (adc.KRADCIP, adc.KRADCEA, adc.KRADCEE):
+            with self.subTest(sector=solver_type.__name__):
+                mykradc = solver_type(mf)
                 expected = mykradc.ground_state_energy()
                 mykradc.kernel(1, kptlist=[0])
                 self.assertIsNotNone(mykradc.E)
                 with mock.patch.object(
                     mykradc,
-                    f'{sector}_adc',
+                    'gen_matvec',
                     side_effect=AssertionError('solver called')):
                     actual = mykradc.kernel(0, kptlist=[])
                 self.assertAlmostEqual(actual, expected, 12)
@@ -204,8 +506,7 @@ class DriverAPI(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        mykradc = adc.KRADC(mf)
-        mykradc.type_ = 'ee'
+        mykradc = adc.KRADCIP(mf)
         expected = mykradc.ground_state_energy()
         mykradcee = kadc_rhf_ee.KRADCEE(mykradc)
         with mock.patch.object(
@@ -226,12 +527,12 @@ class DriverAPI(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        mykradc = adc.KRADC(mf)
-        self.assertIs(kadc_rhf.RADC, kadc_rhf.KRADC)
-        mykradc.method_type = 'EE'
-        self.assertEqual(mykradc.type_, 'EE')
-        mykradc.type_ = 'ip'
-        self.assertEqual(mykradc.method_type, 'ip')
+        mykradc = adc.KRADCIP(mf)
+        self.assertIs(kadc_rhf.RADC, kadc_rhf.KRADCBase)
+        for name in ('type_', 'method_type'):
+            self.assertFalse(hasattr(mykradc, name))
+            with self.assertRaisesRegex(AttributeError, 'Select a sector'):
+                setattr(mykradc, name, 'ee')
         coeff = mykradc.padded_coeff
         self.assertIs(coeff, mykradc.padded_coeff)
         self.assertEqual(mykradc.e_occ.shape, (mykradc.nkpts, mykradc.nocc))
@@ -269,7 +570,7 @@ class DriverAPI(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        mykradc = adc.KRADC(mf)
+        mykradc = adc.KRADCIP(mf)
         with self.assertRaises(NotImplementedError):
             mykradc.method = 'adc(4)'
             mykradc.ground_state_energy()
@@ -294,16 +595,15 @@ class DriverAPI(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        mykradc = adc.KRADC(mf)
+        mykradc = adc.KRADCIP(mf)
         mykradc.compute_properties = False
         mykradc.ground_state_energy()
         for solver_type in (kadc_rhf_ip.KRADCIP, kadc_rhf_ea.KRADCEA,
                             kadc_rhf_ee.KRADCEE):
             mykradc_es = solver_type(mykradc)
-            helper = ('_neutral_init_guess' if mykradc_es.type_ == 'ee'
-                      else '_charged_init_guess')
+            helper = '_init_guess'
             with (
-                self.subTest(sector=mykradc_es.type_),
+                self.subTest(sector=type(mykradc_es).__name__),
                 mock.patch.object(
                     mykradc_es,
                     'get_init_guess',
@@ -312,8 +612,8 @@ class DriverAPI(unittest.TestCase):
                     mykradc_es, helper, wraps=getattr(mykradc_es, helper)
                 ) as guesses,
             ):
-                energies, vectors, _, _ = mykradc_es.kernel(2, kptlist=[0])
-                from_input, _, _, _ = mykradc_es.kernel(
+                energies, vectors, strengths, amplitudes = mykradc_es.kernel(2, kptlist=[0])
+                from_input, input_vectors, input_strengths, input_amplitudes = mykradc_es.kernel(
                     2, guess=vectors, kptlist=[0])
                 np.testing.assert_allclose(from_input, energies, atol=1e-08)
                 self.assertEqual(guesses.call_count, 2)
@@ -331,14 +631,14 @@ class DriverAPI(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        mykradc = adc.KRADC(mf)
+        mykradc = adc.KRADCIP(mf)
         mykradc.ground_state_energy()
         for solver_type in (kadc_rhf_ip.KRADCIP, kadc_rhf_ea.KRADCEA,
                             kadc_rhf_ee.KRADCEE):
             mykradc_es = solver_type(mykradc)
             supplied = np.eye(2, mykradc_es.vector_size())
             for keyword in ('type_', 'type'):
-                with (self.subTest(sector=mykradc_es.type_, keyword=keyword),
+                with (self.subTest(sector=type(mykradc_es).__name__, keyword=keyword),
                       self.assertWarns(DeprecationWarning)):
                     guesses = mykradc_es.get_init_guess(
                         2, ini=supplied, kshift=0, **{keyword: 'read'})
@@ -376,7 +676,7 @@ class DriverAPI(unittest.TestCase):
                 # when the full (with_frozen=True) density is requested.
                 options = {name: np.asarray(getattr(reference, name))[..., :2]
                            for name in ('mo_coeff', 'mo_occ', 'mo_energy')}
-            mykradc = adc.KRADC(reference, frozen=frozen, **options)
+            mykradc = adc.KRADCIP(reference, frozen=frozen, **options)
             # Complex phases exercise the conjugation in C D C^dagger.
             mykradc.mo_coeff = np.asarray(mykradc.mo_coeff) * np.exp(
                 1j * np.array([0.2, -0.3, 0.7])[:len(mykradc.mo_occ[0])])
@@ -404,23 +704,22 @@ class DriverAPI(unittest.TestCase):
 
 
 class Documentation(unittest.TestCase):
-    r"""Execute every package and comparison-helper worked docstring example.
+    r"""Execute every worked docstring example in the periodic ADC package.
 
     Each example block runs in an empty namespace, using only the imports and
     reference setup shown in its example. Numerical energies and tensor
     shapes are checked, including public factories, compatibility functions,
-    FNO/integral workflows and the comparison-script helpers.
+    FNO/integral workflows and pure numerical models.
 
     Run with ``python -m unittest test.test_kadc_api.Documentation``.
     """
     def test_worked_examples(self):
-        """Execute package examples and comparison-table helper examples.
+        r"""Execute package examples in independent empty namespaces.
 
         Read docstrings from the source AST and give each example block an
         empty namespace, including blocks separated by explanatory prose.
         This prevents module globals or another block from hiding missing
-        imports, undefined functions or reference setup. The comparison
-        helpers use the explicit loader shown in their docs.
+        imports, undefined functions or reference setup.
         """
         output = io.StringIO()
         runner = doctest.DocTestRunner()
@@ -483,8 +782,7 @@ class IntegralAPI(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        mykradc = adc.KRADC(mf)
-        mykradc.type_ = 'ee'
+        mykradc = adc.KRADCIP(mf)
         mykradc.method = 'adc(3)'
         context = kadc_ao2mo.AO2MO(mykradc, 'density_fit')
         self.assertEqual(context.nkpts, len(mykradc.kpts))
@@ -553,7 +851,7 @@ class LoggingAPI(unittest.TestCase):
         self.assertTrue(all((len(line) == 50 for line in lines)))
         self.assertIn('End of ADC', lines[-1])
         self.assertIn(',', lines[1])
-        mykradc = adc.KRADC(mf)
+        mykradc = adc.KRADCIP(mf)
         mykradc.stdout, mykradc.verbose = io.StringIO(), 4
         mykradc.ground_state_energy()
         mykradc.kernel(1, kptlist=[0])

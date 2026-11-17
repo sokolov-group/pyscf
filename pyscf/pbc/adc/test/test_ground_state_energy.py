@@ -85,7 +85,7 @@ class KnownValues(unittest.TestCase):
         kpts = cell.make_kpts(nmp)
         kpts -= kpts[0]
         kmf = scf.KRHF(cell, kpts, exxdiv=None).density_fit().run()
-        mykradc  = adc.KRADC(kmf)
+        mykradc  = adc.KRADCBase(kmf)
         e_mp = mykradc.ground_state_energy()
         t1 = mykradc.t1
         t2 = mykradc.t2
@@ -107,7 +107,7 @@ class KnownValues(unittest.TestCase):
         kpts = cell.make_kpts(nmp)
         kpts -= kpts[0]
         kmf = scf.KRHF(cell, kpts, exxdiv=None).density_fit().run()
-        mykradc  = adc.KRADC(kmf)
+        mykradc  = adc.KRADCBase(kmf)
         e_mp2_1 = mykradc.ground_state_energy()
         t1 = mykradc.t1
         t2 = mykradc.t2
@@ -132,7 +132,7 @@ class KnownValues(unittest.TestCase):
         kpts = cell.make_kpts(nmp)
         kpts -= kpts[0]
         kmf = scf.KRHF(cell, kpts, exxdiv=None).density_fit().run()
-        mykradc  = adc.KRADC(kmf)
+        mykradc  = adc.KRADCBase(kmf)
         mykradc.method = 'adc(3)'
         e_mp = mykradc.ground_state_energy()
         t1 = mykradc.t1

@@ -61,7 +61,7 @@ class KnownValues(unittest.TestCase):
         ehf2 = kmf.e_tot
         self.assertAlmostEqual(ehf2, -6.1729762695142645, 4)
 
-        mykradc  = adc.KRADC(kmf)
+        mykradc  = adc.KRADCIP(kmf)
         e_mp2 = mykradc.ground_state_energy()
         t1 = mykradc.t1
         t2 = mykradc.t2

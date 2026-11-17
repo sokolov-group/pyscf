@@ -68,10 +68,10 @@ class _IntegralBlocks:
         ...     basis=[[0, (1.0, 1.0)], [0, (0.5, 1.0)]],
         ...     verbose=0)
         >>> kmf = scf.KRHF(
-        ...     cell, cell.make_kpts([1, 1, 2]), exxdiv=None).density_fit()
-        >>> _ = kmf.kernel()
-        >>> mykradc = kadc_rhf.KRADC(kmf)
-        >>> with mykradc.ao2mo() as eris:
+        ...     cell, cell.make_kpts([1, 1, 2]),
+        ...     exxdiv=None).density_fit().run()
+        >>> mykradcbase = kadc_rhf.KRADCBase(kmf)
+        >>> with mykradcbase.ao2mo() as eris:
         ...     print(tuple(map(int, eris.ovvv_blocks.shape)))
         ...     print(eris.ovvv_blocks[0, 0, 0].shape)
         (2, 2, 2, 1, 1, 1, 1)
@@ -131,7 +131,8 @@ class _ChemistsERIs:
     r"""Own periodic active-space MO integrals and their scratch storage.
 
     Args:
-        adc (KRADC): Driver defining active dimensions, orbitals and momenta.
+        adc (KRADCBase): Driver defining active dimensions, orbitals and
+            momenta.
 
     Attributes:
         nocc, nvir, nkpts (int): Padded active occupied/virtual and k counts.
@@ -161,10 +162,10 @@ class _ChemistsERIs:
         ...     basis=[[0, (1.0, 1.0)], [0, (0.5, 1.0)]],
         ...     verbose=0)
         >>> kmf = scf.KRHF(
-        ...     cell, cell.make_kpts([1, 1, 2]), exxdiv=None).density_fit()
-        >>> _ = kmf.kernel()
-        >>> mykradc = kadc_rhf.KRADC(kmf)
-        >>> with mykradc.ao2mo('density_fit') as eris:
+        ...     cell, cell.make_kpts([1, 1, 2]),
+        ...     exxdiv=None).density_fit().run()
+        >>> mykradcbase = kadc_rhf.KRADCBase(kmf)
+        >>> with mykradcbase.ao2mo('density_fit') as eris:
         ...     print(eris.ovov.shape, eris.ovvv is None)
         ...     print(eris.ovvv_blocks[0, 0, 0].shape)
         (2, 2, 2, 1, 1, 1, 1) True
@@ -176,7 +177,7 @@ class _ChemistsERIs:
         tensors.
 
         Args:
-            adc (KRADC): Reference supplying orbital counts, k points and
+            adc (KRADCBase): Reference supplying orbital counts, k points and
                 dtype.
 
         Returns:
@@ -200,12 +201,11 @@ class _ChemistsERIs:
 
         Args:
             names (sequence[str]): Block names made from four o/v labels, such
-                as
-                ('oooo', 'ovov'). Each block has shape (nkpts,)*3 plus its four
-                orbital dimensions; allocation does not initialize its values.
+                as ('oooo', 'ovov'). Each block has shape (nkpts,)*3 plus its
+                four orbital dimensions; allocation does not initialize its
+                values.
             outcore (bool): Create HDF5 datasets in feri when True; otherwise
-                use
-                NumPy arrays. Reuse the same scratch file for subsequent
+                use NumPy arrays. Reuse the same scratch file for subsequent
                 blocks.
 
         Returns:
@@ -222,11 +222,12 @@ class _ChemistsERIs:
             ...     basis=[[0, (1.0, 1.0)], [0, (0.5, 1.0)]],
             ...     verbose=0)
             >>> kmf = scf.KRHF(
-            ...     cell, cell.make_kpts([1, 1, 2]), exxdiv=None).density_fit()
-            >>> _ = kmf.kernel()
-            >>> mykradc = kadc_rhf.KRADC(kmf)
-            >>> with _ChemistsERIs(mykradc) as eris:
-            ...     _ = eris.allocate(('ovov',), outcore=True)
+            ...     cell, cell.make_kpts([1, 1, 2]),
+            ...     exxdiv=None).density_fit().run()
+            >>> mykradcbase = kadc_rhf.KRADCBase(kmf)
+            >>> with _ChemistsERIs(mykradcbase) as eris:
+            ...     allocated_integrals = eris.allocate(
+            ...         ('ovov',), outcore=True)
             ...     print(eris.ovov.shape)
             (2, 2, 2, 1, 1, 1, 1)
         """
@@ -429,7 +430,7 @@ def _needs_vvvv(adc):
     r"""Decide whether an explicit four-virtual block is needed by a backend.
 
     Args:
-        adc (KRADC): Driver supplying method, excitation type,
+        adc (KRADCBase): Driver supplying method, excitation type,
             approx_trans_moments and if_heri_eris.
 
     Returns:
@@ -437,18 +438,20 @@ def _needs_vvvv(adc):
         or full-transition-moment cases requiring virtual ladders. DF storage
         can supply these ladders from factors instead of an explicit tensor.
     """
+    from pyscf.pbc.adc.kadc_rhf import KRADCEA, KRADCEE
+
     return (adc.method == 'adc(3)'
             or adc.if_heri_eris
             or (adc.method == 'adc(2)-x'
-                and (adc.type_ in ('ee', 'ea')
+                and (isinstance(adc, (KRADCEA, KRADCEE))
                      or not adc.approx_trans_moments))
-            or (adc.type_ == 'ee' and not adc.approx_trans_moments))
+            or (isinstance(adc, KRADCEE) and not adc.approx_trans_moments))
 
 class AO2MO:
     r"""Transform active Bloch MOs using a shared backend-selection context.
 
     Args:
-        adc (KRADC): Driver supplying padded orbitals, active dimensions,
+        adc (KRADCBase): Driver supplying padded orbitals, active dimensions,
             k-point helper, memory settings and an SCF DF transformation
             object.
         backend (str, optional): 'auto', 'incore', 'outcore' or 'density_fit'.
@@ -457,7 +460,7 @@ class AO2MO:
             an integral-memory estimate to choose incore or outcore storage.
 
     Attributes:
-        adc (KRADC): Original reference driver.
+        adc (KRADCBase): Original reference driver.
         backend (str): Resolved backend; initializing the context does not run
             it.
         mo_coeff (ndarray): Padded active coefficients, shape (nkpts, nao,
@@ -484,10 +487,10 @@ class AO2MO:
         ...     basis=[[0, (1.0, 1.0)], [0, (0.5, 1.0)]],
         ...     verbose=0)
         >>> kmf = scf.KRHF(
-        ...     cell, cell.make_kpts([1, 1, 2]), exxdiv=None).density_fit()
-        >>> _ = kmf.kernel()
-        >>> mykradc = kadc_rhf.KRADC(kmf)
-        >>> context = AO2MO(mykradc, backend='density_fit')
+        ...     cell, cell.make_kpts([1, 1, 2]),
+        ...     exxdiv=None).density_fit().run()
+        >>> mykradcbase = kadc_rhf.KRADCBase(kmf)
+        >>> context = AO2MO(mykradcbase, backend='density_fit')
         >>> context.backend, context.mo_coeff.shape
         ('density_fit', (2, 2, 2))
         >>> with context() as eris:
@@ -500,7 +503,7 @@ class AO2MO:
         selection.
 
         Args:
-            adc (KRADC): Source of padded coefficients, k-point and memory
+            adc (KRADCBase): Source of padded coefficients, k-point and memory
                 data.
             backend (str, optional): Backend override; see AO2MO for choices.
 
@@ -583,10 +586,10 @@ class AO2MO:
             ...     basis=[[0, (1.0, 1.0)], [0, (0.5, 1.0)]],
             ...     verbose=0)
             >>> kmf = scf.KRHF(
-            ...     cell, cell.make_kpts([1, 1, 2]), exxdiv=None).density_fit()
-            >>> _ = kmf.kernel()
-            >>> mykradc = kadc_rhf.KRADC(kmf)
-            >>> context = AO2MO(mykradc, 'incore')
+            ...     cell, cell.make_kpts([1, 1, 2]),
+            ...     exxdiv=None).density_fit().run()
+            >>> mykradcbase = kadc_rhf.KRADCBase(kmf)
+            >>> context = AO2MO(mykradcbase, 'incore')
             >>> with context.incore() as eris:
             ...     print(isinstance(eris.ovov, np.ndarray), eris.feri is None)
             True True
@@ -704,10 +707,10 @@ class AO2MO:
             ...     basis=[[0, (1.0, 1.0)], [0, (0.5, 1.0)]],
             ...     verbose=0)
             >>> kmf = scf.KRHF(
-            ...     cell, cell.make_kpts([1, 1, 2]), exxdiv=None).density_fit()
-            >>> _ = kmf.kernel()
-            >>> mykradc = kadc_rhf.KRADC(kmf)
-            >>> context = AO2MO(mykradc, 'outcore')
+            ...     cell, cell.make_kpts([1, 1, 2]),
+            ...     exxdiv=None).density_fit().run()
+            >>> mykradcbase = kadc_rhf.KRADCBase(kmf)
+            >>> context = AO2MO(mykradcbase, 'outcore')
             >>> with context.outcore() as eris:
             ...     print(eris.ovov.shape, eris.feri is not None)
             (2, 2, 2, 1, 1, 1, 1) True
@@ -855,10 +858,10 @@ class AO2MO:
             ...     basis=[[0, (1.0, 1.0)], [0, (0.5, 1.0)]],
             ...     verbose=0)
             >>> kmf = scf.KRHF(
-            ...     cell, cell.make_kpts([1, 1, 2]), exxdiv=None).density_fit()
-            >>> _ = kmf.kernel()
-            >>> mykradc = kadc_rhf.KRADC(kmf)
-            >>> context = AO2MO(mykradc, 'density_fit')
+            ...     cell, cell.make_kpts([1, 1, 2]),
+            ...     exxdiv=None).density_fit().run()
+            >>> mykradcbase = kadc_rhf.KRADCBase(kmf)
+            >>> context = AO2MO(mykradcbase, 'density_fit')
             >>> with context.density_fit() as eris:
             ...     print(eris.ovvv is None, eris.vvvv is None)
             ...     print(eris.Lov.shape[:2], eris.Lov.shape[-2:])
@@ -989,7 +992,7 @@ def chunk_size(adc):
     or complex element size. This is an estimate rather than a memory limit.
 
     Args:
-        adc (KRADC): Driver defining nvir, mo_coeff and max_memory in MB.
+        adc (KRADCBase): Driver defining nvir, mo_coeff and max_memory in MB.
 
     Returns:
         int: At least one orbital and at most nvir when nvir is positive.
@@ -1017,7 +1020,8 @@ def ao2mo(adc, backend=None):
     r"""Transform active MOs and return an owning integral container.
 
     Args:
-        adc (KRADC): Reference defining orbitals, active spaces and momenta.
+        adc (KRADCBase): Reference defining orbitals, active spaces and
+            momenta.
         backend (str, optional): Override adc.integral_backend for this call.
             See AO2MO for backend selection and storage conventions.
 
@@ -1036,10 +1040,10 @@ def ao2mo(adc, backend=None):
         ...     basis=[[0, (1.0, 1.0)], [0, (0.5, 1.0)]],
         ...     verbose=0)
         >>> kmf = scf.KRHF(
-        ...     cell, cell.make_kpts([1, 1, 2]), exxdiv=None).density_fit()
-        >>> _ = kmf.kernel()
-        >>> mykradc = kadc_rhf.KRADC(kmf)
-        >>> with ao2mo(mykradc, 'density_fit') as eris:
+        ...     cell, cell.make_kpts([1, 1, 2]),
+        ...     exxdiv=None).density_fit().run()
+        >>> mykradcbase = kadc_rhf.KRADCBase(kmf)
+        >>> with ao2mo(mykradcbase, 'density_fit') as eris:
         ...     print(eris.ovvo.shape)
         (2, 2, 2, 1, 1, 1, 1)
     """
@@ -1055,7 +1059,7 @@ def transform_integrals_incore(adc):
     r"""Transform integrals using the earlier incore entry point.
 
     Args:
-        adc (KRADC): Driver defining the active orbitals and periodic
+        adc (KRADCBase): Driver defining the active orbitals and periodic
             reference. Backend selection is fixed to 'incore'.
 
     Returns:
@@ -1070,7 +1074,7 @@ def transform_integrals_outcore(adc):
     r"""Transform integrals using the earlier outcore entry point.
 
     Args:
-        adc (KRADC): Driver defining the active orbitals and periodic
+        adc (KRADCBase): Driver defining the active orbitals and periodic
             reference. Backend selection is fixed to 'outcore'.
 
     Returns:
@@ -1085,7 +1089,7 @@ def transform_integrals_df(adc):
     r"""Transform integrals using the earlier df entry point.
 
     Args:
-        adc (KRADC): Driver defining the active orbitals and periodic
+        adc (KRADCBase): Driver defining the active orbitals and periodic
             reference. Backend selection is fixed to 'density_fit'.
 
     Returns:

@@ -59,8 +59,7 @@ def setUpModule():
     kpts = cell.make_kpts(nmp)
     kpts -= kpts[0]
     kmf = scf.KRHF(cell, kpts, exxdiv=None).density_fit().run()
-    mykradc  = adc.KRADC(kmf)
-    mykradc.type_ = 'ea'
+    mykradc  = adc.KRADCEA(kmf)
 
 def tearDownModule():
     r"""Release the paired molecular and periodic reference fixtures.

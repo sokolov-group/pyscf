@@ -84,7 +84,7 @@ def _pick(param, i):
     return param
 
 
-class RADC2FNO(kadc_rhf.KRADC):
+class _KRADCFNO(kadc_rhf.KRADCBase):
     r"""Generate periodic frozen natural orbitals and additive ADC corrections.
 
     The natural orbitals diagonalize the virtual block of a correlated density,
@@ -93,15 +93,17 @@ class RADC2FNO(kadc_rhf.KRADC):
     and previously frozen spaces are retained in the resulting MO ordering.
 
     Args:
-        mf (KRHF): Restricted k-point Hartree-Fock reference.
+        mf (KRHF, Cell or KRADCBase): Restricted periodic reference or ADC
+            object.
         frozen (int or sequence, optional): Initial KMP2 frozen-space setting.
-        mo_coeff, mo_occ (sequence[ndarray], optional): Orbital/occupation
-            overrides as in KRADC. Energies initially come from mf.
+        mo_coeff, mo_occ, mo_energy (sequence[ndarray], optional): Per-k
+            orbital overrides as in KRADCBase.
+        kpts (array_like, optional): Mesh for Cell inputs, default Gamma.
 
     Attributes:
         mode (str): 'min' keeps a common virtual count equal to the largest
-            per-k requested count; 'per_kpt' keeps each count independently.
-            At least one active virtual is retained at every k point.
+            per-k requested count; 'per_kpt' keeps each count independently. At
+            least one active virtual is retained at every k point.
         ref_state: None selects a ground-state density. A positive integer
             selects a ranked charged root using the legacy indexing rule;
             (root_lists, sector_list) explicitly selects zero-based roots,
@@ -109,8 +111,7 @@ class RADC2FNO(kadc_rhf.KRADC):
         if_ref_qp (bool): Filter explicit selected roots and correction lists
             by the quasiparticle threshold is_qp (default True).
         is_qp (float): Minimum spectroscopic factor for quasiparticle
-            selection,
-            default 0.5.
+            selection, default 0.5.
         rdm1_ss (ndarray): Ground/state-averaged density defining the FNOs.
         e_can, v_can, p_can: Canonical charged energies, vectors and strengths.
         e_corr_can (float): Canonical reference correlation energy per cell.
@@ -131,47 +132,49 @@ class RADC2FNO(kadc_rhf.KRADC):
 
         >>> import numpy as np
         >>> from pyscf.pbc import gto, scf
-        >>> from pyscf.pbc.adc.kadc_fno import RADC2FNO
+        >>> from pyscf.pbc.adc.kadc_fno import KRADCIPFNO
         >>> cell = gto.M(
         ...     atom='He 0 0 0',
         ...     a=np.eye(3) * 3,
         ...     basis=[[0, (1.0, 1.0)], [0, (0.5, 1.0)]],
         ...     verbose=0)
         >>> kmf = scf.KRHF(
-        ...     cell, cell.make_kpts([1, 1, 2]), exxdiv=None).density_fit()
-        >>> _ = kmf.kernel()
-        >>> mykradc_fno = RADC2FNO(kmf)
+        ...     cell, cell.make_kpts([1, 1, 2]),
+        ...     exxdiv=None).density_fit().run()
+        >>> mykradc_fno = KRADCIPFNO(kmf)
         >>> energy = mykradc_fno.ground_state_energy(nvir_act=1)
         >>> round(energy, 8), round(mykradc_fno.correct_corr(energy), 8)
         (-0.00416766, -0.00416766)
         >>> int(mykradc_fno.nvir), len(mykradc_fno.mo_coeff)
         (1, 2)
     """
-    _keys = kadc_rhf.KRADC._keys | {'delta_e', 'e_can', 'v_can', 'e_corr_can',
+    _keys = kadc_rhf.KRADCBase._keys | {'delta_e', 'e_can', 'v_can', 'e_corr_can',
                                    'rdm1_ss', 'mode', 'ref_state',
                                    'delta_e_corr', 'p_can',
                                    'if_ref_qp', 'delta_e_qp', 'is_qp',
                                    'e_corr_fno'}
 
-    def __init__(self, mf, frozen=0, mo_coeff=None, mo_occ=None):
+    def __init__(self, mf, frozen=None, mo_coeff=None, mo_occ=None,
+                 mo_energy=None, kpts=None):
         r"""Initialize the reference driver and unset FNO/correction results.
 
         Args:
-            mf (KRHF): Restricted k-point Hartree-Fock reference.
+            mf (KRHF, Cell or KRADCBase): Reference for the concrete FNO
+                sector.
             frozen (int or sequence, optional): Initial frozen-space
-                specification,
-                default zero frozen occupied orbitals.
-            mo_coeff, mo_occ (sequence[ndarray], optional): Orbital/occupation
-                replacements passed to the KRADC reference initializer.
+                specification, None inherits an ADC source setting or freezes
+                no orbitals.
+            mo_coeff, mo_occ, mo_energy (sequence[ndarray], optional): Orbital
+                replacements passed to the KRADCBase reference initializer.
+            kpts (array_like, optional): Mesh for Cell inputs, default Gamma.
 
         Returns:
             None: Choose common-count mode, ground-density FNOs and
-            quasiparticle
-            filtering with threshold 0.5. No canonical ADC calculation or
-            natural
-            orbital transformation is performed during construction.
+            quasiparticle filtering with threshold 0.5. No canonical ADC
+            calculation or natural orbital transformation is performed during
+            construction.
         """
-        super().__init__(mf, frozen, mo_coeff, mo_occ)
+        super().__init__(mf, frozen, mo_coeff, mo_occ, mo_energy, kpts)
         self.delta_e = None
         self.delta_e_corr = None
         self.delta_e_qp = None
@@ -244,16 +247,16 @@ class RADC2FNO(kadc_rhf.KRADC):
         Examples:
             >>> import numpy as np
             >>> from pyscf.pbc import gto, scf
-            >>> from pyscf.pbc.adc.kadc_fno import RADC2FNO
+            >>> from pyscf.pbc.adc.kadc_fno import KRADCIPFNO
             >>> cell = gto.M(
             ...     atom='He 0 0 0',
             ...     a=np.eye(3) * 3,
             ...     basis=[[0, (1.0, 1.0)], [0, (0.5, 1.0)]],
             ...     verbose=0)
             >>> kmf = scf.KRHF(
-            ...     cell, cell.make_kpts([1, 1, 2]), exxdiv=None).density_fit()
-            >>> _ = kmf.kernel()
-            >>> mykradc_fno = RADC2FNO(kmf)
+            ...     cell, cell.make_kpts([1, 1, 2]),
+            ...     exxdiv=None).density_fit().run()
+            >>> mykradc_fno = KRADCIPFNO(kmf)
             >>> energies = mykradc_fno.ground_state_energy(nvir_act=[1, 1])
             >>> np.round(energies, 8).tolist()
             [-0.00416766, -0.00416766]
@@ -324,7 +327,7 @@ class RADC2FNO(kadc_rhf.KRADC):
             self.mo_energy = all_mo_energy
             self.frozen = all_frozen
             self.mo_occ = [[np.copy(oc) for oc in _can_mo_occ]
-                           for _ in range(n_thresh)]
+                           for threshold_index in range(n_thresh)]
             self.delta_e_corr = all_delta_e_corr
             self.e_corr_fno = all_e_corr_fno
 
@@ -396,16 +399,16 @@ class RADC2FNO(kadc_rhf.KRADC):
         Examples:
             >>> import numpy as np
             >>> from pyscf.pbc import gto, scf
-            >>> from pyscf.pbc.adc.kadc_fno import RADC2FNO
+            >>> from pyscf.pbc.adc.kadc_fno import KRADCIPFNO
             >>> cell = gto.M(
             ...     atom='He 0 0 0',
             ...     a=np.eye(3) * 3,
             ...     basis=[[0, (1.0, 1.0)], [0, (0.5, 1.0)]],
             ...     verbose=0)
             >>> kmf = scf.KRHF(
-            ...     cell, cell.make_kpts([1, 1, 2]), exxdiv=None).density_fit()
-            >>> _ = kmf.kernel()
-            >>> mykradc_fno = RADC2FNO(kmf)
+            ...     cell, cell.make_kpts([1, 1, 2]),
+            ...     exxdiv=None).density_fit().run()
+            >>> mykradc_fno = KRADCIPFNO(kmf)
             >>> result = mykradc_fno.kernel(1, nvir_act=1, kptlist=[0])
             >>> result is None, mykradc_fno.e_ssfno.shape
             (True, (1, 1))
@@ -421,6 +424,9 @@ class RADC2FNO(kadc_rhf.KRADC):
             logger.info(self, f'nroots = {nroots}; only the FNO ground state '
                         'was calculated.')
             return energy
+        if isinstance(self, kadc_rhf.KRADCEE) and self.ref_state is not None:
+            raise NotImplementedError(
+                "EE FNO calculations require ref_state=None.")
         cput0 = (logger.process_clock(), logger.perf_counter())
         log = logger.Logger(self.stdout, self.verbose)
         if self.ref_state is None:
@@ -502,7 +508,7 @@ class RADC2FNO(kadc_rhf.KRADC):
             self.mo_energy = all_mo_energy
             self.frozen = all_frozen
             self.mo_occ = [[np.copy(oc) for oc in _can_mo_occ]
-                           for _ in range(n_thresh)]
+                           for threshold_index in range(n_thresh)]
             self.delta_e_corr = all_delta_e_corr
             self.e_corr_fno = all_e_corr_fno
             self.delta_e = all_delta_e
@@ -517,19 +523,17 @@ class RADC2FNO(kadc_rhf.KRADC):
         method.
 
         The canonical energies must already be stored by make_ss_rdm1(). Solve
-        the current FNO orbital space using the base KRADC implementation, so
-        this
-        method does not recursively enter the FNO driver. Default ADC(2) gives
-        MP2/ADC(2) correction data; other method settings use their own
-        equations.
+        the current FNO orbital space using the base KRADCBase implementation,
+        so this method does not recursively enter the FNO driver. Default
+        ADC(2) gives MP2/ADC(2) correction data; other method settings use
+        their own equations.
 
         Args:
             kptlist (sequence[int], optional): Sectors to solve for charged
-                roots;
-                required when if_gs=False. Quasiparticle corrections currently
-                index saved energy arrays directly by these sector numbers; use
-                their full mesh order, or set if_ref_qp=False for arbitrary
-                subsets.
+                roots; required when if_gs=False. Quasiparticle corrections
+                currently index saved energy arrays directly by these sector
+                numbers; use their full mesh order, or set if_ref_qp=False for
+                arbitrary subsets.
             nroots (int, optional): Roots per sector, required for charged
                 runs.
             guess (array_like, optional): Trial vectors in the current FNO
@@ -538,15 +542,14 @@ class RADC2FNO(kadc_rhf.KRADC):
 
         Returns:
             None: Update e_corr and delta_e_corr=e_corr_can-e_corr. Charged
-            runs
-            also update e_ssfno/v_ssfno/p_ssfno and delta_e=e_can-e_ssfno, plus
-            matched quasiparticle differences when if_ref_qp=True.
+            runs also update e_ssfno/v_ssfno/p_ssfno and delta_e=e_can-e_ssfno,
+            plus matched quasiparticle differences when if_ref_qp=True.
         """
         if if_gs:
-            kadc_rhf.KRADC.ground_state_energy(self)
+            kadc_rhf.KRADCBase.ground_state_energy(self)
         else:
-            (self.e_ssfno, self.v_ssfno, self.p_ssfno, _) = (
-                kadc_rhf.KRADC.kernel(
+            (self.e_ssfno, self.v_ssfno, self.p_ssfno, transition_amplitudes) = (
+                kadc_rhf.KRADCBase.kernel(
                     self, nroots, guess=guess, kptlist=kptlist)
             )
             self.delta_e = self.e_can - self.e_ssfno
@@ -580,16 +583,16 @@ class RADC2FNO(kadc_rhf.KRADC):
         Examples:
             >>> import numpy as np
             >>> from pyscf.pbc import gto, scf
-            >>> from pyscf.pbc.adc.kadc_fno import RADC2FNO
+            >>> from pyscf.pbc.adc.kadc_fno import KRADCIPFNO
             >>> cell = gto.M(
             ...     atom='He 0 0 0',
             ...     a=np.eye(3) * 3,
             ...     basis=[[0, (1.0, 1.0)], [0, (0.5, 1.0)]],
             ...     verbose=0)
             >>> kmf = scf.KRHF(
-            ...     cell, cell.make_kpts([1, 1, 2]), exxdiv=None).density_fit()
-            >>> _ = kmf.kernel()
-            >>> mykradc_fno = RADC2FNO(kmf)
+            ...     cell, cell.make_kpts([1, 1, 2]),
+            ...     exxdiv=None).density_fit().run()
+            >>> mykradc_fno = KRADCIPFNO(kmf)
             >>> mykradc_fno.delta_e = np.array([[0.01, 0.02]])
             >>> mykradc_fno.correct(np.array([[1.0, 2.0]])).tolist()
             [[1.01, 2.02]]
@@ -613,16 +616,16 @@ class RADC2FNO(kadc_rhf.KRADC):
         Examples:
             >>> import numpy as np
             >>> from pyscf.pbc import gto, scf
-            >>> from pyscf.pbc.adc.kadc_fno import RADC2FNO
+            >>> from pyscf.pbc.adc.kadc_fno import KRADCIPFNO
             >>> cell = gto.M(
             ...     atom='He 0 0 0',
             ...     a=np.eye(3) * 3,
             ...     basis=[[0, (1.0, 1.0)], [0, (0.5, 1.0)]],
             ...     verbose=0)
             >>> kmf = scf.KRHF(
-            ...     cell, cell.make_kpts([1, 1, 2]), exxdiv=None).density_fit()
-            >>> _ = kmf.kernel()
-            >>> mykradc_fno = RADC2FNO(kmf)
+            ...     cell, cell.make_kpts([1, 1, 2]),
+            ...     exxdiv=None).density_fit().run()
+            >>> mykradc_fno = KRADCIPFNO(kmf)
             >>> energy = mykradc_fno.ground_state_energy(nvir_act=1)
             >>> round(mykradc_fno.correct_corr(energy), 8)
             -0.00416766
@@ -672,16 +675,16 @@ class RADC2FNO(kadc_rhf.KRADC):
             >>> import numpy as np
             >>> from pyscf.lib import logger
             >>> from pyscf.pbc import gto, scf
-            >>> from pyscf.pbc.adc.kadc_fno import RADC2FNO
+            >>> from pyscf.pbc.adc.kadc_fno import KRADCIPFNO
             >>> cell = gto.M(
             ...     atom='He 0 0 0',
             ...     a=np.eye(3) * 3,
             ...     basis=[[0, (1.0, 1.0)], [0, (0.5, 1.0)]],
             ...     verbose=0)
             >>> kmf = scf.KRHF(
-            ...     cell, cell.make_kpts([1, 1, 2]), exxdiv=None).density_fit()
-            >>> _ = kmf.kernel()
-            >>> mykradc_fno = RADC2FNO(kmf)
+            ...     cell, cell.make_kpts([1, 1, 2]),
+            ...     exxdiv=None).density_fit().run()
+            >>> mykradc_fno = KRADCIPFNO(kmf)
             >>> log = logger.Logger(mykradc_fno.stdout, 0)
             >>> started = logger.process_clock(), logger.perf_counter()
             >>> mykradc_fno.make_ss_rdm1(log, started, if_gs=True)
@@ -689,9 +692,9 @@ class RADC2FNO(kadc_rhf.KRADC):
             ((2, 2, 2), True)
         """
         if if_gs:
-            kadc_rhf.KRADC.ground_state_energy(self)
+            kadc_rhf.KRADCBase.ground_state_energy(self)
         else:
-            self.e_can, self.v_can, self.p_can, _ = kadc_rhf.KRADC.kernel(
+            self.e_can, self.v_can, self.p_can, transition_amplitudes = kadc_rhf.KRADCBase.kernel(
                 self, nroots, guess=guess, kptlist=kptlist)
         log.info(f'Current memory use: {lib.current_memory()[0]:.0f} MB')
         self.e_corr_can = self.e_corr
@@ -714,7 +717,7 @@ class RADC2FNO(kadc_rhf.KRADC):
                         'elements in the second list of ref_state should be'
                         ' int type'))
                 if isinstance(self.ref_state[0][0], (int, np.integer)):
-                    sidx = ([self.ref_state[0] for _ in range(
+                    sidx = ([self.ref_state[0] for sector_index in range(
                         len(self.ref_state[1]))])
                 else:
                     if len(self.ref_state[0]) != len(self.ref_state[1]):
@@ -802,16 +805,16 @@ class RADC2FNO(kadc_rhf.KRADC):
             >>> import numpy as np
             >>> from pyscf.lib import logger
             >>> from pyscf.pbc import gto, scf
-            >>> from pyscf.pbc.adc.kadc_fno import RADC2FNO
+            >>> from pyscf.pbc.adc.kadc_fno import KRADCIPFNO
             >>> cell = gto.M(
             ...     atom='He 0 0 0',
             ...     a=np.eye(3) * 3,
             ...     basis=[[0, (1.0, 1.0)], [0, (0.5, 1.0)]],
             ...     verbose=0)
             >>> kmf = scf.KRHF(
-            ...     cell, cell.make_kpts([1, 1, 2]), exxdiv=None).density_fit()
-            >>> _ = kmf.kernel()
-            >>> mykradc_fno = RADC2FNO(kmf)
+            ...     cell, cell.make_kpts([1, 1, 2]),
+            ...     exxdiv=None).density_fit().run()
+            >>> mykradc_fno = KRADCIPFNO(kmf)
             >>> log = logger.Logger(mykradc_fno.stdout, 0)
             >>> started = logger.process_clock(), logger.perf_counter()
             >>> mykradc_fno.make_ss_rdm1(log, started, if_gs=True)
@@ -896,3 +899,33 @@ class RADC2FNO(kadc_rhf.KRADC):
 
         (self.mo_coeff, self.mo_energy, self.frozen) = ((no_coeff, no_energy,
             no_frozen))
+
+
+class KRADCIPFNO(_KRADCFNO, kadc_rhf.KRADCIP):
+    r"""IP-ADC with frozen natural orbitals and optional state-specific
+    densities.
+
+    Accepts the same reference inputs as KRADCIP. Common FNO settings and
+    truncation/correction methods are documented by _KRADCFNO.
+    """
+
+
+class KRADCEAFNO(_KRADCFNO, kadc_rhf.KRADCEA):
+    r"""EA-ADC with frozen natural orbitals and optional state-specific
+    densities.
+
+    Accepts the same reference inputs as KRADCEA. Common FNO settings and
+    truncation/correction methods are documented by _KRADCFNO.
+    """
+
+
+class KRADCEEFNO(_KRADCFNO, kadc_rhf.KRADCEE):
+    r"""EE-ADC with FNOs generated from the correlated reference density.
+
+    Accepts the same reference inputs as KRADCEE. Set ref_state=None: EE
+    transition densities do not supply state-specific FNO densities.
+    """
+
+
+# Earlier FNO name selects IP; explicit sector classes are preferred.
+RADC2FNO = KRADCIPFNO
