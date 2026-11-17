@@ -65,176 +65,6 @@ from pyscf.pbc.scf.hf import INVALID_ORBITAL_ENERGY
 #        Chemist's  oovv(ijab) : ki - kj + ka - kb
 #        Amplitudes t2(ijab)  : ki + kj - ka - kba
 
-def kernel(adc, nroots=1, guess=None, eris=None, kptlist=None):
-    r"""Solve the IP, EA or singlet EE effective-Hamiltonian eigenproblem.
-
-    For each selected momentum sector, Davidson iteration solves
-    :math:`M(k) U_n(k) = E_n(k) U_n(k)`. Ground-state amplitudes must
-    already be present for positive nroots; the KRADCBase driver prepares them.
-
-    Args:
-        adc (KRADCIP, KRADCEA or KRADCEE): Sector solver with reference data.
-        nroots (int): Roots per sector, capped at vector_size(). Zero or a
-            negative value computes only the reference correlation energy.
-        guess (array_like, optional): Trial vectors with shape
-            (len(kptlist), nroots, vector_size()), in kptlist order.
-            By default use unit vectors at the lowest diagonal entries.
-        eris (_ChemistsERIs, optional): Pretransformed active-space
-            integrals. With None, call adc.ao2mo().
-        kptlist (sequence[int], optional): Momentum-sector indices; defaults
-            to every k point. Ignored for a reference-only calculation.
-
-    Returns:
-        tuple: E, U, P, X, also stored on adc. E and P have shape
-        (nsectors, nroots); U has shape (nsectors, nroots, vector_size()).
-        X contains IP/EA spectroscopic amplitudes with shape
-        (nsectors, nmo, nroots), or EE transition densities with shape
-        (nsectors, nroots, nkpts, nmo, nmo). Energies are in Hartree.
-        P contains charged spectral factors or neutral density-response
-        strengths. If compute_properties=False, P and X are zero arrays.
-        For nroots < 1, return scalar e_corr and clear excitation results.
-
-    For excitation calculations, read E, U, P and X from the solver/driver
-    attributes after calling kernel(). Unpacking the returned tuple is
-    discouraged; the tuple remains available for compatibility.
-
-    Examples:
-        Create the two-k-point helium reference below; lattice vectors
-        are in Angstrom and energies are in Hartree:
-
-        >>> import numpy as np
-        >>> from pyscf.pbc import gto, scf
-        >>> from pyscf.pbc.adc.kadc_rhf import KRADCBase, kernel
-        >>> from pyscf.pbc.adc.kadc_rhf import KRADCEE
-        >>> cell = gto.M(
-        ...     atom='He 0 0 0',
-        ...     a=np.eye(3) * 3,
-        ...     basis=[[0, (1.0, 1.0)], [0, (0.5, 1.0)]],
-        ...     verbose=0)
-        >>> kmf = scf.KRHF(
-        ...     cell, cell.make_kpts([1, 1, 2]),
-        ...     exxdiv=None).density_fit().run()
-        >>> mykradcbase = KRADCBase(kmf).run(0)
-        >>> mykradcee = KRADCEE(mykradcbase)
-        >>> excitation_results = kernel(mykradcee, nroots=2, kptlist=[0])
-        >>> energies = mykradcee.E
-        >>> vectors = mykradcee.U
-        >>> strengths = mykradcee.P
-        >>> densities = mykradcee.X
-        >>> energies.round(6).tolist()
-        [[1.756312, 2.102047]]
-        >>> vectors.shape, densities.shape
-        ((1, 2, 10), (1, 2, 2, 2, 2))
-    """
-    if not isinstance(nroots, (int, np.integer)):
-        raise TypeError('nroots must be an integer.')
-    if nroots < 1:
-        energy = KRADCBase.ground_state_energy(adc, eris)
-        adc._clear_excitations()
-        logger.info(
-            adc, f'nroots = {nroots}; only the ground state was calculated.')
-        return energy
-
-    adc._invalidate_orbitals()
-    validate(adc)
-    started = logger.process_clock(), logger.perf_counter()
-    log = logger.Logger(adc.stdout, adc.verbose)
-    adc.dump_flags()
-    if eris is None:
-        eris = adc.ao2mo()
-    vec_size = adc.vector_size()
-    nroots = min(nroots, vec_size)
-    nkpts, nmo = adc.nkpts, adc.nmo
-    kptlist = list(range(nkpts) if kptlist is None else kptlist)
-    if not (kptlist and all(
-        isinstance(k, (int, np.integer)) and 0 <= k < nkpts for k in kptlist)):
-        raise ValueError('kptlist must contain valid k-point indices.')
-    dtype = np.result_type(adc.t2[0])
-    root_shape = len(kptlist), nroots
-    evals = np.zeros(root_shape)
-    evecs = np.zeros((*root_shape, vec_size), dtype=dtype)
-    conv = np.zeros(root_shape, dtype=bool)
-    P = np.zeros(root_shape)
-    neutral = isinstance(adc, KRADCEE)
-    if neutral:
-        X = np.zeros((*root_shape, nkpts, nmo, nmo), dtype=dtype)
-        imds = None  # Neutral intermediates depend on kshift.
-    else:
-        X = np.zeros((len(kptlist), nmo, nroots), dtype=dtype)
-        imds = adc.get_imds(eris)
-    initial_guess = adc._init_guess
-    match guess:
-        case None:
-            guess_type = None
-        case str():
-            raise NotImplementedError('Supply trial vectors as an array.')
-        case _:
-            if not hasattr(guess, '__len__'):
-                raise NotImplementedError('Guess type not implemented.')
-            guess_type = 'read'
-            guess_k = np.asarray(guess).copy()
-
-    for k, kshift in enumerate(kptlist):
-        matvec, diag = adc.gen_matvec(kshift, imds, eris)
-        match guess_type:
-            case 'read':
-                initial = initial_guess(
-                    nroots,
-                    diag,
-                    ascending=True,
-                    type_='read',
-                    ini=guess_k[k],
-                    kshift=kshift)
-            case None:
-                initial = initial_guess(
-                    nroots, diag, ascending=True, kshift=kshift)
-        conv_k, evals_k, evecs_k = lib.linalg_helper.davidson_nosym1(
-            lambda xs: [matvec(x) for x in xs],
-            initial,
-            diag,
-            nroots=nroots,
-            verbose=log,
-            tol=adc.conv_tol,
-            max_cycle=adc.max_cycle,
-            max_space=adc.max_space,
-            tol_residual=adc.tol_residual)
-        evals[k], evecs[k], conv[k] = evals_k.real, evecs_k, conv_k
-        U = evecs[k].T.copy()
-        if neutral:
-            U = adc.renormalize_eigenvectors(kshift, U, nroots)
-            evecs[k] = U.T
-        if adc.compute_properties:
-            P[k], X[k] = adc.get_properties(kshift, U, nroots)
-
-    adc._kptlist = kptlist
-    adc.E, adc.U, adc.P, adc.X, adc.converged = evals, evecs, P, X, conv
-    if neutral:
-        adc.T = X.reshape(*root_shape, -1) if adc.compute_properties else None
-    nfalse = conv.size - np.count_nonzero(conv)
-    if nfalse:
-        logger.warn(
-            adc, f'Davidson iterations for {nfalse} root(s) did not converge.')
-    data = {'Method': [], 'k': [], 'Root': [], 'Energy (Eh)': [],
-            'Energy (eV)': []}
-    strength_label = 'Density' if neutral else 'Spec factor'
-    if adc.compute_properties:
-        data[strength_label] = []
-    data['Converged'] = []
-    for k, kshift in enumerate(kptlist):
-        for root in range(nroots):
-            data['Method'].append(adc.method)
-            data['k'].append(kshift)
-            data['Root'].append(root)
-            data['Energy (Eh)'].append(f'{evals[k, root]:.10f}')
-            data['Energy (eV)'].append(f'{evals[k, root] * HARTREE2EV:.8f}')
-            if adc.compute_properties:
-                data[strength_label].append(f'{P[k, root]:.8f}')
-            data['Converged'].append(conv[k, root])
-    log_table(adc, data, 'ADC calculation summary')
-    log.timer('ADC', *started)
-    return evals, evecs, P, X
-
-
 def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
     r"""Build the spin-summed reference one-particle density matrix.
 
@@ -625,17 +455,21 @@ class KRADCBase(lib.StreamObject):
     _keys = {
         'cell', 'kpts', 'khelper', 'exxdiv', 'method', 'frozen',
         'mo_coeff', 'mo_occ', 'mo_energy', 'scf_energy', 'e_corr', 't1', 't2',
-        'max_space', 'max_cycle', 'conv_tol', 'tol_residual', 'incore_complete',
-        'compute_properties', 'approx_trans_moments', 'integral_backend',
-        'chunk_size', 'keep_exxdiv', 'with_df', 'naux', 'if_heri_eris', 'eris',
-        'if_naf', 'thresh_naf', 'if_corr', 'density_gv', 'nkop_chk', 'kop_npick',
-        'imds', 'E', 'T', 'U', 'X', 'P', 'converged',
+        'nroots', 'max_space', 'max_cycle', 'conv_tol', 'tol_residual',
+        'incore_complete', 'compute_properties', 'approx_trans_moments',
+        'integral_backend', 'chunk_size', 'keep_exxdiv', 'with_df', 'naux',
+        'if_heri_eris', 'eris', 'if_naf', 'thresh_naf', 'if_corr',
+        'density_gv', 'nkop_chk', 'kop_npick', 'imds', 'E', 'T', 'U', 'X', 'P',
+        'converged',
     }
 
+    # Default number of roots per momentum sector when a call omits nroots.
+    nroots = 1
     incore_complete = False
 
     # Only common reference data survive a sector conversion.
-    _reference_keys = _keys - {'E', 'T', 'U', 'X', 'P', 'converged', 'chunk_size'}
+    _reference_keys = _keys - {'E', 'T', 'U', 'X', 'P', 'converged',
+                               'chunk_size'}
 
     def __init__(self, mf, frozen=None, mo_coeff=None, mo_occ=None,
                  mo_energy=None, kpts=None):
@@ -758,12 +592,13 @@ class KRADCBase(lib.StreamObject):
         self._transition_cache = {}
         self._clear_excitations()
 
-    def kernel(self, nroots=1, guess=None, eris=None, kptlist=None):
+    def kernel(self, nroots=None, guess=None, eris=None, kptlist=None):
         r"""Compute the reference and solve :math:`M(k) U_n=E_n U_n`.
 
         Args:
-            nroots (int): Roots per selected momentum sector. Zero or a
-                negative value requests only the ground-state calculation.
+            nroots (int, optional): Roots per selected momentum sector, capped
+                at vector_size(). None uses self.nroots. A nonpositive value
+                requests only the ground-state calculation.
             guess (array_like, optional): Trial vectors with shape
                 (len(kptlist), nroots, vector_size()), in kptlist order.
             eris (_ChemistsERIs, optional): Pretransformed integrals.
@@ -806,6 +641,8 @@ class KRADCBase(lib.StreamObject):
             >>> mykradcee.E.round(6).tolist()
             [[1.756312, 2.102047]]
         """
+        if nroots is None:
+            nroots = self.nroots
         if not isinstance(nroots, (int, np.integer)):
             raise TypeError('nroots must be an integer.')
         if nroots > 0 and not isinstance(self, (KRADCIP, KRADCEA, KRADCEE)):
@@ -817,7 +654,101 @@ class KRADCBase(lib.StreamObject):
         if nroots < 1:
             self._clear_excitations()
             return self.e_corr
-        return kernel(self, nroots, guess, eris, kptlist)
+
+        started = logger.process_clock(), logger.perf_counter()
+        log = logger.Logger(self.stdout, self.verbose)
+        self.dump_flags()
+        vec_size = self.vector_size()
+        nroots = min(nroots, vec_size)
+        nkpts, nmo = self.nkpts, self.nmo
+        kptlist = list(range(nkpts) if kptlist is None else kptlist)
+        if not (kptlist and all(
+            isinstance(k, (int, np.integer)) and 0 <= k < nkpts for k in kptlist)):
+            raise ValueError('kptlist must contain valid k-point indices.')
+        dtype = np.result_type(self.t2[0])
+        root_shape = len(kptlist), nroots
+        evals = np.zeros(root_shape)
+        evecs = np.zeros((*root_shape, vec_size), dtype=dtype)
+        conv = np.zeros(root_shape, dtype=bool)
+        P = np.zeros(root_shape)
+        neutral = isinstance(self, KRADCEE)
+        if neutral:
+            X = np.zeros((*root_shape, nkpts, nmo, nmo), dtype=dtype)
+            imds = None  # Neutral intermediates depend on kshift.
+        else:
+            X = np.zeros((len(kptlist), nmo, nroots), dtype=dtype)
+            imds = self.get_imds(eris)
+        initial_guess = self._init_guess
+        match guess:
+            case None:
+                guess_type = None
+            case str():
+                raise NotImplementedError('Supply trial vectors as an array.')
+            case _:
+                if not hasattr(guess, '__len__'):
+                    raise NotImplementedError('Guess type not implemented.')
+                guess_type = 'read'
+                guess_k = np.asarray(guess).copy()
+
+        for k, kshift in enumerate(kptlist):
+            matvec, diag = self.gen_matvec(kshift, imds, eris)
+            match guess_type:
+                case 'read':
+                    initial = initial_guess(
+                        nroots,
+                        diag,
+                        ascending=True,
+                        type_='read',
+                        ini=guess_k[k],
+                        kshift=kshift)
+                case None:
+                    initial = initial_guess(
+                        nroots, diag, ascending=True, kshift=kshift)
+            conv_k, evals_k, evecs_k = lib.linalg_helper.davidson_nosym1(
+                lambda xs: [matvec(x) for x in xs],
+                initial,
+                diag,
+                nroots=nroots,
+                verbose=log,
+                tol=self.conv_tol,
+                max_cycle=self.max_cycle,
+                max_space=self.max_space,
+                tol_residual=self.tol_residual)
+            evals[k], evecs[k], conv[k] = evals_k.real, evecs_k, conv_k
+            U = evecs[k].T.copy()
+            if neutral:
+                U = self.renormalize_eigenvectors(kshift, U, nroots)
+                evecs[k] = U.T
+            if self.compute_properties:
+                P[k], X[k] = self.get_properties(kshift, U, nroots)
+
+        self._kptlist = kptlist
+        self.E, self.U, self.P, self.X, self.converged = evals, evecs, P, X, conv
+        if neutral:
+            self.T = X.reshape(*root_shape, -1) if self.compute_properties else None
+        nfalse = conv.size - np.count_nonzero(conv)
+        if nfalse:
+            logger.warn(
+                self, f'Davidson iterations for {nfalse} root(s) did not converge.')
+        data = {'Method': [], 'k': [], 'Root': [], 'Energy (Eh)': [],
+                'Energy (eV)': []}
+        strength_label = 'Density' if neutral else 'Spec factor'
+        if self.compute_properties:
+            data[strength_label] = []
+        data['Converged'] = []
+        for k, kshift in enumerate(kptlist):
+            for root in range(nroots):
+                data['Method'].append(self.method)
+                data['k'].append(kshift)
+                data['Root'].append(root)
+                data['Energy (Eh)'].append(f'{evals[k, root]:.10f}')
+                data['Energy (eV)'].append(f'{evals[k, root] * HARTREE2EV:.8f}')
+                if self.compute_properties:
+                    data[strength_label].append(f'{P[k, root]:.8f}')
+                data['Converged'].append(conv[k, root])
+        log_table(self, data, 'ADC calculation summary')
+        log.timer('ADC', *started)
+        return evals, evecs, P, X
 
     def _compute_reference(self, eris=None):
         r"""Validate settings, transform integrals, and populate reference
@@ -996,7 +927,7 @@ class KRADCBase(lib.StreamObject):
             self._get_adc3_ham(eris, singles_ham)
         return singles_ham
 
-    def _init_guess(self, nroots=1, diag=None, ascending=True,
+    def _init_guess(self, nroots=None, diag=None, ascending=True,
                     type_=None, ini=None, kshift=None):
         r"""Build sector unit guesses or validate supplied root vectors.
 
@@ -1033,6 +964,8 @@ class KRADCBase(lib.StreamObject):
             >>> [int(np.argmax(vector)) for vector in guesses]
             [0, 1]
         """
+        if nroots is None:
+            nroots = self.nroots
         if type_ not in (None, 'read'):
             raise NotImplementedError(f'Unknown initial-guess type: {type_!r}')
         dim = self.vector_size()
@@ -1085,7 +1018,7 @@ class KRADCBase(lib.StreamObject):
             imds = self.get_imds(eris=eris, kshift=kshift)
         return self.matvec(kshift, imds, eris), self.get_diag(kshift, imds, eris)
 
-    def get_properties(self, kshift, U, nroots=1):
+    def get_properties(self, kshift, U, nroots=None):
         # Transition moments
         r"""Compute charged spectroscopic amplitudes and spin-summed pole
         strengths.
@@ -1125,6 +1058,8 @@ class KRADCBase(lib.StreamObject):
             >>> strengths.shape, amplitudes.shape
             ((1,), (2, 1))
         """
+        if nroots is None:
+            nroots = self.nroots
         T = self.get_trans_moments(kshift)
 
         # Spectroscopic amplitudes
@@ -1829,7 +1764,7 @@ class KRADCBase(lib.StreamObject):
         """
         self._close_amp_scratch()
 
-    def ip_adc(self, nroots=1, guess=None, eris=None, kptlist=None):
+    def ip_adc(self, nroots=None, guess=None, eris=None, kptlist=None):
         r"""Solve IP-ADC using previously computed reference amplitudes.
 
         Args:
@@ -1877,7 +1812,7 @@ class KRADCBase(lib.StreamObject):
         mykradcip.U = v_exc
         return e_exc, v_exc, spec_fac, x, mykradcip
 
-    def ea_adc(self, nroots=1, guess=None, eris=None, kptlist=None):
+    def ea_adc(self, nroots=None, guess=None, eris=None, kptlist=None):
         r"""Solve EA-ADC using previously computed reference amplitudes.
 
         Args:
@@ -1925,7 +1860,7 @@ class KRADCBase(lib.StreamObject):
         mykradcea.U = v_exc
         return e_exc, v_exc, spec_fac, x, mykradcea
 
-    def ee_adc(self, nroots=1, guess=None, eris=None, kptlist=None):
+    def ee_adc(self, nroots=None, guess=None, eris=None, kptlist=None):
         r"""Solve EE-ADC using previously computed reference amplitudes.
 
         Args:
@@ -2548,7 +2483,7 @@ class KRADCIP(KRADCBase):
     # __init__ and kernel are inherited from KRADCBase. The sector
     # routines below follow their calls through the shared driver.
 
-    def renormalize_eigenvectors(self, kshift, U, nroots=1):
+    def renormalize_eigenvectors(self, kshift, U, nroots=None):
         r"""Normalize charged eigenvectors in the spin-adapted ADC metric.
 
         The metric is :math:`U_1^\dagger U_1+2U_2^\dagger U_2
@@ -2586,6 +2521,8 @@ class KRADCIP(KRADCBase):
             >>> float(abs(normalized[0, 0]))
             1.0
         """
+        if nroots is None:
+            nroots = self.nroots
         nkpts = self.nkpts
         nocc = self.t2[0].shape[3]
         n_singles = nocc
@@ -4312,7 +4249,7 @@ class KRADCEA(KRADCBase):
     # __init__ and kernel are inherited from KRADCBase. The sector
     # routines below follow their calls through the shared driver.
 
-    def renormalize_eigenvectors(self, kshift, U, nroots=1):
+    def renormalize_eigenvectors(self, kshift, U, nroots=None):
         r"""Normalize charged eigenvectors in the spin-adapted ADC metric.
 
         The metric is :math:`U_1^\dagger U_1+2U_2^\dagger U_2
@@ -4350,6 +4287,8 @@ class KRADCEA(KRADCBase):
             >>> float(abs(normalized[0, 0]))
             1.0
         """
+        if nroots is None:
+            nroots = self.nroots
         nkpts = self.nkpts
         nocc = self.t2[0].shape[3]
         nvir = self.nvir
@@ -6500,7 +6439,7 @@ class KRADCEE(KRADCBase):
         return M_ph.transpose(0, 2, 3, 1, 4, 5).reshape(
             self.n_singles, self.n_singles)
 
-    def renormalize_eigenvectors(self, kshift, U, nroots=1):
+    def renormalize_eigenvectors(self, kshift, U, nroots=None):
         r"""Return copies of EE eigenvectors normalized in the singlet metric.
 
         The norm is :math:`U_1^\dagger U_1+U_2^\dagger U_2
@@ -6547,6 +6486,8 @@ class KRADCEE(KRADCBase):
             >>> float(normalized[0, 0]), float(vectors[0, 0])
             (1.0, 2.0)
         """
+        if nroots is None:
+            nroots = self.nroots
         if U.shape != (self.vector_size(), nroots):
             raise ValueError(
                 'Eigenvectors must have shape (vector_size, nroots).')
@@ -6564,7 +6505,7 @@ class KRADCEE(KRADCBase):
             vectors[:, root] /= np.sqrt(norm)
         return vectors
 
-    def get_properties(self, kshift, U, nroots=1):
+    def get_properties(self, kshift, U, nroots=None):
         r"""Contract transition densities into density-response strengths per
         cell.
 
@@ -6615,6 +6556,8 @@ class KRADCEE(KRADCBase):
             >>> strengths.shape, densities.shape
             ((1,), (1, 2, 2, 2))
         """
+        if nroots is None:
+            nroots = self.nroots
         if U.shape[1] != nroots:
             raise ValueError('nroots does not match the eigenvector array.')
         T = self.get_trans_moments(kshift, U)

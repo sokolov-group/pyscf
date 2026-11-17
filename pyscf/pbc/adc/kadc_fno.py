@@ -332,7 +332,7 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
 
         return self.e_corr_fno
 
-    def kernel(self, nroots=1, guess=None, eris=None, thresh=1e-4,
+    def kernel(self, nroots=None, guess=None, eris=None, thresh=1e-4,
         pct_occ=None, nvir_act=None, kptlist=None):
         r"""Generate ground/state-specific FNO spaces and charged excitation
         corrections.
@@ -393,6 +393,8 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
             >>> mykradc_fno.correct(mykradc_fno.e_ssfno).round(6).tolist()
             [[0.371589]]
         """
+        if nroots is None:
+            nroots = self.nroots
         if not isinstance(nroots, (int, np.integer)):
             raise TypeError('nroots must be an integer.')
         if nroots < 1:
@@ -669,6 +671,8 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
             >>> mykradc_fno.rdm1_ss.shape, mykradc_fno.t2 is None
             ((2, 2, 2), True)
         """
+        if nroots is None:
+            nroots = self.nroots
         if if_gs:
             kadc_rhf.KRADCBase.ground_state_energy(self)
         else:

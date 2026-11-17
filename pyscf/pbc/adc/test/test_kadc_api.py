@@ -437,14 +437,16 @@ class DriverAPI(unittest.TestCase):
             with self.subTest(sector=solver_type.__name__):
                 mykradc = solver_type(mf)
                 expected = mykradc.ground_state_energy()
-                mykradc.kernel(1, kptlist=[0])
-                self.assertIsNotNone(mykradc.E)
+                mykradc.nroots = 2
+                mykradc.kernel(kptlist=[0])
+                self.assertEqual(mykradc.E.shape, (1, 2))
                 with mock.patch.object(
                     mykradc,
                     'gen_matvec',
                     side_effect=AssertionError('solver called')):
                     actual = mykradc.kernel(0, kptlist=[])
                 self.assertAlmostEqual(actual, expected, 12)
+                self.assertEqual(mykradc.nroots, 2)
                 for field in ('E', 'U', 'P', 'X', 'T', 'converged', '_adc_es'):
                     self.assertIsNone(getattr(mykradc, field))
                 self.assertIsNotNone(mykradc.t2[0])
