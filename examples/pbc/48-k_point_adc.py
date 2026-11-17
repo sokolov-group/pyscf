@@ -42,24 +42,24 @@ kmf = scf.KRHF(cell, kpts=kpts, exxdiv=None).density_fit()
 ekrhf = kmf.kernel()
 
 # KADC
-kadc  = adc.KRADC(kmf)
+kadc  = adc.KRADCBase(kmf)
 
 #KMP2 energy
-emp2, t1, t2 = kadc.kernel_gs()
+emp2 = kadc.ground_state_energy()
 print("PBC KMP2 Energy:", emp2)
 
 #KMP3 energy
 kadc.method = 'adc(3)'
-emp3, t1, t2 = kadc.kernel_gs()
+emp3 = kadc.ground_state_energy()
 print("PBC KMP3 Energy:", emp3)
 
 # IP-KRADC
-kadc.method_type = 'ip'
+kadc = adc.KRADCIP(kadc)
 kadc.method = 'adc(3)'
 k_e_ip, v_e_ip, k_p_ip, k_x_ip = kadc.kernel(nroots_test,kptlist=[0])
 
 # EA-KRADC
-kadc.method_type = 'ea'
+kadc = adc.KRADCEA(kadc)
 kadc.method = 'adc(3)'
 k_e_ea, v_e_ea, k_p_ea, k_x_ea = kadc.kernel(nroots=nroots_test,kptlist=[0])
 

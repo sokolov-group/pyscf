@@ -75,16 +75,15 @@ ekrhf = kmf.kernel()
 # case1 SS-FNO kADC3
 
 # FNOGenerator
-ADCFG = adc.KRADC2FNO(kmf)
-ADCFG.method_type = 'ea'
+ADCFG = adc.KRADCEAFNO(kmf)
 ADCFG.approx_trans_moments = True
 ADCFG.verbose = 5
 ADCFG.ref_state = [[0],[0]]
 ADCFG.kernel(nroots_test,pct_occ=0.90,kptlist=[0])
 
 # kadc3
-kadc = adc.KRADC(kmf,ADCFG.frozen,ADCFG.mo_coeff,ADCFG.mo_occ,ADCFG.mo_energy)
-kadc.method_type = "ea"
+kadc = adc.KRADCEA(kmf, ADCFG.frozen, ADCFG.mo_coeff,
+                   ADCFG.mo_occ, ADCFG.mo_energy)
 kadc.approx_trans_moments = True
 kadc.verbose = 5
 kadc.method="adc(3)"
@@ -115,13 +114,13 @@ print("SS-FNO K-EA-EOM-CCSD roots (eV):", eomcc_e_corrected*27.2114)
 MPFG = adc.KRADC2FNO(kmf)
 MPFG.approx_trans_moments = True
 MPFG.verbose = 5
-MPFG.kernel_gs(pct_occ=0.1)
+MPFG.ground_state_energy(pct_occ=0.1)
 
-kadc_gs  = adc.KRADC(kmf,MPFG.frozen,MPFG.mo_coeff,MPFG.mo_occ,MPFG.mo_energy)
+kadc_gs  = adc.KRADCBase(kmf,MPFG.frozen,MPFG.mo_coeff,MPFG.mo_occ,MPFG.mo_energy)
 kadc_gs.approx_trans_moments = True
 kadc_gs.verbose = 5
 kadc_gs.method = "adc(3)"
-e_corr,t1,t2 = kadc_gs.kernel_gs()
+e_corr = kadc_gs.ground_state_energy()
 
 e_corr_correct = MPFG.correct_corr(e_corr)
 print("FNO KMP3 correlation energy (eV):", e_corr_correct*27.2114)
@@ -136,17 +135,17 @@ print("FNO KMP3 correlation energy (eV):", e_corr_correct*27.2114)
 MPMFG = adc.KRADC2FNO(kmf)
 MPMFG.approx_trans_moments = True
 MPMFG.verbose = 5
-MPMFG.kernel_gs(pct_occ=[0.5, 0.8, 0.9])
+MPMFG.ground_state_energy(pct_occ=[0.5, 0.8, 0.9])
 
 pct_list = [0.5, 0.8, 0.9]
 e_corr_list = []
 for i in range(len(MPMFG.frozen)):
-    kadc_gs = adc.KRADC(kmf, MPMFG.frozen[i], MPMFG.mo_coeff[i],
+    kadc_gs = adc.KRADCBase(kmf, MPMFG.frozen[i], MPMFG.mo_coeff[i],
                          MPMFG.mo_occ[i], MPMFG.mo_energy[i])
     kadc_gs.approx_trans_moments = True
     kadc_gs.verbose = 5
     kadc_gs.method = "adc(3)"
-    e_corr, t1, t2 = kadc_gs.kernel_gs()
+    e_corr = kadc_gs.ground_state_energy()
     e_corr_correct = MPMFG.correct_corr(e_corr, i)
     print('pct %4.2f | n_frozen/kpt = %s | uncorrected E_corr = %.10f eV | corrected E_corr = %.10f eV' %
           (pct_list[i], [len(f) for f in MPMFG.frozen[i]], e_corr*27.2114, e_corr_correct*27.2114))
@@ -170,8 +169,7 @@ print('Linear extrapolated FNO KMP3 correlation energy (eV): %.10f' % (e_corr_le
 # The excited-state kernel() also accepts a list of thresholds.
 # For multiple thresholds, e_ssfno, v_ssfno, p_ssfno, delta_e, delta_e_qp
 # become lists indexed by threshold as well.
-ADCMFG = adc.KRADC2FNO(kmf)
-ADCMFG.method_type = 'ea'
+ADCMFG = adc.KRADCEAFNO(kmf)
 ADCMFG.approx_trans_moments = True
 ADCMFG.verbose = 5
 ADCMFG.ref_state = [[0],[0]]
@@ -179,9 +177,8 @@ ADCMFG.kernel(nroots_test, pct_occ=[0.80, 0.90], kptlist=[0])
 
 pct_list_es = [0.80, 0.90]
 for i in range(len(ADCMFG.frozen)):
-    kadc = adc.KRADC(kmf, ADCMFG.frozen[i], ADCMFG.mo_coeff[i],
-                       ADCMFG.mo_occ[i])
-    kadc.method_type = "ea"
+    kadc = adc.KRADCEA(kmf, ADCMFG.frozen[i], ADCMFG.mo_coeff[i],
+                       ADCMFG.mo_occ[i], ADCMFG.mo_energy[i])
     kadc.approx_trans_moments = True
     kadc.verbose = 5
     kadc.method = "adc(3)"
@@ -201,11 +198,11 @@ PKFG = adc.KRADC2FNO(kmf)
 PKFG.mode = 'per_kpt'
 PKFG.approx_trans_moments = True
 PKFG.verbose = 5
-PKFG.kernel_gs(thresh=0.05)
+PKFG.ground_state_energy(thresh=0.05)
 
-kadc_pk = adc.KRADC(kmf, PKFG.frozen, PKFG.mo_coeff, PKFG.mo_occ, PKFG.mo_energy)
+kadc_pk = adc.KRADCBase(kmf, PKFG.frozen, PKFG.mo_coeff, PKFG.mo_occ, PKFG.mo_energy)
 kadc_pk.approx_trans_moments = True
 kadc_pk.verbose = 5
 kadc_pk.method = 'adc(3)'
-e_corr_pk, t1_pk, t2_pk = kadc_pk.kernel_gs()
+e_corr_pk = kadc_pk.ground_state_energy()
 print('per_kpt FNO-MP3 correlation energy (eV):', (e_corr_pk + PKFG.delta_e_corr)*27.2114)

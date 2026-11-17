@@ -366,30 +366,6 @@ class _ChemistsERIs:
         ks = self.kconserv[kp, kr, kq]
         return self.vvvv_df(self.Lvv[kp, kr], self.Lvv[kq, ks]) / self.nkpts
 
-    def get_ovvv(self, kp, kq, kr):
-        r"""Return an ovvv block through the earlier method interface.
-
-        Args:
-            kp, kq, kr (int): Three leading chemists' k indices.
-
-        Returns:
-            ndarray: Normalized block of shape (nocc, nvir, nvir, nvir).
-            Equivalent to ``ovvv_blocks[kp, kq, kr]``, the preferred interface.
-        """
-        return self.ovvv_blocks[kp, kq, kr]
-
-    def get_vvvv(self, kp, kq, kr):
-        r"""Return a vvvv block through the earlier method interface.
-
-        Args:
-            kp, kq, kr (int): Three leading particle-pair k indices.
-
-        Returns:
-            ndarray: Normalized block of shape (nvir,)*4. Equivalent to
-            ``vvvv_blocks[kp, kq, kr]``, the preferred interface.
-        """
-        return self.vvvv_blocks[kp, kq, kr]
-
     def close(self):
         r"""Close the owned integral scratch file and clear its file reference.
 
@@ -1048,53 +1024,3 @@ def ao2mo(adc, backend=None):
         (2, 2, 2, 1, 1, 1, 1)
     """
     return AO2MO(adc, backend)()
-
-
-# Legacy names retained for external callers; production code uses ao2mo.
-transform_integrals = ao2mo
-calculate_chunk_size = chunk_size
-
-
-def transform_integrals_incore(adc):
-    r"""Transform integrals using the earlier incore entry point.
-
-    Args:
-        adc (KRADCBase): Driver defining the active orbitals and periodic
-            reference. Backend selection is fixed to 'incore'.
-
-    Returns:
-        _ChemistsERIs: Owning integral container, with the storage and
-        normalization described by AO2MO.incore(). New callers can
-        use ao2mo(adc, backend='incore') instead.
-    """
-    return AO2MO(adc, 'incore').incore()
-
-
-def transform_integrals_outcore(adc):
-    r"""Transform integrals using the earlier outcore entry point.
-
-    Args:
-        adc (KRADCBase): Driver defining the active orbitals and periodic
-            reference. Backend selection is fixed to 'outcore'.
-
-    Returns:
-        _ChemistsERIs: Owning integral container, with the storage and
-        normalization described by AO2MO.outcore(). New callers can
-        use ao2mo(adc, backend='outcore') instead.
-    """
-    return AO2MO(adc, 'outcore').outcore()
-
-
-def transform_integrals_df(adc):
-    r"""Transform integrals using the earlier df entry point.
-
-    Args:
-        adc (KRADCBase): Driver defining the active orbitals and periodic
-            reference. Backend selection is fixed to 'density_fit'.
-
-    Returns:
-        _ChemistsERIs: Owning integral container, with the storage and
-        normalization described by AO2MO.density_fit(). New callers can
-        use ao2mo(adc, backend='density_fit') instead.
-    """
-    return AO2MO(adc, 'density_fit').density_fit()

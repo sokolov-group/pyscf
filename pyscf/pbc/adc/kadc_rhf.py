@@ -33,7 +33,6 @@ from types import SimpleNamespace
 import copy
 import tempfile
 import time
-import warnings
 
 import h5py
 import numpy as np
@@ -1030,7 +1029,7 @@ class KRADCBase(lib.StreamObject):
             ...     cell, cell.make_kpts([1, 1, 2]),
             ...     exxdiv=None).density_fit().run()
             >>> mykradcip = KRADCIP(kmf)
-            >>> guesses = mykradcip._charged_init_guess(2, diag=np.arange(5.0))
+            >>> guesses = mykradcip._init_guess(2, diag=np.arange(5.0))
             >>> [int(np.argmax(vector)) for vector in guesses]
             [0, 1]
         """
@@ -1739,41 +1738,6 @@ class KRADCBase(lib.StreamObject):
                                  'KRADCEE; inspect it with type(obj).')
         super().__setattr__(name, value)
 
-    def transform_integrals(self, backend=None):
-        r"""Transform active integrals through the earlier method name.
-
-        Args:
-            backend (str, optional): Backend override passed to ao2mo(); None
-                uses integral_backend. See AO2MO for supported storage choices.
-
-        Returns:
-            _ChemistsERIs: Owning normalized integral container. This is an
-            alias
-            operation for ao2mo(), whose examples and cleanup rules apply here.
-
-        Warns:
-            DeprecationWarning: Use ao2mo() for new calls. The same backend and
-            integral-container ownership rules apply to both entry points.
-        """
-        warnings.warn(
-            'transform_integrals is deprecated; use ao2mo() instead.',
-            DeprecationWarning,
-            stacklevel=2)
-        return self.ao2mo(backend)
-
-    def get_chnk_size(self):
-        r"""Compute an automatic chunk estimate through the earlier method
-        interface.
-
-        Returns:
-            int: Fresh estimate from kadc_ao2mo.chunk_size(), using active
-            virtual
-            dimensions and current memory usage. Unlike reading chunk_size,
-            this
-            method does not return or update the cached/manual property value.
-        """
-        return kadc_ao2mo.chunk_size(self)
-
     def _pad_orbitals(self):
         r"""Construct or reuse active-space coefficients and energies with KMP2
         padding.
@@ -1795,18 +1759,6 @@ class KRADCBase(lib.StreamObject):
             self._padded_orbitals = (coeff, energy[:, :self.nocc],
                                     energy[:, self.nocc:])
         return self._padded_orbitals
-
-    def _orbital_data(self):
-        r"""Return the cached padded orbital tuple through the earlier helper
-        name.
-
-        Returns:
-            tuple[ndarray, ndarray, ndarray]: padded_coeff, e_occ and e_vir,
-            with shapes (nkpts, nao, nmo), (nkpts, nocc) and (nkpts, nvir).
-            New callers should read the individual properties, which share this
-            same cache rather than recomputing padding.
-        """
-        return self._pad_orbitals()
 
     def _init_from_ground_state(self, adc):
         r"""Copy shared reference data and its amplitude-storage owner.
@@ -1830,67 +1782,6 @@ class KRADCBase(lib.StreamObject):
         self.frozen = copy.deepcopy(adc.frozen)
         self.density_gv = np.asarray(adc.density_gv).copy()
         self._amp_storage = getattr(adc, '_amp_storage', None)
-
-    def get_init_guess(self, nroots=1, diag=None, ascending=True,
-                       type_=None, ini=None, kshift=None, **legacy):
-        r"""Build trial vectors through the deprecated common guess interface.
-
-        Args:
-            nroots (int): Number of guesses, from 1 to vector_size().
-            diag (ndarray, optional): Preconditioner diagonal; with None, the
-                sector helper obtains it for kshift.
-            ascending (bool): Select low diagonal entries first, or high
-                entries
-                when False. Ignored for supplied vectors.
-            type_ (str, optional): None for unit guesses; 'read' to validate
-                ini.
-            ini (array_like, optional): Supplied vectors, shape
-                (nroots, vector_size()), copied before use.
-            kshift (int, optional): Momentum sector, default zero.
-            **legacy: The earlier keyword type is accepted as an alias for
-            type_.
-                Supplying both spellings or other keywords raises TypeError.
-
-        Returns:
-            list[ndarray]: One flat vector per requested root. The shared
-            _init_guess helper masks inactive charged components; EE uses its
-            full vector layout. Invalid shapes and zero norms raise
-            ValueError.
-
-        A DeprecationWarning is emitted. This entry point is intended for
-        sector
-        solvers; the kernel calls their protected helpers directly.
-
-        Examples:
-            >>> import numpy as np
-            >>> import warnings
-            >>> from pyscf.pbc import gto, scf
-            >>> from pyscf.pbc.adc.kadc_rhf import KRADCIP
-            >>> cell = gto.M(
-            ...     atom='He 0 0 0',
-            ...     a=np.eye(3) * 3,
-            ...     basis=[[0, (1.0, 1.0)], [0, (0.5, 1.0)]],
-            ...     verbose=0)
-            >>> kmf = scf.KRHF(
-            ...     cell, cell.make_kpts([1, 1, 2]),
-            ...     exxdiv=None).density_fit().run()
-            >>> mykradcip = KRADCIP(kmf)
-            >>> with warnings.catch_warnings(record=True) as caught:
-            ...     warnings.simplefilter('always', DeprecationWarning)
-            ...     guesses = mykradcip.get_init_guess(1, diag=np.arange(5.0))
-            >>> np.shape(guesses), caught[0].category.__name__
-            ((1, 5), 'DeprecationWarning')
-        """
-        warnings.warn('get_init_guess is deprecated; use _init_guess.',
-                      DeprecationWarning, stacklevel=2)
-        if 'type' in legacy:
-            if type_ is not None:
-                raise TypeError('Pass only one of type_ and the legacy type.')
-            type_ = legacy.pop('type')
-        if legacy:
-            names = ', '.join(sorted(legacy))
-            raise TypeError(f'Unexpected initial-guess keyword(s): {names}')
-        return self._init_guess(nroots, diag, ascending, type_, ini, kshift)
 
     def ground_state_energy(self, eris=None):
         r"""Compute and store reference amplitudes and correlation energy.
@@ -1928,25 +1819,6 @@ class KRADCBase(lib.StreamObject):
         self._compute_reference(eris)
         logger.timer(self, 'ground-state ADC', *started)
         return self.e_corr
-
-    def kernel_gs(self, eris=None):
-        r"""Compute the reference through the deprecated tuple-returning
-        interface.
-
-        Args:
-            eris (_ChemistsERIs, optional): Pretransformed active MO integrals.
-
-        Returns:
-            tuple: (e_corr, t1, t2), also stored on the driver. e_corr is the
-            correlation contribution in Hartree per primitive cell. A
-            DeprecationWarning is emitted; ground_state_energy() returns the
-            scalar energy and leaves both amplitude tuples on the instance.
-        """
-        warnings.warn('kernel_gs is deprecated; use ground_state_energy() '
-                      'and read t1 and t2 from the ADC instance.',
-                      DeprecationWarning, stacklevel=2)
-        self.ground_state_energy(eris)
-        return self.e_corr, self.t1, self.t2
 
     def __del__(self):
         r"""Release owned amplitude scratch files during object finalization.
@@ -1999,7 +1871,6 @@ class KRADCBase(lib.StreamObject):
             >>> energies.round(6).tolist()
             [[0.371589]]
         """
-        from pyscf.pbc.adc import kadc_rhf_ip
         mykradcip = KRADCIP(self)
         e_exc, v_exc, spec_fac, x = mykradcip.kernel(
             nroots, guess, eris, kptlist)
@@ -2048,7 +1919,6 @@ class KRADCBase(lib.StreamObject):
             >>> energies.round(6).tolist()
             [[1.558245]]
         """
-        from pyscf.pbc.adc import kadc_rhf_ea
         mykradcea = KRADCEA(self)
         e_exc, v_exc, spec_fac, x = mykradcea.kernel(
             nroots, guess, eris, kptlist)
@@ -2097,7 +1967,6 @@ class KRADCBase(lib.StreamObject):
             >>> energies.round(6).tolist()
             [[1.756312]]
         """
-        from pyscf.pbc.adc import kadc_rhf_ee
         mykradcee = KRADCEE(self)
         e_exc, v_exc, spec_fac, x = mykradcee.kernel(
             nroots, guess, eris, kptlist)
@@ -2305,85 +2174,6 @@ class KRADCBase(lib.StreamObject):
             return np.asarray(densities)
         return densities
 
-    def compute_amplitudes(self, eris):
-        r"""Populate reference amplitudes through the deprecated tuple
-        interface.
-
-        Args:
-            eris (_ChemistsERIs): Active-space MO integrals.
-
-        Returns:
-            tuple: t1, t2 and the first-order-doubles virtual-ladder
-            intermediate.
-            The same quantities remain on self and self.imds. Emit a
-            DeprecationWarning; new callers use amplitudes(eris), which returns
-            None, then read the stored attributes.
-        """
-        warnings.warn(
-            'Use amplitudes() and the t1/t2 instance attributes.',
-            DeprecationWarning,
-            stacklevel=2)
-        self.amplitudes(eris)
-        return self.t1, self.t2, self.imds.t2_1_vvvv
-
-    def compute_energy(self, t2, eris):
-        r"""Evaluate a supplied doubles tuple through the deprecated energy
-        interface.
-
-        Args:
-            t2 (tuple): First-/second-order doubles, in the layout of self.t2.
-            eris (_ChemistsERIs): Active-space MO integrals matching those
-                amplitudes.
-
-        Returns:
-            float: Correlation contribution in Hartree per primitive cell, with
-            method and if_corr following the driver. Temporarily substitute t2
-            while calling correlation_energy(), then restore the earlier t2 and
-            e_corr even if an exception occurs. Emit a DeprecationWarning.
-        """
-        warnings.warn(
-            'Use correlation_energy() and the e_corr attribute.',
-            DeprecationWarning,
-            stacklevel=2)
-        saved_t2, saved_energy = self.t2, self.e_corr
-        self.t2 = t2
-        try:
-            return self.correlation_energy(eris)
-        finally:
-            self.t2, self.e_corr = saved_t2, saved_energy
-
-    def compute_amplitudes_energy(self, eris, verbose=None, if_corr=True):
-        r"""Compute reference amplitudes and energy through the deprecated
-        combined API.
-
-        Args:
-            eris (_ChemistsERIs): Active MO integral container.
-            verbose: Retained for the earlier signature; logging uses
-            self.verbose.
-            if_corr (bool): Enable the correlation-energy contribution for this
-                call. Amplitudes are computed either way; the driver flag is
-                restored.
-
-        Returns:
-            tuple: e_corr, t1 and t2, also stored on the driver. The energy is
-            in
-            Hartree per primitive cell. Emit a DeprecationWarning; new code
-            uses
-            ground_state_energy() and reads amplitude attributes separately.
-        """
-        warnings.warn(
-            'Use ground_state_energy() and instance attributes.',
-            DeprecationWarning,
-            stacklevel=2)
-        self.amplitudes(eris)
-        old_if_corr = self.if_corr
-        self.if_corr = if_corr
-        try:
-            self.correlation_energy(eris)
-        finally:
-            self.if_corr = old_if_corr
-        return self.e_corr, self.t1, self.t2
-
     @property
     def chunk_size(self):
         r"""Get the cached number of orbitals reconstructed per integral chunk.
@@ -2440,32 +2230,6 @@ class KRADCBase(lib.StreamObject):
             raise ValueError('chunk_size must be a positive integer or None.')
         self._chunk_size = value
         self._chunk_size_manual = value is not None
-
-    @property
-    def chnk_size(self):
-        r"""Read the earlier chnk_size spelling of the chunk_size property.
-
-        Returns:
-            int: Same cached or manually assigned orbital chunk size as
-            chunk_size. Reading either spelling can trigger automatic
-            estimation.
-            New code should use chunk_size.
-        """
-        return self.chunk_size
-
-    @chnk_size.setter
-    def chnk_size(self, value):
-        r"""Assign a chunk size through the earlier property spelling.
-
-        Args:
-            value (int or None): Positive orbital chunk count or None for
-                automatic estimation, validated by the chunk_size setter.
-
-        Returns:
-            None: Update chunk_size and its manual-selection flag. This setter
-            does not maintain a second independent chunk-size value.
-        """
-        self.chunk_size = value
 
     @property
     def nkpts(self):
@@ -2716,10 +2480,6 @@ class KRADCBase(lib.StreamObject):
     get_nocc = get_nocc
 
     get_nmo = get_nmo
-
-    _charged_init_guess = _init_guess
-
-    _neutral_init_guess = _init_guess
 
 
 class KRADCIP(KRADCBase):
@@ -7604,7 +7364,3 @@ class KRADCEE(KRADCBase):
         """
         return (self.nkpts, self.nkpts, self.nocc, self.nvir,
                 self.nocc, self.nvir)
-
-
-# Historical reference-only names; choose a concrete class for excitations.
-KRADC = RADC = KRADCBase

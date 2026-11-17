@@ -5,8 +5,7 @@
 shares reference amplitudes, integral handling, solver settings, guesses,
 and charged-property helpers. Methods start with `__init__` and `kernel`,
 then follow their call dependencies; sector classes inherit those entry
-points. The earlier sector modules re-export these
-classes and retain functional adapters for importing applications.
+points.
 Molecular implementations under `pyscf/adc` retain their own APIs.
 
 ## Reference calculations and API names
@@ -73,7 +72,7 @@ FNO's `ground_state_energy()` returns the active-space
 correlation energy (or a list for multiple thresholds); additive
 corrections remain available through `correct_corr`.
 
-Compatibility entry points remain for external callers:
+Migration from the earlier periodic ADC API:
 
 | Earlier name | Primary API |
 | --- | --- |
@@ -82,26 +81,20 @@ Compatibility entry points remain for external callers:
 | `type_` / `method_type` sector attributes | Construct `KRADCIP`, `KRADCEA` or `KRADCEE` |
 | `kernel_gs()` | `ground_state_energy()` |
 | `transform_integrals()` | `ao2mo()` |
+| `kadc_ao2mo.transform_integrals_*` | `ao2mo(adc, backend=...)` |
+| `eris.get_ovvv()` / `eris.get_vvvv()` | `eris.ovvv_blocks[...]` / `eris.vvvv_blocks[...]` |
 | `chnk_size` / `get_chnk_size()` | `chunk_size` property |
 | `_orbital_data()` | `padded_coeff`, `e_occ`, `e_vir` properties |
 | `compute_amplitudes()` | `amplitudes()` and instance attributes |
 | `compute_energy()` | `correlation_energy()` |
+| `compute_amplitudes_energy()` | `ground_state_energy()` |
+| `RADC2FNO` | `KRADCIPFNO` |
 | `get_init_guess(..., type=...)` | Shared `_init_guess(..., type_=...)` helper |
+| `_charged_init_guess()` / `_neutral_init_guess()` | `_init_guess()` |
 
-The earlier base `kernel_gs()` still returns its tuple with a
-DeprecationWarning; callers should migrate to the scalar API and instance
-fields. The earlier `compute_*` methods and the driver
-`transform_integrals()` method also emit DeprecationWarning. Earlier sector
-class names remain aliases of their canonical K-point class names. Periodic
-examples and tests use the new names. Molecular reference calls keep their
-existing PySCF names.
-
-The shared solver calls `_init_guess` for every sector. The earlier
-`_charged_init_guess` and `_neutral_init_guess` spellings alias this helper.
-Its `type_=None` argument selects diagonal unit guesses and `type_='read'`
-selects supplied vectors; this argument describes the guess, not an ADC
-sector attribute. The inherited `get_init_guess`
-adapter emits a DeprecationWarning and accepts the earlier `type` keyword.
+The shared solver calls `_init_guess` for every sector. Its `type_=None`
+argument selects diagonal unit guesses and `type_='read'` selects supplied
+vectors.
 User guesses have shape `(nsectors, nroots, vector_size)` at the kernel
 boundary, and `(nroots, vector_size)` for one sector's helper.
 
@@ -231,9 +224,8 @@ large intermediates elsewhere retain their existing memory behavior.
 FNO workflows have concrete `KRADCIPFNO`, `KRADCEAFNO` and `KRADCEEFNO`
 classes. `KRADC2FNO(adc_object)` preserves the source sector; raw Cells,
 KRHF references and reference-only ADC inputs default to IP. For example,
-`adc.KRADC2FNO(adc.KRADCEA(kmf))` constructs an EA FNO driver. The earlier
-`RADC2FNO` name aliases `KRADCIPFNO`. EE FNOs use the reference density;
-state-specific EE densities are not implemented.
+`adc.KRADC2FNO(adc.KRADCEA(kmf))` constructs an EA FNO driver. EE FNOs use the
+reference density.
 
 ## Density-response properties
 
@@ -289,9 +281,8 @@ form factors.
 ## Validation
 
 Every function and class in the active Python modules, comparison script
-and tests has a docstring, including constructors, property setters,
-compatibility adapters and nested contraction helpers. The scientific
-interfaces document equations, tensor shapes and ordering, k-point
+and tests has a docstring, including constructors, property setters
+and nested contraction helpers. The scientific interfaces document equations, tensor shapes and ordering, k-point
 normalization, units, mutation and scratch-file ownership. Class docstrings
 describe their configuration and result attributes.
 
@@ -334,7 +325,7 @@ larger-system benchmarks and are not included in this command.
 API tests check concrete sector classes, ADC-to-ADC conversion, shared
 amplitude ownership across reference recomputation, deferred SCF, typed FNO
 construction, charged Hamiltonian orders, ragged root selection,
-scalar energies, state-only amplitudes, legacy warnings,
+scalar energies, state-only amplitudes,
 zero-root behavior, lazy integral properties, cached chunking and logging.
 They execute the worked docstring examples and check reference-density AO
 conversion with frozen orbitals, complex MO phases and rectangular active

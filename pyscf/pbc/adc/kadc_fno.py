@@ -25,7 +25,6 @@ state-specific/state-averaged densities, together with multiple independent
 truncation settings. Numerical examples include their imports and build
 their own two-k-point helium reference ``kmf``.
 """
-import warnings
 
 import numpy as np
 
@@ -332,27 +331,6 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
             self.e_corr_fno = all_e_corr_fno
 
         return self.e_corr_fno
-
-    def kernel_gs(self, eris=None, thresh=1e-4, pct_occ=None, nvir_act=None):
-        r"""Generate ground-density FNOs through the deprecated method name.
-
-        Args:
-            eris, thresh, pct_occ, nvir_act: Same settings and precedence as
-                ground_state_energy(). eris is accepted but not reused across
-                the canonical/FNO orbital transformations.
-
-        Returns:
-            None: Emit a DeprecationWarning, invoke ground_state_energy(), and
-            retain results in e_corr_fno and delta_e_corr. The earlier wrapper
-            does not forward the scalar/list return value; use the primary
-            method
-            when the computed energy is required directly.
-        """
-        warnings.warn(
-            'Use ground_state_energy() for FNO generation.',
-            DeprecationWarning,
-            stacklevel=2)
-        self.ground_state_energy(eris, thresh, pct_occ, nvir_act)
 
     def kernel(self, nroots=1, guess=None, eris=None, thresh=1e-4,
         pct_occ=None, nvir_act=None, kptlist=None):
@@ -925,7 +903,3 @@ class KRADCEEFNO(_KRADCFNO, kadc_rhf.KRADCEE):
     Accepts the same reference inputs as KRADCEE. Set ref_state=None: EE
     transition densities do not supply state-specific FNO densities.
     """
-
-
-# Earlier FNO name selects IP; explicit sector classes are preferred.
-RADC2FNO = KRADCIPFNO

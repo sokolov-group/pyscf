@@ -7,14 +7,12 @@ import doctest
 import io
 import gc
 import unittest
-import warnings
 import weakref
 
 import numpy as np
 
 from pyscf.pbc import adc, gto, scf
-from pyscf.pbc.adc import (kadc_ao2mo, kadc_rhf, kadc_rhf_ea, kadc_rhf_ee,
-                           kadc_rhf_ip, lib as adc_lib)
+from pyscf.pbc.adc import kadc_ao2mo, kadc_rhf, lib as adc_lib
 from pyscf.pbc.scf.hf import INVALID_ORBITAL_ENERGY
 
 
@@ -41,24 +39,17 @@ class DriverAPI(unittest.TestCase):
 
     The shared module fixture is the small two-k helium KRHF reference.
     Individual methods construct independent drivers to test scalar energies,
-    root clearing, cached data, guess routing, aliases and AO densities.
+    root clearing, cached data, guess routing and AO densities.
 
     Run with ``python -m unittest test.test_kadc_api.DriverAPI``.
     """
     def test_periodic_sector_class_names(self):
-        """Check canonical k-point class names and earlier import aliases.
-
-        Returns:
-            None: Verify each new KRADCIP/KRADCEA/KRADCEE class name and
-            excitation sector. Earlier RADC spellings must remain aliases
-            of the same class, preserving existing importing applications.
-        """
+        """Check canonical class names and conversion from another sector."""
         mykradc = adc.KRADCIP(mf)
-        for module, suffix in ((kadc_rhf_ip, 'IP'), (kadc_rhf_ea, 'EA'),
-                               (kadc_rhf_ee, 'EE')):
-            canonical = getattr(module, 'KRADC' + suffix)
-            self.assertEqual(canonical.__name__, 'KRADC' + suffix)
-            self.assertIs(getattr(module, 'RADC' + suffix), canonical)
+        for canonical, name in ((adc.KRADCIP, 'KRADCIP'),
+                                (adc.KRADCEA, 'KRADCEA'),
+                                (adc.KRADCEE, 'KRADCEE')):
+            self.assertEqual(canonical.__name__, name)
             self.assertIsInstance(canonical(mykradc), kadc_rhf.KRADCBase)
             self.assertIs(type(canonical(mykradc)), canonical)
             self.assertFalse(hasattr(canonical(mykradc), 'type_'))
@@ -363,22 +354,6 @@ class DriverAPI(unittest.TestCase):
                 np.testing.assert_array_equal(diagonal[~mask], LARGE_DENOM)
                 self.assertTrue(np.all(diagonal[mask].real < LARGE_DENOM / 2))
 
-    def test_transform_integrals_deprecation(self):
-        r"""Check the earlier integral method warning and backend forwarding.
-
-        Returns:
-            None: Preserve the returned integral owner and backend selection
-            while directing callers to ao2mo() with DeprecationWarning.
-        """
-        mykradc = adc.KRADCIP(mf)
-        with mock.patch.object(
-            mykradc, 'ao2mo', return_value=mock.sentinel.eris) as transform:
-            with self.assertWarns(DeprecationWarning) as warning:
-                eris = mykradc.transform_integrals('outcore')
-        self.assertIs(eris, mock.sentinel.eris)
-        transform.assert_called_once_with('outcore')
-        self.assertEqual(warning.filename, __file__)
-
     def test_flat_orbital_masks_and_per_k_counts(self):
         """Check flat masks and orbital counts on unequal per-k MO spaces.
 
@@ -508,7 +483,7 @@ class DriverAPI(unittest.TestCase):
         """
         mykradc = adc.KRADCIP(mf)
         expected = mykradc.ground_state_energy()
-        mykradcee = kadc_rhf_ee.KRADCEE(mykradc)
+        mykradcee = adc.KRADCEE(mykradc)
         with mock.patch.object(
             mykradcee, 'gen_matvec', side_effect=AssertionError('matvec built')
         ):
@@ -516,19 +491,9 @@ class DriverAPI(unittest.TestCase):
         np.testing.assert_array_equal(mykradcee.t2[0], mykradc.t2[0])
         self.assertIsNone(mykradcee.E)
 
-    def test_padding_chunking_and_legacy_names(self):
-        r"""Check cached orbital/chunk properties and earlier API spellings.
-
-        Verify active energy shapes, lazy automatic chunk estimation, retained
-        manual overrides, invalid chunk rejection, aliases and deprecated
-        ground-state tuple returns with their warning.
-
-        Returns:
-            None: unittest reports an assertion failure if the stated contract
-            fails.
-        """
+    def test_padding_and_chunking(self):
+        """Check cached padding, automatic chunking and manual overrides."""
         mykradc = adc.KRADCIP(mf)
-        self.assertIs(kadc_rhf.RADC, kadc_rhf.KRADCBase)
         for name in ('type_', 'method_type'):
             self.assertFalse(hasattr(mykradc, name))
             with self.assertRaisesRegex(AttributeError, 'Select a sector'):
@@ -546,18 +511,11 @@ class DriverAPI(unittest.TestCase):
         mykradc.chunk_size = 2
         mykradc.ground_state_energy()
         self.assertEqual(mykradc.chunk_size, 2)
-        mykradc.chnk_size = None
+        mykradc.chunk_size = None
         self.assertGreaterEqual(mykradc.chunk_size, 1)
         for invalid in (0, -1, 1.5):
             with self.assertRaises(ValueError):
                 mykradc.chunk_size = invalid
-        with warnings.catch_warnings(record=True) as recorded:
-            warnings.simplefilter('always', DeprecationWarning)
-            result = mykradc.kernel_gs()
-        self.assertTrue(
-            any((issubclass(w.category, DeprecationWarning) for w in recorded))
-        )
-        self.assertEqual(result, (mykradc.e_corr, mykradc.t1, mykradc.t2))
 
     def test_input_validation(self):
         r"""Check method normalization and invalid root/sector inputs.
@@ -583,31 +541,17 @@ class DriverAPI(unittest.TestCase):
             mykradc.kernel(1.5)
 
     def test_solver_uses_sector_guess_helpers(self):
-        r"""Check that every sector kernel bypasses the deprecated guess
-        adapter.
-
-        Mock get_init_guess to fail and observe protected helper routing for
-        unit and supplied guesses. Reusing converged root vectors must
-        reproduce
-        the original roots and pass type_=read to the helper.
-
-        Returns:
-            None: unittest reports an assertion failure if the stated contract
-            fails.
+        """Check that each sector routes default and supplied guesses through
+        _init_guess and reproduces converged roots from supplied vectors.
         """
         mykradc = adc.KRADCIP(mf)
         mykradc.compute_properties = False
         mykradc.ground_state_energy()
-        for solver_type in (kadc_rhf_ip.KRADCIP, kadc_rhf_ea.KRADCEA,
-                            kadc_rhf_ee.KRADCEE):
+        for solver_type in (adc.KRADCIP, adc.KRADCEA, adc.KRADCEE):
             mykradc_es = solver_type(mykradc)
             helper = '_init_guess'
             with (
                 self.subTest(sector=type(mykradc_es).__name__),
-                mock.patch.object(
-                    mykradc_es,
-                    'get_init_guess',
-                    side_effect=AssertionError('deprecated')),
                 mock.patch.object(
                     mykradc_es, helper, wraps=getattr(mykradc_es, helper)
                 ) as guesses,
@@ -618,37 +562,6 @@ class DriverAPI(unittest.TestCase):
                 np.testing.assert_allclose(from_input, energies, atol=1e-08)
                 self.assertEqual(guesses.call_count, 2)
                 self.assertEqual(guesses.call_args.kwargs['type_'], 'read')
-
-    def test_deprecated_initial_guess_adapter(self):
-        r"""Check warning and keyword compatibility of the earlier guess
-        interface.
-
-        For IP/EA/EE, accept supplied vectors with type_ or legacy type,
-        preserve
-        the vector contents, and reject simultaneous spellings or unknown keys.
-
-        Returns:
-            None: unittest reports an assertion failure if the stated contract
-            fails.
-        """
-        mykradc = adc.KRADCIP(mf)
-        mykradc.ground_state_energy()
-        for solver_type in (kadc_rhf_ip.KRADCIP, kadc_rhf_ea.KRADCEA,
-                            kadc_rhf_ee.KRADCEE):
-            mykradc_es = solver_type(mykradc)
-            supplied = np.eye(2, mykradc_es.vector_size())
-            for keyword in ('type_', 'type'):
-                with (self.subTest(sector=type(mykradc_es).__name__, keyword=keyword),
-                      self.assertWarns(DeprecationWarning)):
-                    guesses = mykradc_es.get_init_guess(
-                        2, ini=supplied, kshift=0, **{keyword: 'read'})
-                np.testing.assert_array_equal(guesses, supplied)
-            with (self.assertWarns(DeprecationWarning),
-                  self.assertRaisesRegex(TypeError, 'only one')):
-                mykradc_es.get_init_guess(type_='read', type='read')
-            with (self.assertWarns(DeprecationWarning),
-                  self.assertRaisesRegex(TypeError, 'Unexpected')):
-                mykradc_es.get_init_guess(unknown='read')
 
     def test_reference_density_ao(self):
         r"""Check AO reference densities with complex phases and reduced MO
@@ -708,7 +621,7 @@ class Documentation(unittest.TestCase):
 
     Each example block runs in an empty namespace, using only the imports and
     reference setup shown in its example. Numerical energies and tensor
-    shapes are checked, including public factories, compatibility functions,
+    shapes are checked, including public factories,
     FNO/integral workflows and pure numerical models.
 
     Run with ``python -m unittest test.test_kadc_api.Documentation``.

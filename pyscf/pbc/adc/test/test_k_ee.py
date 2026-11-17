@@ -242,13 +242,13 @@ class KnownValues(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        guesses = np.asarray(mykradcee._neutral_init_guess(2, kshift=1))
+        guesses = np.asarray(mykradcee._init_guess(2, kshift=1))
         self.assertEqual(guesses.shape, (2, mykradcee.vector_size()))
         np.testing.assert_array_equal(
-            mykradcee._neutral_init_guess(2, type_='read', ini=guesses),
+            mykradcee._init_guess(2, type_='read', ini=guesses),
             guesses)
         with self.assertRaises(ValueError):
-            mykradcee._neutral_init_guess(2, type_='read', ini=guesses * 0)
+            mykradcee._init_guess(2, type_='read', ini=guesses * 0)
         weights, densities = mykradcee.get_properties(0, guesses.T, 2)
         self.assertEqual(
             densities.shape, (2, mykradcee.nkpts, mykradcee.nmo, mykradcee.nmo)

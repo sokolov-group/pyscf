@@ -23,10 +23,6 @@ from pyscf.pbc.adc.kadc_rhf import KRADCBase, KRADCIP, KRADCEA, KRADCEE
 from pyscf.pbc.adc.kadc_fno import KRADCIPFNO, KRADCEAFNO, KRADCEEFNO
 
 
-# Compatibility name for reference-only calculations.
-KRADC = KRADCBase
-
-
 def KRADC2FNO(mf, frozen=None, mo_coeff=None, mo_occ=None,
               mo_energy=None, kpts=None):
     r"""Create an FNO solver with the sector of a supplied periodic ADC object.
