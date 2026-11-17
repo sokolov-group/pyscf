@@ -9,13 +9,14 @@ Also shown are molecular EA/IP-ADC Gamma-point calculations using a supercell.
 '''
 
 import numpy as np
-from pyscf.pbc import gto, scf, adc
+from pyscf.pbc import gto, scf
+from pyscf.pbc.adc import KRADCEA, KRADCIP, KRADCEE
 from pyscf import adc as mol_adc
 from pyscf.pbc.tools.pbc import super_cell
 
 
 cell = gto.Cell()
-cell.verbose = 5
+cell.verbose = 3
 cell.unit = 'B'
 
 #
@@ -35,57 +36,46 @@ cell.build()
 
 nmp = [1,2,2]
 nroots_test = 2
+adc_method = 'adc(2)' # Options: 'adc(2)', 'adc(2)-x', 'adc(3)'
+verbose = 4
 
 # KRHF
 kpts = cell.make_kpts(nmp)
-kmf = scf.KRHF(cell, kpts=kpts, exxdiv=None).density_fit()
-ekrhf = kmf.kernel()
+kmf = scf.KRHF(cell, kpts=kpts, exxdiv=None).density_fit().run()
 
-# KADC
-kadc  = adc.KRADCBase(kmf)
-
-#KMP2 energy
-emp2 = kadc.ground_state_energy()
-print("PBC KMP2 Energy:", emp2)
-
-#KMP3 energy
-kadc.method = 'adc(3)'
-emp3 = kadc.ground_state_energy()
-print("PBC KMP3 Energy:", emp3)
 
 # IP-KRADC
-kadc = adc.KRADCIP(kadc)
-kadc.method = 'adc(3)'
-k_e_ip, v_e_ip, k_p_ip, k_x_ip = kadc.kernel(nroots_test,kptlist=[0])
+myipadc = KRADCIP(kmf)
+myipadc.method = adc_method
+myipadc.nroots = nroots_test
+myipadc.verbose = verbose
+myipadc.kernel()
+# To get properties, we can try using these codes below:
+# e_ipadc = myipadc.E
+# t_ipadc = myipadc.T
+# p_ipadc = myipadc.P
+# x_ipadc = myipadc.X
+
 
 # EA-KRADC
-kadc = adc.KRADCEA(kadc)
-kadc.method = 'adc(3)'
-k_e_ea, v_e_ea, k_p_ea, k_x_ea = kadc.kernel(nroots=nroots_test,kptlist=[0])
+myeaadc = KRADCEA(kmf)
+myeaadc.method = adc_method
+myeaadc.nroots = nroots_test
+myeaadc.verbose = verbose
+myeaadc.kernel()
 
-# Supercell
-scell = super_cell(cell, nmp)
+# EE-KRADC
+myeeadc = KRADCEE(kmf)
+myeeadc.method = adc_method
+myeeadc.nroots = nroots_test
+myeeadc.verbose = verbose
+myeeadc.kernel()
 
-# PBC Gamma-point RHF based on supercell
-mf = scf.RHF(scell, exxdiv=None).density_fit()
-erhf = mf.kernel()
-
-# Molecular ADC
-myadc = mol_adc.RADC(mf)
-
-# Molecular IP-ADC
-myadc.method_type = 'ip'
-myadc.method = 'adc(3)'
-mol_e_ip,mol_v_ip,mol_p_ip,mol_x_ip = myadc.kernel(nroots=nroots_test*np.prod(nmp))
-
-# Molecular EA-ADC
-myadc.method_type = 'ea'
-myadc.method = 'adc(3)'
-mol_e_ea,mol_v_ea,mol_p_ea,mol_x_ea = myadc.kernel(nroots=nroots_test*np.prod(nmp))
-
-print("PBC KRHF Energy:", ekrhf)
-print("PBC RHF Energy :", erhf / np.prod(nmp))
-print("PBC IP-ADC(3) roots:", k_e_ip)
-print("Mol IP-ADC(3) roots:", mol_e_ip)
-print("PBC EA-ADC(3) roots:", k_e_ea)
-print("Mol EA-ADC(3) roots:", mol_e_ea)
+# To compare, we can run a supercell ADC calculation.
+# ncopies = np.prod(nmp)
+# supcell = super_cell(cell, nmp)
+# supmf = scf.RHF(supcell, exxdiv=None).density_fit().run()
+# mysupadc = mol_adc.RADC(supmf)
+# mysupadc.method, mysupadc.method_type = (adc_method, 'ee')
+# mysupadc.verbose = verbose
+# mysupadc.kernel(nroots=nroots_test*np.prod(nmp))
