@@ -119,17 +119,16 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
     t2_ov = t1[0]
     t1_oovv = t2[0]
 
-    ######################
-
     nocc = adc.nocc
     nmo = adc.nmo
     nvir = nmo - nocc
     nkpts = adc.nkpts
 
+    # Start from the closed-shell reference occupation.
     OPDM = np.zeros((nkpts, nmo, nmo), dtype=np.complex128)
     OPDM[:, :nocc, :nocc] += np.identity(nocc)
 
-    ####### ADC(2) SPIN ADAPTED REF OPDM with SQA ################
+    # Contract first-order doubles into the ADC(2) reference density.
     kj, ka = np.indices((nkpts, nkpts))
     idx0 = np.arange(nkpts)[:, None]
     oo = np.zeros((nkpts, nocc, nocc), dtype=np.complex128)
@@ -154,12 +153,12 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
     del (vv)
 
     if adc.approx_trans_moments is False or adc.method == "adc(3)":
-        ### OCC-VIR ###
+        # Add the singles contribution to the occupied-virtual block.
         OPDM[:, :nocc, nocc:] += t2_ov
-        ### VIR-OCC ###
+        # Recover the virtual-occupied block by Hermitian symmetry.
         OPDM[:, nocc:, :nocc] = OPDM[:, :nocc, nocc:].conj().transpose(0, 2, 1)
 
-    ####### ADC(3) SPIN ADAPTED REF OPDM WITH SQA ################
+    # Include third-order corrections to the reference density.
     if adc.method == "adc(3)":
         t2_oovv = t2[1]
 
@@ -167,7 +166,8 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
             for kj in range(nkpts):
                 for ka in range(nkpts):
                     kb = adc.khelper.kconserv[ki, ka, kj]
-                    #### OCC-OCC ###
+                    # Contract first- and second-order doubles over virtual
+                    # pairs.
                     OPDM[ki][:nocc, :nocc] -= 2 * einsum(
                         'Iiab,Jiab->IJ',
                         t1_oovv[ki][kj][ka], t2_oovv[ki][kj][ka].conj())
@@ -180,7 +180,7 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
                     OPDM[ki][:nocc, :nocc] += einsum(
                         'Jiab,Iiba->IJ',
                         t1_oovv[ki][kj][ka].conj(), t2_oovv[ki][kj][kb])
-                    ##### VIR-VIR ###
+                    # Trace the same amplitude products over occupied pairs.
                     OPDM[ka][nocc:, nocc:] += 2 * einsum(
                         'ijBa,ijAa->AB',
                         t1_oovv[ki][kj][ka], t2_oovv[ki][kj][ka].conj())
@@ -196,19 +196,21 @@ def make_ref_rdm1(adc, with_frozen=True, ao_repr=False):
 
                 ka = ki
                 kb = kj
-                ##### OCC-VIR ### ####
+                # Mix doubles and singles in the occupied-virtual block.
                 OPDM[ki][:nocc, nocc:] += einsum(
                     'IiAa,ia->IA',
                     t1_oovv[ki][kj][ka], t2_ov[kj].conj())
                 OPDM[ki][:nocc, nocc:] -= 1 / 2 * einsum(
                     'IiaA,ia->IA',
                     t1_oovv[ki][kj][kb], t2_ov[kj].conj())
-            ###### VIR-OCC ###
+            # Complete the Hermitian pair of off-diagonal blocks.
             OPDM[ki][nocc:, :nocc] = OPDM[ki][:nocc, nocc:].conj().T
 
+    # Combine each half-density with its adjoint for the spin sum.
     for ki in range(nkpts):
         OPDM[ki] += OPDM[ki].conj().T
 
+    # Embed the active density in the original MO space at each k point.
     if with_frozen and adc.frozen is not None:
         nmo = max(mo_occ_k.size for mo_occ_k in adc.mo_occ)
         nocc = np.count_nonzero(adc.mo_occ[0] > 0)
@@ -322,6 +324,7 @@ def orbital_number_lists(myadc):
     nocc_fr, nocc_ar, nvir_ar, nvir_fr, nremoved = [], [], [], [], []
     for kpt in range(myadc.nkpts):
         frz_occ, act_occ, act_vir, frz_vir = mo_splitter(myadc, kpt)
+        # Count removed FNO columns separately from frozen virtual orbitals.
         if getattr(myadc, 'mo_energy', None) is not None:
             valid_k = (np.asarray(
                 myadc.mo_energy[kpt]) != INVALID_ORBITAL_ENERGY)
@@ -569,7 +572,8 @@ class KRADCBase(lib.StreamObject):
             self.max_space = getattr(__config__, 'adc_kadc_RADC_max_space', 12)
             self.max_cycle = getattr(__config__, 'adc_kadc_RADC_max_cycle', 50)
             self.conv_tol = getattr(__config__, 'adc_kadc_RADC_conv_tol', 1e-7)
-            self.tol_residual = getattr(__config__, 'adc_kadc_RADC_tol_res', 1e-4)
+            self.tol_residual = getattr(
+                __config__, 'adc_kadc_RADC_tol_res', 1e-4)
             self.compute_properties = self.approx_trans_moments = True
             self._nocc = self._nmo = self._nvir = None
             self.nkop_chk = self.kop_npick = False
@@ -648,6 +652,7 @@ class KRADCBase(lib.StreamObject):
         if nroots > 0 and not isinstance(self, (KRADCIP, KRADCEA, KRADCEE)):
             raise NotImplementedError('Choose KRADCIP, KRADCEA or KRADCEE for '
                                       'excitation calculations.')
+        # Rebuild reference data shared by all requested momentum sectors.
         self._ee_momentum.clear()
         self._transition_cache.clear()
         eris = self._compute_reference(eris)
@@ -663,8 +668,10 @@ class KRADCBase(lib.StreamObject):
         nkpts, nmo = self.nkpts, self.nmo
         kptlist = list(range(nkpts) if kptlist is None else kptlist)
         if not (kptlist and all(
-            isinstance(k, (int, np.integer)) and 0 <= k < nkpts for k in kptlist)):
+            isinstance(k, (int, np.integer)) and 0 <= k < nkpts
+            for k in kptlist)):
             raise ValueError('kptlist must contain valid k-point indices.')
+        # Allocate one vector and one property result per sector and root.
         dtype = np.result_type(self.t2[0])
         root_shape = len(kptlist), nroots
         evals = np.zeros(root_shape)
@@ -690,6 +697,7 @@ class KRADCBase(lib.StreamObject):
                 guess_type = 'read'
                 guess_k = np.asarray(guess).copy()
 
+        # Each momentum sector has its own matrix action and starting vectors.
         for k, kshift in enumerate(kptlist):
             matvec, diag = self.gen_matvec(kshift, imds, eris)
             match guess_type:
@@ -722,14 +730,18 @@ class KRADCBase(lib.StreamObject):
             if self.compute_properties:
                 P[k], X[k] = self.get_properties(kshift, U, nroots)
 
+        # Save results in kptlist order for subsequent density calculations.
         self._kptlist = kptlist
-        self.E, self.U, self.P, self.X, self.converged = evals, evecs, P, X, conv
+        self.E, self.U, self.P, self.X, self.converged = (
+            evals, evecs, P, X, conv)
         if neutral:
-            self.T = X.reshape(*root_shape, -1) if self.compute_properties else None
+            self.T = (X.reshape(*root_shape, -1)
+                      if self.compute_properties else None)
         nfalse = conv.size - np.count_nonzero(conv)
         if nfalse:
             logger.warn(
-                self, f'Davidson iterations for {nfalse} root(s) did not converge.')
+                self,
+                f'Davidson iterations for {nfalse} root(s) did not converge.')
         data = {'Method': [], 'k': [], 'Root': [], 'Energy (Eh)': [],
                 'Energy (eV)': []}
         strength_label = 'Density' if neutral else 'Spec factor'
@@ -742,7 +754,8 @@ class KRADCBase(lib.StreamObject):
                 data['k'].append(kshift)
                 data['Root'].append(root)
                 data['Energy (Eh)'].append(f'{evals[k, root]:.10f}')
-                data['Energy (eV)'].append(f'{evals[k, root] * HARTREE2EV:.8f}')
+                data['Energy (eV)'].append(
+                    f'{evals[k, root] * HARTREE2EV:.8f}')
                 if self.compute_properties:
                     data[strength_label].append(f'{P[k, root]:.8f}')
                 data['Converged'].append(conv[k, root])
@@ -776,6 +789,7 @@ class KRADCBase(lib.StreamObject):
         validate(self)
         self.dump_flags_gs()
         self._dump_orbital_info()
+        # Use the same MO integrals for amplitudes and correlation energy.
         if eris is None:
             eris = self.ao2mo()
         self.amplitudes(eris)
@@ -828,7 +842,8 @@ class KRADCBase(lib.StreamObject):
         """
         log = logger.new_logger(self, verbose)
         log.info('******** %s / %s ********', type(self).__name__, self.method)
-        log.info('max_space = %d; max_cycle = %d', self.max_space, self.max_cycle)
+        log.info('max_space = %d; max_cycle = %d',
+                 self.max_space, self.max_cycle)
         log.info('conv_tol = %s; tol_residual = %s',
                  self.conv_tol, self.tol_residual)
         log.info('max_memory %d MB (current use %d MB)',
@@ -921,6 +936,7 @@ class KRADCBase(lib.StreamObject):
         self.method = check_implemented(self.method)
         if eris is None:
             eris = self.ao2mo()
+        # Accumulate charged singles corrections in the orbital-energy block.
         singles_ham = self._get_adc0_ham()
         self._get_adc2_ham(eris, singles_ham)
         if self.method == 'adc(3)':
@@ -971,6 +987,7 @@ class KRADCBase(lib.StreamObject):
         dim = self.vector_size()
         if not 1 <= nroots <= dim:
             raise ValueError('nroots must be between 1 and vector_size().')
+        # Project supplied trial vectors onto the active orbital space.
         if type_ == 'read':
             g = np.asarray(ini).T.copy()
             if g.shape != (dim, nroots):
@@ -980,9 +997,11 @@ class KRADCBase(lib.StreamObject):
                 singles = g[:self.n_singles, root]
                 doubles = g[self.n_singles:, root].reshape(self.doubles_shape)
                 singles, doubles = self._mask_frozen(
-                    singles, doubles, 0 if kshift is None else kshift, const=0.0)
+                    singles, doubles, 0 if kshift is None else kshift,
+                    const=0.0)
                 g[:, root] = np.hstack((singles, doubles.ravel()))
         else:
+            # Seed Davidson with unit vectors at the selected diagonal entries.
             if diag is None:
                 diag = self.get_diag(0 if kshift is None else kshift)
             order = np.argsort(diag)
@@ -1016,10 +1035,10 @@ class KRADCBase(lib.StreamObject):
             eris = self.ao2mo()
         if imds is None:
             imds = self.get_imds(eris=eris, kshift=kshift)
-        return self.matvec(kshift, imds, eris), self.get_diag(kshift, imds, eris)
+        return (self.matvec(kshift, imds, eris),
+                self.get_diag(kshift, imds, eris))
 
     def get_properties(self, kshift, U, nroots=None):
-        # Transition moments
         r"""Compute charged spectroscopic amplitudes and spin-summed pole
         strengths.
 
@@ -1083,7 +1102,8 @@ class KRADCBase(lib.StreamObject):
         if any(value is None for value in
                (self.mo_coeff, self.mo_occ, self.mo_energy)):
             if any(value is None for value in
-                   (self._scf.mo_coeff, self._scf.mo_occ, self._scf.mo_energy)):
+                   (self._scf.mo_coeff, self._scf.mo_occ,
+                    self._scf.mo_energy)):
                 self._scf.kernel()
             for name in ('mo_coeff', 'mo_occ', 'mo_energy'):
                 if getattr(self, name) is None:
@@ -1177,13 +1197,13 @@ class KRADCBase(lib.StreamObject):
         kpts = self.kpts
         madelung = tools.madelung(cell, kpts)
 
-        # release the scratch file from a previous kernel call, if any
+        # Release the scratch storage from the previous kernel call.
         self._close_amp_scratch()
 
-        # Compute first-order doubles t2 (tijab)
+        # Save first-order doubles in momentum-resolved disk storage.
         self._amp_storage = _AmplitudeStorage()
         tf, f = self._amp_storage.temporary_file, self._amp_storage.file
-        # Keep scratch storage alive while converted ADC objects share amplitudes.
+        # Keep scratch storage alive for solvers sharing these amplitudes.
         self._amp_h5file = f
         self._amp_tmpfile = tf
         t2_1 = f.create_dataset(
@@ -1199,12 +1219,13 @@ class KRADCBase(lib.StreamObject):
         kconserv = self.khelper.kconserv
         touched = np.zeros((nkpts, nkpts, nkpts), dtype=bool)
 
+        # A momentum triple and its virtual exchange share energy denominators.
         for ki, kj, ka in kpts_helper.loop_kkk(nkpts):
             if touched[ki, kj, ka]:
                 continue
 
             kb = kconserv[ki, ka, kj]
-            # For discussion of LARGE_DENOM, see t1new update above
+            # Assign large denominators to padded orbital indices.
             eia = _get_epq(
                 [0, nocc, ki, mo_e_o, nonzero_opadding],
                 [0, nvir, ka, mo_e_v, nonzero_vpadding],
@@ -1231,7 +1252,7 @@ class KRADCBase(lib.StreamObject):
 
         t1_2 = None
         if self.approx_trans_moments is False or self.method == "adc(3)":
-            # Compute second-order singles t1 (tij)
+            # Build second-order singles from the first-order doubles.
             t1_2 = np.zeros((nkpts, nocc, nvir), dtype=t2_1.dtype)
             eris_ovoo = eris.ovoo
             for ki in range(nkpts):
@@ -1240,6 +1261,8 @@ class KRADCBase(lib.StreamObject):
                         kd = kconserv[ki, kc, kk]
                         ka = kconserv[kc, kk, kd]
 
+                        # Reconstruct DF integrals in occupied slices for the
+                        # singles update.
                         if eris.ovvv is None:
                             chunk_size = self.chunk_size
                             chunk_size = min(chunk_size, nocc)
@@ -1324,7 +1347,7 @@ class KRADCBase(lib.StreamObject):
         if (self.method == 'adc(3)' or
                 (not self.approx_trans_moments and
                  (self.method == 'adc(2)-x' or isinstance(self, KRADCEE)))):
-            # Compute second-order doubles t2 (tijab)
+            # Build second-order doubles and retain the virtual ladder.
             t2_1_vvvv = f.create_dataset(
                 't2_1_vvvv',
                 (nkpts, nkpts, nkpts, nocc, nocc, nvir, nvir),
@@ -1333,6 +1356,7 @@ class KRADCBase(lib.StreamObject):
             eris_ovvo = eris.ovvo
             eris_oovv = eris.oovv
 
+            # Store the particle-particle ladder for reuse in higher orders.
             for ka, kb, kc in kpts_helper.loop_kkk(nkpts):
                 kd = kconserv[ka, kc, kb]
                 for ki in range(nkpts):
@@ -1434,6 +1458,8 @@ class KRADCBase(lib.StreamObject):
             cput0 = log.timer_debug1(
                 'Completed t2_2 amplitude calculation', *cput0)
 
+            # Exact third-order transition moments also need third-order
+            # singles.
             if (self.method == "adc(3)"
                     and self.approx_trans_moments is False):
                 from pyscf.pbc.adc.lib import MomentumContractions
@@ -1506,6 +1532,7 @@ class KRADCBase(lib.StreamObject):
         if not self.if_corr:
             self.e_corr = 0.0
             return self.e_corr
+        # Sum direct and exchange contractions over conserving k triples.
         energy = 0.0
         for ki, kj, ka in kpts_helper.loop_kkk(self.nkpts):
             amplitude = self.t2[0][ki, kj, ka]
@@ -1633,6 +1660,7 @@ class KRADCBase(lib.StreamObject):
         chunk_size = self.chunk_size
         chunk_size = min(chunk_size, nvir)
         a = 0
+        # Contract virtual pairs in chunks from either DF factors or disk.
         if isinstance(vvvv, np.ndarray):
             vv1 = vvvv[kc, ka]
             vv2 = vvvv[kd, kb]
@@ -1707,6 +1735,7 @@ class KRADCBase(lib.StreamObject):
             owner without retaining the source solver. Sector results, caches
             and FNO-only settings are excluded from the converted object.
         """
+        # Share the reference arrays and copy per-solver bookkeeping below.
         for key in self._reference_keys:
             if hasattr(adc, key):
                 setattr(self, key, getattr(adc, key))
@@ -2001,6 +2030,7 @@ class KRADCBase(lib.StreamObject):
 
         rdm1 = []
 
+        # Normalize each sector once before contracting the selected roots.
         for kpt, kshift in enumerate(K_idx):
             k = kptlist.index(kshift)
             U = np.array(self.U[k]).T.copy()
@@ -2056,10 +2086,12 @@ class KRADCBase(lib.StreamObject):
             (1, 1, 2, 2, 2)
         """
         if not isinstance(self, (KRADCIP, KRADCEA)):
-            raise NotImplementedError('State densities are available for IP/EA; '
-                                      'EE transition densities are stored in X.')
+            raise NotImplementedError(
+                'State densities are available for IP/EA; '
+                'EE transition densities are stored in X.')
         if self.U is None:
             raise ValueError('Run kernel() before requesting a state density.')
+        # Resolve sector and root indices against the saved Davidson results.
         if kptlist is None:
             kptlist = self._kptlist
         kptlist = list(kptlist)
@@ -2067,14 +2099,17 @@ class KRADCBase(lib.StreamObject):
         if root is None:
             root = [list(range(self.U.shape[1])) for kshift in K_idx]
         if len(root) != len(K_idx):
-            raise ValueError('Supply one root list per selected momentum sector.')
+            raise ValueError(
+                'Supply one root list per selected momentum sector.')
         if any(kshift not in kptlist for kshift in K_idx):
             raise ValueError('Density sectors must be present in kptlist.')
         if any(len(roots) == 0 or any(not isinstance(i, (int, np.integer))
                                or not 0 <= i < self.U.shape[1] for i in roots)
                for roots in root):
-            raise ValueError('Root lists must contain valid saved root indices.')
+            raise ValueError(
+                'Root lists must contain valid saved root indices.')
         densities = self._make_rdm1(root, kptlist, K_idx, if_ss)
+        # Restore frozen occupations before transforming to the AO basis.
         if with_frozen and self.frozen is not None:
             nmo = max(len(occ) for occ in self.mo_occ)
             mask = get_frozen_mask(self)
@@ -2104,7 +2139,7 @@ class KRADCBase(lib.StreamObject):
             densities = [einsum('kpI,SkIJ,kqJ->Skpq', coefficients, dm,
                                 np.asarray(coefficients).conj())
                          for dm in densities]
-        # Distinct selected root counts remain a list rather than an object array.
+        # Stack sectors with equal root counts. Ragged selections stay lists.
         if len({len(dm) for dm in densities}) == 1:
             return np.asarray(densities)
         return densities
@@ -2480,8 +2515,7 @@ class KRADCIP(KRADCBase):
         ((1, 1, 5), (1, 2, 1))
     """
 
-    # __init__ and kernel are inherited from KRADCBase. The sector
-    # routines below follow their calls through the shared driver.
+    # Supply the one-hole and two-hole/one-particle blocks to the driver.
 
     def renormalize_eigenvectors(self, kshift, U, nroots=None):
         r"""Normalize charged eigenvectors in the spin-adapted ADC metric.
@@ -2528,6 +2562,7 @@ class KRADCIP(KRADCBase):
         n_singles = nocc
         nvir = self.nvir
 
+        # Use the spin-adapted doubles norm, including hole exchange.
         for I in range(U.shape[1]):
             U1 = U[:n_singles, I]
             U2 = U[n_singles:, I].reshape(nkpts, nkpts, nvir, nocc, nocc)
@@ -2590,6 +2625,7 @@ class KRADCIP(KRADCBase):
         eris_ovov = eris.ovov
         t2_1 = self.t2[0]
         M_ij = np.zeros_like(self._get_adc0_ham()) if M is None else M
+        # Accumulate the doubles contribution at fixed external hole momentum.
         for ki in range(nkpts):
             kj = ki
             for kl in range(nkpts):
@@ -2665,6 +2701,7 @@ class KRADCIP(KRADCBase):
         eris_oovv = eris.oovv
         eris_oooo = eris.oooo
 
+        # Dress the hole block with second-order singles and doubles.
         for ki in range(nkpts):
             kj = ki
             for kl in range(nkpts):
@@ -2727,6 +2764,7 @@ class KRADCIP(KRADCBase):
                         'ljde,ield->ij',
                         t2_2_ljd.conj(), eris_ovov[ki, ke, kl].conj())
 
+            # Contract pairs of doubles into mixed hole-particle intermediates.
             for km, ke, kd in kpts_helper.loop_kkk(nkpts):
                 t2_1 = self.t2[0]
 
@@ -2799,6 +2837,8 @@ class KRADCIP(KRADCBase):
                     temp_t2_v_3, eris_oovv[ki, km, ke])
                 del temp_t2_v_3
 
+            # Trace doubles pairs over internal lines for two-index
+            # intermediates.
             for km, ke, kd in kpts_helper.loop_kkk(nkpts):
 
                 kl = kconserv[kd, km, ke]
@@ -2873,6 +2913,7 @@ class KRADCIP(KRADCBase):
                     temp_t2_v_11.T, eris_oooo[kj, ki, kn])
                 del temp_t2_v_11
 
+            # Close the occupied intermediates with four-hole integrals.
             for km, ke, kd in kpts_helper.loop_kkk(nkpts):
                 t2_1 = self.t2[0]
                 kl = kconserv[kd, km, ke]
@@ -3116,11 +3157,10 @@ class KRADCIP(KRADCBase):
 
             eris_ovoo = eris.ovoo
 
-    ############ ADC(2) ij block ############################
-
+            # Apply the effective one-hole block to the singles.
             s1 = einsum('ij,j->i', M_ij[kshift], r1)
 
-    ########### ADC(2) i - kja block #########################
+            # Couple the two-hole/one-particle amplitudes back to singles.
             for kj in range(nkpts):
                 for kk in range(nkpts):
                     ka = kconserv[kk, kshift, kj]
@@ -3132,20 +3172,17 @@ class KRADCIP(KRADCBase):
                     s1 -= einsum(
                         'kaji,ajk->i',
                         eris_ovoo[kk, ka, kj].conj(), r2[ka, kj])
-    #################### ADC(2) ajk - i block ############################
-
+                    # Accumulate the reverse coupling in the doubles rows.
                     s2[ka, kj] += einsum(
                         'jaki,i->ajk',
                         eris_ovoo[kj, ka, kk], r1)
 
-    ################# ADC(2) ajk - bil block ############################
-
+                    # Apply the independent-orbital energies to the IP doubles.
                     s2[ka, kj] -= einsum('a,ajk->ajk', e_vir[ka], r2[ka, kj])
                     s2[ka, kj] += einsum('j,ajk->ajk', e_occ[kj], r2[ka, kj])
                     s2[ka, kj] += einsum('k,ajk->ajk', e_occ[kk], r2[ka, kj])
 
-    ############### ADC(3) ajk - bil block ############################
-
+            # ADC(2)-x and ADC(3) also couple distinct doubles configurations.
             if (method == "adc(2)-x" or method == "adc(3)"):
 
                 eris_oooo = eris.oooo
@@ -3208,9 +3245,8 @@ class KRADCIP(KRADCBase):
 
                 eris_ovoo = eris.ovoo
 
-    # ################ ADC(3) i - kja block and ajk - i
-    # ############################
-
+                # Dress the singles-doubles coupling with ground-state
+                # amplitudes.
                 for kj in range(nkpts):
                     for kk in range(nkpts):
                         ka = kconserv[kj, kshift, kk]
@@ -3574,8 +3610,7 @@ class KRADCIP(KRADCBase):
         T1 = np.zeros(nocc, dtype=np.complex128)
         T2 = np.zeros((nkpts, nkpts, nvir, nocc, nocc), dtype=np.complex128)
 
-    ######## ADC(2) 1h part  ############################################
-
+        # Build the leading one-hole transition amplitudes.
         if orb < nocc:
             T1 += idn_occ[orb, :]
             for kk in range(nkpts):
@@ -3611,8 +3646,7 @@ class KRADCIP(KRADCBase):
                 t1_2 = self.t1[0]
                 T1 += t1_2[kshift][:, (orb - nocc)]
 
-    ######## ADC(2) 2h-1p  part  ############################################
-
+            # Add the two-hole/one-particle transition amplitudes.
             for ki in range(nkpts):
                 for kj in range(nkpts):
                     ka = self.khelper.kconserv[kj, kshift, ki]
@@ -3621,8 +3655,7 @@ class KRADCIP(KRADCBase):
                     T2[ka, kj] += t2_1_t[:, orb - nocc, :, :].conj()
 
             del t2_1_t
-    ####### ADC(3) 2h-1p  part  ############################################
-
+        # Include second-order doubles in the higher-order transitions.
         if (self.method == 'adc(2)-x' and self.approx_trans_moments is False
             or self.method == 'adc(3)'):
             t2_2 = self.t2[1]
@@ -3635,8 +3668,7 @@ class KRADCIP(KRADCBase):
                         t2_2_t = -t2_2[ki, kj, ka].transpose(2, 3, 1, 0)
                         T2[ka, kj] += t2_2_t[:, orb - nocc, :, :].conj()
 
-    ######### ADC(3) 1h part  ############################################
-
+        # Dress the one-hole transition at third order.
         if (method == 'adc(3)'):
             if orb < nocc:
                 for kk in range(nkpts):
@@ -3711,6 +3743,7 @@ class KRADCIP(KRADCBase):
             del t2_2
         del t2_1
 
+        # Combine direct and hole-exchanged doubles before flattening.
         for ki in range(nkpts):
             for kj in range(nkpts):
                 ka = self.khelper.kconserv[kj, kshift, ki]
@@ -3771,7 +3804,7 @@ class KRADCIP(KRADCBase):
         L2 = L2.reshape(nkpts, nkpts, nvir, nocc, nocc)
         R2 = R2.reshape(nkpts, nkpts, nvir, nocc, nocc)
 
-    # block- ij
+        # Occupied-occupied density block.
         # 000
         for ki in range(nkpts):
             rdm1[ki][:nocc, :nocc] += 2 * einsum('ij,m,m->ij', kd_oc, L1, R1)
@@ -3834,7 +3867,7 @@ class KRADCIP(KRADCBase):
                         'i,i,Ijab,Jjba->IJ',
                         L1, R1, t1_oovv[ki][kj][ka], t1_oovv[ki][kj][kb].conj()
                     )
-    # block- ab
+        # Virtual-virtual density block.
         # 101
         for ki in range(nkpts):
             for ka in range(nkpts):
@@ -3875,7 +3908,7 @@ class KRADCIP(KRADCBase):
                         L1, R1, t1_oovv[kj][kk][ka], t1_oovv[kj][kk][kb].conj()
                     )
 
-    # block- ia
+        # Occupied-virtual density block.
         for ki in range(nkpts):
             for kj in range(nkpts):
                 kb = kshift
@@ -3908,19 +3941,19 @@ class KRADCIP(KRADCBase):
             rdm1[ka][:nocc, nocc:] += 2 * einsum('i,AIi->IA', L1, R2[ka][ka])
             rdm1[ka][:nocc, nocc:] -= einsum('i,AiI->IA', L1, R2[ka][ki])
 
-    # block- ai
+        # Virtual-occupied density block.
         for ki in range(nkpts):
             rdm1[ki][nocc:, :nocc] = rdm1[ki][:nocc, nocc:].conj().T
 
         if self.approx_trans_moments is False or self.method == "adc(3)":
             ki = kshift
-            ### block- ia ###
+            # Occupied-virtual density block.
             rdm1[ki][:nocc, nocc:] -= einsum('i,I,iA->IA', L1, R1, t2_ov[ki])
             for ki in range(nkpts):
                 rdm1[ki][:nocc, nocc:] += 2 * einsum(
                     'i,i,IA->IA',
                     L1, R1, t2_ov[ki])
-            ### block- ai ###
+                # Virtual-occupied density block.
                 rdm1[ki][nocc:, :nocc] = rdm1[ki][:nocc, nocc:].conj().T
 
         return rdm1
@@ -3980,6 +4013,7 @@ class KRADCIP(KRADCBase):
         nvir = nmo - nocc
         nkpts = self.nkpts
 
+        # Gather momentum partners of the ground-state doubles for exchange.
         t1_oovv_sjb = np.zeros_like(t1_oovv[0])
         t1_oovv_isb = np.zeros_like(t1_oovv[0])
         t1_oovv_sja = t1_oovv[kshift]
@@ -4012,6 +4046,7 @@ class KRADCIP(KRADCBase):
         L2_aji = np.zeros_like(L2)
         L2_jia = np.zeros_like(L2)
 
+        # Align the exchanged holes of the left and right IP vectors.
         ka, ki = np.indices((nkpts, nkpts))
         kj = kconserv_s[ki, ka]
         R2_aji[ka, ki] = R2[ka, kj]
@@ -4023,7 +4058,7 @@ class KRADCIP(KRADCBase):
         ka = kconserv_s[ki, kj]
         L2_jia[kj, ki] = L2[ka, ki]
 
-    # block- ij
+        # Occupied-occupied density block.
         # 000
         rdm1[:, occ_list, occ_list] += 2 * einsum('m,m->', L1, R1)
         rdm1[kshift, :nocc, :nocc] -= einsum('i,j->ij', L1, R1)
@@ -4054,7 +4089,7 @@ class KRADCIP(KRADCBase):
             'i,j,KkIiab,KkJjba->KIJ',
             L1, R1, t1_oovv_isa, t1_oovv_isb.conj())
 
-    # block- ab
+        # Virtual-virtual density block.
         # 101
         rdm1[:, nocc:, nocc:] += 2 * einsum('KkAij,KkBij->KAB', L2, R2)
         rdm1[:, nocc:, nocc:] -= einsum('KkAij,KkBji->KAB', L2, R2_aji)
@@ -4072,7 +4107,7 @@ class KRADCIP(KRADCBase):
             'i,m,kKijaB,kKmjaA->KAB',
             L1, R1, t1_oovv_sjb, t1_oovv_sjb.conj())
 
-    # block- ia
+        # Occupied-virtual density block.
         rdm1[kshift, :nocc, nocc:] += einsum(
             'kKaij,I,KkijAa->IA',
             L2_jia, R1, t1_oovv_ijs)
@@ -4091,6 +4126,7 @@ class KRADCIP(KRADCBase):
 
         kj, ka = np.indices((nkpts, nkpts))
         idx0 = np.arange(nkpts)[:, None]
+        # The state-specific density adds the reference occupation and weight.
         LR = np.dot(L1, R1)
         if if_ss:
             rdm1[:, :nocc, :nocc] += np.identity(nocc)
@@ -4104,21 +4140,21 @@ class KRADCIP(KRADCBase):
             t1_oovv_np = np.array(t1_oovv[ki])
             t1_oovv_ijb = t1_oovv_np[idx0, kb]
             t1_oovv_ijs_b[ki] = t1_oovv_ijb[:, kshift].copy()
-    # block- ij
+            # Occupied-occupied density block.
             oo[ki] -= 4 * einsum(
                 'KkIjab,KkJjab->IJ',
                 t1_oovv_np, t1_oovv_np.conj())
             oo[ki] += 2 * einsum(
                 'KkIjab,KkJjba->IJ',
                 t1_oovv_np, t1_oovv_ijb.conj())
-    # block- ab
+            # Virtual-virtual density block.
             vv += 4 * einsum(
                 'kKijBa,kKijAa->KAB',
                 t1_oovv_np, t1_oovv_np.conj())
             vv -= 2 * einsum(
                 'kKijBa,kKijaA->KAB',
                 t1_oovv_np, t1_oovv_ijb.conj())
-    # block- ia
+            # Occupied-virtual density block.
             ov[ki] -= 2 * einsum(
                 'kaij,i,kIjAa->IA',
                 L2_asj, R1, t1_oovv_np[:, ki])
@@ -4139,14 +4175,14 @@ class KRADCIP(KRADCBase):
         del (vv)
         del (ov)
         del (L2_asj)
-    # block- ia
+        # Occupied-virtual density block.
         rdm1[kshift, :nocc, nocc:] -= 2 * einsum(
             'kKaij,I,KkijaA->IA',
             L2_jia, R1, t1_oovv_ijs_b)
         del (L2_jia)
         del (t1_oovv_ijs_b)
 
-    # block- ai
+        # Virtual-occupied density block.
         rdm1[:, nocc:, :nocc] = rdm1[:, :nocc, nocc:].conj().transpose(0, 2, 1)
 
         if self.approx_trans_moments is False or self.method == "adc(3)":
@@ -4246,8 +4282,7 @@ class KRADCEA(KRADCBase):
         ((1, 1, 5), (1, 2, 1))
     """
 
-    # __init__ and kernel are inherited from KRADCBase. The sector
-    # routines below follow their calls through the shared driver.
+    # Supply the one-particle and two-particle/one-hole blocks to the driver.
 
     def renormalize_eigenvectors(self, kshift, U, nroots=None):
         r"""Normalize charged eigenvectors in the spin-adapted ADC metric.
@@ -4294,6 +4329,7 @@ class KRADCEA(KRADCBase):
         nvir = self.nvir
         n_singles = nvir
 
+        # Use the spin-adapted doubles norm, including particle exchange.
         for I in range(U.shape[1]):
             U1 = U[:n_singles, I]
             U2 = U[n_singles:, I].reshape(nkpts, nkpts, nocc, nvir, nvir)
@@ -4354,6 +4390,8 @@ class KRADCEA(KRADCBase):
         kconserv = self.khelper.kconserv
         eris_ovov = eris.ovov
         M_ab = np.zeros_like(self._get_adc0_ham()) if M is None else M
+        # Accumulate the doubles contribution at fixed external particle
+        # momentum.
         for ka in range(nkpts):
             kb = ka
             for kl in range(nkpts):
@@ -4432,6 +4470,8 @@ class KRADCEA(KRADCBase):
 
         t1_2 = self.t1[0]
 
+        # Contract second-order singles with stored or reconstructed ovvv
+        # blocks.
         for ka in range(nkpts):
             kb = ka
             for kl in range(nkpts):
@@ -4514,6 +4554,8 @@ class KRADCEA(KRADCBase):
         for ka in range(nkpts):
             kb = ka
             log.timer_debug1('start:t2_ijbc*v_acij||O(No^2*Nv^3*Nk^3)')
+            # Dress the particle block with second-order doubles and ovov
+            # integrals.
             for kl in range(nkpts):
                 for km in range(nkpts):
                     kd = kconserv[km, ka, kl]
@@ -4559,6 +4601,7 @@ class KRADCEA(KRADCBase):
                     del t2_2_mlb
 
             log.timer_debug1('start:temp1_ovov*v_ovov||O(No^3*Nv^3*Nk^3)')
+            # Form mixed intermediates from pairs of first-order doubles.
             for kn, ke, kd in kpts_helper.loop_kkk(nkpts):
 
                 kl = kconserv[ke, kn, kd]
@@ -4632,6 +4675,7 @@ class KRADCEA(KRADCBase):
                 del temp_t2_v_3
 
             log.timer_debug1('start:temp2_oo*v_ovov||O(No^3*Nv^2*Nk^3)')
+            # Trace the doubles pairs over both virtual indices.
             for kn, ke, kd in kpts_helper.loop_kkk(nkpts):
                 kl = kconserv[ke, kn, kd]
                 km = kconserv[ke, kl, kd]
@@ -4658,6 +4702,8 @@ class KRADCEA(KRADCBase):
                 del temp_t2_v_9
 
             log.timer_debug1('start:Mab vvvv||O(No^2*Nv^3*Nk^3)')
+            # Reuse the particle-particle ladder from the amplitude
+            # calculation.
             for km in range(nkpts):
                 for kl in range(nkpts):
                     kf = kconserv[km, kl, ka]
@@ -5057,12 +5103,10 @@ class KRADCEA(KRADCBase):
             kpts = self.kpts
             madelung = tools.madelung(cell, kpts)
 
-    ############ ADC(2) ij block ############################
-
+            # Apply the effective one-particle block to the singles.
             s1 = einsum('ab,b->a', M_ab[kshift], r1)
 
-    ########### ADC(2) coupling blocks #########################
-
+            # Couple one-particle and two-particle/one-hole configurations.
             for kb in range(nkpts):
                 for kc in range(nkpts):
                     ki = kconserv[kb, kshift, kc]
@@ -5108,14 +5152,12 @@ class KRADCEA(KRADCBase):
                             exchange.conj(), r2[ki, kb])
                         s2[ki, kb] += einsum('icab,a->ibc', direct, r1)
 
-    #########    ########## ADC(2) ajk - bil block ############################
-
+                    # Apply the independent-orbital energies to the EA doubles.
                     s2[ki, kb] -= einsum('i,ibc->ibc', e_occ[ki], r2[ki, kb])
                     s2[ki, kb] += einsum('b,ibc->ibc', e_vir[kb], r2[ki, kb])
                     s2[ki, kb] += einsum('c,ibc->ibc', e_vir[kc], r2[ki, kb])
 
-    ################ ADC(3) ajk - bil block ############################
-
+            # ADC(2)-x and ADC(3) also couple distinct doubles configurations.
             if (method == "adc(2)-x" or method == "adc(3)"):
                 eris_oovv = eris.oovv
                 eris_ovvo = eris.ovvo
@@ -5184,9 +5226,8 @@ class KRADCEA(KRADCBase):
 
                 eris_ovoo = eris.ovoo
 
-    # ############### ADC(3) a - ibc block and ibc-a coupling blocks
-    # ########################
-
+                # Dress the singles-doubles coupling with ground-state
+                # amplitudes.
                 t2_1 = self.t2[0]
 
                 for kz in range(nkpts):
@@ -5633,6 +5674,7 @@ class KRADCEA(KRADCBase):
         chunk_size = min(chunk_size, nvir)
 
         a = 0
+        # Stream virtual pairs and accumulate one output slice at a time.
         if isinstance(vvvv, np.ndarray) and vvvv.ndim == 5:
             vv1 = vvvv[ka, kc]
             vv2 = vvvv[kb, kd]
@@ -5705,8 +5747,7 @@ class KRADCEA(KRADCBase):
         T1 = np.zeros(nvir, dtype=np.complex128)
         T2 = np.zeros((nkpts, nkpts, nocc, nvir, nvir), dtype=np.complex128)
 
-    ######## ADC(2) 1h part  ############################################
-
+        # Build the leading one-particle and two-particle/one-hole terms.
         if orb < nocc:
 
             if (self.approx_trans_moments is False or self.method == "adc(3)"):
@@ -5754,8 +5795,7 @@ class KRADCEA(KRADCBase):
                         t2_1[kl, kk, kshift][:, :, orb - nocc, :],
                         t2_1[kl, kk, ka].conj())
 
-    ######### ADC(3) 2p-1h  part  ############################################
-
+        # Include second-order doubles in the higher-order transitions.
         if (self.method == 'adc(2)-x' and self.approx_trans_moments is False
             or self.method == 'adc(3)'):
             t2_2 = self.t2[1]
@@ -5771,8 +5811,7 @@ class KRADCEA(KRADCBase):
 
                         T2[kj, ka] -= t2_2_t[:, orb, :, :].conj()
 
-    ########### ADC(3) 1p part  ############################################
-
+        # Dress the one-particle transition at third order.
         if (method == 'adc(3)'):
             if orb < nocc:
                 for kk in range(nkpts):
@@ -5847,6 +5886,7 @@ class KRADCEA(KRADCBase):
             del t2_2
         del t2_1
 
+        # Combine direct and particle-exchanged doubles before flattening.
         for ka in range(nkpts):
             for kb in range(nkpts):
                 ki = self.khelper.kconserv[kb, kshift, ka]
@@ -5907,7 +5947,7 @@ class KRADCEA(KRADCBase):
         L2 = L2.reshape(nkpts, nkpts, nocc, nvir, nvir)
         R2 = R2.reshape(nkpts, nkpts, nocc, nvir, nvir)
 
-    # block- ij
+        # Occupied-occupied density block.
         # 000
         for ki in range(nkpts):
             rdm1[ki][:nocc, :nocc] += 2 * einsum('ij,m,m->ij', kd_oc, L1, R1)
@@ -5959,7 +5999,7 @@ class KRADCEA(KRADCBase):
                     'a,b,Iica,Jicb->IJ',
                     L1, R1, t1_oovv[kj][ki][kc], t1_oovv[kj][ki][kc].conj())
 
-    # block- ab
+        # Virtual-virtual density block.
         # 000
         rdm1[kshift][nocc:, nocc:] += einsum('A,B->AB', L1, R1)
         # 101
@@ -6014,7 +6054,7 @@ class KRADCEA(KRADCBase):
                     'a,b,ijBa,ijbA->AB',
                     L1, R1, t1_oovv[ki][kj][ka], t1_oovv[ki][kj][kb].conj())
 
-    # block- ia
+        # Occupied-virtual density block.
         # 100
         for ki in range(nkpts):
             rdm1[ki][:nocc, nocc:] -= einsum('a,IAa->IA', L1, R2[ki][ki])
@@ -6047,19 +6087,19 @@ class KRADCEA(KRADCBase):
                     'iab,b,IiaA->IA',
                     L2[ki][ka], R1, t1_oovv[kj][ki][ka])
 
-    # block- ai
+        # Virtual-occupied density block.
         for ki in range(nkpts):
             rdm1[ki][nocc:, :nocc] = rdm1[ki][:nocc, nocc:].conj().T
 
         if self.approx_trans_moments is False or self.method == "adc(3)":
             ki = kshift
-            ### block- ia ###
+            # Occupied-virtual density block.
             rdm1[ki][:nocc, nocc:] -= einsum('a,A,Ia->IA', L1, R1, t2_ov[ki])
             for kj in range(nkpts):
                 rdm1[kj][:nocc, nocc:] += 2 * einsum(
                     'a,a,IA->IA',
                     L1, R1, t2_ov[kj])
-            ### block- ai ###
+                # Virtual-occupied density block.
                 rdm1[kj][nocc:, :nocc] = rdm1[kj][:nocc, nocc:].conj().T
 
         return rdm1
@@ -6120,6 +6160,7 @@ class KRADCEA(KRADCBase):
         nkpts = self.nkpts
         occ_list = range(nocc)
 
+        # Gather the exchanged virtual momenta of the ground-state doubles.
         t1_oovv_sjb = np.zeros_like(t1_oovv[0])
         t1_oovv_sja = t1_oovv[kshift]
         t1_oovv_ijs = t1_oovv[:, :, kshift, :, :, :]
@@ -6148,13 +6189,14 @@ class KRADCEA(KRADCBase):
         R2_iba = np.zeros_like(R2)
         L2_iba = np.zeros_like(L2)
 
+        # Align exchanged particle pairs in the EA vectors.
         ka, ki = np.indices((nkpts, nkpts))
         kb = kconserv_s[ka, ki]
         R2_iba[ki, ka] = R2[ki, kb]
         L2_iba[ki, ka] = L2[ki, kb]
         R2_isb = R2[:, kshift, :, :, :]
         L2_isb = L2[:, kshift, :, :, :]
-    # block- ij
+        # Occupied-occupied density block.
         # 000
         rdm1[:, occ_list, occ_list] += 2 * einsum('m,m->', L1, R1)
         # 101
@@ -6167,7 +6209,7 @@ class KRADCEA(KRADCBase):
             'a,b,KkIiac,KkJibc->KIJ',
             L1, R1, t1_oovv_ijs, t1_oovv_ijs.conj())
 
-    # block- ab
+        # Virtual-virtual density block.
         # 000
         rdm1[kshift, nocc:, nocc:] += einsum('A,B->AB', L1, R1)
         # 101
@@ -6183,7 +6225,7 @@ class KRADCEA(KRADCBase):
             'a,B,kKijab,kKijAb->AB',
             L1, R1, t1_oovv_ijs, t1_oovv_ijs.conj())
 
-    # block- ia
+        # Occupied-virtual density block.
         # 100
         rdm1[:, :nocc, nocc:] -= einsum('a,KKIAa->KIA', L1, R2)
         rdm1[:, :nocc, nocc:] += 2 * einsum('a,KIaA->KIA', L1, R2_isb)
@@ -6207,6 +6249,7 @@ class KRADCEA(KRADCBase):
         kj, ka = np.indices((nkpts, nkpts))
         idx0 = np.arange(nkpts)[:, None]
         LR = np.dot(L1, R1)
+        # Include the reference density when building a state-specific density.
         if if_ss:
             rdm1[:, :nocc, :nocc] += np.identity(nocc)
             LR += 1.
@@ -6219,21 +6262,21 @@ class KRADCEA(KRADCBase):
             t1_oovv_np = np.array(t1_oovv[ki])
             t1_oovv_ijb = t1_oovv_np[idx0, kb]
             t1_oovv_ijs_b[ki] = t1_oovv_ijb[:, kshift].copy()
-    # block- ij
+            # Occupied-occupied density block.
             oo[ki] -= 4 * einsum(
                 'KkIibc,KkJibc->IJ',
                 t1_oovv_np, t1_oovv_np.conj())
             oo[ki] += 2 * einsum(
                 'KkIibc,KkJicb->IJ',
                 t1_oovv_np, t1_oovv_ijb.conj())
-    # block- ab
+            # Virtual-virtual density block.
             vv += 4 * einsum(
                 'kKijBb,kKijAb->KAB',
                 t1_oovv_np, t1_oovv_np.conj())
             vv -= 2 * einsum(
                 'kKijBb,kKijbA->KAB',
                 t1_oovv_np, t1_oovv_ijb.conj())
-    # block- ia
+            # Occupied-virtual density block.
             ov[ki] += 4 * einsum(
                 'kiab,a,kIiAb->IA',
                 L2_isb, R1, t1_oovv_np[:, ki])
@@ -6258,7 +6301,7 @@ class KRADCEA(KRADCBase):
         kj = kconserv_s[ki, ka]
         t1_oovv_ijas = t1_oovv_ijs_b[idx0, kj]
         t1_oovv_ijsa = t1_oovv_ijs[idx0, kj]
-    # block- ij
+        # Occupied-occupied density block.
         rdm1[:, :nocc, :nocc] -= einsum(
             'a,b,KkIiac,KkJicb->KIJ',
             L1, R1, t1_oovv_ijs, t1_oovv_ijs_b.conj())
@@ -6268,7 +6311,7 @@ class KRADCEA(KRADCBase):
         rdm1[:, :nocc, :nocc] += 2 * einsum(
             'a,b,KkIica,KkJicb->KIJ',
             L1, R1, t1_oovv_ijs_b, t1_oovv_ijs_b.conj())
-    # block- ab
+        # Virtual-virtual density block.
         rdm1[kshift, nocc:, nocc:] += 1 / 2 * einsum(
             'A,a,kKijBb,kKijba->AB',
             L1, R1, t1_oovv_ijs, t1_oovv_ijs_b.conj())
@@ -6286,7 +6329,7 @@ class KRADCEA(KRADCBase):
         del (t1_oovv_ijs)
         del (t1_oovv_ijs_b)
 
-    # block- ai
+        # Virtual-occupied density block.
         rdm1[:, nocc:, :nocc] = rdm1[:, :nocc, nocc:].conj().transpose(0, 2, 1)
 
         if self.approx_trans_moments is False or self.method == "adc(3)":
@@ -6294,7 +6337,7 @@ class KRADCEA(KRADCBase):
                 'a,A,Ia->IA',
                 L1, R1, t2_ov[kshift])
             rdm1[:, :nocc, nocc:] += 2 * LR * t2_ov
-            ### block- ai ###
+            # Virtual-occupied density block.
             rdm1[:, nocc:, :nocc] = rdm1[:, :nocc, nocc:].conj().transpose(
                 0, 2, 1)
 
@@ -6389,8 +6432,7 @@ class KRADCEE(KRADCBase):
         ((1, 2, 10), (1, 2), (1, 2, 2, 2, 2))
     """
 
-    # __init__ and kernel are inherited from KRADCBase. The sector
-    # routines below follow their calls through the shared driver.
+    # Build the neutral singles Hamiltonian for each momentum transfer.
 
     def get_imds(self, eris=None, kshift=0):
         r"""Assemble the singles effective Hamiltonian through the ADC order.
@@ -6432,6 +6474,7 @@ class KRADCEE(KRADCBase):
         self.method = check_implemented(self.method)
         if eris is None:
             eris = self.ao2mo()
+        # Accumulate each requested order in the same particle-hole tensor.
         M_ph = self._get_adc1_ham(eris, kshift)
         self._get_adc2_ham(eris, kshift, M=M_ph)
         if self.method == 'adc(3)':
@@ -6492,6 +6535,7 @@ class KRADCEE(KRADCBase):
             raise ValueError(
                 'Eigenvectors must have shape (vector_size, nroots).')
         vectors = np.array(U, dtype=np.result_type(U, float), copy=True)
+        # Include the exchanged-hole overlap in the singlet doubles norm.
         for root in range(nroots):
             singles = vectors[:self.n_singles, root]
             doubles = vectors[self.n_singles:, root].reshape(
@@ -6560,6 +6604,7 @@ class KRADCEE(KRADCBase):
             nroots = self.nroots
         if U.shape[1] != nroots:
             raise ValueError('nroots does not match the eigenvector array.')
+        # Project the transition density onto the Fourier density operator.
         T = self.get_trans_moments(kshift, U)
         X = T.reshape(nroots, self.nkpts, self.nmo, self.nmo)
         amplitudes = einsum(
@@ -6679,7 +6724,7 @@ class KRADCEE(KRADCBase):
         if M_ph is None:
             M_ph = np.zeros(self._singles_ham_shape, dtype=t1_oovv.dtype)
         occ_identity, vir_identity = np.eye(nocc), np.eye(nvir)
-        # ADC(2)
+        # Contract first-order doubles with ovov in the singles block.
         for kI in range(nkpts):
             kD = kshift_ia[kI]
             for kL in range(nkpts):
@@ -6797,6 +6842,7 @@ class KRADCEE(KRADCBase):
             M_ph = np.zeros(self._singles_ham_shape, dtype=self.t2[0].dtype)
         context = MomentumContractions(self, eris, kshift)
         ia, ai, doubles = self._momentum_maps(kshift)
+        # Fix the external particle-hole momenta before summing internal lines.
         for ki, kl in product(range(self.nkpts), repeat=2):
             momenta = dict(I=ki, D=ia[ki], L=kl, A=ia[kl])
             for term in kadc_ee_terms.SINGLES_3.get('ss', ()):
@@ -6809,6 +6855,8 @@ class KRADCEE(KRADCBase):
                 value = context.contract(term, fixed, signs)
                 if value is None:
                     continue
+                # Embed two-index terms with an identity on the spectator
+                # orbital.
                 if output == 'IL':
                     value = einsum('IL,DA->IDLA', value, np.eye(self.nvir))
                 elif output == 'DA':
@@ -6931,6 +6979,7 @@ class KRADCEE(KRADCBase):
             eris = self.ao2mo()
         doubles_diagonal = self._doubles_diagonal(kshift)
 
+        # Prepare the coupling integrals shared by Davidson iterations.
         v_ovoo = eris.ovoo
         if eris.ovvv is None:
             shape = (nkpts,) * 3 + (nocc,) + (nvir,) * 3
@@ -7014,6 +7063,8 @@ class KRADCEE(KRADCBase):
                             'ijDa,iajI->ID',
                             r2[ki, kj, kD], v_ovoo[ki, ka, kj])
 
+            # Apply the extra doubles and coupling terms at the requested
+            # order.
             if self.method in ('adc(2)-x', 'adc(3)'):
                 self._add_sigma_terms(
                     s1, s2, r1, r2, context, kadc_ee_terms.SIGMA_2X)
@@ -7082,6 +7133,7 @@ class KRADCEE(KRADCBase):
             return self._transition_cache[kshift].reshape(
                 self._transition_cache[kshift].shape[0], -1)
         U = self.renormalize_eigenvectors(kshift, U, U.shape[1])
+        # Select the transition-density contractions for this ADC order.
         context = MomentumContractions(self, kshift=kshift)
         tables = [kadc_ee_terms.TRANSITION_2]
         if self.method in ('adc(2)-x', 'adc(3)'):
@@ -7093,6 +7145,7 @@ class KRADCEE(KRADCBase):
             dtype=np.result_type(U, self.t2[0]))
         ia, ai, doubles = self._momentum_maps(kshift)
         occupied, virtual = slice(None, self.nocc), slice(self.nocc, None)
+        # Insert one root into the contraction context and fill its MO density.
         for root in range(U.shape[1]):
             context.data.update(
                 r1=U[:self.n_singles, root].reshape(self.singles_shape),
@@ -7157,6 +7210,7 @@ class KRADCEE(KRADCBase):
         q = -self.kpts[kshift]
         operator = np.empty(
             (self.nkpts, self.nmo, self.nmo), dtype=np.complex128)
+        # Transform each momentum-matched AO pair density to the MO basis.
         for ki, ka in enumerate(ia):
             ao = ft_ao.ft_aopair(
                 self.cell,
@@ -7191,6 +7245,7 @@ class KRADCEE(KRADCBase):
             ai[ia] = np.arange(self.nkpts)
             lattice = self.cell.lattice_vectors() / (2 * np.pi)
             kpts = self.kpts
+            # Match the fourth momentum modulo a reciprocal lattice vector.
             momenta = (kpts[:, None, None, :] - kpts[:, None, :]
                        + kpts - kpts[kshift])
             doubles = np.full((self.nkpts,) * 3, -1, dtype=int)
@@ -7224,6 +7279,7 @@ class KRADCEE(KRADCBase):
         ia, ai, kconserv = self._momentum_maps(kshift)
         diagonal = np.empty(
             self.doubles_shape, dtype=np.result_type(e_occ, e_vir))
+        # Broadcast the two-particle and two-hole energies over each block.
         for ki, kj, ka in kpts_helper.loop_kkk(self.nkpts):
             kb = kconserv[ki, ka, kj]
             occupied = e_occ[ki][:, None] + e_occ[kj]
@@ -7254,6 +7310,7 @@ class KRADCEE(KRADCBase):
         """
         context.data.update(r1=r1, r2=r2)
         ia, ai, doubles = self._momentum_maps(context.kshift)
+        # Fix the external indices separately for singles and doubles rows.
         for ki in range(self.nkpts):
             for term in table.get('s1', ()):
                 value = context.contract(term, {'I': ki, 'D': ia[ki]}, (1, -1))

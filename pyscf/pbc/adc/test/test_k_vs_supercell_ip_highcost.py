@@ -18,9 +18,10 @@
 import unittest
 import numpy
 from pyscf.pbc import gto
-from pyscf.pbc import scf,adc,mp
+from pyscf.pbc import scf, adc, mp
 from pyscf import adc as mol_adc
 from pyscf.pbc.tools.pbc import super_cell
+
 
 def setUpModule():
     r"""Prepare matching IP molecular-supercell and k-point references.
@@ -48,18 +49,19 @@ def setUpModule():
 
     nmp = [1,1,3]
 
-    # treating supercell at gamma point
+    # A single Gamma point describes the commensurate supercell.
     supcell = super_cell(cell, nmp)
-    mf  = scf.RHF(supcell, exxdiv=None).density_fit()
-    ehf  = mf.kernel()
+    mf = scf.RHF(supcell, exxdiv=None).density_fit()
+    ehf = mf.kernel()
     myadc = mol_adc.RADC(mf)
     myadc.approx_trans_moments = True
 
-    # periodic calculation at gamma point
+    # Use the primitive cell with a Gamma-centered mesh.
     kpts = cell.make_kpts(nmp)
     kpts -= kpts[0]
     kmf = scf.KRHF(cell, kpts, exxdiv=None).density_fit().run()
-    mykradc  = adc.KRADCIP(kmf)
+    mykradc = adc.KRADCIP(kmf)
+
 
 def tearDownModule():
     r"""Release the paired molecular and periodic reference fixtures.
@@ -73,8 +75,8 @@ def tearDownModule():
     cell.stdout.close()
     del cell, myadc, mykradc
 
-class KnownValues(unittest.TestCase):
 
+class KnownValues(unittest.TestCase):
     r"""Compare IP spectra from commensurate supercell and k-point ADC.
 
     The module fixture supplies the reference system shared by these tests.
@@ -98,7 +100,7 @@ class KnownValues(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        e1,v1,p1,x1 = myadc.kernel(nroots=3)
+        e1, v1, p1, x1 = myadc.kernel(nroots=3)
         e2, v2, p2, x2 = mykradc.kernel(nroots=3, kptlist=[0])
 
         ediff = e1[0] - e2[0][0]
@@ -108,7 +110,6 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(pdiff, 0.0, 2)
 
     def test_ip_adc2x_supercell_vs_k_high_cost(self):
-
         r"""Compare IP-ADC2X between supercell and sector-zero k ADC.
 
         Use matched states in the three-copy carbon gth-dzv/gth-pade
@@ -121,7 +122,7 @@ class KnownValues(unittest.TestCase):
             fails.
         """
         myadc.method = 'adc(2)-x'
-        e1,v1,p1,x1 = myadc.kernel(nroots=3)
+        e1, v1, p1, x1 = myadc.kernel(nroots=3)
 
         mykradc.method = 'adc(2)-x'
         e2, v2, p2, x2 = mykradc.kernel(nroots=3, kptlist=[0])
@@ -133,7 +134,6 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(pdiff, 0.0, 2)
 
     def test_ip_adc3_supercell_vs_k_high_cost(self):
-
         r"""Compare IP-ADC3 between supercell and sector-zero k ADC.
 
         Use matched states in the three-copy carbon gth-dzv/gth-pade
@@ -146,7 +146,7 @@ class KnownValues(unittest.TestCase):
             fails.
         """
         myadc.method = 'adc(3)'
-        e1,v1,p1,x1 = myadc.kernel(nroots=3)
+        e1, v1, p1, x1 = myadc.kernel(nroots=3)
 
         mykradc.method = 'adc(3)'
         e2, v2, p2, x2 = mykradc.kernel(nroots=3, kptlist=[0])
@@ -156,6 +156,7 @@ class KnownValues(unittest.TestCase):
 
         self.assertAlmostEqual(ediff, 0.0, 2)
         self.assertAlmostEqual(pdiff, 0.0, 2)
+
 
 if __name__ == "__main__":
     print('supercell vs k-point calculations for IP-ADC methods')

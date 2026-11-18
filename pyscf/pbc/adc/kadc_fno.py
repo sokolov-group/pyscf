@@ -147,11 +147,11 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
         >>> int(mykradc_fno.nvir), len(mykradc_fno.mo_coeff)
         (1, 2)
     """
-    _keys = kadc_rhf.KRADCBase._keys | {'delta_e', 'e_can', 'v_can', 'e_corr_can',
-                                   'rdm1_ss', 'mode', 'ref_state',
-                                   'delta_e_corr', 'p_can',
-                                   'if_ref_qp', 'delta_e_qp', 'is_qp',
-                                   'e_corr_fno'}
+    _keys = kadc_rhf.KRADCBase._keys | {
+        'delta_e', 'e_can', 'v_can', 'e_corr_can', 'rdm1_ss', 'mode',
+        'ref_state', 'delta_e_corr', 'p_can', 'if_ref_qp', 'delta_e_qp',
+        'is_qp', 'e_corr_fno',
+    }
 
     def __init__(self, mf, frozen=None, mo_coeff=None, mo_occ=None,
                  mo_energy=None, kpts=None):
@@ -174,6 +174,7 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
             construction.
         """
         super().__init__(mf, frozen, mo_coeff, mo_occ, mo_energy, kpts)
+        # Keep canonical results alongside each truncation correction.
         self.delta_e = None
         self.delta_e_corr = None
         self.delta_e_qp = None
@@ -267,10 +268,11 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
         logger.info(self, 'generate fno with correction for the ground state')
         self.ref_state = None
 
+        # Build the reference density once for the entire threshold scan.
         self.make_ss_rdm1(log, cput0, if_gs=True)
         log.timer('make gs rdm1', *cput0)
 
-        # Snapshot canonical orbital layout needed by make_fno
+        # Save the canonical orbitals used to construct each FNO space.
         _can_frozen = self.frozen
         _can_mo_coeff = self.mo_coeff
         _can_mo_energy = self.mo_energy
@@ -282,8 +284,7 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
         all_delta_e_corr, all_e_corr_fno = [], []
 
         for i in range(n_thresh):
-            # Restore canonical orbitals so make_fno always starts from the
-            # full space
+            # Start each independent truncation from the full space.
             self.frozen = _can_frozen
             self.mo_coeff = _can_mo_coeff
             self.mo_energy = _can_mo_energy
@@ -295,7 +296,7 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
             self.make_fno(
                 self.rdm1_ss, self._scf, log, thresh=t, pct_occ=p, nvir_act=v)
 
-            # Snapshot FNO orbitals before solver state is overwritten
+            # Retain this orbital layout across the correction calculation.
             fno_mo_coeff = list(self.mo_coeff)
             fno_mo_energy = list(self.mo_energy)
             fno_frozen = list(self.frozen)
@@ -313,8 +314,7 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
 
         log.timer('gs FNO', *cput0)
 
-        # Expose results — single threshold keeps scalar attrs (backward
-        # compatible)
+        # Keep a scalar energy for a single threshold.
         if n_thresh == 1:
             self.mo_coeff = all_mo_coeff[0]
             self.mo_energy = all_mo_energy[0]
@@ -397,6 +397,7 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
             nroots = self.nroots
         if not isinstance(nroots, (int, np.integer)):
             raise TypeError('nroots must be an integer.')
+        # A reference-only calculation needs no state selection.
         if nroots < 1:
             energy = self.ground_state_energy(
                 eris, thresh=thresh, pct_occ=pct_occ, nvir_act=nvir_act)
@@ -425,10 +426,11 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
         if kptlist is None:
             kptlist = range(self.nkpts)
 
+        # Use the same canonical density for every virtual-space cutoff.
         self.make_ss_rdm1(log, cput0, kptlist, nroots, guess)
         log.timer('make ss rdm1', *cput0)
 
-        # Snapshot canonical orbital layout
+        # Save the canonical orbitals used to construct each FNO space.
         _can_frozen = self.frozen
         _can_mo_coeff = self.mo_coeff
         _can_mo_energy = self.mo_energy
@@ -441,6 +443,7 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
         all_delta_e, all_delta_e_qp = [], []
         all_e_ssfno, all_v_ssfno, all_p_ssfno = [], [], []
 
+        # Build each truncated space from the original canonical orbitals.
         for i in range(n_thresh):
             self.frozen = _can_frozen
             self.mo_coeff = _can_mo_coeff
@@ -458,6 +461,7 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
             fno_frozen = list(self.frozen)
 
             self._reset_adc_state()
+            # Compare roots in this truncated space with the canonical roots.
             self.compute_correction(kptlist, nroots, guess)
 
             all_mo_coeff.append(fno_mo_coeff)
@@ -475,6 +479,7 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
 
         log.timer('es FNO', *cput0)
 
+        # Keep the threshold axis only when returning multiple truncations.
         if n_thresh == 1:
             self.mo_coeff = all_mo_coeff[0]
             self.mo_energy = all_mo_energy[0]
@@ -528,11 +533,11 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
         if if_gs:
             kadc_rhf.KRADCBase.ground_state_energy(self)
         else:
-            (self.e_ssfno, self.v_ssfno, self.p_ssfno, transition_amplitudes) = (
-                kadc_rhf.KRADCBase.kernel(
-                    self, nroots, guess=guess, kptlist=kptlist)
-            )
+            (self.e_ssfno, self.v_ssfno, self.p_ssfno,
+             transition_amplitudes) = kadc_rhf.KRADCBase.kernel(
+                 self, nroots, guess=guess, kptlist=kptlist)
             self.delta_e = self.e_can - self.e_ssfno
+            # Match quasiparticle energies by rank within each sector.
             if self.if_ref_qp:
                 self.delta_e_qp = []
                 mask_fno = self.p_ssfno > self.is_qp
@@ -676,10 +681,12 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
         if if_gs:
             kadc_rhf.KRADCBase.ground_state_energy(self)
         else:
-            self.e_can, self.v_can, self.p_can, transition_amplitudes = kadc_rhf.KRADCBase.kernel(
-                self, nroots, guess=guess, kptlist=kptlist)
+            (self.e_can, self.v_can, self.p_can,
+             transition_amplitudes) = kadc_rhf.KRADCBase.kernel(
+                 self, nroots, guess=guess, kptlist=kptlist)
         log.info(f'Current memory use: {lib.current_memory()[0]:.0f} MB')
         self.e_corr_can = self.e_corr
+        # Resolve ranked or explicitly listed roots to sector and root indices.
         if self.ref_state is not None:
             if isinstance(self.ref_state, (int, np.integer)):
                 idx = np.argsort(self.e_can.ravel()).tolist()
@@ -709,6 +716,7 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
                             'as the second element'))
                     sidx = self.ref_state[0]
                 kidx = self.ref_state[1]
+                # Map indices in the quasiparticle subset back to all roots.
                 if self.if_ref_qp:
                     state_list = []
                     mask_can = self.p_can > self.is_qp
@@ -720,6 +728,7 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
                     sidx = state_list
 
             log.info(f'the specific state is {sidx} with kidx {kidx}')
+            # Weight each selected state equally in the density used for FNOs.
             es_DM = self.make_rdm1(kptlist, root=sidx, K_idx=kidx, if_ss=True)
             self.rdm1_ss = np.zeros_like(es_DM[0][0])
             n_state = sum([len(s_k) for s_k in sidx])
@@ -733,6 +742,7 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
             log.info(f'Current memory use: {lib.current_memory()[0]:.0f} MB')
             log.timer('make ref rdm1', *cput0)
 
+        # Discard amplitudes and intermediates tied to the canonical space.
         self.t1 = None
         self.t2 = None
         self._adc_es = None
@@ -811,6 +821,7 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
         V_trunc = []
         padding_convention = padding_k_idx(self, kind='joint')
 
+        # Rank virtual natural orbitals by occupation at each k point.
         T = []
         for kpt in range(self.nkpts):
             masks = kadc_rhf.mo_splitter(self, kpt)
@@ -832,7 +843,7 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
             else:
                 T.append(n > thresh)
 
-        # "min": union the per-kpt masks so every k-point keeps the same count
+        # In min mode, use the largest retained count across the k mesh.
         n_keep_union = None
         if self.mode.lower() == "min":
             n_keep_union = max(int(np.sum(t)) for t in T)
@@ -856,31 +867,34 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
                     n_keep += 1
                     T[kpt][0] = True
 
-            (moeoccfrz0, moeocc, moevir, moevirfrz0) = ([self.mo_energy[kpt][
-                m] for m in masks])
-            orboccfrz0, orbocc, orbvir, orbvirfrz0 = [self.mo_coeff[kpt][:,
-                m] for m in masks]
+            moeoccfrz0, moeocc, moevir, moevirfrz0 = [
+                self.mo_energy[kpt][m] for m in masks]
+            orboccfrz0, orbocc, orbvir, orbvirfrz0 = [
+                self.mo_coeff[kpt][:, m] for m in masks]
+            # Semicanonicalize the Fock block for the retained virtuals.
             F_can = np.diag(moevir)
             F_trunc = V_trunc_k.T.conj().dot(F_can).dot(V_trunc_k)
             e_trunc, Z_trunc = np.linalg.eigh(F_trunc[:n_keep, :n_keep])
             e_fro = np.diagonal(F_trunc[n_keep:, n_keep:]).copy()
             U_vir_act = orbvir.dot(V_trunc_k[:, :n_keep]).dot(Z_trunc)
             U_vir_fro = orbvir.dot(V_trunc_k[:, n_keep:])
+            # Keep original frozen orbitals at the ends of the new MO ordering.
             no_comp = (orboccfrz0, orbocc, U_vir_act, U_vir_fro, orbvirfrz0)
             no_e_comp = (moeoccfrz0, moeocc, e_trunc, e_fro, moevirfrz0)
             no_coeff_k = np.hstack(no_comp)
             no_energy_k = np.hstack(no_e_comp)
-            nocc_loc = (np.cumsum([0] + [x.shape[1] for x in no_comp]).astype(
-                int))
-            no_frozen_k = np.hstack((np.arange(nocc_loc[0], nocc_loc[1]),
-                                    np.arange(
-                                        nocc_loc[3], nocc_loc[5]))).astype(int)
+            nocc_loc = np.cumsum([0] + [x.shape[1] for x in no_comp]).astype(
+                int)
+            no_frozen_k = np.hstack((
+                np.arange(nocc_loc[0], nocc_loc[1]),
+                np.arange(nocc_loc[3], nocc_loc[5]),
+            )).astype(int)
             no_coeff.append(no_coeff_k)
             no_energy.append(no_energy_k)
             no_frozen.append(no_frozen_k)
 
-        (self.mo_coeff, self.mo_energy, self.frozen) = ((no_coeff, no_energy,
-            no_frozen))
+        self.mo_coeff, self.mo_energy, self.frozen = (
+            no_coeff, no_energy, no_frozen)
 
 
 class KRADCIPFNO(_KRADCFNO, kadc_rhf.KRADCIP):

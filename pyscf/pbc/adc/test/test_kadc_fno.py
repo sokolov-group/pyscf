@@ -121,6 +121,7 @@ def _gs_corr(fg, i=None):
         driver uses the selected coefficients, energies, occupations and frozen
         list.
     """
+    # Multi-threshold runs keep a separate orbital space for each cutoff.
     frozen = fg.frozen[i] if i is not None else fg.frozen
     mo_coeff = fg.mo_coeff[i] if i is not None else fg.mo_coeff
     mo_energy = fg.mo_energy[i] if i is not None else fg.mo_energy
@@ -146,6 +147,7 @@ def _es_corr(fg, solver_type, i=None):
         float: Corrected root-zero sector-zero energy in Hartree, after a
         separate ADC(3) calculation initialized with the selected FNO vectors.
     """
+    # Multi-threshold runs keep a separate orbital space for each cutoff.
     frozen = fg.frozen[i] if i is not None else fg.frozen
     mo_coeff = fg.mo_coeff[i] if i is not None else fg.mo_coeff
     mo_occ = fg.mo_occ[i] if (i is not None and isinstance(
@@ -271,8 +273,8 @@ class KnownValues(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        self.assertAlmostEqual(
-            _es_corr(_fno_es(adc.KRADCEA, [[0], [0]], 0.9), adc.KRADCEA), 1.0069869404, 4)
+        fg = _fno_es(adc.KRADCEA, [[0], [0]], 0.9)
+        self.assertAlmostEqual(_es_corr(fg, adc.KRADCEA), 1.0069869404, 4)
 
     def test_sa_fno_ea(self):
         r"""Check corrected EA-ADC(3) with a two-state averaged FNO density.
@@ -284,8 +286,8 @@ class KnownValues(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        self.assertAlmostEqual(
-            _es_corr(_fno_es(adc.KRADCEA, [[0, 1], [0]], 0.9), adc.KRADCEA), 0.9951643793, 4)
+        fg = _fno_es(adc.KRADCEA, [[0, 1], [0]], 0.9)
+        self.assertAlmostEqual(_es_corr(fg, adc.KRADCEA), 0.9951643793, 4)
 
     def test_ss_fno_ip(self):
         r"""Check the first corrected IP-ADC(3) root in a state-specific FNO
@@ -298,8 +300,8 @@ class KnownValues(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        self.assertAlmostEqual(
-            _es_corr(_fno_es(adc.KRADCIP, [[0], [0]], 0.9), adc.KRADCIP), -0.7491959409, 4)
+        fg = _fno_es(adc.KRADCIP, [[0], [0]], 0.9)
+        self.assertAlmostEqual(_es_corr(fg, adc.KRADCIP), -0.7491959409, 4)
 
 
 if __name__ == '__main__':

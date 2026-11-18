@@ -29,7 +29,6 @@ two-k-point helium reference locally. All shapes include active-space
 padding. An integral container owns its scratch file and supports ``with``.
 """
 from itertools import product
-import time
 
 import numpy as np
 
@@ -72,8 +71,8 @@ class _IntegralBlocks:
         ...     exxdiv=None).density_fit().run()
         >>> mykradcbase = kadc_rhf.KRADCBase(kmf)
         >>> with mykradcbase.ao2mo() as eris:
-        ...     print(tuple(map(int, eris.ovvv_blocks.shape)))
-        ...     print(eris.ovvv_blocks[0, 0, 0].shape)
+        ...     print(tuple(map(int, eris.ovvv_kpoint_normalized.shape)))
+        ...     print(eris.ovvv_kpoint_normalized[0, 0, 0].shape)
         (2, 2, 2, 1, 1, 1, 1)
         (1, 1, 1, 1)
     """
@@ -92,11 +91,20 @@ class _IntegralBlocks:
             None: Initialize shape, dtype, ndim and the retained reader.
         """
         self._eris = eris
+        self._name = name
         self._read = read
         sizes = {'o': eris.nocc, 'v': eris.nvir}
         self.shape = (eris.nkpts,) * 3 + tuple(sizes[x] for x in name)
         self.dtype = eris.dtype
         self.ndim = len(self.shape)
+
+    def __repr__(self):
+        """Preview the first k block using the active NumPy print options."""
+        header = (f'{type(self).__name__}({self._name}, shape={self.shape}, '
+                  f'dtype={self.dtype}')
+        if getattr(self._eris, self._name) is None and self._eris.Lvv is None:
+            return f'{header}, unavailable)'
+        return f'{header}, block[0, 0, 0]=\n{np.array2string(self[0, 0, 0])})'
 
     def __getitem__(self, key):
         r"""Read one k block and apply any trailing NumPy orbital indices.
@@ -115,6 +123,7 @@ class _IntegralBlocks:
                 indices outside [-nkpts, nkpts). Slicing the full k tensor is
                 deliberately unsupported.
         """
+        # Resolve the k triple before applying any orbital-axis slices.
         key = key if isinstance(key, tuple) else (key,)
         if len(key) < 3 or not all(
             isinstance(k, (int, np.integer)) for k in key[:3]):
@@ -148,8 +157,10 @@ class _ChemistsERIs:
         Lpq_mo: Object array indexed by a k pair, containing full MO DF blocks.
         feri: Owning HDF5 scratch file, or None for entirely in-memory storage.
 
-    Raw stored blocks and the lazy ovvv_blocks/vvvv_blocks accessors include
-    1/nkpts normalization. The static DF helpers return unnormalized blocks.
+    Raw stored blocks and the lazy ovvv_kpoint_normalized and
+    vvvv_kpoint_normalized accessors include 1/nkpts normalization. Printing
+    an accessor previews the first k block using NumPy's print options.
+    The static DF helpers return unnormalized blocks.
     Use close() or a context manager to release scratch storage.
 
     Examples:
@@ -167,7 +178,7 @@ class _ChemistsERIs:
         >>> mykradcbase = kadc_rhf.KRADCBase(kmf)
         >>> with mykradcbase.ao2mo('density_fit') as eris:
         ...     print(eris.ovov.shape, eris.ovvv is None)
-        ...     print(eris.ovvv_blocks[0, 0, 0].shape)
+        ...     print(eris.ovvv_kpoint_normalized[0, 0, 0].shape)
         (2, 2, 2, 1, 1, 1, 1) True
         (1, 1, 1, 1)
     """
@@ -231,6 +242,7 @@ class _ChemistsERIs:
             ...     print(eris.ovov.shape)
             (2, 2, 2, 1, 1, 1, 1)
         """
+        # All disk-backed blocks share one file for the container's lifetime.
         if outcore and self.feri is None:
             self.feri = lib.H5TmpFile()
         sizes = {'o': self.nocc, 'v': self.nvir}
@@ -304,31 +316,35 @@ class _ChemistsERIs:
         return einsum('Lpq,Lrs->prqs', vv1[:, start:stop], vv2)
 
     @property
-    def ovvv_blocks(self):
+    def ovvv_kpoint_normalized(self):
         r"""Access stored or DF-reconstructed ovvv through three k indices.
 
         Returns:
             _IntegralBlocks: Accessor with logical shape
             (nkpts, nkpts, nkpts, nocc, nvir, nvir, nvir). Index as
-            ``ovvv_blocks[kp, kq, kr, ...]``; the fourth k point follows
-            chemists'
-            momentum conservation. Reading one block does not fill raw ovvv.
+            ``ovvv_kpoint_normalized[kp, kq, kr, ...]``; the fourth k point
+            follows chemists' momentum conservation. Reading one block does not
+            fill raw ovvv.
         """
         return _IntegralBlocks(self, 'ovvv', self._get_ovvv)
 
     @property
-    def vvvv_blocks(self):
+    def vvvv_kpoint_normalized(self):
         r"""Access vvvv in particle-particle ordering without full expansion.
 
         Returns:
             _IntegralBlocks: Accessor with logical shape (nkpts,)*3 +
             (nvir,)*4.
-            Index as ``vvvv_blocks[kp, kq, kr, ...]``. The fourth momentum is
-            kconserv[kp, kr, kq]; the returned orbital order is p,r,q,s
-            relative
+            Index as ``vvvv_kpoint_normalized[kp, kq, kr, ...]``. The fourth
+            momentum is kconserv[kp, kr, kq]; the returned orbital order is
+            p,r,q,s relative
             to the DF pair product. Reading a block does not fill raw vvvv.
         """
         return _IntegralBlocks(self, 'vvvv', self._get_vvvv)
+
+    # Compatibility with existing scripts using the original accessor names.
+    ovvv_blocks = ovvv_kpoint_normalized
+    vvvv_blocks = vvvv_kpoint_normalized
 
     def _get_ovvv(self, kp, kq, kr):
         r"""Read one normalized ovvv block from storage or DF factors.
@@ -423,6 +439,7 @@ def _needs_vvvv(adc):
                      or not adc.approx_trans_moments))
             or (isinstance(adc, KRADCEE) and not adc.approx_trans_moments))
 
+
 class AO2MO:
     r"""Transform active Bloch MOs using a shared backend-selection context.
 
@@ -490,6 +507,7 @@ class AO2MO:
         Raises:
             ValueError: The requested backend name is not recognized.
         """
+        # Keep the padded orbital basis and k mesh common to all backends.
         self.adc = adc
         self.log = logger.Logger(adc.stdout, adc.verbose)
         self.kpts = adc.kpts
@@ -504,6 +522,8 @@ class AO2MO:
         self.with_df = getattr(adc, 'with_df', None) or adc._scf.with_df
         self.fao2mo = self.with_df.ao2mo
         self.orbv = np.asarray(self.mo_coeff[:, :, self.nocc:], order='C')
+
+        # Prefer GDF factors in auto mode, then use the four-index size.
         backend = backend or adc.integral_backend
         match backend:
             case 'auto':
@@ -539,6 +559,14 @@ class AO2MO:
             case 'density_fit':
                 return self.density_fit()
 
+    def _transform_block(self, triple, coeffs):
+        """Transform and normalize one momentum-conserving quartet."""
+        quartet = (*triple, self.kconserv[triple])
+        block = self.fao2mo(coeffs, self.kpts[list(quartet)], compact=False)
+        if self.dtype == np.float64:
+            block = block.real
+        return block.reshape(tuple(c.shape[1] for c in coeffs)) / self.nkpts
+
     def incore(self):
         r"""Transform symmetry-related four-index k blocks into NumPy storage.
 
@@ -570,92 +598,28 @@ class AO2MO:
             ...     print(isinstance(eris.ovov, np.ndarray), eris.feri is None)
             True True
         """
-        eris = _ChemistsERIs(self.adc)
-        self.log.info('Using incore ERI storage')
-        eris.allocate(('oooo', 'oovv', 'ovoo', 'ovov', 'ovvv', 'ovvo'))
-
-        for (ikp,ikq,ikr) in self.khelper.symm_map:
-            iks = self.kconserv[ikp,ikq,ikr]
-            eri_kpt = self.fao2mo(
-                (
-                    self.mo_coeff[ikp],
-                    self.mo_coeff[ikq],
-                    self.mo_coeff[ikr],
-                    self.mo_coeff[iks],
-                ),
-                (
-                    self.kpts[ikp],
-                    self.kpts[ikq],
-                    self.kpts[ikr],
-                    self.kpts[iks],
-                ),
-                compact=False,
-            )
-            if self.dtype == np.float64:
-                eri_kpt = eri_kpt.real
-            eri_kpt = eri_kpt.reshape(self.nmo, self.nmo, self.nmo, self.nmo)
-            for (kp, kq, kr) in self.khelper.symm_map[(ikp, ikq, ikr)]:
-                eri_kpt_symm = self.khelper.transform_symm(eri_kpt, kp, kq, kr)
-                eris.oooo[kp, kq, kr] = (
-                    eri_kpt_symm[
-                        :self.nocc,
-                        :self.nocc,
-                        :self.nocc,
-                        :self.nocc,
-                    ]
-                    / self.nkpts
-                )
-                eris.oovv[kp, kq, kr] = (
-                    eri_kpt_symm[
-                        :self.nocc,
-                        :self.nocc,
-                        self.nocc:,
-                        self.nocc:,
-                    ]
-                    / self.nkpts
-                )
-                eris.ovoo[kp, kq, kr] = (
-                    eri_kpt_symm[
-                        :self.nocc,
-                        self.nocc:,
-                        :self.nocc,
-                        :self.nocc,
-                    ]
-                    / self.nkpts
-                )
-                eris.ovov[kp, kq, kr] = (
-                    eri_kpt_symm[
-                        :self.nocc,
-                        self.nocc:,
-                        :self.nocc,
-                        self.nocc:,
-                    ]
-                    / self.nkpts
-                )
-                eris.ovvv[kp, kq, kr] = (
-                    eri_kpt_symm[
-                        :self.nocc,
-                        self.nocc:,
-                        self.nocc:,
-                        self.nocc:,
-                    ]
-                    / self.nkpts
-                )
-                eris.ovvo[kp, kq, kr] = (
-                    eri_kpt_symm[
-                        :self.nocc,
-                        self.nocc:,
-                        self.nocc:,
-                        :self.nocc,
-                    ]
-                    / self.nkpts
-                )
-
+        # Allocate only the orbital sectors needed by this ADC calculation.
+        o, v = slice(None, self.nocc), slice(self.nocc, None)
+        spaces = {'oooo': (o, o, o, o), 'oovv': (o, o, v, v),
+                  'ovoo': (o, v, o, o), 'ovov': (o, v, o, v),
+                  'ovvo': (o, v, v, o), 'ovvv': (o, v, v, v)}
+        eris = _ChemistsERIs(self.adc).allocate(spaces)
         if _needs_vvvv(self.adc):
-            eris.vvvv = self.with_df.ao2mo_7d(
-                self.orbv, factor=1.0 / self.nkpts
-            ).transpose(0, 2, 1, 3, 5, 4, 6)
+            eris.allocate(('vvvv',))
+        self.log.info('Using incore ERI storage')
 
+        # Transform one representative and distribute its symmetry images.
+        for triple, equivalents in self.khelper.symm_map.items():
+            quartet = (*triple, self.kconserv[triple])
+            block = self._transform_block(
+                triple, tuple(self.mo_coeff[k] for k in quartet))
+            for kp, kq, kr in equivalents:
+                related = self.khelper.transform_symm(block, kp, kq, kr)
+                for name, indices in spaces.items():
+                    getattr(eris, name)[kp, kq, kr] = related[indices]
+                if eris.vvvv is not None:
+                    eris.vvvv[kp, kr, kq] = related[v, v, v, v].transpose(
+                        0, 2, 1, 3)
         return eris
 
     def outcore(self):
@@ -691,119 +655,55 @@ class AO2MO:
             ...     print(eris.ovov.shape, eris.feri is not None)
             (2, 2, 2, 1, 1, 1, 1) True
         """
+        # Group occupied-leading blocks by their first orbital pair.
         eris = _ChemistsERIs(self.adc)
         eris.allocate(
-            ('oooo', 'oovv', 'ovoo', 'ovov', 'ovvv', 'ovvo'), outcore=True)
+            ('oooo', 'oovv', 'ovoo', 'ovov', 'ovvo', 'ovvv'), outcore=True)
+        o, v = slice(None, self.nocc), slice(self.nocc, None)
+        spaces = {'o': o, 'v': v}
+        for triple in product(range(self.nkpts), repeat=3):
+            p, q, r, s = (self.mo_coeff[k]
+                          for k in (*triple, self.kconserv[triple]))
+            for second, names in ((o, ('oooo', 'oovv')),
+                                  (v, ('ovoo', 'ovov', 'ovvo', 'ovvv'))):
+                block = self._transform_block(
+                    triple, (p[:, o], q[:, second], r, s))
+                for name in names:
+                    getattr(eris, name)[triple] = block[
+                        :, :, spaces[name[2]], spaces[name[3]]]
+                del block
+
+        # Store all-virtual integrals in particle-particle order if required.
         if _needs_vvvv(self.adc):
             eris.allocate(('vvvv',), outcore=True)
-
-        cput1 = time.process_time(), time.time()
-        for kp, kq, kr in product(range(self.nkpts), repeat=3):
-            ks = self.kconserv[kp, kq, kr]
-            orbo_p = self.mo_coeff[kp][:, :self.nocc]
-            orbo_q = self.mo_coeff[kq][:, :self.nocc]
-            buf_kpt = self.fao2mo(
-                (orbo_p, orbo_q, self.mo_coeff[kr], self.mo_coeff[ks]),
-                (self.kpts[kp], self.kpts[kq], self.kpts[kr], self.kpts[ks]),
-                compact=False)
-            if self.mo_coeff[0].dtype == np.float64:
-                buf_kpt = buf_kpt.real
-            buf_kpt = buf_kpt.reshape(self.nocc, self.nocc, self.nmo, self.nmo)
-            self.dtype = buf_kpt.dtype
-            eris.oooo[kp, kq, kr, :, :, :, :] = buf_kpt[:, :, :self.nocc,
-                :self.nocc] / self.nkpts
-            eris.oovv[kp, kq, kr, :, :, :, :] = buf_kpt[:, :, self.nocc:,
-                self.nocc:] / self.nkpts
-        cput1 = self.log.timer_debug1('transforming oopq', *cput1)
-
-        # <ia|pq> = (ip|aq)
-        cput1 = time.process_time(), time.time()
-        for kp, kq, kr in product(range(self.nkpts), repeat=3):
-            ks = self.kconserv[kp, kq, kr]
-            orbo_p = self.mo_coeff[kp][:, :self.nocc]
-            orbv_q = self.mo_coeff[kq][:, self.nocc:]
-            buf_kpt = self.fao2mo(
-                (orbo_p, orbv_q, self.mo_coeff[kr], self.mo_coeff[ks]),
-                (self.kpts[kp], self.kpts[kq], self.kpts[kr], self.kpts[ks]),
-                compact=False)
-            if self.mo_coeff[0].dtype == np.float64:
-                buf_kpt = buf_kpt.real
-            buf_kpt = buf_kpt.reshape(self.nocc, self.nvir, self.nmo, self.nmo)
-            eris.ovoo[kp, kq, kr, :, :, :, :] = buf_kpt[:, :, :self.nocc,
-                :self.nocc] / self.nkpts
-            eris.ovov[kp, kq, kr, :, :, :, :] = buf_kpt[:, :, :self.nocc,
-                self.nocc:] / self.nkpts
-            eris.ovvo[kp, kq, kr, :, :, :, :] = buf_kpt[:, :, self.nocc:,
-                :self.nocc] / self.nkpts
-            eris.ovvv[kp, kq, kr, :, :, :, :] = buf_kpt[:, :, self.nocc:,
-                self.nocc:] / self.nkpts
-        cput1 = self.log.timer_debug1('transforming ovpq', *cput1)
-
-        if _needs_vvvv(self.adc):
-            mem_now = lib.current_memory()[0]
-            if self.nvir ** 4 * 16 / 1e6 + mem_now < self.adc.max_memory:
-                for (ikp, ikq, ikr) in self.khelper.symm_map:
-                    iks = self.kconserv[ikp, ikq, ikr]
-                    orbv_p = self.mo_coeff[ikp][:, self.nocc:]
-                    orbv_q = self.mo_coeff[ikq][:, self.nocc:]
-                    orbv_r = self.mo_coeff[ikr][:, self.nocc:]
-                    orbv_s = self.mo_coeff[iks][:, self.nocc:]
-                    # unit cell is small enough to handle vvvv in-core
-                    buf_kpt = self.fao2mo(
-                        (orbv_p, orbv_q, orbv_r, orbv_s),
-                        self.kpts[[ikp, ikq, ikr, iks]],
-                        compact=False)
-                    if self.dtype == np.float64:
-                        buf_kpt = buf_kpt.real
-                    buf_kpt = buf_kpt.reshape(
-                        (self.nvir, self.nvir, self.nvir, self.nvir))
-                    for (kp, kq, kr) in self.khelper.symm_map[(ikp, ikq, ikr)]:
-                        buf_kpt_symm = self.khelper.transform_symm(
-                            buf_kpt, kp, kq, kr).transpose(0, 2, 1, 3)
-                        eris.vvvv[kp, kr, kq] = buf_kpt_symm / self.nkpts
-            else:
-                for (ikp, ikq, ikr) in self.khelper.symm_map:
-                    iks = self.kconserv[ikp, ikq, ikr]
-                    orbv_p = self.mo_coeff[ikp][:, self.nocc:]
-                    orbv_q = self.mo_coeff[ikq][:, self.nocc:]
-                    orbv_r = self.mo_coeff[ikr][:, self.nocc:]
-                    orbv_s = self.mo_coeff[iks][:, self.nocc:]
-                    for a in range(self.nvir):
-                        orbva_p = orbv_p[:, a].reshape(-1, 1)
-                        buf_kpt = self.fao2mo(
-                            (orbva_p, orbv_q, orbv_r, orbv_s),
-                            (
-                                self.kpts[ikp],
-                                self.kpts[ikq],
-                                self.kpts[ikr],
-                                self.kpts[iks],
-                            ),
-                            compact=False,
-                        )
-                        if self.mo_coeff[0].dtype == np.float64:
-                            buf_kpt = buf_kpt.real
-                        buf_kpt = buf_kpt.reshape(
-                            (1, self.nvir, self.nvir, self.nvir)
-                        ).transpose(0, 2, 1, 3)
-
-                        eris.vvvv[ikp, ikr, ikq, a, :, :, :] = buf_kpt[0, :, :,
-                            :] / self.nkpts
-                        # Store symmetric permutations
-                        eris.vvvv[ikr, ikp, iks, :, a, :, :] = (
-                            buf_kpt.transpose(1, 0, 3, 2)[:, 0, :, :]
-                            / self.nkpts
-                        )
-                        eris.vvvv[ikq, iks, ikp, :, :, a, :] = (
-                            buf_kpt.transpose(2, 3, 0, 1).conj()[:, :, 0, :]
-                            / self.nkpts
-                        )
-                        eris.vvvv[iks, ikq, ikr, :, :, :, a] = (
-                            buf_kpt.transpose(3, 2, 1, 0).conj()[:, :, :, 0]
-                            / self.nkpts
-                        )
-                cput1 = self.log.timer_debug1('transforming vvvv', *cput1)
-
+            self._write_vvvv(eris.vvvv)
         return eris
+
+    def _write_vvvv(self, dataset):
+        # Budget for one dense complex virtual quartet at a time.
+        available_mb = self.adc.max_memory - lib.current_memory()[0]
+        full_block = self.nvir ** 4 * 16 / 1e6 < available_mb
+        for triple, equivalents in self.khelper.symm_map.items():
+            kp, kq, kr = triple
+            ks = self.kconserv[triple]
+            p, q, r, s = (self.orbv[k] for k in (*triple, ks))
+            if full_block:
+                block = self._transform_block(triple, (p, q, r, s))
+                for i, j, k in equivalents:
+                    related = self.khelper.transform_symm(block, i, j, k)
+                    dataset[i, k, j] = related.transpose(0, 2, 1, 3)
+            else:
+                # Transform one orbital and write its four symmetry images.
+                for a in range(self.nvir):
+                    block = self._transform_block(
+                        triple, (p[:, a:a + 1], q, r, s))
+                    prqs = block[0].transpose(1, 0, 2)
+                    dataset[kp, kr, kq, a, :, :, :] = prqs
+                    dataset[kr, kp, ks, :, a, :, :] = prqs.transpose(0, 2, 1)
+                    dataset[kq, ks, kp, :, :, a, :] = (
+                        prqs.transpose(1, 2, 0).conj())
+                    dataset[ks, kq, kr, :, :, :, a] = (
+                        prqs.transpose(2, 1, 0).conj())
 
     def density_fit(self):
         r"""Transform three-index GDF factors and store occupied four-index
@@ -849,26 +749,10 @@ class AO2MO:
         naux = self.with_df.get_naoaux()
         eris = _ChemistsERIs(self.adc)
 
-        eris.Lpq_mo = Lpq_mo = np.empty((self.nkpts, self.nkpts), dtype=object)
-        Loo = np.empty(
-            (self.nkpts, self.nkpts, naux, self.nocc, self.nocc),
-            dtype=self.dtype)
-        Lvo = np.empty(
-            (self.nkpts, self.nkpts, naux, self.nvir, self.nocc),
-            dtype=self.dtype)
-        eris.Lvv = np.empty(
-            (self.nkpts, self.nkpts, naux, self.nvir, self.nvir),
-            dtype=self.dtype)
-        eris.Lov = np.empty(
-            (self.nkpts, self.nkpts, naux, self.nocc, self.nvir),
-            dtype=self.dtype)
-
-        eris.vvvv = None
-        eris.ovvv = None
-
+        # Keep the original MO factors for consumers that need the full pair.
+        eris.Lpq_mo = np.empty((self.nkpts, self.nkpts), dtype=object)
         with df._load3c(self.with_df._cderi, 'j3c') as fload:
-            tao = []
-            ao_loc = None
+            orbital_range = (0, self.nmo, self.nmo, 2 * self.nmo)
             for ki, kpti in enumerate(self.kpts):
                 for kj, kptj in enumerate(self.kpts):
                     Lpq_ao = np.asarray(fload(kpti, kptj))
@@ -879,85 +763,69 @@ class AO2MO:
                         out = _ao2mo.nr_e2(
                             Lpq_ao,
                             mo,
-                            (0, self.nmo, self.nmo, self.nmo + self.nmo),
+                            orbital_range,
                             aosym='s2')
                     else:
-                        # Auxiliary linear dependence can reduce Lpq.shape[0].
+                        # The complex transform expects full AO-pair blocks.
                         if Lpq_ao[0].size != self.nao**2:  # aosym = 's2'
                             Lpq_ao = lib.unpack_tril(Lpq_ao).astype(
                                 np.complex128)
                         out = _ao2mo.r_e2(
                             Lpq_ao,
                             mo,
-                            (0, self.nmo, self.nmo, self.nmo + self.nmo),
-                            tao,
-                            ao_loc)
-                    Lpq_mo[ki, kj] = out.reshape(-1, self.nmo, self.nmo)
+                            orbital_range,
+                            [], None)
+                    eris.Lpq_mo[ki, kj] = out.reshape(-1, self.nmo, self.nmo)
 
-                    Loo[ki, kj] = Lpq_mo[ki, kj][:, :self.nocc, :self.nocc]
-                    eris.Lov[ki, kj] = Lpq_mo[ki, kj][
-                        :,
-                        :self.nocc,
-                        self.nocc:,
-                    ]
-                    Lvo[ki, kj] = Lpq_mo[ki, kj][:, self.nocc:, :self.nocc]
-                    eris.Lvv[ki, kj] = Lpq_mo[ki, kj][
-                        :,
-                        self.nocc:,
-                        self.nocc:,
-                    ]
+        # Pack orbital sectors for contractions and lazy virtual blocks.
+        o, v = slice(None, self.nocc), slice(self.nocc, None)
+        spaces = {'oo': (o, o), 'ov': (o, v), 'vo': (v, o), 'vv': (v, v)}
+        sizes = {'o': self.nocc, 'v': self.nvir}
+        pairs = {}
+        for key, (left, right) in spaces.items():
+            shape = (self.nkpts, self.nkpts, naux,
+                     sizes[key[0]], sizes[key[1]])
+            pairs[key] = np.empty(shape, dtype=self.dtype)
+            for ki, kj in np.ndindex(eris.Lpq_mo.shape):
+                pairs[key][ki, kj] = eris.Lpq_mo[ki, kj][:, left, right]
 
         if self.adc.if_naf:
-            Loo_big = Loo.transpose(2, 0, 1, 3, 4).reshape(naux, -1)
-            Lov_big = eris.Lov.transpose(2, 0, 1, 3, 4).reshape(naux, -1)
-            Lvo_big = Lvo.transpose(2, 0, 1, 3, 4).reshape(naux, -1)
-            Lvv_big = eris.Lvv.transpose(2, 0, 1, 3, 4).reshape(naux, -1)
-            L_big = np.concatenate(
-                [Loo_big, Lov_big, Lvo_big, Lvv_big], axis=1)
-            W = L_big.dot(L_big.T.conj())
-            n, N = np.linalg.eigh(W / self.nkpts)
-            N_trunc = N[:, n > self.adc.thresh_naf].T
-            self.adc.naux = N_trunc.shape[0]
-            self.log.info(
-                f'origin naux is {naux}||naf naux is {self.adc.naux}')
-            Loo = einsum('rL,mnLsj->mnrsj', N_trunc, Loo)
-            eris.Lov = einsum('rL,mnLsj->mnrsj', N_trunc, eris.Lov)
-            Lvo = einsum('rL,mnLsj->mnrsj', N_trunc, Lvo)
-            eris.Lvv = einsum('rL,mnLsj->mnrsj', N_trunc, eris.Lvv)
+            self._project_auxiliary(pairs, naux)
+        eris.Lov, eris.Lvv = pairs['ov'], pairs['vv']
 
-            del (Loo_big)
-            del (Lov_big)
-            del (Lvo_big)
-            del (Lvv_big)
-            del (L_big)
-            del (W)
-            del (N)
-            del (n)
-            del (N_trunc)
-
-        eris.allocate(('oooo', 'oovv', 'ovoo', 'ovov', 'ovvo'), outcore=True)
-
-        for kp, kq, kr in product(range(self.nkpts), repeat=3):
-            ks = self.kconserv[kp, kq, kr]
-            eris.oooo[kp, kq, kr] = einsum(
-                'Lpq,Lrs->pqrs',
-                Loo[kp, kq], Loo[kr, ks]) / self.nkpts
-            eris.oovv[kp, kq, kr] = einsum(
-                'Lpq,Lrs->pqrs',
-                Loo[kp, kq], eris.Lvv[kr, ks]) / self.nkpts
-            eris.ovoo[kp, kq, kr] = einsum(
-                'Lpq,Lrs->pqrs',
-                eris.Lov[kp, kq], Loo[kr, ks]) / self.nkpts
-            eris.ovov[kp, kq, kr] = einsum(
-                'Lpq,Lrs->pqrs',
-                eris.Lov[kp, kq], eris.Lov[kr, ks]) / self.nkpts
-            eris.ovvo[kp, kq, kr] = einsum(
-                'Lpq,Lrs->pqrs',
-                eris.Lov[kp, kq], Lvo[kr, ks]) / self.nkpts
-                    # eris.ovvv[kp,kq,kr] = einsum('Lpq,Lrs->pqrs',
-                    # eris.Lov[kp,kq], Lvv[kr,ks])/nkpts
+        # Contract only the five occupied-containing blocks used from disk.
+        names = ('oooo', 'oovv', 'ovoo', 'ovov', 'ovvo')
+        eris.allocate(names, outcore=True)
+        for triple in product(range(self.nkpts), repeat=3):
+            kp, kq, kr = triple
+            ks = self.kconserv[triple]
+            for name in names:
+                left = pairs[name[:2]][kp, kq]
+                right = pairs[name[2:]][kr, ks]
+                getattr(eris, name)[triple] = (
+                    einsum('Lpq,Lrs->pqrs', left, right) / self.nkpts)
 
         return eris
+
+    def _project_auxiliary(self, pairs, naux):
+        """Project all orbital sectors onto the retained auxiliary basis."""
+        # Each column is one orbital pair at one pair of k points.
+        columns = np.concatenate([
+            factors.transpose(2, 0, 1, 3, 4).reshape(naux, -1)
+            for factors in pairs.values()
+        ], axis=1)
+        metric = columns @ columns.conj().T
+        del columns
+
+        # Apply the same retained auxiliary eigenvectors to each sector.
+        values, vectors = np.linalg.eigh(metric / self.nkpts)
+        projection = vectors[:, values > self.adc.thresh_naf].T
+        self.adc.naux = len(projection)
+        self.log.info('NAF reduced %d auxiliary functions to %d',
+                      naux, self.adc.naux)
+        for key, factors in pairs.items():
+            pairs[key] = einsum('rL,mnLsj->mnrsj', projection, factors)
+
 
 def chunk_size(adc):
     r"""Estimate an orbital chunk from the remaining memory budget.

@@ -18,9 +18,10 @@
 import unittest
 import numpy
 from pyscf.pbc import gto
-from pyscf.pbc import scf,adc,mp
+from pyscf.pbc import scf, adc, mp
 from pyscf import adc as mol_adc
 from pyscf.pbc.tools.pbc import super_cell
+
 
 def setUpModule():
     r"""Prepare the two-k helium KRHF reference for IP-ADC regression values.
@@ -33,10 +34,10 @@ def setUpModule():
     global cell, kpts, mykradc
     cell = gto.M(
         unit='B',
-        a=[[0.,          3.37013733,  3.37013733],
-             [3.37013733,  0.,          3.37013733],
-             [3.37013733,  3.37013733,  0.        ]],
-        mesh=[13]*3,
+        a=[[0., 3.37013733, 3.37013733],
+           [3.37013733, 0., 3.37013733],
+           [3.37013733, 3.37013733, 0.]],
+        mesh=[13] * 3,
         atom='''He 0 0 0
                   He 1.68506866 1.68506866 1.68506866''',
         basis='gth-dzv',
@@ -44,13 +45,14 @@ def setUpModule():
         verbose=0,
     )
 
-    nmp = [1,1,2]
+    nmp = [1, 1, 2]
 
-    # periodic calculation at gamma point
+    # Use the primitive cell with a Gamma-centered mesh.
     kpts = cell.make_kpts(nmp)
     kpts -= kpts[0]
     kmf = scf.KRHF(cell, kpts, exxdiv=None).density_fit().run()
-    mykradc  = adc.KRADCIP(kmf)
+    mykradc = adc.KRADCIP(kmf)
+
 
 def tearDownModule():
     r"""Release shared helium cell and charged ADC fixture references.
@@ -62,8 +64,8 @@ def tearDownModule():
     global cell, mykradc
     del cell, mykradc
 
-class KnownValues(unittest.TestCase):
 
+class KnownValues(unittest.TestCase):
     r"""Check stored helium IP energies and spectroscopic factors.
 
     The module fixture supplies the reference system shared by these tests.
@@ -75,7 +77,6 @@ class KnownValues(unittest.TestCase):
     energies or pass/fail flags.
     """
     def test_ip_adc2_k(self):
-
         r"""Check three IP-ADC(2) roots and their pole strengths.
 
         Solve sector zero on the two-k helium reference and compare energies
@@ -96,7 +97,6 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[0][2], 4.972e-05, 4)
 
     def test_ip_adc2x_k_high_cost(self):
-
         r"""Check IP-ADC(2)-x roots on a denser eight-k mesh.
 
         Build a separate 2x2x2 reference, solve three roots at sector zero and
@@ -106,11 +106,11 @@ class KnownValues(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        nmp = [2,2,2]
+        nmp = [2, 2, 2]
         kpts = cell.make_kpts(nmp)
         kpts -= kpts[0]
         kmf = scf.KRHF(cell, kpts, exxdiv=None).density_fit().run()
-        mykradc  = adc.KRADCIP(kmf)
+        mykradc = adc.KRADCIP(kmf)
         mykradc.method = 'adc(2)-x'
         e, v, p, x = mykradc.kernel(nroots=3, kptlist=[0])
 
@@ -123,7 +123,6 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[0][2], 0.00357151, 4)
 
     def test_ip_adc3_k(self):
-
         r"""Check three IP-ADC(3) roots and pole strengths.
 
         Solve the two-k reference at sector zero and compare with stored
@@ -135,7 +134,7 @@ class KnownValues(unittest.TestCase):
             fails.
         """
         kmf = scf.KRHF(cell, kpts, exxdiv=None).run()
-        mykradc  = adc.KRADCIP(kmf)
+        mykradc = adc.KRADCIP(kmf)
         mykradc.method = 'adc(3)'
         e, v, p, x = mykradc.kernel(nroots=3, kptlist=[0])
 
@@ -146,6 +145,7 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(p[0][0], 1.90849228, 4)
         self.assertAlmostEqual(p[0][1], 1.80306363, 4)
         self.assertAlmostEqual(p[0][2], 0.0057808, 4)
+
 
 if __name__ == "__main__":
     print('k-point calculations for IP-ADC methods')

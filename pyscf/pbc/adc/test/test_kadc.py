@@ -3,6 +3,7 @@ from pyscf.pbc.tools.pbc import super_cell
 from pyscf.pbc import gto, scf, adc
 import unittest
 
+
 def setUpModule():
     r"""Prepare the diffuse-cell KRHF reference shared by the basic IP tests.
 
@@ -22,6 +23,7 @@ def setUpModule():
     kmf.verbose = 0
     kmf.scf()
 
+
 def tearDownModule():
     r"""Release the diffuse-cell fixture and close its log stream.
 
@@ -32,6 +34,7 @@ def tearDownModule():
     global cell, kmf
     cell.stdout.close()
     del cell, kmf
+
 
 class KnownValues(unittest.TestCase):
     r"""Check diffuse-cell reference energies and momentum-selected IP roots.
@@ -45,8 +48,6 @@ class KnownValues(unittest.TestCase):
     energies or pass/fail flags.
     """
     def test_n3_diffuse(self):
-
-        # Running HF and MP2 and MP3 with 1x1x2 Monkhorst-Pack k-point mesh
         r"""Check diffuse-cell HF, MP2 and momentum-resolved IP-ADC roots.
 
         Verify the stored HF/MP2 values, compare three IP-ADC(2) roots in each
@@ -61,7 +62,7 @@ class KnownValues(unittest.TestCase):
         ehf2 = kmf.e_tot
         self.assertAlmostEqual(ehf2, -6.1729762695142645, 4)
 
-        mykradc  = adc.KRADCIP(kmf)
+        mykradc = adc.KRADCIP(kmf)
         e_mp2 = mykradc.ground_state_energy()
         t1 = mykradc.t1
         t2 = mykradc.t2
@@ -74,7 +75,7 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[0][1], -1.0944210679002468, 4)
         self.assertAlmostEqual(e[0][2], -1.0944210623845938, 4)
 
-        # Ensure kptlist behaves correctly
+        # Solving the second sector alone still puts its roots in row zero.
         e, v, p, x = mykradc.kernel(nroots=3, kptlist=[1])
         self.assertAlmostEqual(e[0][0], -1.0362468821854942, 4)
         self.assertAlmostEqual(e[0][1], -1.0015050525294895, 4)
@@ -86,6 +87,7 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(e[0][0], -1.1740951190044178, 4)
         self.assertAlmostEqual(e[0][1], -1.1536065878793587, 4)
         self.assertAlmostEqual(e[0][2], -1.153606584783398, 4)
+
 
 if __name__ == '__main__':
     print('kadc_ip_basic tests')

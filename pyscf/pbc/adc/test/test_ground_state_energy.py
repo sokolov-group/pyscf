@@ -18,16 +18,16 @@
 import unittest
 import numpy
 from pyscf.pbc import gto
-from pyscf.pbc import scf,adc,mp
+from pyscf.pbc import scf, adc, mp
 from pyscf import adc as mol_adc
 from pyscf.pbc.tools.pbc import super_cell
 
 cell = gto.M(
     unit='B',
-    a=[[0.,          3.37013733,  3.37013733],
-         [3.37013733,  0.,          3.37013733],
-         [3.37013733,  3.37013733,  0.        ]],
-    mesh=[13]*3,
+        a=[[0., 3.37013733, 3.37013733],
+           [3.37013733, 0., 3.37013733],
+           [3.37013733, 3.37013733, 0.]],
+    mesh=[13] * 3,
     atom='''He 0 0 0
               He 1.68506866 1.68506866 1.68506866''',
     basis='gth-dzv',
@@ -35,7 +35,8 @@ cell = gto.M(
     verbose=0,
 )
 
-nmp = [1,1,2]
+nmp = [1, 1, 2]
+
 
 class KnownValues(unittest.TestCase):
     r"""Check per-cell MP2/MP3 reference energies for periodic helium.
@@ -50,7 +51,6 @@ class KnownValues(unittest.TestCase):
     energies or pass/fail flags.
     """
     def test_check_mol_mp2(self):
-        # treating supercell at gamma point
         r"""Check molecular supercell MP2 energy after primitive-cell
         normalization.
 
@@ -63,11 +63,12 @@ class KnownValues(unittest.TestCase):
             fails.
         """
         supcell = super_cell(cell, nmp)
-        mf  = scf.RHF(supcell, exxdiv=None).density_fit()
-        ehf  = mf.kernel()
-        myadc  = mol_adc.ADC(mf)
+        mf = scf.RHF(supcell, exxdiv=None).density_fit()
+        ehf = mf.kernel()
+        myadc = mol_adc.ADC(mf)
         e_mp, t1, t2 = myadc.kernel_gs()
-        e_mp = e_mp/(numpy.prod(nmp))
+        # Express the supercell correlation energy per primitive cell.
+        e_mp = e_mp / numpy.prod(nmp)
 
         self.assertAlmostEqual(e_mp, -0.02095766698, 4)
 
@@ -85,7 +86,7 @@ class KnownValues(unittest.TestCase):
         kpts = cell.make_kpts(nmp)
         kpts -= kpts[0]
         kmf = scf.KRHF(cell, kpts, exxdiv=None).density_fit().run()
-        mykradc  = adc.KRADCBase(kmf)
+        mykradc = adc.KRADCBase(kmf)
         e_mp = mykradc.ground_state_energy()
         t1 = mykradc.t1
         t2 = mykradc.t2
@@ -103,15 +104,16 @@ class KnownValues(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        nmp = [2,2,2]
+        nmp = [2, 2, 2]
         kpts = cell.make_kpts(nmp)
         kpts -= kpts[0]
         kmf = scf.KRHF(cell, kpts, exxdiv=None).density_fit().run()
-        mykradc  = adc.KRADCBase(kmf)
+        mykradc = adc.KRADCBase(kmf)
         e_mp2_1 = mykradc.ground_state_energy()
         t1 = mykradc.t1
         t2 = mykradc.t2
 
+        # Compute an independent MP2 reference on the same mesh.
         mp2 = mp.KMP2(kmf)
         e_mp2_2 = mp2.kernel()[0]
 
@@ -132,13 +134,14 @@ class KnownValues(unittest.TestCase):
         kpts = cell.make_kpts(nmp)
         kpts -= kpts[0]
         kmf = scf.KRHF(cell, kpts, exxdiv=None).density_fit().run()
-        mykradc  = adc.KRADCBase(kmf)
+        mykradc = adc.KRADCBase(kmf)
         mykradc.method = 'adc(3)'
         e_mp = mykradc.ground_state_energy()
         t1 = mykradc.t1
         t2 = mykradc.t2
 
         self.assertAlmostEqual(e_mp, -0.0208366684841, 4)
+
 
 if __name__ == "__main__":
     print('Ground state calculations for helium')

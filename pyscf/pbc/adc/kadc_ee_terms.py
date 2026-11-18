@@ -49,6 +49,8 @@ Examples:
     (2.0, 'Ia,LADa->IDLA', ('t1_2', 'ovvv'))
 """
 
+# IDLA terms act on a hole-particle pair. The caller lifts IL terms with a
+# virtual identity and DA terms with an occupied identity.
 SINGLES_3 = {
     'ss': (
         (2.0, 'Ia,LADa->IDLA', ('t1_2', 'ovvv')),
@@ -383,6 +385,8 @@ SIGMA_2X = {
     ),
 }
 
+# The keys select the output sector. The r1 or r2 operand selects the
+# input sector for each coupling.
 SIGMA_3 = {
     's1': (
         (2.0, 'IiDa,a,ia->ID', ('r2', 'ev', 't1_2')),

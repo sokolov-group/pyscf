@@ -71,6 +71,7 @@ class DriverAPI(unittest.TestCase):
             source.density_gv = np.array([0.1, 0.2, 0.3])
             source.ground_state_energy()
             amplitude = np.asarray(source.t2[0]).copy()
+            # Populate sector caches to detect accidental result sharing.
             source.E = source.P = np.ones((1, 1))
             source.U = source.X = source.T = np.ones((1, 1, 1))
             source.converged = np.ones((1, 1), dtype=bool)
@@ -102,6 +103,7 @@ class DriverAPI(unittest.TestCase):
                     self.assertEqual(target._transition_cache, {})
                     target.density_gv[0] = 1.0
                     self.assertEqual(source.density_gv[0], 0.1)
+            # Recomputing the source must leave old amplitudes readable.
             source.ground_state_energy()
             for target in converted:
                 np.testing.assert_array_equal(target.t2[0], amplitude)
@@ -143,8 +145,9 @@ class DriverAPI(unittest.TestCase):
             pending = solver_type(mf.cell)
             self.assertIsNone(pending.mo_coeff)
             self.assertEqual(pending.kpts.shape, (1, 3))
-            with mock.patch.object(pending._scf, 'kernel',
-                                   side_effect=AssertionError('SCF in constructor')):
+            with mock.patch.object(
+                    pending._scf, 'kernel',
+                    side_effect=AssertionError('SCF in constructor')):
                 converted = adc.KRADCEA(pending)
                 self.assertIsNone(converted.mo_coeff)
                 self.assertIsNone(converted._chunk_size)
@@ -203,7 +206,8 @@ class DriverAPI(unittest.TestCase):
             amplitudes = np.asarray(solver.t2[0]).copy()
             with solver.ao2mo() as eris:
                 zeroth = solver._get_adc0_ham()
-                energies = solver.e_occ if solver_type is adc.KRADCIP else solver.e_vir
+                energies = (solver.e_occ if solver_type is adc.KRADCIP
+                            else solver.e_vir)
                 np.testing.assert_allclose(
                     np.diagonal(zeroth, axis1=1, axis2=2), energies)
                 second = solver._get_adc2_ham(eris)
@@ -249,6 +253,7 @@ class DriverAPI(unittest.TestCase):
             selected = solver.make_rdm1(root=np.array([[0, 2], [1, 0]]))
             np.testing.assert_allclose(selected[0], density[0, [0, 2]])
             np.testing.assert_allclose(selected[1], density[1, [1, 0]])
+            # Request unequal root counts in reverse saved-sector order.
             ragged = solver.make_rdm1(root=[[0], [1, 2]], K_idx=[0, 1])
             self.assertIsInstance(ragged, list)
             self.assertEqual([len(dm) for dm in ragged], [1, 2])
@@ -312,7 +317,8 @@ class DriverAPI(unittest.TestCase):
                                 kb = kconserv[kshift, k2, k1]
                                 doubles[k1, k2, p, q, r] = (
                                     e_vir[k2, q] + e_vir[kb, r] - e_occ[k1, p])
-                        actual = solver_type.get_diag(model, kshift, intermediate)
+                        actual = solver_type.get_diag(
+                            model, kshift, intermediate)
                         self.assertEqual(actual.dtype, np.dtype(dtype))
                         tolerance = (5e-7 if real_dtype == np.dtype(np.float32)
                                      else 1e-13)
@@ -558,8 +564,9 @@ class DriverAPI(unittest.TestCase):
                     mykradc_es, helper, wraps=getattr(mykradc_es, helper)
                 ) as guesses,
             ):
-                energies, vectors, strengths, amplitudes = mykradc_es.kernel(2, kptlist=[0])
-                from_input, input_vectors, input_strengths, input_amplitudes = mykradc_es.kernel(
+                # Reuse the converged vectors as guesses for the second run.
+                energies, vectors, _, _ = mykradc_es.kernel(2, kptlist=[0])
+                from_input, _, _, _ = mykradc_es.kernel(
                     2, guess=vectors, kptlist=[0])
                 np.testing.assert_allclose(from_input, energies, atol=1e-08)
                 self.assertEqual(guesses.call_count, 2)
@@ -642,11 +649,12 @@ class Documentation(unittest.TestCase):
         directory = Path(kadc_rhf.__file__).parent
         paths = sorted(
             [*directory.glob('*.py'), *(directory / 'test').glob('*.py')])
+        documented_nodes = (ast.Module, ast.ClassDef, ast.FunctionDef,
+                            ast.AsyncFunctionDef)
         for path in paths:
             tree = ast.parse(path.read_text())
             for node in ast.walk(tree):
-                if not isinstance(node, (ast.Module, ast.ClassDef,
-                                         ast.FunctionDef, ast.AsyncFunctionDef)):
+                if not isinstance(node, documented_nodes):
                     continue
                 doc = ast.get_docstring(node)
                 if not doc or not parser.get_examples(doc):
@@ -655,6 +663,7 @@ class Documentation(unittest.TestCase):
                         f'{getattr(node, 'name', 'module')}')
                 blocks = []
                 current = []
+                # Prose separates examples with independent setup code.
                 for part in parser.parse(doc):
                     if isinstance(part, doctest.Example):
                         current.append(part)
@@ -708,15 +717,20 @@ class IntegralAPI(unittest.TestCase):
             direct = np.einsum(
                 'Lpq,Lrs->pqrs',
                 eris.Lov[0, 0], eris.Lvv[0, 0]) / mykradc.nkpts
-            np.testing.assert_allclose(eris.ovvv_blocks[0, 0, 0], direct)
+            with np.printoptions(precision=3):
+                preview = repr(eris.ovvv_kpoint_normalized)
+                self.assertIn(np.array2string(direct), preview)
+                self.assertIn('block[0, 0, 0]', preview)
             np.testing.assert_allclose(
-                eris.ovvv_blocks[0, 0, 0, :1], direct[:1])
+                eris.ovvv_kpoint_normalized[0, 0, 0], direct)
+            np.testing.assert_allclose(
+                eris.ovvv_kpoint_normalized[0, 0, 0, :1], direct[:1])
             with self.assertRaises(IndexError):
-                eris.ovvv_blocks[:]
+                eris.ovvv_kpoint_normalized[:]
             with self.assertRaises(IndexError):
-                eris.vvvv_blocks[mykradc.nkpts, 0, 0]
+                eris.vvvv_kpoint_normalized[mykradc.nkpts, 0, 0]
             # Reading either lazy property must not materialize its raw tensor.
-            eris.vvvv_blocks[0, 0, 0]
+            eris.vvvv_kpoint_normalized[0, 0, 0]
             self.assertIsNone(eris.ovvv)
             self.assertIsNone(eris.vvvv)
 

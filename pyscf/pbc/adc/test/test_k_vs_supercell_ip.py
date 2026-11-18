@@ -18,9 +18,10 @@
 import unittest
 import numpy
 from pyscf.pbc import gto
-from pyscf.pbc import scf,adc,mp
+from pyscf.pbc import scf, adc, mp
 from pyscf import adc as mol_adc
 from pyscf.pbc.tools.pbc import super_cell
+
 
 def setUpModule():
     r"""Prepare matching IP molecular-supercell and k-point references.
@@ -34,10 +35,10 @@ def setUpModule():
     global cell, myadc, mykradc
     cell = gto.M(
         unit='B',
-        a=[[0.,          3.37013733,  3.37013733],
-             [3.37013733,  0.,          3.37013733],
-             [3.37013733,  3.37013733,  0.        ]],
-        mesh=[13]*3,
+        a=[[0., 3.37013733, 3.37013733],
+           [3.37013733, 0., 3.37013733],
+           [3.37013733, 3.37013733, 0.]],
+        mesh=[13] * 3,
         atom='''He 0 0 0
                   He 1.68506866 1.68506866 1.68506866''',
         basis='gth-dzv',
@@ -45,20 +46,21 @@ def setUpModule():
         verbose=0,
     )
 
-    nmp = [1,1,2]
+    nmp = [1, 1, 2]
 
-    # treating supercell at gamma point
+    # A single Gamma point describes the commensurate supercell.
     supcell = super_cell(cell, nmp)
-    mf  = scf.RHF(supcell, exxdiv=None).density_fit()
-    ehf  = mf.kernel()
+    mf = scf.RHF(supcell, exxdiv=None).density_fit()
+    ehf = mf.kernel()
     myadc = mol_adc.RADC(mf)
     myadc.approx_trans_moments = True
 
-    # periodic calculation at gamma point
+    # Use the primitive cell with a Gamma-centered mesh.
     kpts = cell.make_kpts(nmp)
     kpts -= kpts[0]
     kmf = scf.KRHF(cell, kpts, exxdiv=None).density_fit().run()
-    mykradc  = adc.KRADCIP(kmf)
+    mykradc = adc.KRADCIP(kmf)
+
 
 def tearDownModule():
     r"""Release the paired molecular and periodic reference fixtures.
@@ -69,6 +71,7 @@ def tearDownModule():
     """
     global cell, myadc, mykradc
     del cell, myadc, mykradc
+
 
 class KnownValues(unittest.TestCase):
     r"""Compare IP spectra from commensurate supercell and k-point ADC.
@@ -93,7 +96,7 @@ class KnownValues(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        e1,v1,p1,x1 = myadc.kernel(nroots=3)
+        e1, v1, p1, x1 = myadc.kernel(nroots=3)
 
         self.assertAlmostEqual(e1[0], 0.03211224, 6)
         self.assertAlmostEqual(e1[1], 0.18376286, 6)
@@ -115,7 +118,7 @@ class KnownValues(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        e1,v1,p1,x1 = myadc.kernel(nroots=3)
+        e1, v1, p1, x1 = myadc.kernel(nroots=3)
         e2, v2, p2, x2 = mykradc.kernel(nroots=3, kptlist=[0])
 
         ediff = e1[0] - e2[0][0]
@@ -125,7 +128,6 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(pdiff, 0.0, 4)
 
     def test_ip_adc2x_supercell_vs_k(self):
-
         r"""Compare IP-ADC2X between supercell and sector-zero k ADC.
 
         Use matched states in the two-copy helium gth-dzv/gth-pade
@@ -138,7 +140,7 @@ class KnownValues(unittest.TestCase):
             fails.
         """
         myadc.method = 'adc(2)-x'
-        e1,v1,p1,x1 = myadc.kernel(nroots=3)
+        e1, v1, p1, x1 = myadc.kernel(nroots=3)
 
         mykradc.method = 'adc(2)-x'
         e2, v2, p2, x2 = mykradc.kernel(nroots=3, kptlist=[0])
@@ -150,7 +152,6 @@ class KnownValues(unittest.TestCase):
         self.assertAlmostEqual(pdiff, 0.0, 4)
 
     def test_ip_adc3_supercell_vs_k(self):
-
         r"""Compare IP-ADC3 between supercell and sector-zero k ADC.
 
         Use matched states in the two-copy helium gth-dzv/gth-pade
@@ -163,7 +164,7 @@ class KnownValues(unittest.TestCase):
             fails.
         """
         myadc.method = 'adc(3)'
-        e1,v1,p1,x1 = myadc.kernel(nroots=3)
+        e1, v1, p1, x1 = myadc.kernel(nroots=3)
 
         mykradc.method = 'adc(3)'
         e2, v2, p2, x2 = mykradc.kernel(nroots=3, kptlist=[0])
@@ -173,6 +174,7 @@ class KnownValues(unittest.TestCase):
 
         self.assertAlmostEqual(ediff, 0.0, 4)
         self.assertAlmostEqual(pdiff, 0.0, 4)
+
 
 if __name__ == "__main__":
     print('supercell vs k-point calculations for IP-ADC methods')

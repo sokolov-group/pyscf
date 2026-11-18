@@ -68,6 +68,7 @@ class KnownValues(unittest.TestCase):
                 mykradc.ground_state_energy()
                 eris = mykradc.ao2mo()
                 mykradcee = KRADCEE(mykradc)
+                # Strip the Gamma indices to build the molecular reference.
                 reference = SimpleNamespace(
                     method=method, _nocc=mykradcee.nocc, _nvir=mykradcee.nvir,
                     mo_energy=np.asarray(mykradc.mo_energy)[0].real,
@@ -78,16 +79,17 @@ class KnownValues(unittest.TestCase):
                 ref_eris = SimpleNamespace(**{
                     name: np.asarray(getattr(eris, name))[0, 0, 0].real
                     for name in ('oooo', 'oovv', 'ovoo', 'ovov', 'ovvo')})
-                ref_eris.ovvv = eris.ovvv_blocks[0, 0, 0].real[
+                ref_eris.ovvv = eris.ovvv_kpoint_normalized[0, 0, 0].real[
                     :, :, *np.tril_indices(mykradcee.nvir)]
-                ref_eris.vvvv = eris.vvvv_blocks[0, 0, 0].real.reshape(
-                    mykradcee.nvir ** 2, mykradcee.nvir ** 2)
+                vvvv = eris.vvvv_kpoint_normalized[0, 0, 0].real
+                ref_eris.vvvv = vvvv.reshape(mykradcee.nvir ** 2,
+                                             mykradcee.nvir ** 2)
                 reference.transform_integrals = lambda: ref_eris
                 reference.verbose = 0
                 reference.stdout = mykradc.stdout
                 reference.method_type = 'ee'
                 reference.approx_trans_moments = False
-                ref_t1, ref_t2, virtual_ladder = radc_amplitudes.compute_amplitudes(
+                ref_t1, ref_t2, _ = radc_amplitudes.compute_amplitudes(
                     reference, ref_eris)
                 for actual_amp, expected_amp in zip(reference.t1, ref_t1):
                     if expected_amp is not None:
@@ -106,6 +108,7 @@ class KnownValues(unittest.TestCase):
                 vector = rng.normal(size=mykradcee.vector_size())
                 np.testing.assert_allclose(
                     action(vector), ref_action(vector), atol=1e-12)
+                # Singlet doubles have simultaneous hole-particle exchange.
                 vectors = rng.normal(size=(mykradcee.vector_size(), 2))
                 for root in range(2):
                     block = vectors[mykradcee.n_singles:, root].reshape(
@@ -178,6 +181,7 @@ class KnownValues(unittest.TestCase):
                 mykradc.tol_residual = molecular.tol_residual = 1e-8
                 ke, kv, kp, kx = mykradc.kernel(4)
                 me, mv, mp, mx = molecular.kernel(4 * len(kpoints))
+                # Restrict the comparison to roots covered by both solves.
                 cutoff = min(ke.max(axis=1).min(), me.max()) - 1e-6
                 np.testing.assert_allclose(
                     np.sort(ke[ke < cutoff]),
@@ -190,6 +194,7 @@ class KnownValues(unittest.TestCase):
                     op = smf.mo_coeff.conj().T @ ao @ smf.mo_coeff
                     strength = (2 / len(kpoints)) * abs(
                         np.einsum('pq,npq->n', op, mx))**2
+                    # Sum over degeneracies to remove the choice of basis.
                     for energy in ke[shift][ke[shift] < cutoff]:
                         expected = strength[abs(me - energy) < 1e-06].sum()
                         actual = kp[shift][

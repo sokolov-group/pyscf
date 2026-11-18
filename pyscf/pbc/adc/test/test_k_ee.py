@@ -48,7 +48,6 @@ class KnownValues(unittest.TestCase):
     energies or pass/fail flags.
     """
     def test_adc1_tensor_against_identity_prototype(self):
-        # Unequal occupied/virtual dimensions catch permutation mistakes.
         r"""Compare the optimized first-order singles tensor with an
         independent prototype.
 
@@ -60,6 +59,7 @@ class KnownValues(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
+        # Unequal occupied/virtual dimensions catch permutation mistakes.
         model = copy.copy(mykradcee)
         model._nocc, model._nmo = 2, 5
         nk, no, nv = model.nkpts, model.nocc, model.nvir
@@ -98,6 +98,7 @@ class KnownValues(unittest.TestCase):
                     expected[ki, ki] -= np.einsum(
                         'j,ab,ij->iajb',
                         eo[ki], np.eye(nv), np.eye(no))
+                    # Add the direct and exchange couplings for this sector.
                     for kj in range(nk):
                         ka = ia[kj]
                         expected[ki, kj] += 2 * np.einsum(
@@ -121,7 +122,7 @@ class KnownValues(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        energies, vectors, strengths, densities = mykradcee.kernel(4, eris=eris)
+        energies, vectors, _, _ = mykradcee.kernel(4, eris=eris)
         np.testing.assert_allclose(
             np.sort(energies.ravel())[:6],
             [1.40629, 1.49977, 1.6711, 1.73389, 1.75824, 1.82029],
@@ -163,6 +164,7 @@ class KnownValues(unittest.TestCase):
                         eris.Lov[kp, kq], eris.Lvv[kr, ks]) / nk
         for shift in range(nk):
             action, diagonal = mykradcee.gen_matvec(shift, eris=eris)
+            # Unit-vector actions give each column of the dense matrix.
             dense = np.column_stack(
                 [action(v) for v in np.eye(mykradcee.vector_size())])
             np.testing.assert_allclose(diagonal, dense.diagonal(), atol=1e-12)

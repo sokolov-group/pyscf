@@ -43,7 +43,8 @@ class KnownValues(unittest.TestCase):
                         mykradc.method = method
                         mykradc.integral_backend = backend
                         results.append(mykradc.kernel(1, kptlist=[0]))
-                    for energies, vectors, strengths, amplitudes in results[1:]:
+                    # Compare both explicit transforms with density fitting.
+                    for energies, _, strengths, _ in results[1:]:
                         np.testing.assert_allclose(
                             energies, results[0][0], atol=1e-10)
                         np.testing.assert_allclose(
@@ -85,22 +86,23 @@ class KnownValues(unittest.TestCase):
                 eris = mykradc.ao2mo()
                 self.assertIsInstance(eris, _ChemistsERIs)
                 integrals.append(eris)
+            reference = integrals[0]
             for candidate in integrals[1:]:
                 for name in ('oooo', 'oovv', 'ovoo', 'ovov', 'ovvo'):
                     np.testing.assert_allclose(
                         np.asarray(getattr(candidate, name)),
-                        np.asarray(getattr(integrals[0], name)),
+                        np.asarray(getattr(reference, name)),
                         atol=1e-11)
                 for kp in range(3):
                     for kq in range(3):
                         for kr in range(3):
                             np.testing.assert_allclose(
-                                candidate.ovvv_blocks[kp, kq, kr],
-                                integrals[0].ovvv_blocks[kp, kq, kr],
+                                candidate.ovvv_kpoint_normalized[kp, kq, kr],
+                                reference.ovvv_kpoint_normalized[kp, kq, kr],
                                 atol=1e-11)
                             np.testing.assert_allclose(
-                                candidate.vvvv_blocks[kp, kq, kr],
-                                integrals[0].vvvv_blocks[kp, kq, kr],
+                                candidate.vvvv_kpoint_normalized[kp, kq, kr],
+                                reference.vvvv_kpoint_normalized[kp, kq, kr],
                                 atol=1e-11)
         finally:
             for eris in integrals:

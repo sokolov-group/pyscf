@@ -164,6 +164,7 @@ def table_lines(data, title=None, width=None):
         return []
     columns = [[str(x) for x in values] for values in data.values()]
     headings = [str(x) for x in data]
+    # Spread unused table width evenly after sizing columns to their contents.
     widths = [max(map(len, [heading, *column]))
               for heading, column in zip(headings, columns)]
     line_width = max(
@@ -271,6 +272,7 @@ def _conjugations(equation, names, output_signs):
     labels = set(''.join(inputs))
     choices = [(1,) if name.startswith('r') or name in ('eo', 'ev')
                else (1, -1) for name in names]
+    # Internal orbital phases must cancel in a valid contraction.
     for flips in product(*choices):
         weights = Counter()
         for indices, name, flip in zip(inputs, names, flips):
@@ -360,15 +362,17 @@ class MomentumContractions:
         self.eris = eris
         self.kshift = kshift
         self.nkpts = adc.nkpts
+        # Use the zero k index as the origin for mesh addition and inversion.
         self.kconserv = adc.khelper.kconserv
         self.add = self.kconserv[:, 0, :]
         self.neg = self.kconserv[0, :, 0]
+        # Use the same padded orbital axes for energies and amplitudes.
         if hasattr(adc, 'padded_coeff'):
-            coefficients, eo, ev = (adc.padded_coeff,
-                adc.e_occ, adc.e_vir)
+            coefficients, eo, ev = adc.padded_coeff, adc.e_occ, adc.e_vir
         else:
             from pyscf.pbc.mp.kmp2 import _add_padding
-            coefficients, energy = _add_padding(adc, adc.mo_coeff, adc.mo_energy)
+            coefficients, energy = _add_padding(
+                adc, adc.mo_coeff, adc.mo_energy)
             eo = np.asarray(energy)[:, :adc.nocc]
             ev = np.asarray(energy)[:, adc.nocc:]
         t1 = adc.t1 if t1 is None else t1
@@ -376,6 +380,7 @@ class MomentumContractions:
         self.data = {'eo': eo, 'ev': ev, 't2_1': t2[0],
                      't2_2': t2[1], 't1_2': t1[0],
                      't1_3': t1[1] if len(t1) > 1 else None}
+        # Budget k-point assignments separately from cached orbital tensors.
         self._plans = OrderedDict()
         self._plans_bytes = 0
         self._cache = OrderedDict()
@@ -431,6 +436,7 @@ class MomentumContractions:
             plans, cost = self._plans.pop(key)
             self._plans[key] = plans, cost
             return plans
+        # Combine repeated orbital labels into one mesh equation per operand.
         inputs = equation.split('->')[0].split(',')
         equations = []
         for indices, name in zip(inputs, names):
@@ -462,6 +468,7 @@ class MomentumContractions:
                 The enclosing scope supplies equations, labels and tensor
                 signatures.
             """
+            # Solve single unknowns before branching over coupled indices.
             while True:
                 changed = False
                 for coefficients, rhs in equations:
@@ -481,6 +488,7 @@ class MomentumContractions:
                         changed = True
                 if not changed:
                     break
+            # Branch first on the unknown appearing in the most constraints.
             missing = labels - known.keys()
             if missing:
                 label = max(sorted(missing), key=lambda x: sum(
@@ -492,12 +500,14 @@ class MomentumContractions:
                     tuple((known[x] for x in indices)) for indices in inputs))
 
         solve(dict(fixed))
+        # Retain small plans, evicting the least recently used ones first.
         cost = sum(
             80 + sum((80 + 8 * len(ks) for ks in plan)) for plan in plans)
         limit = self._cache_limit // 4
         if cost <= limit:
             while self._plans and self._plans_bytes + cost > limit:
-                equation_key, (path, old_cost) = self._plans.popitem(last=False)
+                equation_key, (path, old_cost) = self._plans.popitem(
+                    last=False)
                 self._plans_bytes -= old_cost
             self._plans[key] = plans, cost
             self._plans_bytes += cost
@@ -527,6 +537,7 @@ class MomentumContractions:
         value = build()
         if value is None or value.nbytes > self._cache_limit:
             return value
+        # Release older blocks until the new tensor fits the memory budget.
         while (self._cache and
                self._cache_bytes + value.nbytes > self._cache_limit):
             cache_key, old = self._cache.popitem(last=False)
@@ -581,10 +592,11 @@ class MomentumContractions:
             if name in ('r1', 't1_2', 't1_3'):
                 return tensor[kpts[0]]
             return tensor[kpts[:3]]
+        # These virtual blocks may need reconstruction from DF factors.
         if name == 'ovvv':
-            return self.eris.ovvv_blocks[kpts[:3]]
+            return self.eris.ovvv_kpoint_normalized[kpts[:3]]
         if name == 'vvvv':
-            return self.eris.vvvv_blocks[kpts[:3]]
+            return self.eris.vvvv_kpoint_normalized[kpts[:3]]
         return getattr(self.eris, name)[kpts[:3]]
 
     def contract(self, term, fixed, output_signs):
@@ -630,9 +642,11 @@ class MomentumContractions:
         conjugate = _conjugations(equation, names, tuple(output_signs))
         plans = self._plan(equation, names, fixed)
         response = [i for i, name in enumerate(names) if name.startswith('r')]
+        # Factor linear terms so Davidson vectors can share ground tensors.
         if len(response) == 1 and len(names) > 1:
             return self._linear_contract(
                 term, fixed, conjugate, plans, response[0])
+        # Sum weighted orbital contractions over allowed k-point assignments.
         value = None
         for momenta in plans:
             operands = [self._block(name, ks)
@@ -677,11 +691,13 @@ class MomentumContractions:
         inputs, output = equation.split('->')
         inputs = inputs.split(',')
         ground = [i for i in range(len(names)) if i != response]
+        # Keep the ground indices needed by the response or final result.
         external = set(inputs[response] + output)
         labels = ''.join(dict.fromkeys(''.join((inputs[i] for i in ground))))
         labels = ''.join(x for x in labels if x in external)
         ground_eq = ','.join(inputs[i] for i in ground) + '->' + labels
         final_eq = inputs[response] + ',' + labels + '->' + output
+        # Sum internal momenta once for each distinct response block.
         groups = {}
         for momenta in plans:
             groups.setdefault(momenta[response], []).append(momenta)
@@ -703,6 +719,7 @@ class MomentumContractions:
                     equations, signs,
                     operand positions and allowed momentum assignments.
                 """
+                # Sum the ground factors for this response momentum tuple.
                 intermediate = None
                 for momenta in assignments:
                     operands = [self._block(
@@ -718,6 +735,7 @@ class MomentumContractions:
                         intermediate += block
                 return intermediate
 
+            # Apply the trial vector to the cached ground intermediate.
             intermediate = self._cached(key, build)
             if intermediate is None:
                 continue
