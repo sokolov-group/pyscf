@@ -15,6 +15,12 @@ class KnownValues(unittest.TestCase):
     phases on a three-k mesh and force the low-memory outcore path.
 
     Run with ``python -m unittest test.test_kadc_integrals.KnownValues``.
+
+    Methods:
+        test_charged_backend_selection: Compare charged energies and strengths
+            across all integral backends.
+        test_backends: Compare complex ERI blocks from DF, incore and forced-
+            low-memory outcore.
     """
     def test_charged_backend_selection(self):
         r"""Compare charged energies and strengths across all integral

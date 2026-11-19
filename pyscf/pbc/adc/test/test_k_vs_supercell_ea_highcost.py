@@ -87,6 +87,14 @@ class KnownValues(unittest.TestCase):
     test.test_k_vs_supercell_ea_highcost.KnownValues``. The tests
     raise unittest assertion failures on a regression rather than returning
     energies or pass/fail flags.
+
+    Methods:
+        test_ea_adc2_supercell_vs_k_high_cost: Compare EA-ADC2 between
+            supercell and sector-zero k ADC.
+        test_ea_adc2x_supercell_vs_k_high_cost: Compare EA-ADC2X between
+            supercell and sector-zero k ADC.
+        test_ea_adc3_supercell_vs_k_high_cost: Compare EA-ADC3 between
+            supercell and sector-zero k ADC.
     """
     def test_ea_adc2_supercell_vs_k_high_cost(self):
         r"""Compare EA-ADC2 between supercell and sector-zero k ADC.

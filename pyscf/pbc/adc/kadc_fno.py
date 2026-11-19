@@ -125,6 +125,22 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
     density; result/orbital attributes become per-run lists. Amplitude scratch
     arrays correspond to the final run, rather than a list of all runs.
 
+    Methods:
+        ground_state_energy: Generate FNO spaces and compute their reference
+            correlation energies.
+        kernel: Generate ground/state-specific FNO spaces and charged
+            excitation corrections.
+        compute_correction: Calculate canonical-minus-FNO corrections with the
+            current ADC method.
+        correct: Add a stored canonical-minus-FNO correction to excitation
+            energies.
+        correct_corr: Add a stored canonical-minus-FNO reference correlation
+            correction.
+        make_ss_rdm1: Compute the canonical reference and the density used to
+            define FNOs.
+        make_fno: Rotate virtual MOs to retained semicanonical natural-orbital
+            subspaces.
+
     Examples:
         Create the two-k-point helium reference below; lattice vectors
         are in Angstrom and energies are in Hartree:
@@ -915,6 +931,10 @@ class KRADCIPFNO(_KRADCFNO, kadc_rhf.KRADCIP):
 
     Accepts the same reference inputs as KRADCIP. Common FNO settings and
     truncation/correction methods are documented by _KRADCFNO.
+
+    Methods:
+        Inherits kernel, ground_state_energy, make_fno and correction methods
+            from _KRADCFNO.
     """
 
 
@@ -924,6 +944,10 @@ class KRADCEAFNO(_KRADCFNO, kadc_rhf.KRADCEA):
 
     Accepts the same reference inputs as KRADCEA. Common FNO settings and
     truncation/correction methods are documented by _KRADCFNO.
+
+    Methods:
+        Inherits kernel, ground_state_energy, make_fno and correction methods
+            from _KRADCFNO.
     """
 
 
@@ -932,4 +956,8 @@ class KRADCEEFNO(_KRADCFNO, kadc_rhf.KRADCEE):
 
     Accepts the same reference inputs as KRADCEE. Set ref_state=None: EE
     transition densities do not supply state-specific FNO densities.
+
+    Methods:
+        Inherits kernel, ground_state_energy, make_fno and correction methods
+            from _KRADCFNO.
     """

@@ -345,6 +345,10 @@ class _AmplitudeStorage:
     ADC instances keep a reference to this owner rather than closing another
     object's arrays. Storage is released when the last owner reference is
     dropped, including after a source ADC recomputes its amplitudes.
+
+    Methods:
+        __init__: Open the temporary amplitude file.
+        __del__: Release the file when its last owner exits.
     """
 
     def __init__(self):
@@ -418,6 +422,39 @@ class KRADCBase(lib.StreamObject):
     The inherited run() method returns this object for chaining. Use
     run(0) to prepare only the reference, or run(nroots) for all sectors.
     Use kernel(..., kptlist=...) when selecting individual momentum sectors.
+
+    Methods:
+        kernel: Compute the reference and solve :math:`M(k) U_n=E_n U_n`.
+        dump_flags: Log the concrete solver class, ADC order and Davidson
+            settings.
+        ao2mo: Return active-space MO integrals using
+            :class:`kadc_ao2mo.AO2MO`.
+        vector_size: Return the flattened singles-plus-doubles excitation
+            dimension.
+        get_imds: Build the charged-sector singles effective-Hamiltonian
+            intermediate.
+        gen_matvec: Prepare a sector action and Davidson diagonal from shared
+            integrals.
+        get_properties: Compute strengths and transition amplitudes for one
+            sector.
+        dump_flags_gs: Log reference settings using the common periodic ADC
+            flag printer.
+        amplitudes: Populate self.t1, self.t2 and the ladder intermediate.
+        correlation_energy: Contract doubles with integrals and store the
+            correlation energy.
+        get_trans_moments: Assemble the charged transition matrix for every
+            active MO.
+        ground_state_energy: Compute and store reference amplitudes and
+            correlation energy.
+        ip_adc: Solve IP-ADC using previously computed reference amplitudes.
+        ea_adc: Solve EA-ADC using previously computed reference amplitudes.
+        ee_adc: Solve EE-ADC using previously computed reference amplitudes.
+        density_fit: Attach a density-fitting object for subsequent
+            transformations.
+        make_rdm1: Build charged-state one-particle densities after an IP/EA
+            run.
+        make_ref_rdm1: Build the reference one-particle density matrix.
+        get_nocc, get_nmo: Count active occupied and total orbitals.
 
     Examples:
         Two k points for a helium crystal with two s basis functions per
@@ -2504,22 +2541,33 @@ class KRADCBase(lib.StreamObject):
 
 
 class _KRADCCharged(KRADCBase):
-    """Shared kernel conventions for electron attachment and removal."""
+    """Shared kernel conventions for electron attachment and removal.
+
+    Methods:
+        Inherits kernel and get_properties from KRADCBase.
+    """
 
     _strength_label = 'Spec factor'
 
     def _root_properties(self, kshift, U, nroots, energies):
+        """Project normalized charged roots onto transition orbitals.
+
+        Return spin-summed pole strengths and orbital-by-root amplitudes.
+        """
         T = self.get_trans_moments(kshift)
         X = T @ self.renormalize_eigenvectors(kshift, U, nroots)
         return 2.0 * einsum('pi,pi->i', X.conj(), X).real, X
 
     def _shared_imds(self, eris):
+        """Build the singles intermediate shared by all charged k sectors."""
         return self.get_imds(eris)
 
     def _transition_shape(self, nroots):
+        """Return the orbital-by-root shape of the charged amplitudes."""
         return (self.nmo, nroots)
 
     def _prepare_root_vectors(self, kshift, roots):
+        """Copy root columns for in-place property normalization."""
         # Charged properties normalize in place. Preserve the Davidson roots.
         return roots.T.copy() if self.compute_properties else None
 
@@ -2558,6 +2606,21 @@ class KRADCIP(_KRADCCharged):
     The inherited run() method returns this object for chaining. Use run(0) to
     prepare only the reference, or run(nroots) for all sectors. Use kernel(...,
     kptlist=...) when selecting individual momentum sectors.
+
+    Methods:
+        renormalize_eigenvectors: Normalize charged eigenvectors in the spin-
+            adapted ADC metric.
+        get_diag: Construct the ionization Davidson diagonal.
+        matvec: Return a callable applying the ionization effective
+            Hamiltonian.
+        mask_frozen_ip: Replace inactive padding in charged vector blocks by a
+            constant.
+        get_trans_moments_orbital: Build the effective ionization transition
+            vector for one MO.
+        make_rdm1_eigenvectors_slow: Evaluate the retained explicit-loop
+            charged density expression.
+        make_rdm1_eigenvectors: Contract left/right charged vectors into an
+            active MO density.
 
     Examples:
         Create the two-k-point helium reference below; lattice vectors
@@ -4342,6 +4405,23 @@ class KRADCEA(_KRADCCharged):
     prepare only the reference, or run(nroots) for all sectors. Use kernel(...,
     kptlist=...) when selecting individual momentum sectors.
 
+    Methods:
+        renormalize_eigenvectors: Normalize charged eigenvectors in the spin-
+            adapted ADC metric.
+        get_diag: Construct the electron-attachment Davidson diagonal.
+        matvec: Return a callable applying the electron-attachment effective
+            Hamiltonian.
+        mask_frozen_ea: Replace inactive padding in charged vector blocks by a
+            constant.
+        ea_contract_r_vvvv: Contract one EA doubles block with a virtual-
+            particle ladder.
+        get_trans_moments_orbital: Build the effective electron-attachment
+            transition vector for one MO.
+        make_rdm1_eigenvectors_slow: Evaluate the retained explicit-loop
+            charged density expression.
+        make_rdm1_eigenvectors: Contract left/right charged vectors into an
+            active MO density.
+
     Examples:
         Create the two-k-point helium reference below; lattice vectors
         are in Angstrom and energies are in Hartree:
@@ -5764,33 +5844,27 @@ class KRADCEA(_KRADCCharged):
 
         kd = kconserv[ka, kc, kb]
         r2 = np.ascontiguousarray(r2.reshape(nocc, -1))
-        r2_vvvv = np.zeros(
+        r2_vvvv = np.empty(
             (nvir, nvir, nocc), dtype=np.result_type(r2, self.mo_coeff[0]))
         chunk_size = self.chunk_size
         chunk_size = min(chunk_size, nvir)
 
-        a = 0
-        # Stream virtual pairs and accumulate one output slice at a time.
-        if isinstance(vvvv, np.ndarray) and vvvv.ndim == 5:
+        # Stream the leading virtual axis from either DF factors or disk.
+        use_factors = isinstance(vvvv, np.ndarray) and vvvv.ndim == 5
+        if use_factors:
             vv1 = vvvv[ka, kc]
             vv2 = vvvv[kb, kd]
-            for p in range(0, nvir, chunk_size):
-                vvvv_p = _ChemistsERIs.vvvv_df(vv1, vv2, p, chunk_size) / nkpts
-                k = vvvv_p.shape[0]
-                vvvv_p = vvvv_p.reshape(-1, nvir * nvir)
-                r2_vvvv[a:a + k] += np.dot(vvvv_p.conj(), r2.T).reshape(
-                    -1, nvir, nocc)
-                del vvvv_p
-                a += k
-        else:
-            for p in range(0, nvir, chunk_size):
-                vvvv_p = vvvv[ka, kb, kc][p:p + chunk_size].reshape(
-                    -1, nvir * nvir)
-                k = vvvv_p.shape[0]
-                r2_vvvv[a:a + k] += np.dot(vvvv_p.conj(), r2.T).reshape(
-                    -1, nvir, nocc)
-                del vvvv_p
-                a += k
+        for start in range(0, nvir, chunk_size):
+            rows = slice(start, start + chunk_size)
+            if use_factors:
+                block = _ChemistsERIs.vvvv_df(vv1, vv2, start, chunk_size)
+                block /= nkpts
+            else:
+                block = vvvv[ka, kb, kc, rows]
+            pairs = block.reshape(-1, nvir * nvir)
+            del block
+            r2_vvvv[rows] = np.dot(pairs.conj(), r2.T).reshape(-1, nvir, nocc)
+            del pairs
 
         r2_vvvv = np.ascontiguousarray(r2_vvvv.transpose(2, 0, 1))
 
@@ -6518,6 +6592,20 @@ class KRADCEE(KRADCBase):
     prepare only the reference, or run(nroots) for all sectors. Use kernel(...,
     kptlist=...) when selecting individual momentum sectors.
 
+    Methods:
+        get_imds: Assemble the singles effective Hamiltonian through the ADC
+            order.
+        renormalize_eigenvectors: Return copies of EE eigenvectors normalized
+            in the singlet metric.
+        get_diag: Build the diagonal used to precondition EE Davidson
+            residuals.
+        matvec: Prepare a callable applying the EE effective Hamiltonian at one
+            momentum.
+        get_trans_moments: Evaluate spin-free EE transition densities,
+            flattened by root.
+        get_density_operator: Transform the Fourier density operator
+            exp[-i(q+G).r] to active MOs.
+
     Examples:
         >>> import numpy as np
         >>> from pyscf.pbc import gto, scf
@@ -6547,19 +6635,23 @@ class KRADCEE(KRADCBase):
     oscillator_strength_mode = 'supercell'
 
     def _shared_imds(self, eris):
+        """Defer the EE singles intermediate until its transfer is known."""
         # gen_matvec builds the EE singles Hamiltonian for each transfer.
         return None
 
     def _transition_shape(self, nroots):
+        """Return the root, momentum and MO axes of the EE density."""
         return (nroots, self.nkpts, self.nmo, self.nmo)
 
     def _prepare_root_vectors(self, kshift, roots):
+        """Store singlet-normalized roots and return them as columns."""
         # EE stores metric-normalized roots even with properties disabled.
         vectors = self.renormalize_eigenvectors(kshift, roots.T, len(roots))
         roots[:] = vectors.T
         return vectors
 
     def _save_transitions(self, X):
+        """Store transition densities and expose their flattened view as T."""
         super()._save_transitions(X)
         self.T = (X.reshape(*self.E.shape, -1)
                   if self.compute_properties else None)
@@ -6684,6 +6776,12 @@ class KRADCEE(KRADCBase):
         return vectors
 
     def _root_properties(self, kshift, U, nroots, energies):
+        """Contract singlet transition densities with the EE operator.
+
+        Use one positive energy in Hartree per vector. Omitted energies
+        require the saved roots at this momentum. Return one strength per
+        root and the transition MO densities.
+        """
         # Use saved energies only for the corresponding saved eigenvectors.
         if energies is None:
             if self.E is None or kshift not in self._kptlist:
@@ -6720,7 +6818,13 @@ class KRADCEE(KRADCBase):
         return 4 * speed2 / (3 * self.nkpts * energies), X
 
     def _supercell_dipole(self, kshift):
-        """Fold molecular AO position integrals into the selected k pairs."""
+        """Fold molecular AO position integrals into the selected k pairs.
+
+        For transfer kshift, return the electronic dipole in the active MO
+        basis with axes (k, Cartesian component, bra MO, ket MO). Evaluate
+        one bra image at a time on the commensurate supercell to bound the
+        size of the temporary AO integral array.
+        """
         from pyscf.pbc.tools import k2gamma
 
         mesh = k2gamma.kpts_to_kmesh(self.cell, self.kpts,
@@ -6746,7 +6850,12 @@ class KRADCEE(KRADCBase):
         return einsum('kap,kxab,kbq->kxpq', coeff.conj(), dipoles, coeff[ia])
 
     def _velocity_operator(self):
-        """Return Cartesian velocity matrices in the active Bloch MO basis."""
+        """Return Cartesian velocities in the active Bloch MO basis.
+
+        The three velocity components connect orbitals at the same k point.
+        Include the nonlocal commutator for GTH pseudopotentials before
+        transforming the AO derivative integrals into the MO basis.
+        """
         from pyscf.pbc.gto.pseudo.ppnl_velgauge import (
             get_gth_pp_nl_velgauge_commutator)
 

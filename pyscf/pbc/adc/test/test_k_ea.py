@@ -75,6 +75,12 @@ class KnownValues(unittest.TestCase):
     Run with ``python -m unittest test.test_k_ea.KnownValues``. The tests
     raise unittest assertion failures on a regression rather than returning
     energies or pass/fail flags.
+
+    Methods:
+        test_ea_adc2_k: Check three EA-ADC(2) roots and their pole strengths.
+        test_ea_adc2x_k_high_cost: Check EA-ADC(2)-x roots on a denser eight-k
+            mesh.
+        test_ea_adc3_k_skip: Check three EA-ADC(3) roots and pole strengths.
     """
     def test_ea_adc2_k(self):
         r"""Check three EA-ADC(2) roots and their pole strengths.

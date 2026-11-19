@@ -320,6 +320,10 @@ class MomentumContractions:
     1 MB floor. Momentum-plan storage has a separate quarter-sized budget.
     The context must be rebuilt after changing its reference orbitals or mesh.
 
+    Methods:
+        contract: Evaluate a term with fixed external momenta and sum allowed
+            internal k's.
+
     Examples:
         >>> import numpy as np
         >>> from pyscf.pbc import gto, scf

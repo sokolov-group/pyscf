@@ -42,6 +42,44 @@ class DriverAPI(unittest.TestCase):
     root clearing, cached data, guess routing and AO densities.
 
     Run with ``python -m unittest test.test_kadc_api.DriverAPI``.
+
+    Methods:
+        test_periodic_sector_class_names: Check canonical class names and
+            conversion from another sector.
+        test_adc_conversion_reference_ownership: Convert between all periodic
+            ADC classes without sharing sector state.
+        test_lazy_cell_inputs_and_stream_methods: Accept raw Cells and unrun
+            KRHF references with StreamObject chaining.
+        test_typed_fno_construction: Select the FNO sector by concrete class,
+            including converted inputs.
+        test_charged_hamiltonian_order_helpers: Check correction-only and
+            accumulation contracts for IP/EA helpers.
+        test_charged_density_root_selection_and_ao: Restore frozen orbitals for
+            several roots and arbitrary sector order.
+        test_charged_diagonal_values_and_dtypes: Check charged diagonals
+            against explicit orbital/momentum loops.
+        test_charged_diagonal_padding_and_integral_reuse: Preserve frozen-
+            padding sentinels and reuse supplied integral owners.
+        test_flat_orbital_masks_and_per_k_counts: Check flat masks and orbital
+            counts on unequal per-k MO spaces.
+        test_ground_state_and_amplitudes: Check scalar reference energies,
+            stored amplitudes and correlation control.
+        test_reference_only_and_stale_results: Check reference-only kernels and
+            stale-root clearing in every sector.
+        test_fno_reference_only: Check the FNO zero-root scalar-energy path.
+        test_direct_neutral_reference_only: Check a direct KRADCEE reference-
+            only run without constructing an action.
+        test_padding_and_chunking: Check cached padding, automatic chunking and
+            manual overrides.
+        test_input_validation: Check method normalization and invalid
+            root/sector inputs.
+        test_solver_uses_sector_guess_helpers: Check that each sector routes
+            default and supplied guesses through _init_guess and reproduces
+            converged roots from supplied vectors.
+        test_sector_intermediates_and_transitions: Check intermediate reuse and
+            root layout across two transfers.
+        test_reference_density_ao: Check AO reference densities with complex
+            phases and reduced MO spaces.
     """
     def test_periodic_sector_class_names(self):
         """Check canonical class names and conversion from another sector."""
@@ -651,6 +689,10 @@ class Documentation(unittest.TestCase):
     FNO/integral workflows and pure numerical models.
 
     Run with ``python -m unittest test.test_kadc_api.Documentation``.
+
+    Methods:
+        test_worked_examples: Execute package examples in independent empty
+            namespaces.
     """
     def test_worked_examples(self):
         r"""Execute package examples in independent empty namespaces.
@@ -710,6 +752,14 @@ class IntegralAPI(unittest.TestCase):
     and synthetic complex factors for independent reconstruction comparisons.
 
     Run with ``python -m unittest test.test_kadc_api.IntegralAPI``.
+
+    Methods:
+        test_context_and_lazy_block_properties: Check AO2MO context metadata
+            and nonexpanding integral block access.
+        test_incore_memory_selection: Check the backend at a fixed RAM budget.
+        test_chunked_ladder_reads: Check the slices read by the EA ladder.
+        test_df_orbital_slices: Compare sliced DF reconstructions with full
+            complex tensor contractions.
     """
     def test_context_and_lazy_block_properties(self):
         r"""Check AO2MO context metadata and nonexpanding integral block
@@ -751,6 +801,46 @@ class IntegralAPI(unittest.TestCase):
             self.assertIsNone(eris.ovvv)
             self.assertIsNone(eris.vvvv)
 
+    def test_incore_memory_selection(self):
+        """Check the extra virtual quartet storage and FFT grid workspace."""
+        from pyscf.pbc.df import FFTDF
+
+        solver = adc.KRADCEA(mf)
+        solver.with_df = FFTDF(mf.cell, mf.kpts)
+        solver.with_df.mesh = [9, 9, 9]
+        ctx = kadc_ao2mo.AO2MO(solver)
+        required = ctx._incore_memory_mb()
+        virtual_mb = ctx.dtype.itemsize * ctx.nkpts**3 * ctx.nvir**4 / 1e6
+        solver.max_memory = required + virtual_mb / 2
+        with mock.patch.object(kadc_ao2mo.lib, 'current_memory',
+                               return_value=(0., 0.)):
+            self.assertEqual(kadc_ao2mo.AO2MO(solver).backend, 'incore')
+            solver.method = 'adc(2)-x'
+            ctx = kadc_ao2mo.AO2MO(solver)
+            self.assertAlmostEqual(ctx._incore_memory_mb(),
+                                   required + virtual_mb)
+            self.assertEqual(ctx.backend, 'outcore')
+            solver.with_df.mesh = [7, 7, 7]
+            self.assertEqual(kadc_ao2mo.AO2MO(solver).backend, 'incore')
+
+    def test_chunked_ladder_reads(self):
+        """Request one disk slice per chunk and compare with a dense ladder."""
+        nvir = 5
+        rng = np.random.default_rng(8)
+        tensor = rng.normal(size=(1, 1, 1) + (nvir,) * 4)
+        disk = mock.MagicMock()
+        disk.__getitem__.side_effect = tensor.__getitem__
+        helper = SimpleNamespace(kconserv=np.zeros((1, 1, 1), dtype=int))
+        model = SimpleNamespace(nkpts=1, mo_coeff=[np.eye(nvir)],
+                                khelper=helper, chunk_size=2)
+        r2 = rng.normal(size=(1, nvir, nvir))
+        actual = adc.KRADCEA.ea_contract_r_vvvv(model, r2, disk, 0, 0, 0)
+        np.testing.assert_allclose(actual, np.einsum(
+            'abcd,icd->iab', tensor[0, 0, 0], r2))
+        expected = [mock.call((0, 0, 0, slice(a, a + 2)))
+                    for a in range(0, nvir, 2)]
+        self.assertEqual(disk.__getitem__.call_args_list, expected)
+
     def test_df_orbital_slices(self):
         r"""Compare sliced DF reconstructions with full complex tensor
         contractions.
@@ -780,6 +870,10 @@ class LoggingAPI(unittest.TestCase):
     calculation summaries without relying on terminal formatting.
 
     Run with ``python -m unittest test.test_kadc_api.LoggingAPI``.
+
+    Methods:
+        test_tables_and_global_width: Check shared table formatting and
+            calculation-summary logging.
     """
     def test_tables_and_global_width(self):
         r"""Check shared table formatting and calculation-summary logging.

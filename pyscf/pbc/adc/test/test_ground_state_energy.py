@@ -49,6 +49,16 @@ class KnownValues(unittest.TestCase):
     The tests
     raise unittest assertion failures on a regression rather than returning
     energies or pass/fail flags.
+
+    Methods:
+        test_check_mol_mp2: Check molecular supercell MP2 energy after
+            primitive-cell normalization.
+        test_check_periodic_mp2: Check the k-point ADC(2) reference correlation
+            energy.
+        test_check_periodic_mp2_2_high_cost: Compare ADC reference MP2 with
+            KMP2 on an eight-k-point mesh.
+        test_check_periodic_mp3: Check the ADC(3) reference MP3 correlation
+            contribution.
     """
     def test_check_mol_mp2(self):
         r"""Check molecular supercell MP2 energy after primitive-cell

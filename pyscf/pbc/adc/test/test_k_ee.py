@@ -46,6 +46,20 @@ class KnownValues(unittest.TestCase):
     Run with ``python -m unittest test.test_k_ee.KnownValues``. The tests
     raise unittest assertion failures on a regression rather than returning
     energies or pass/fail flags.
+
+    Methods:
+        test_adc1_tensor_against_identity_prototype: Compare the optimized
+            first-order singles tensor with an independent prototype.
+        test_energies: Check low EE-ADC(2) energies and their Davidson
+            residuals.
+        test_diagonal_and_integrals: Compare the EE action, its ADC(2) diagonal
+            and DF reconstruction.
+        test_normalization: Check singlet normalization, phase covariance and
+            zero-vector rejection.
+        test_molecular_normalization_limit: Compare Gamma-only singlet
+            normalization with molecular EE-ADC.
+        test_guesses_and_properties: Check neutral guess validation and
+            density-property output shapes.
     """
     def test_adc1_tensor_against_identity_prototype(self):
         r"""Compare the optimized first-order singles tensor with an

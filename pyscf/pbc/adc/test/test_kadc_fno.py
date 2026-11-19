@@ -173,6 +173,26 @@ class KnownValues(unittest.TestCase):
     Run with ``python -m unittest test.test_kadc_fno.KnownValues``. The tests
     raise unittest assertion failures on a regression rather than returning
     energies or pass/fail flags.
+
+    Methods:
+        test_canonical: Check untruncated carbon MP2 and MP3 reference
+            energies.
+        test_gs_fno_pct_occ: Check corrected ADC(3) correlation energy with
+            occupation-fraction FNOs.
+        test_gs_fno_thresh: Check corrected ADC(3) correlation energy with a
+            natural-occupation cutoff.
+        test_gs_fno_nvir_act: Check corrected ADC(3) energy with an explicit
+            retained virtual count.
+        test_gs_fno_per_kpt: Check independent per-k virtual truncation and its
+            energy correction.
+        test_gs_fno_multithreshold: Check independent corrections for two FNO
+            occupation-fraction runs.
+        test_ss_fno_ea: Check the first corrected EA-ADC(3) root in a state-
+            specific FNO space.
+        test_sa_fno_ea: Check corrected EA-ADC(3) with a two-state averaged FNO
+            density.
+        test_ss_fno_ip: Check the first corrected IP-ADC(3) root in a state-
+            specific FNO space.
     """
     def test_canonical(self):
         # Canonical references (no FNO truncation).

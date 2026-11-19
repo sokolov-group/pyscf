@@ -84,6 +84,16 @@ class KnownValues(unittest.TestCase):
     The tests
     raise unittest assertion failures on a regression rather than returning
     energies or pass/fail flags.
+
+    Methods:
+        test_ip_adc2_supercell: Check the molecular-supercell IP-ADC(2)
+            reference spectrum.
+        test_ip_adc2_supercell_vs_k: Compare IP-ADC2 between supercell and
+            sector-zero k ADC.
+        test_ip_adc2x_supercell_vs_k: Compare IP-ADC2X between supercell and
+            sector-zero k ADC.
+        test_ip_adc3_supercell_vs_k: Compare IP-ADC3 between supercell and
+            sector-zero k ADC.
     """
     def test_ip_adc2_supercell(self):
         r"""Check the molecular-supercell IP-ADC(2) reference spectrum.

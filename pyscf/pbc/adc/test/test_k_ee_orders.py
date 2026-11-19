@@ -45,6 +45,16 @@ class KnownValues(unittest.TestCase):
     tests
     raise unittest assertion failures on a regression rather than returning
     energies or pass/fail flags.
+
+    Methods:
+        test_molecular_limit: Compare all EE orders with molecular amplitudes,
+            matrices and densities.
+        test_supercell_oscillator_strengths: Check two-k EE energies and
+            oscillator strengths against the Gamma supercell.
+        test_complex_kpoint_oscillator_strengths: Check three-k EE strengths
+            with complex Bloch orbitals.
+        test_optical_transition: Compare a bright Gamma transition with the AO
+            velocity integral.
     """
     def test_molecular_limit(self):
         r"""Compare all EE orders with molecular amplitudes, matrices and

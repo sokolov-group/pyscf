@@ -36,7 +36,7 @@ from pyscf import lib
 from pyscf.ao2mo import _ao2mo
 from pyscf.lib import logger
 from pyscf.pbc.adc.lib import einsum
-from pyscf.pbc.df import df
+from pyscf.pbc.df import FFTDF, df
 
 
 class _IntegralBlocks:
@@ -56,6 +56,10 @@ class _IntegralBlocks:
         shape (tuple[int]): Three k dimensions followed by four orbital sizes.
         dtype (numpy.dtype): Integral element type, including complex orbitals.
         ndim (int): Number of tensor axes, currently seven.
+
+    Methods:
+        __getitem__: Read one momentum block and optional orbital slices.
+        __repr__: Preview the first block with NumPy print options.
 
     Examples:
         >>> import numpy as np
@@ -162,6 +166,15 @@ class _ChemistsERIs:
     an accessor previews the first k block using NumPy's print options.
     The static DF helpers return unnormalized blocks.
     Use close() or a context manager to release scratch storage.
+
+    Methods:
+        __enter__, __exit__: Manage scratch-file lifetime.
+        allocate: Allocate selected four-index blocks in memory or in one
+            scratch file.
+        ovvv_df: Reconstruct an occupied slice of a chemists' (ov|vv) DF block.
+        vvvv_df: Reconstruct a virtual slice in particle-particle ordering.
+        close: Close the owned integral scratch file and clear its file
+            reference.
 
     Examples:
         >>> import numpy as np
@@ -480,6 +493,15 @@ class AO2MO:
     Calling the context, or one of its backend methods, returns an owning
     _ChemistsERIs container. Four-index stored blocks carry 1/nkpts factors.
 
+    Methods:
+        __call__: Run the selected transformation backend.
+        incore: Transform symmetry-related four-index k blocks into NumPy
+            storage.
+        outcore: Transform four-index blocks into a single owned HDF5 scratch
+            file.
+        density_fit: Transform three-index GDF factors and store occupied four-
+            index blocks.
+
     Examples:
         >>> import numpy as np
         >>> from pyscf.pbc import gto, scf
@@ -541,7 +563,7 @@ class AO2MO:
                 if isinstance(self.with_df, df.GDF):
                     backend = 'density_fit'
                 else:
-                    required = self.nkpts**3 * self.nmo**4 * 64 / 1e6
+                    required = self._incore_memory_mb()
                     available = adc.max_memory - lib.current_memory()[0]
                     backend = ('incore' if adc.incore_complete
                                or required < available else 'outcore')
@@ -552,6 +574,33 @@ class AO2MO:
             case _:
                 raise ValueError(f'Unknown ADC integral backend: {backend!r}')
         self.backend = backend
+
+    def _incore_memory_mb(self):
+        """Estimate additional resident MB for the in-core transformation.
+
+        Count the stored orbital sectors and allow three full MO quartets
+        for overlapping transform, normalization and symmetry buffers.
+        FFTDF additionally transforms blocks of orbital pairs on its grid.
+        Native library workspace and allocator reuse vary by backend.
+        """
+        o, v = self.nocc, self.nvir
+        stored = o**4 + o**3 * v + 3 * o**2 * v**2 + o * v**3
+        if _needs_vvvv(self.adc):
+            stored += v**4
+        storage_mb = self.dtype.itemsize * self.nkpts**3 * stored / 1e6
+        return storage_mb + self._quartet_memory_mb(self.nmo)
+
+    def _quartet_memory_mb(self, norb):
+        """Estimate transient MB for one full four-index transformation."""
+        required = 3 * self.dtype.itemsize * norb**4
+        if isinstance(self.with_df, FFTDF):
+            # Pair values and their forward and inverse FFT buffers.
+            pairs = norb**2
+            if (self.nkpts == 1 and self.dtype == np.float64
+                    and not np.any(self.kpts)):
+                pairs = norb * (norb + 1) // 2
+            required += 3 * pairs * np.prod(self.with_df.mesh) * 16
+        return required / 1e6
 
     def __call__(self):
         r"""Execute the resolved incore, outcore or density_fit backend.
@@ -571,7 +620,12 @@ class AO2MO:
                 return self.density_fit()
 
     def _transform_block(self, triple, coeffs):
-        """Transform and normalize one momentum-conserving quartet."""
+        """Transform and normalize one momentum-conserving quartet.
+
+        Use the three indices in triple to find the fourth k point. The
+        four coefficient matrices determine the orbital axes of the
+        returned array, including any occupied or virtual restrictions.
+        """
         quartet = (*triple, self.kconserv[triple])
         block = self.fao2mo(coeffs, self.kpts[list(quartet)], compact=False)
         if self.dtype == np.float64:
@@ -691,9 +745,14 @@ class AO2MO:
         return eris
 
     def _write_vvvv(self, dataset):
+        """Write normalized virtual quartets to the supplied HDF5 dataset.
+
+        Expand symmetry-related quartets in particle-particle order. Under
+        memory pressure, transform one virtual orbital at a time.
+        """
         # Budget for one dense complex virtual quartet at a time.
         available_mb = self.adc.max_memory - lib.current_memory()[0]
-        full_block = self.nvir ** 4 * 16 / 1e6 < available_mb
+        full_block = self._quartet_memory_mb(self.nvir) < available_mb
         for triple, equivalents in self.khelper.symm_map.items():
             kp, kq, kr = triple
             ks = self.kconserv[triple]
@@ -819,7 +878,12 @@ class AO2MO:
         return eris
 
     def _project_auxiliary(self, pairs, naux):
-        """Project all orbital sectors onto the retained auxiliary basis."""
+        """Project all orbital sectors onto the retained auxiliary basis.
+
+        Stack their three-index factors to form one auxiliary metric.
+        Replace each entry in pairs with factors in the same truncated
+        eigenbasis and record its dimension on the ADC object.
+        """
         # Each column is one orbital pair at one pair of k points.
         columns = np.concatenate([
             factors.transpose(2, 0, 1, 3, 4).reshape(naux, -1)
@@ -841,10 +905,11 @@ class AO2MO:
 def chunk_size(adc):
     r"""Estimate an orbital chunk from the remaining memory budget.
 
-    A reconstructed virtual block needs approximately
-    :math:`n_{chunk} n_{vir}^3` elements. Use half the positive difference
-    between max_memory and current PySCF memory usage, with the actual real
-    or complex element size. This is an estimate rather than a memory limit.
+    A single reconstructed virtual block needs approximately
+    :math:`n_{chunk} n_{vir}^3` elements. Budget for two such blocks
+    because normalization, conjugation or packing can require a second
+    copy during contraction. Use the remaining resident-memory budget and
+    the actual orbital dtype. Other solver arrays also contribute to RSS.
 
     Args:
         adc (KRADCBase): Driver defining nvir, mo_coeff and max_memory in MB.

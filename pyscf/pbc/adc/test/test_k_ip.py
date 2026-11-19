@@ -75,6 +75,12 @@ class KnownValues(unittest.TestCase):
     Run with ``python -m unittest test.test_k_ip.KnownValues``. The tests
     raise unittest assertion failures on a regression rather than returning
     energies or pass/fail flags.
+
+    Methods:
+        test_ip_adc2_k: Check three IP-ADC(2) roots and their pole strengths.
+        test_ip_adc2x_k_high_cost: Check IP-ADC(2)-x roots on a denser eight-k
+            mesh.
+        test_ip_adc3_k: Check three IP-ADC(3) roots and pole strengths.
     """
     def test_ip_adc2_k(self):
         r"""Check three IP-ADC(2) roots and their pole strengths.

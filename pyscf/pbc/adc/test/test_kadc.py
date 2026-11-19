@@ -46,6 +46,10 @@ class KnownValues(unittest.TestCase):
     Run with ``python -m unittest test.test_kadc.KnownValues``. The tests
     raise unittest assertion failures on a regression rather than returning
     energies or pass/fail flags.
+
+    Methods:
+        test_n3_diffuse: Check diffuse-cell HF, MP2 and momentum-resolved IP-
+            ADC roots.
     """
     def test_n3_diffuse(self):
         r"""Check diffuse-cell HF, MP2 and momentum-resolved IP-ADC roots.
