@@ -124,8 +124,8 @@ class KnownValues(unittest.TestCase):
                 np.testing.assert_allclose(actual_t, expected_t, atol=1e-12)
                 eris.close()
 
-    def test_supercell_density_response(self):
-        r"""Check two-k EE energies and density response against the Gamma
+    def test_supercell_oscillator_strengths(self):
+        r"""Check two-k EE energies and oscillator strengths against the Gamma
         supercell.
 
         Invoke the common supercell comparison on a 1x1x2 mesh for all EE
@@ -138,8 +138,8 @@ class KnownValues(unittest.TestCase):
         """
         self._check_supercell([1, 1, 2])
 
-    def test_complex_kpoint_density_response(self):
-        r"""Check the three-k EE density response with complex Bloch orbitals.
+    def test_complex_kpoint_oscillator_strengths(self):
+        r"""Check three-k EE strengths with complex Bloch orbitals.
 
         Invoke the same supercell comparison on a 1x1x3 mesh, where complex
         orbital phases exercise momentum orientation and integral conjugation.
@@ -151,7 +151,7 @@ class KnownValues(unittest.TestCase):
         self._check_supercell([1, 1, 3])
 
     def _check_supercell(self, mesh):
-        r"""Compare periodic EE energies and Fourier-density strengths with a
+        r"""Compare periodic EE energies and oscillator strengths with a
         supercell.
 
         Args:
@@ -161,9 +161,8 @@ class KnownValues(unittest.TestCase):
 
         Returns:
             None: For all EE orders, assert agreement of roots below the shared
-            cutoff and summed density strengths in degenerate subspaces. Build
-            the supercell Fourier operator independently from AO-pair
-            transforms.
+            cutoff and summed oscillator strengths in degenerate subspaces.
+            Compare directly with molecular ADC pole energies and strengths.
         """
         kpoints = mf.cell.make_kpts(mesh)
         kmf = scf.KRHF(mf.cell, kpoints, exxdiv=None).density_fit().run()
@@ -188,39 +187,44 @@ class KnownValues(unittest.TestCase):
                     np.sort(me[me < cutoff]),
                     atol=1e-06,
                     rtol=0)
-                for shift in range(len(kpoints)):
-                    q = -kpoints[shift]
-                    ao = ft_ao.ft_aopair(scell, q.reshape(1, 3))[0]
-                    op = smf.mo_coeff.conj().T @ ao @ smf.mo_coeff
-                    strength = (2 / len(kpoints)) * abs(
-                        np.einsum('pq,npq->n', op, mx))**2
-                    # Sum over degeneracies to remove the choice of basis.
-                    for energy in ke[shift][ke[shift] < cutoff]:
-                        expected = strength[abs(me - energy) < 1e-06].sum()
-                        actual = kp[shift][
-                            abs(ke[shift] - energy) < 1e-6].sum()
-                        np.testing.assert_allclose(
-                            actual, expected, atol=1e-07, rtol=1e-05)
+                # Molecular roots may mix degenerate states from different
+                # transfers. Their summed oscillator strength is invariant.
+                for energy in me[me < cutoff]:
+                    expected = mp[abs(me - energy) < 1e-6].sum()
+                    actual = kp[abs(ke - energy) < 1e-6].sum()
+                    np.testing.assert_allclose(
+                        actual, expected, atol=1e-6, rtol=1e-5)
 
-    def test_number_response(self):
-        r"""Check vanishing inelastic response to the total-number operator.
-
-        At Gamma with G=0, all returned density strengths must vanish within
-        1e-12. Also check the root/k/MO density shape, flattened T view and
-        consistency of saved E/U with the kernel outputs.
-
-        Returns:
-            None: unittest reports an assertion failure if the stated contract
-            fails.
-        """
-        mykradc = adc.KRADCEE(mf)
+    def test_optical_transition(self):
+        """Compare a bright Gamma transition with the AO velocity integral."""
+        cell = gto.M(atom='He 0 0 0', a=np.eye(3) * 5, unit='B',
+                     basis=[[0, (1., 1.)], [1, (.5, 1.)]], verbose=0)
+        kmf = scf.KRHF(cell, exxdiv=None).density_fit().run()
+        mykradc = adc.KRADCEE(kmf)
+        mykradc.oscillator_strength_mode = 'periodic'
         energies, vectors, weights, densities = mykradc.kernel(3)
-        self.assertEqual(densities.shape, (1, 3, 1, mykradc.nmo, mykradc.nmo))
-        np.testing.assert_allclose(weights, 0, atol=1e-12)
+        coeff = kmf.mo_coeff[0]
+        velocity = coeff.conj().T @ cell.pbc_intor('int1e_ipovlp') @ coeff
+        moment = np.einsum('xpq,npq->nx', velocity, densities[0, :, 0])
+        reference = 4 * (abs(moment)**2).sum(axis=1) / (3 * energies[0])
+        self.assertGreater(reference.max(), 1e-3)
+        np.testing.assert_allclose(weights[0], reference, atol=1e-12)
         np.testing.assert_array_equal(
             mykradc.T.reshape(densities.shape), densities)
         np.testing.assert_array_equal(mykradc.U, vectors)
         np.testing.assert_array_equal(mykradc.E, energies)
+
+        # A reciprocal lattice vector probes a finite transfer at Gamma.
+        mykradc.density_gv = cell.reciprocal_vectors()[0]
+        strengths, _ = mykradc.get_properties(0, vectors[0].T, 3)
+        ao = ft_ao.ft_aopair(cell, mykradc.density_gv.reshape(1, 3))[0]
+        rho = coeff.conj().T @ ao @ coeff
+        amplitudes = np.einsum('pq,npq->n', rho, densities[0, :, 0])
+        q2 = mykradc.density_gv @ mykradc.density_gv
+        np.testing.assert_allclose(strengths,
+                                   4 * energies[0] * abs(amplitudes)**2 / q2)
+        with self.assertRaisesRegex(ValueError, 'matching'):
+            mykradc.get_properties(0, vectors[0, ::-1].T, 3)
 
 
 if __name__ == '__main__':

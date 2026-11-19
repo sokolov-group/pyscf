@@ -237,7 +237,7 @@ class KnownValues(unittest.TestCase):
         r"""Check neutral guess validation and density-property output shapes.
 
         Construct and reread sector guesses, reject zero supplied vectors,
-        and verify nonnegative density strengths and transition densities
+        and verify nonnegative oscillator strengths and transition densities
         with the expected root/k/MO axes.
 
         Returns:
@@ -251,7 +251,8 @@ class KnownValues(unittest.TestCase):
             guesses)
         with self.assertRaises(ValueError):
             mykradcee._init_guess(2, type_='read', ini=guesses * 0)
-        weights, densities = mykradcee.get_properties(0, guesses.T, 2)
+        weights, densities = mykradcee.get_properties(
+            0, guesses.T, 2, energies=[1., 2.])
         self.assertEqual(
             densities.shape, (2, mykradcee.nkpts, mykradcee.nmo, mykradcee.nmo)
         )

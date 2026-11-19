@@ -409,7 +409,7 @@ class KRADCBase(lib.StreamObject):
         approx_trans_moments (bool): Omit selected higher-order transition
             amplitudes, following the molecular ADC convention (default True).
         density_gv (ndarray): Reciprocal vector G in inverse Bohr for EE
-            density response at physical momentum q + G.
+            density response in periodic mode at physical momentum q + G.
         integral_backend (str): ``auto``, ``incore``, ``outcore`` or
             ``density_fit``; ``df`` is accepted for compatibility.
         chunk_size (int): Cached orbital chunk size; assigning None restores
@@ -462,8 +462,8 @@ class KRADCBase(lib.StreamObject):
         'incore_complete', 'compute_properties', 'approx_trans_moments',
         'integral_backend', 'chunk_size', 'keep_exxdiv', 'with_df', 'naux',
         'if_heri_eris', 'eris', 'if_naf', 'thresh_naf', 'if_corr',
-        'density_gv', 'imds', 'E', 'T', 'U', 'X', 'P',
-        'converged',
+        'oscillator_strength_mode', 'density_gv', 'imds',
+        'E', 'T', 'U', 'X', 'P', 'converged',
     }
 
     # Default number of roots per momentum sector when a call omits nroots.
@@ -616,7 +616,7 @@ class KRADCBase(lib.StreamObject):
                 shape (nsectors, nroots, vector_size()). X has shape
                 (nsectors, nmo, nroots) for IP/EA, or
                 (nsectors, nroots, nkpts, nmo, nmo) for EE. E is in Hartree.
-                P contains spectral factors (IP/EA) or density strengths
+                P contains spectral factors (IP/EA) or oscillator strengths
                 (EE). With properties disabled, P and X are zero arrays.
                 A reference-only run returns scalar e_corr in Hartree and
                 clears all excitation results.
@@ -683,13 +683,14 @@ class KRADCBase(lib.StreamObject):
         # Allocate one vector and one property result per sector and root.
         dtype = np.result_type(self.t2[0])
         root_shape = len(kptlist), nroots
+        # The fixed-size arrays are filled in place and returned directly.
         evals = np.empty(root_shape)
         evecs = np.empty((*root_shape, vec_size), dtype=dtype)
         conv = np.empty(root_shape, dtype=bool)
         P = np.zeros(root_shape)
         X = np.zeros((len(kptlist), *self._transition_shape(nroots)),
                      dtype=dtype)
-        imds = self._shared_imds(eris)
+        imds = self._shared_imds(eris) # Intermediates, the M matrix.
         if isinstance(guess, str):
             raise NotImplementedError('Supply trial vectors as an array.')
         if guess is not None:
@@ -718,7 +719,8 @@ class KRADCBase(lib.StreamObject):
             evals[k], evecs[k], conv[k] = evals_k.real, evecs_k, conv_k
             vectors = self._prepare_root_vectors(kshift, evecs[k])
             if self.compute_properties:
-                P[k], X[k] = self.get_properties(kshift, vectors, nroots)
+                P[k], X[k] = self.get_properties(
+                    kshift, vectors, nroots, energies=evals[k])
 
         # Publish results only after all selected sectors have been solved.
         self._kptlist = kptlist
@@ -1048,24 +1050,42 @@ class KRADCBase(lib.StreamObject):
         return (self.matvec(kshift, imds, eris),
                 self.get_diag(kshift, imds, eris))
 
-    def get_properties(self, kshift, U, nroots=None):
-        r"""Compute charged spectroscopic amplitudes and spin-summed pole
-        strengths.
-
-        With effective transition matrix T and metric-normalized U,
-        :math:`X=T U` and :math:`P_n=2\sum_p |X_{pn}|^2`. The factor of two
-        accounts for restricted spin degeneracy. These strengths are
-        dimensionless and are not optical oscillator strengths.
+    def get_properties(self, kshift, U, nroots=None, *, energies=None):
+        r"""Compute strengths and transition amplitudes for one sector.
 
         Args:
-            kshift (int): Charged momentum sector.
-            U (ndarray): Writable eigenvector columns, shape
-                (vector_size(), nroots). Renormalized in place.
-            nroots (int): Number of columns to return; must match U.
+            kshift (int): Momentum sector of the supplied roots.
+            U (ndarray): Eigenvector columns of shape (vector_size(), nroots).
+                IP and EA normalize these in place. EE uses a normalized copy.
+            nroots (int, optional): Number of roots. Defaults to self.nroots.
+            energies (array_like, optional): EE excitation energies in Hartree,
+                one per column. May be omitted for the first n saved roots in
+                their original order. Charged strengths are energy independent.
 
         Returns:
-            tuple[ndarray, ndarray]: Real P of shape (nroots,) and complex X
-            of shape (nmo, nroots), in padded active MO order.
+            tuple: Real strengths P of shape (nroots,) and amplitudes X. For
+            IP/EA, X has shape (nmo, nroots) and P contains spin-summed pole
+            strengths. For EE, X contains spin-free transition MO densities of
+            shape (nroots, nkpts, nmo, nmo). P contains dimensionless
+            oscillator strengths for the selected convention.
+
+        Notes:
+            The default EE mode, 'supercell', uses the same electronic dipole
+            as molecular RADC on the commensurate Gamma supercell. In atomic
+            units, :math:`f_n=(4/3) E_n \sum_\alpha
+            |\sum_{kpq} d^\alpha_{kpq} X_{nkpq}|^2` for the spin-free singlet
+            density and electronic dipole d. This is the total strength for
+            that finite supercell and its choice of images.
+
+            Set oscillator_strength_mode='periodic' for per-cell intensities:
+            isotropic velocity-gauge strengths at zero transfer and generalized
+            oscillator strengths at finite Q = -kpts[kshift] + density_gv.
+
+        Raises:
+            ValueError: Root dimensions or energies are invalid, the EE mode
+                is unknown, or the mesh cannot form the requested supercell.
+            NotImplementedError: In periodic mode the optical velocity
+                operator for a non-GTH effective core potential is unavailable.
 
         Examples:
             >>> import numpy as np
@@ -1089,17 +1109,9 @@ class KRADCBase(lib.StreamObject):
         """
         if nroots is None:
             nroots = self.nroots
-        T = self.get_trans_moments(kshift)
-
-        # Spectroscopic amplitudes
-        U = self.renormalize_eigenvectors(kshift, U, nroots)
-        X = np.dot(T, U).reshape(-1, nroots)
-
-        # Spectroscopic factors
-        P = 2.0 * einsum('pi,pi->i', X.conj(), X)
-        P = P.real
-
-        return P, X
+        if U.shape != (self.vector_size(), nroots):
+            raise ValueError('U must have shape (vector_size(), nroots).')
+        return self._root_properties(kshift, U, nroots, energies)
 
     def _ensure_reference(self):
         r"""Run the underlying KRHF if necessary and fill missing orbital data.
@@ -2495,6 +2507,11 @@ class _KRADCCharged(KRADCBase):
     """Shared kernel conventions for electron attachment and removal."""
 
     _strength_label = 'Spec factor'
+
+    def _root_properties(self, kshift, U, nroots, energies):
+        T = self.get_trans_moments(kshift)
+        X = T @ self.renormalize_eigenvectors(kshift, U, nroots)
+        return 2.0 * einsum('pi,pi->i', X.conj(), X).real, X
 
     def _shared_imds(self, eris):
         return self.get_imds(eris)
@@ -6458,8 +6475,7 @@ class KRADCEA(_KRADCCharged):
 
 
 class KRADCEE(KRADCBase):
-    r"""Solve singlet periodic EE-ADC and compute momentum-resolved density
-    response.
+    r"""Solve singlet periodic EE-ADC and compute oscillator strengths.
 
     Args:
         mf (KRHF, Cell or KRADCBase): Reference, periodic cell, or another ADC
@@ -6483,10 +6499,14 @@ class KRADCEE(KRADCBase):
             nroots, nkpts, nmo, nmo).
         T (ndarray): Flattened view of X, shape (nsectors, nroots,
             nkpts*nmo*nmo), or None without properties.
-        P (ndarray): Dimensionless density-response strengths per primitive
-            cell, shape (nsectors, nroots).
+        P (ndarray): Dimensionless oscillator strengths, shape
+            (nsectors, nroots).
+        oscillator_strength_mode (str): 'supercell' (default) uses molecular
+            length-gauge strengths for the whole commensurate supercell.
+            'periodic' gives momentum-resolved strengths per primitive cell.
         density_gv (ndarray): Reciprocal vector G, in Cartesian inverse Bohr.
-            Properties use the operator exp[-i(q+G).r], q=-kpts[kshift].
+            In periodic mode, finite-transfer strengths use exp[-i(q+G).r],
+            q=-kpts[kshift].
         converged (ndarray): Boolean root-convergence flags with E's shape.
 
     Singles have axes (k_i, i, a); doubles have axes (k_i, k_j, k_a, i, j, a,
@@ -6523,7 +6543,8 @@ class KRADCEE(KRADCBase):
         ((1, 2, 10), (1, 2), (1, 2, 2, 2, 2))
     """
 
-    _strength_label = 'Density'
+    _strength_label = 'Osc strength'
+    oscillator_strength_mode = 'supercell'
 
     def _shared_imds(self, eris):
         # gen_matvec builds the EE singles Hamiltonian for each transfer.
@@ -6662,69 +6683,85 @@ class KRADCEE(KRADCBase):
             vectors[:, root] /= np.sqrt(norm)
         return vectors
 
-    def get_properties(self, kshift, U, nroots=None):
-        r"""Contract transition densities into density-response strengths per
-        cell.
+    def _root_properties(self, kshift, U, nroots, energies):
+        # Use saved energies only for the corresponding saved eigenvectors.
+        if energies is None:
+            if self.E is None or kshift not in self._kptlist:
+                raise ValueError('Supply excitation energies for these roots.')
+            sector = self._kptlist.index(kshift)
+            if not np.array_equal(U.T, self.U[sector, :nroots]):
+                raise ValueError('Supply energies matching the given vectors.')
+            energies = self.E[sector, :nroots]
+        energies = np.asarray(energies)
+        if (energies.shape != (nroots,) or not np.isrealobj(energies)
+                or not np.all(np.isfinite(energies)) or np.any(energies <= 0)):
+            raise ValueError('Supply one positive excitation energy per root.')
 
-        For the Fourier density matrix rho and the spin-free transition density
-        X,
+        X = self.get_trans_moments(kshift, U).reshape(
+            self._transition_shape(nroots))
+        if self.oscillator_strength_mode == 'supercell':
+            dipoles = self._supercell_dipole(kshift)
+            moments = einsum('kxpq,nkpq->nx', dipoles, X)
+            return (4.0 / 3.0) * energies * (abs(moments)**2).sum(1), X
+        if self.oscillator_strength_mode != 'periodic':
+            raise ValueError("oscillator_strength_mode must be 'supercell' "
+                             "or 'periodic'.")
 
-        .. math::
-            P_n(q+G)=\frac{2}{N_k}\left|\sum_{kpq}
-                \rho_{kpq}(q+G)X_{nkpq}\right|^2.
+        # The spin-free singlet transition amplitude carries sqrt(2/Nk).
+        transfer = self.density_gv - self.kpts[kshift]
+        q2 = np.dot(transfer, transfer)
+        if q2 > 1e-24:
+            rho = einsum('kpq,nkpq->n', self.get_density_operator(kshift), X)
+            return (4 * energies / (self.nkpts * q2)) * abs(rho)**2, X
 
-        The factor of two follows the singlet convention. These are
-        dimensionless
-        density-response strengths, distinct from optical oscillator strengths.
+        velocity = self._velocity_operator()
+        moments = einsum('kxpq,nkpq->nx', velocity, X)
+        speed2 = (abs(moments)**2).sum(axis=1)
+        return 4 * speed2 / (3 * self.nkpts * energies), X
 
-        Args:
-            kshift (int): Momentum sector; physical q=-kpts[kshift].
-            U (ndarray): Eigenvector columns of shape (vector_size(), nroots).
-                Use a normalized copy, preserving the supplied U.
-            nroots (int): Number of roots, which must equal U's column count.
+    def _supercell_dipole(self, kshift):
+        """Fold molecular AO position integrals into the selected k pairs."""
+        from pyscf.pbc.tools import k2gamma
 
-        Returns:
-            tuple[ndarray, ndarray]: Real P of shape (nroots,) and transition
-            MO
-            densities X of shape (nroots, nkpts, nmo, nmo). Their flattened
-            form
-            T is cached by get_trans_moments() for this sector.
+        mesh = k2gamma.kpts_to_kmesh(self.cell, self.kpts,
+                                     bound_by_supmol=False)
+        if np.prod(mesh) != self.nkpts:
+            raise ValueError('Supercell strengths require a full commensurate '
+                             'k mesh. Use periodic mode for other meshes.')
+        scell, phase = k2gamma.get_phase(self.cell, self.kpts, mesh)
+        ia, _, _ = self._momentum_maps(kshift)
+        nao = self.cell.nao_nr()
+        nbas = self.cell.nbas
+        dipoles = np.zeros((self.nkpts, 3, nao, nao), dtype=complex)
 
-        Raises:
-            ValueError: nroots does not match the supplied eigenvector columns.
+        # Read one bra cell at a time. The two Bloch phases each include
+        # 1/sqrt(Nk), giving the matrix element between supercell orbitals.
+        for r in range(self.nkpts):
+            shells = (r * nbas, (r + 1) * nbas, 0, scell.nbas)
+            row = scell.intor('int1e_r', comp=3, shls_slice=shells)
+            row = row.reshape(3, nao, self.nkpts, nao)
+            weights = phase[r].conj() * phase[:, ia]
+            dipoles -= einsum('sk,xasb->kxab', weights, row)
+        coeff = self.padded_coeff
+        return einsum('kap,kxab,kbq->kxpq', coeff.conj(), dipoles, coeff[ia])
 
-        Examples:
-            >>> import numpy as np
-            >>> from pyscf.pbc import gto, scf
-            >>> from pyscf.pbc.adc import kadc_rhf
-            >>> from pyscf.pbc.adc.kadc_rhf import KRADCEE
-            >>> cell = gto.M(
-            ...     atom='He 0 0 0',
-            ...     a=np.eye(3) * 3,
-            ...     basis=[[0, (1.0, 1.0)], [0, (0.5, 1.0)]],
-            ...     verbose=0)
-            >>> kmf = scf.KRHF(
-            ...     cell, cell.make_kpts([1, 1, 2]),
-            ...     exxdiv=None).density_fit().run()
-            >>> mykradcee = kadc_rhf.KRADCEE(kmf).run(0)
-            >>> excitation_results = mykradcee.kernel(1, kptlist=[1])
-            >>> strengths, densities = mykradcee.get_properties(
-            ...     1, mykradcee.U[0].T, 1)
-            >>> strengths.shape, densities.shape
-            ((1,), (1, 2, 2, 2))
-        """
-        if nroots is None:
-            nroots = self.nroots
-        if U.shape[1] != nroots:
-            raise ValueError('nroots does not match the eigenvector array.')
-        # Project the transition density onto the Fourier density operator.
-        T = self.get_trans_moments(kshift, U)
-        X = T.reshape(nroots, self.nkpts, self.nmo, self.nmo)
-        amplitudes = einsum(
-            'kpq,nkpq->n',
-            self.get_density_operator(kshift), X)
-        P = (2.0 / self.nkpts) * abs(amplitudes)**2
-        return P.real, X
+    def _velocity_operator(self):
+        """Return Cartesian velocity matrices in the active Bloch MO basis."""
+        from pyscf.pbc.gto.pseudo.ppnl_velgauge import (
+            get_gth_pp_nl_velgauge_commutator)
+
+        if len(self.cell._ecpbas):
+            raise NotImplementedError(
+                'Optical strengths require the velocity commutator for ECPs.')
+        # int1e_ipovlp supplies p/i. Include the nonlocal GTH current, as
+        # in periodic TD-SCF, before transforming to the padded orbital basis.
+        ao = np.asarray(self.cell.pbc_intor('int1e_ipovlp', comp=3,
+                                            hermi=0, kpts=self.kpts))
+        if self.cell.pseudo:
+            ao = ao - get_gth_pp_nl_velgauge_commutator(
+                self.cell, np.zeros(3), kpts=self.kpts)
+        coeff = self.padded_coeff
+        return 1j * einsum('kap,kxab,kbq->kxpq', coeff.conj(), ao, coeff)
 
     def _get_adc1_ham(self, eris, kshift=0):
         r"""Build the zeroth- and first-order effective Hamiltonian M matrix.
@@ -7317,9 +7354,8 @@ class KRADCEE(KRADCBase):
             (2, 2, 2)
         """
         from pyscf.pbc.df import ft_ao
-        coeff, e_occ, e_vir = (self.padded_coeff,
-            self.e_occ, self.e_vir)
-        ia, ai, doubles = self._momentum_maps(kshift)
+        coeff = self.padded_coeff
+        ia, _, _ = self._momentum_maps(kshift)
         q = -self.kpts[kshift]
         operator = np.empty(
             (self.nkpts, self.nmo, self.nmo), dtype=np.complex128)
@@ -7327,7 +7363,7 @@ class KRADCEE(KRADCBase):
         for ki, ka in enumerate(ia):
             ao = ft_ao.ft_aopair(
                 self.cell,
-                self.density_gv.reshape(1, 3),
+                np.asarray(self.density_gv).reshape(1, 3),
                 kpti_kptj=np.array([self.kpts[ki], self.kpts[ka]]),
                 q=q)[0]
             operator[ki] = coeff[ki].conj().T @ ao @ coeff[ka]
