@@ -63,6 +63,9 @@ myeaadc.kernel()
 
 # EE-KRADC
 myeeadc = KRADCEE(myipadc)
+# Include the higher-order amplitudes in the EE transition moments on both
+# sides of the comparison. Periodic ADC normally approximates these.
+myeeadc.approx_trans_moments = False
 myeeadc.kernel()
 
 # To compare, we can run a supercell ADC calculation.
@@ -72,4 +75,20 @@ myeeadc.kernel()
 # mysupadc = mol_adc.RADC(supmf)
 # mysupadc.method, mysupadc.method_type = (adc_method, 'ee')
 # mysupadc.verbose = verbose
-# mysupadc.kernel(nroots=nroots_test*np.prod(nmp))
+# mysupadc.approx_trans_moments = myeeadc.approx_trans_moments
+# sup_e, _, sup_f, _ = mysupadc.kernel(nroots=nroots_test * ncopies)
+
+# A supercell root can mix degenerate states from different k sectors.
+# Compare strengths summed over energy-matched groups with equal root counts.
+# print('Energy (Eh)   Roots    k-point sum    supercell sum')
+# remaining = np.ones(sup_e.size, dtype=bool)
+# for root in np.argsort(sup_e):
+    # if remaining[root]:
+        # energy = sup_e[root]
+        # group = remaining & (abs(sup_e - energy) < 1e-6)
+        # remaining[group] = False
+        # matched = abs(myeeadc.E - energy) < 1e-6
+        # if matched.sum() == group.sum():
+            # print(f'{energy:11.7f} {group.sum():7d} '
+                  # f'{myeeadc.P[matched].sum():14.8f} '
+                  # f'{sup_f[group].sum():16.8f}')

@@ -411,7 +411,8 @@ class KRADCBase(lib.StreamObject):
         converged: Boolean array matching E, one flag per root and sector.
         compute_properties (bool): Compute P and X after diagonalization.
         approx_trans_moments (bool): Omit selected higher-order transition
-            amplitudes, following the molecular ADC convention (default True).
+            amplitudes (default True). Set False for a comparison with the
+            default full transition moments of molecular RADC-EE.
         density_gv (ndarray): Reciprocal vector G in inverse Bohr for EE
             density response in periodic mode at physical momentum q + G.
         integral_backend (str): ``auto``, ``incore``, ``outcore`` or

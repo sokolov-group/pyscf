@@ -49,6 +49,8 @@ class KnownValues(unittest.TestCase):
     Methods:
         test_molecular_limit: Compare all EE orders with molecular amplitudes,
             matrices and densities.
+        test_gamma_oscillator_strengths: Compare four LiH strengths at Gamma.
+        test_four_k_oscillator_strengths: Compare all eight example roots.
         test_supercell_oscillator_strengths: Check two-k EE energies and
             oscillator strengths against the Gamma supercell.
         test_complex_kpoint_oscillator_strengths: Check three-k EE strengths
@@ -134,6 +136,17 @@ class KnownValues(unittest.TestCase):
                 np.testing.assert_allclose(actual_t, expected_t, atol=1e-12)
                 eris.close()
 
+    def test_gamma_oscillator_strengths(self):
+        """Compare four nondegenerate LiH excitations at all three orders."""
+        cell = gto.M(atom='Li 0 0 0; H 0 0 1.6', a=np.diag([6., 7., 8.]),
+                     unit='Angstrom', basis='sto-3g', verbose=0)
+        self._check_supercell(cell, [1, 1, 1], compare_all=True)
+
+    def test_four_k_oscillator_strengths(self):
+        """Match the example's eight roots, including its degenerate pairs."""
+        self._check_supercell(mf.cell, [1, 2, 2], methods=('adc(2)',),
+                              nroots=2, compare_all=True)
+
     def test_supercell_oscillator_strengths(self):
         r"""Check two-k EE energies and oscillator strengths against the Gamma
         supercell.
@@ -146,7 +159,7 @@ class KnownValues(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        self._check_supercell([1, 1, 2])
+        self._check_supercell(mf.cell, [1, 1, 2])
 
     def test_complex_kpoint_oscillator_strengths(self):
         r"""Check three-k EE strengths with complex Bloch orbitals.
@@ -158,40 +171,48 @@ class KnownValues(unittest.TestCase):
             None: unittest reports an assertion failure if the stated contract
             fails.
         """
-        self._check_supercell([1, 1, 3])
+        self._check_supercell(mf.cell, [1, 1, 3])
 
-    def _check_supercell(self, mesh):
+    def _check_supercell(self, cell, mesh,
+                         methods=('adc(2)', 'adc(2)-x', 'adc(3)'),
+                         nroots=4, compare_all=False):
         r"""Compare periodic EE energies and oscillator strengths with a
         supercell.
 
         Args:
-            mesh (sequence[int]): Three positive replication counts defining
-                both
-                the k mesh and its commensurate Gamma-point supercell.
+            cell (Cell): Primitive cell used for the k-point calculation.
+            mesh (sequence[int]): Replication counts defining the k mesh and
+                its commensurate Gamma-point supercell.
+            methods (tuple[str]): Approximation orders to check.
+            nroots (int): Number of roots requested per momentum sector.
+            compare_all (bool): Require both solvers to cover the same roots,
+                including the upper edge of the computed spectrum.
 
         Returns:
             None: For all EE orders, assert agreement of roots below the shared
             cutoff and summed oscillator strengths in degenerate subspaces.
             Compare directly with molecular ADC pole energies and strengths.
         """
-        kpoints = mf.cell.make_kpts(mesh)
-        kmf = scf.KRHF(mf.cell, kpoints, exxdiv=None).density_fit().run()
-        scell = super_cell(mf.cell, mesh)
+        kpoints = cell.make_kpts(mesh)
+        kmf = scf.KRHF(cell, kpoints, exxdiv=None).density_fit().run()
+        scell = super_cell(cell, mesh)
         smf = scf.RHF(scell, exxdiv=None).density_fit().run()
-        for method in ('adc(2)', 'adc(2)-x', 'adc(3)'):
+        for method in methods:
             with self.subTest(method=method):
                 mykradc = adc.KRADCEE(kmf)
                 mykradc.method = method
-                mykradc.approx_trans_moments = False
                 molecular = molecular_adc.RADC(smf)
                 molecular.method_type = 'ee'
                 molecular.method = method
+                mykradc.approx_trans_moments = molecular.approx_trans_moments
                 mykradc.conv_tol = molecular.conv_tol = 1e-10
                 mykradc.tol_residual = molecular.tol_residual = 1e-8
-                ke, kv, kp, kx = mykradc.kernel(4)
-                me, mv, mp, mx = molecular.kernel(4 * len(kpoints))
+                ke, _, kp, _ = mykradc.kernel(nroots)
+                me, _, mp, _ = molecular.kernel(nroots * len(kpoints))
                 # Restrict the comparison to roots covered by both solves.
                 cutoff = min(ke.max(axis=1).min(), me.max()) - 1e-6
+                if compare_all:
+                    cutoff = np.inf
                 np.testing.assert_allclose(
                     np.sort(ke[ke < cutoff]),
                     np.sort(me[me < cutoff]),
