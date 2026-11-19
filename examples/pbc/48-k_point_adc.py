@@ -58,17 +58,11 @@ myipadc.kernel()
 
 
 # EA-KRADC
-myeaadc = KRADCEA(kmf)
-myeaadc.method = adc_method
-myeaadc.nroots = nroots_test
-myeaadc.verbose = verbose
+myeaadc = KRADCEA(myipadc)
 myeaadc.kernel()
 
 # EE-KRADC
-myeeadc = KRADCEE(kmf)
-myeeadc.method = adc_method
-myeeadc.nroots = nroots_test
-myeeadc.verbose = verbose
+myeeadc = KRADCEE(myipadc)
 myeeadc.kernel()
 
 # To compare, we can run a supercell ADC calculation.

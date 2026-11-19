@@ -52,6 +52,10 @@ def einsum(subscripts, *operands, **kwargs):
         ndarray or scalar: Contracted result with output axes in subscripts
         order. Result shape and dtype follow the selected contraction.
 
+    Raises:
+        ValueError: The operand dimensions are incompatible with the
+            contraction indices.
+
     Examples:
         >>> import numpy as np
         >>> from pyscf.pbc.adc.lib import einsum

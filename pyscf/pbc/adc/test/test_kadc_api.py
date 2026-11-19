@@ -572,6 +572,23 @@ class DriverAPI(unittest.TestCase):
                 self.assertEqual(guesses.call_count, 2)
                 self.assertEqual(guesses.call_args.kwargs['type_'], 'read')
 
+    def test_sector_intermediates_and_transitions(self):
+        """Check intermediate reuse and root layout across two transfers."""
+        for cls in (adc.KRADCIP, adc.KRADCEA, adc.KRADCEE):
+            solver = cls(mf)
+            with self.subTest(sector=cls.__name__), mock.patch.object(
+                    solver, 'get_imds', wraps=solver.get_imds) as build:
+                _, _, _, transitions = solver.kernel(2, kptlist=[1, 0])
+                if cls is adc.KRADCEE:
+                    shifts = [c.kwargs['kshift'] for c in build.call_args_list]
+                    self.assertEqual(shifts, [1, 0])
+                    self.assertTrue(np.shares_memory(solver.T, transitions))
+                    self.assertEqual(solver.T.shape, (2, 2, solver.nkpts
+                                                      * solver.nmo ** 2))
+                else:
+                    build.assert_called_once()
+                    self.assertEqual(transitions.shape, (2, solver.nmo, 2))
+
     def test_reference_density_ao(self):
         r"""Check AO reference densities with complex phases and reduced MO
         spaces.

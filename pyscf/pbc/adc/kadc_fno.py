@@ -147,6 +147,8 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
         >>> int(mykradc_fno.nvir), len(mykradc_fno.mo_coeff)
         (1, 2)
     """
+    if_ref_qp = True
+
     _keys = kadc_rhf.KRADCBase._keys | {
         'delta_e', 'e_can', 'v_can', 'e_corr_can', 'rdm1_ss', 'mode',
         'ref_state', 'delta_e_corr', 'p_can', 'if_ref_qp', 'delta_e_qp',
@@ -186,7 +188,6 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
         self.rdm1_ss = None
         self.mode = "min"
         self.ref_state = None
-        self.if_ref_qp = True
         self.e_corr_fno = None
 
     def _reset_adc_state(self):
@@ -374,6 +375,13 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
             runs
             return the scalar/list from ground_state_energy() instead.
 
+        Raises:
+            TypeError: nroots is not an integer.
+            ValueError: ref_state is outside the solved roots or has an invalid
+                selection format.
+            NotImplementedError: EE truncation requires a ground-state
+                reference.
+
         Examples:
             >>> import numpy as np
             >>> from pyscf.pbc import gto, scf
@@ -529,6 +537,10 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
             None: Update e_corr and delta_e_corr=e_corr_can-e_corr. Charged
             runs also update e_ssfno/v_ssfno/p_ssfno and delta_e=e_can-e_ssfno,
             plus matched quasiparticle differences when if_ref_qp=True.
+
+        Examples:
+            After preparing canonical energies and FNO orbitals, call
+            ``solver.compute_correction(if_gs=True)`` for the energy offset.
         """
         if if_gs:
             kadc_rhf.KRADCBase.ground_state_energy(self)
@@ -645,16 +657,16 @@ class _KRADCFNO(kadc_rhf.KRADCBase):
             the
             density is built, preserving the canonical results for correction.
 
-        For ref_state=None, use the ground density. Explicit (root_lists,
-        sectors)
-        selection averages the requested charged densities with their
-        additional
-        reference contribution. If if_ref_qp=True, root-list entries select
-        among
-        poles with P>is_qp. The integer ref_state form is one-based and uses
-        nkpts
-        as its legacy flattening stride; explicit lists avoid that indexing
-        rule.
+        Notes:
+            With ref_state=None, use the ground density. Explicit root and
+            sector lists select charged densities to average with the
+            reference contribution. With if_ref_qp=True, root lists index
+            poles with P>is_qp. An integer ref_state is one-based and uses
+            nkpts as the stride when indexing the flattened energies.
+
+        Raises:
+            ValueError: The root and sector lists in ref_state have
+                inconsistent lengths or invalid element types.
 
         Examples:
             >>> import numpy as np

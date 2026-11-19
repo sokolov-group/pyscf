@@ -462,13 +462,20 @@ class KRADCBase(lib.StreamObject):
         'incore_complete', 'compute_properties', 'approx_trans_moments',
         'integral_backend', 'chunk_size', 'keep_exxdiv', 'with_df', 'naux',
         'if_heri_eris', 'eris', 'if_naf', 'thresh_naf', 'if_corr',
-        'density_gv', 'nkop_chk', 'kop_npick', 'imds', 'E', 'T', 'U', 'X', 'P',
+        'density_gv', 'imds', 'E', 'T', 'U', 'X', 'P',
         'converged',
     }
 
     # Default number of roots per momentum sector when a call omits nroots.
     nroots = 1
     incore_complete = False
+    compute_properties = True
+    approx_trans_moments = True
+    keep_exxdiv = False
+    if_heri_eris = False
+    if_naf = False
+    if_corr = True
+    _strength_label = None
 
     # Only common reference data survive a sector conversion.
     _reference_keys = _keys - {'E', 'T', 'U', 'X', 'P', 'converged',
@@ -574,17 +581,12 @@ class KRADCBase(lib.StreamObject):
             self.conv_tol = getattr(__config__, 'adc_kadc_RADC_conv_tol', 1e-7)
             self.tol_residual = getattr(
                 __config__, 'adc_kadc_RADC_tol_res', 1e-4)
-            self.compute_properties = self.approx_trans_moments = True
             self._nocc = self._nmo = self._nvir = None
-            self.nkop_chk = self.kop_npick = False
             self.t1 = self.t2 = self.e_corr = None
             self._chunk_size = None
             self._chunk_size_manual = False
             self.imds = SimpleNamespace()
-            self.keep_exxdiv = False
             self.naux = None
-            self.if_heri_eris = self.if_naf = False
-            self.if_corr = True
             self.thresh_naf = 1e-2
             self.eris = None
             # Backends: auto, incore, outcore, density_fit (also spelled df).
@@ -619,9 +621,16 @@ class KRADCBase(lib.StreamObject):
                 A reference-only run returns scalar e_corr in Hartree and
                 clears all excitation results.
 
-        For excitation calculations, read E, U, P and X from the solver/driver
-        attributes after calling kernel(). Unpacking the returned tuple is
-        discouraged; the tuple remains available for compatibility.
+        Raises:
+            TypeError: nroots is not an integer.
+            ValueError: A momentum index or trial vector is invalid.
+            NotImplementedError: Positive roots require an excitation solver
+                and array-like trial vectors.
+
+        Notes:
+            Charged sectors share a singles intermediate across all k points.
+            EE builds one per momentum transfer and stores metric-normalized
+            eigenvectors. Read E, U, P and X from the solver after kernel().
 
         Examples:
             Create the two-k-point helium reference below; lattice vectors
@@ -649,7 +658,7 @@ class KRADCBase(lib.StreamObject):
             nroots = self.nroots
         if not isinstance(nroots, (int, np.integer)):
             raise TypeError('nroots must be an integer.')
-        if nroots > 0 and not isinstance(self, (KRADCIP, KRADCEA, KRADCEE)):
+        if nroots > 0 and self._strength_label is None:
             raise NotImplementedError('Choose KRADCIP, KRADCEA or KRADCEE for '
                                       'excitation calculations.')
         # Rebuild reference data shared by all requested momentum sectors.
@@ -665,7 +674,7 @@ class KRADCBase(lib.StreamObject):
         self.dump_flags()
         vec_size = self.vector_size()
         nroots = min(nroots, vec_size)
-        nkpts, nmo = self.nkpts, self.nmo
+        nkpts = self.nkpts
         kptlist = list(range(nkpts) if kptlist is None else kptlist)
         if not (kptlist and all(
             isinstance(k, (int, np.integer)) and 0 <= k < nkpts
@@ -674,44 +683,28 @@ class KRADCBase(lib.StreamObject):
         # Allocate one vector and one property result per sector and root.
         dtype = np.result_type(self.t2[0])
         root_shape = len(kptlist), nroots
-        evals = np.zeros(root_shape)
-        evecs = np.zeros((*root_shape, vec_size), dtype=dtype)
-        conv = np.zeros(root_shape, dtype=bool)
+        evals = np.empty(root_shape)
+        evecs = np.empty((*root_shape, vec_size), dtype=dtype)
+        conv = np.empty(root_shape, dtype=bool)
         P = np.zeros(root_shape)
-        neutral = isinstance(self, KRADCEE)
-        if neutral:
-            X = np.zeros((*root_shape, nkpts, nmo, nmo), dtype=dtype)
-            imds = None  # Neutral intermediates depend on kshift.
-        else:
-            X = np.zeros((len(kptlist), nmo, nroots), dtype=dtype)
-            imds = self.get_imds(eris)
-        initial_guess = self._init_guess
-        match guess:
-            case None:
-                guess_type = None
-            case str():
-                raise NotImplementedError('Supply trial vectors as an array.')
-            case _:
-                if not hasattr(guess, '__len__'):
-                    raise NotImplementedError('Guess type not implemented.')
-                guess_type = 'read'
-                guess_k = np.asarray(guess).copy()
+        X = np.zeros((len(kptlist), *self._transition_shape(nroots)),
+                     dtype=dtype)
+        imds = self._shared_imds(eris)
+        if isinstance(guess, str):
+            raise NotImplementedError('Supply trial vectors as an array.')
+        if guess is not None:
+            if not hasattr(guess, '__len__'):
+                raise NotImplementedError('Guess type not implemented.')
+            guess = np.asarray(guess)
 
         # Each momentum sector has its own matrix action and starting vectors.
         for k, kshift in enumerate(kptlist):
             matvec, diag = self.gen_matvec(kshift, imds, eris)
-            match guess_type:
-                case 'read':
-                    initial = initial_guess(
-                        nroots,
-                        diag,
-                        ascending=True,
-                        type_='read',
-                        ini=guess_k[k],
-                        kshift=kshift)
-                case None:
-                    initial = initial_guess(
-                        nroots, diag, ascending=True, kshift=kshift)
+            if guess is None:
+                initial = self._init_guess(nroots, diag, kshift=kshift)
+            else:
+                initial = self._init_guess(nroots, diag, type_='read',
+                                           ini=guess[k], kshift=kshift)
             conv_k, evals_k, evecs_k = lib.linalg_helper.davidson_nosym1(
                 lambda xs: [matvec(x) for x in xs],
                 initial,
@@ -723,45 +716,46 @@ class KRADCBase(lib.StreamObject):
                 max_space=self.max_space,
                 tol_residual=self.tol_residual)
             evals[k], evecs[k], conv[k] = evals_k.real, evecs_k, conv_k
-            U = evecs[k].T.copy()
-            if neutral:
-                U = self.renormalize_eigenvectors(kshift, U, nroots)
-                evecs[k] = U.T
+            vectors = self._prepare_root_vectors(kshift, evecs[k])
             if self.compute_properties:
-                P[k], X[k] = self.get_properties(kshift, U, nroots)
+                P[k], X[k] = self.get_properties(kshift, vectors, nroots)
 
-        # Save results in kptlist order for subsequent density calculations.
+        # Publish results only after all selected sectors have been solved.
         self._kptlist = kptlist
-        self.E, self.U, self.P, self.X, self.converged = (
-            evals, evecs, P, X, conv)
-        if neutral:
-            self.T = (X.reshape(*root_shape, -1)
-                      if self.compute_properties else None)
+        self.E, self.U, self.P, self.converged = evals, evecs, P, conv
+        self._save_transitions(X)
         nfalse = conv.size - np.count_nonzero(conv)
         if nfalse:
-            logger.warn(
-                self,
-                f'Davidson iterations for {nfalse} root(s) did not converge.')
+            log.warn('Davidson iterations for %d root(s) did not converge.',
+                     nfalse)
+        if self.verbose >= logger.INFO:
+            self._log_roots()
+        log.timer('ADC', *started)
+        return evals, evecs, P, X
+
+    def _save_transitions(self, X):
+        """Keep the complete set of transition arrays in kptlist order."""
+        self.X = X
+
+    def _log_roots(self):
+        """Report the energies and optional strengths in requested order."""
         data = {'Method': [], 'k': [], 'Root': [], 'Energy (Eh)': [],
                 'Energy (eV)': []}
-        strength_label = 'Density' if neutral else 'Spec factor'
         if self.compute_properties:
-            data[strength_label] = []
+            data[self._strength_label] = []
         data['Converged'] = []
-        for k, kshift in enumerate(kptlist):
-            for root in range(nroots):
+        for k, kshift in enumerate(self._kptlist):
+            for root in range(self.E.shape[1]):
                 data['Method'].append(self.method)
                 data['k'].append(kshift)
                 data['Root'].append(root)
-                data['Energy (Eh)'].append(f'{evals[k, root]:.10f}')
+                data['Energy (Eh)'].append(f'{self.E[k, root]:.10f}')
                 data['Energy (eV)'].append(
-                    f'{evals[k, root] * HARTREE2EV:.8f}')
+                    f'{self.E[k, root] * HARTREE2EV:.8f}')
                 if self.compute_properties:
-                    data[strength_label].append(f'{P[k, root]:.8f}')
-                data['Converged'].append(conv[k, root])
+                    data[self._strength_label].append(f'{self.P[k, root]:.8f}')
+                data['Converged'].append(self.converged[k, root])
         log_table(self, data, 'ADC calculation summary')
-        log.timer('ADC', *started)
-        return evals, evecs, P, X
 
     def _compute_reference(self, eris=None):
         r"""Validate settings, transform integrals, and populate reference
@@ -839,6 +833,9 @@ class KRADCBase(lib.StreamObject):
 
         Returns:
             KRADCBase: This object, for PySCF method chaining.
+
+        Examples:
+            For an initialized sector solver, call ``solver.dump_flags()``.
         """
         log = logger.new_logger(self, verbose)
         log.info('******** %s / %s ********', type(self).__name__, self.method)
@@ -858,6 +855,9 @@ class KRADCBase(lib.StreamObject):
 
         Returns:
             _ChemistsERIs: The owner of arrays, DF factors and scratch files.
+
+        Raises:
+            ValueError: The requested integral backend is unknown.
 
         Examples:
             Create the two-k-point helium reference below; lattice vectors
@@ -887,6 +887,9 @@ class KRADCBase(lib.StreamObject):
         Returns:
             int: n_singles + n_doubles, in the concrete sector's C-order
             layout.
+
+        Examples:
+            Use ``np.zeros(solver.vector_size())`` for one trial vector.
         """
         return self.n_singles + self.n_doubles
 
@@ -1030,6 +1033,13 @@ class KRADCBase(lib.StreamObject):
             tuple[callable, ndarray]: Matrix action sigma(r) and flat diagonal,
             each using the same singles intermediate and active orbital layout.
             Keep any supplied integral owner open while using the action.
+
+        Examples:
+            After preparing the ground state, use the same integrals to
+            form the action and its diagonal::
+
+                action, diagonal = solver.gen_matvec(0, eris=eris)
+                sigma = action(trial_vector)
         """
         if eris is None:
             eris = self.ao2mo()
@@ -1118,6 +1128,9 @@ class KRADCBase(lib.StreamObject):
 
         Returns:
             KRADCBase: This object.
+
+        Examples:
+            Use ``solver.dump_flags_gs()`` to log the reference settings.
         """
         return self.dump_flags(verbose)
 
@@ -1736,9 +1749,12 @@ class KRADCBase(lib.StreamObject):
             and FNO-only settings are excluded from the converted object.
         """
         # Share the reference arrays and copy per-solver bookkeeping below.
+        missing = object()
         for key in self._reference_keys:
-            if hasattr(adc, key):
-                setattr(self, key, getattr(adc, key))
+            value = getattr(adc, key, missing)
+            if value is not missing and value is not getattr(
+                    type(self), key, missing):
+                setattr(self, key, value)
         for key in ('_scf', '_nocc', '_nmo', '_nvir', '_chunk_size',
                     '_chunk_size_manual', 'stdout', 'verbose', 'max_memory'):
             setattr(self, key, getattr(adc, key))
@@ -2067,6 +2083,11 @@ class KRADCBase(lib.StreamObject):
             otherwise the corresponding active/full MO count. Neutral
             transition densities are available separately as X.
 
+        Raises:
+            ValueError: Saved roots are missing or the sector or root selection
+                is invalid.
+            NotImplementedError: State densities require an IP or EA solver.
+
         Examples:
             >>> import numpy as np
             >>> from pyscf.pbc import gto, scf
@@ -2194,6 +2215,9 @@ class KRADCBase(lib.StreamObject):
 
         Raises:
             ValueError: value is nonintegral or less than one.
+
+        Examples:
+            Set ``solver.chunk_size = 1`` to transform one orbital per batch.
         """
         if value is not None and (not isinstance(value, (int, np.integer))
                                   or value < 1):
@@ -2326,6 +2350,10 @@ class KRADCBase(lib.StreamObject):
 
         Raises:
             NotImplementedError: A reference-only KRADCBase has no sector.
+
+        Examples:
+            Reshape the singles part of a sector vector with
+            ``vector[:solver.n_singles].reshape(solver.singles_shape)``.
         """
         raise NotImplementedError('Choose KRADCIP, KRADCEA or KRADCEE.')
 
@@ -2335,6 +2363,10 @@ class KRADCBase(lib.StreamObject):
 
         Returns:
             int: Product of singles_shape, including active-space padding.
+
+        Examples:
+            The singles part of a trial vector is
+            ``vector[:solver.n_singles]``.
         """
         return int(np.prod(self.singles_shape))
 
@@ -2344,6 +2376,9 @@ class KRADCBase(lib.StreamObject):
 
         Returns:
             int: Product of doubles_shape, including active-space padding.
+
+        Examples:
+            Allocate a flat doubles vector with ``np.zeros(solver.n_doubles)``.
         """
         return int(np.prod(self.doubles_shape))
 
@@ -2356,6 +2391,10 @@ class KRADCBase(lib.StreamObject):
 
         Raises:
             NotImplementedError: A reference-only KRADCBase has no sector.
+
+        Examples:
+            Reshape ``vector[solver.n_singles:]`` to ``solver.doubles_shape``
+            to recover the momentum and orbital axes.
         """
         raise NotImplementedError('Choose KRADCIP, KRADCEA or KRADCEE.')
 
@@ -2452,7 +2491,23 @@ class KRADCBase(lib.StreamObject):
     get_nmo = get_nmo
 
 
-class KRADCIP(KRADCBase):
+class _KRADCCharged(KRADCBase):
+    """Shared kernel conventions for electron attachment and removal."""
+
+    _strength_label = 'Spec factor'
+
+    def _shared_imds(self, eris):
+        return self.get_imds(eris)
+
+    def _transition_shape(self, nroots):
+        return (self.nmo, nroots)
+
+    def _prepare_root_vectors(self, kshift, roots):
+        # Charged properties normalize in place. Preserve the Davidson roots.
+        return roots.T.copy() if self.compute_properties else None
+
+
+class KRADCIP(_KRADCCharged):
     r"""Solve restricted periodic ionization ADC in one-hole/particle sectors.
 
     Args:
@@ -3540,6 +3595,10 @@ class KRADCIP(KRADCBase):
         Returns:
             tuple[ndarray, ndarray]: Independent masked singles and doubles,
             with the original shapes and dtypes. Neither input is modified.
+
+        Examples:
+            For IP singles and doubles, ``solver.mask_frozen_ip(s, d, 0, 0)``
+            zeros padded entries at the first k point.
         """
         nkpts = self.nkpts
         kconserv = self.khelper.kconserv
@@ -3771,6 +3830,10 @@ class KRADCIP(KRADCBase):
             ndarray: Complex active MO density of shape (nkpts, nmo, nmo).
             Ground amplitudes must already be present; inputs are copied.
             This legacy path has no additional if_ss reference-density flag.
+
+        Examples:
+            For a normalized sector-zero vector ``u``, compute its density
+            with ``solver.make_rdm1_eigenvectors_slow(u, u, 0)``.
         """
         L = np.array(L).ravel().conj()
         R = np.array(R).ravel()
@@ -4202,6 +4265,10 @@ class KRADCIP(KRADCBase):
         Returns:
             tuple[int]: (nocc,), including active-space padding. The selected
             momentum sector fixes the one-hole momentum.
+
+        Examples:
+            Reshape the singles part of a sector vector with
+            ``vector[:solver.n_singles].reshape(solver.singles_shape)``.
         """
         return (self.nocc,)
 
@@ -4212,13 +4279,17 @@ class KRADCIP(KRADCBase):
         Returns:
             tuple[int]: nkpts, nkpts, nvir, nocc, nocc,
             including padding; the sector fixes the unstored third momentum.
+
+        Examples:
+            Reshape ``vector[solver.n_singles:]`` to ``solver.doubles_shape``
+            to recover the momentum and orbital axes.
         """
         return (self.nkpts, self.nkpts, self.nvir, self.nocc, self.nocc)
 
     _mask_frozen = mask_frozen_ip
 
 
-class KRADCEA(KRADCBase):
+class KRADCEA(_KRADCCharged):
     r"""Solve restricted periodic electron-attachment ADC in one-hole/particle
     sectors.
 
@@ -5616,6 +5687,10 @@ class KRADCEA(KRADCBase):
         Returns:
             tuple[ndarray, ndarray]: Independent masked singles and doubles,
             with the original shapes and dtypes. Neither input is modified.
+
+        Examples:
+            For EA singles and doubles, ``solver.mask_frozen_ea(s, d, 0, 0)``
+            zeros padded entries at the first k point.
         """
         nkpts = self.nkpts
         kconserv = self.khelper.kconserv
@@ -5660,6 +5735,10 @@ class KRADCEA(KRADCBase):
             ndarray: Contiguous ladder contribution of shape
             (nocc, nvir, nvir). DF reconstruction includes division by nkpts;
             stored integral blocks already contain this normalization.
+
+        Examples:
+            For density-fitted integrals at Gamma, use
+            ``solver.ea_contract_r_vvvv(r2, eris.Lvv, 0, 0, 0)``.
         """
         nocc = r2.shape[0]
         nvir = r2.shape[1]
@@ -5914,6 +5993,10 @@ class KRADCEA(KRADCBase):
             ndarray: Complex active MO density of shape (nkpts, nmo, nmo).
             Ground amplitudes must already be present; inputs are copied.
             This legacy path has no additional if_ss reference-density flag.
+
+        Examples:
+            For a normalized sector-zero vector ``u``, compute its density
+            with ``solver.make_rdm1_eigenvectors_slow(u, u, 0)``.
         """
         L = np.array(L).ravel().conj()
         R = np.array(R).ravel()
@@ -6350,6 +6433,10 @@ class KRADCEA(KRADCBase):
         Returns:
             tuple[int]: (nvir,), including active-space padding. The selected
             momentum sector fixes the one-particle momentum.
+
+        Examples:
+            Reshape the singles part of a sector vector with
+            ``vector[:solver.n_singles].reshape(solver.singles_shape)``.
         """
         return (self.nvir,)
 
@@ -6360,6 +6447,10 @@ class KRADCEA(KRADCBase):
         Returns:
             tuple[int]: nkpts, nkpts, nocc, nvir, nvir,
             including padding; the sector fixes the unstored third momentum.
+
+        Examples:
+            Reshape ``vector[solver.n_singles:]`` to ``solver.doubles_shape``
+            to recover the momentum and orbital axes.
         """
         return (self.nkpts, self.nkpts, self.nocc, self.nvir, self.nvir)
 
@@ -6432,7 +6523,25 @@ class KRADCEE(KRADCBase):
         ((1, 2, 10), (1, 2), (1, 2, 2, 2, 2))
     """
 
-    # Build the neutral singles Hamiltonian for each momentum transfer.
+    _strength_label = 'Density'
+
+    def _shared_imds(self, eris):
+        # gen_matvec builds the EE singles Hamiltonian for each transfer.
+        return None
+
+    def _transition_shape(self, nroots):
+        return (nroots, self.nkpts, self.nmo, self.nmo)
+
+    def _prepare_root_vectors(self, kshift, roots):
+        # EE stores metric-normalized roots even with properties disabled.
+        vectors = self.renormalize_eigenvectors(kshift, roots.T, len(roots))
+        roots[:] = vectors.T
+        return vectors
+
+    def _save_transitions(self, X):
+        super()._save_transitions(X)
+        self.T = (X.reshape(*self.E.shape, -1)
+                  if self.compute_properties else None)
 
     def get_imds(self, eris=None, kshift=0):
         r"""Assemble the singles effective Hamiltonian through the ADC order.
@@ -6479,8 +6588,12 @@ class KRADCEE(KRADCBase):
         self._get_adc2_ham(eris, kshift, M=M_ph)
         if self.method == 'adc(3)':
             self._get_adc3_ham(eris, kshift, M=M_ph)
-        return M_ph.transpose(0, 2, 3, 1, 4, 5).reshape(
+        H = M_ph.transpose(0, 2, 3, 1, 4, 5).reshape(
             self.n_singles, self.n_singles)
+        if self.verbose >= logger.DEBUG:
+            logger.debug(self, 'EE singles eigenvalues %s',
+                         np.linalg.eigvalsh(H))
+        return H
 
     def renormalize_eigenvectors(self, kshift, U, nroots=None):
         r"""Return copies of EE eigenvectors normalized in the singlet metric.
@@ -7335,6 +7448,10 @@ class KRADCEE(KRADCBase):
             selected
             kshift fixes k_a from k_i-k_a=kshift; it is not another independent
             tensor axis. See _momentum_maps() for the explicit lookup.
+
+        Examples:
+            Reshape the singles part of a sector vector with
+            ``vector[:solver.n_singles].reshape(solver.singles_shape)``.
         """
         return (self.nkpts, self.nocc, self.nvir)
 
@@ -7349,6 +7466,10 @@ class KRADCEE(KRADCBase):
             in the selected sector. No orbital-pair permutation symmetry is
             used
             to compress this tensor.
+
+        Examples:
+            Reshape ``vector[solver.n_singles:]`` to ``solver.doubles_shape``
+            to recover the momentum and orbital axes.
         """
         return (self.nkpts,) * 3 + (self.nocc,) * 2 + (self.nvir,) * 2
 

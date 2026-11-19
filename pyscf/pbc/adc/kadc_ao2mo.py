@@ -325,6 +325,10 @@ class _ChemistsERIs:
             ``ovvv_kpoint_normalized[kp, kq, kr, ...]``; the fourth k point
             follows chemists' momentum conservation. Reading one block does not
             fill raw ovvv.
+
+        Examples:
+            Read the Gamma block on a Gamma-centered mesh with
+            ``eris.ovvv_kpoint_normalized[0, 0, 0]``.
         """
         return _IntegralBlocks(self, 'ovvv', self._get_ovvv)
 
@@ -339,6 +343,10 @@ class _ChemistsERIs:
             momentum is kconserv[kp, kr, kq]; the returned orbital order is
             p,r,q,s relative
             to the DF pair product. Reading a block does not fill raw vvvv.
+
+        Examples:
+            Read the Gamma block on a Gamma-centered mesh with
+            ``eris.vvvv_kpoint_normalized[0, 0, 0]``.
         """
         return _IntegralBlocks(self, 'vvvv', self._get_vvvv)
 
@@ -390,6 +398,9 @@ class _ChemistsERIs:
             remain
             available, but HDF5 datasets belonging to the closed file must no
             longer be accessed. Containers do not own the ADC amplitude files.
+
+        Examples:
+            Call ``eris.close()`` after the final disk-backed integral read.
         """
         if self.feri is not None:
             self.feri.close()
@@ -872,6 +883,9 @@ def ao2mo(adc, backend=None):
     Returns:
         _ChemistsERIs: Normalized active integrals and any DF factors or
         scratch files. Use a context manager to release scratch storage.
+
+    Raises:
+        ValueError: The requested integral backend is unknown.
 
     Examples:
         >>> import numpy as np

@@ -43,6 +43,10 @@ def KRADC2FNO(mf, frozen=None, mo_coeff=None, mo_occ=None,
         ground_state_energy and kernel methods. Concrete FNO classes can also
         be called directly.
 
+    Raises:
+        TypeError: The input does not provide a supported periodic reference.
+        ValueError: kpts was supplied with an SCF or ADC object.
+
     Examples:
         Build and run a small two-k helium reference, then preserve the EA
         sector when enabling FNO truncation. Lattice vectors are in Angstrom:
