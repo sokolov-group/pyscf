@@ -1256,9 +1256,6 @@ class KRADCBase(lib.StreamObject):
         nocc = self.nocc
         nvir = nmo - nocc
         nkpts = self.nkpts
-        cell = self.cell
-        kpts = self.kpts
-        madelung = tools.madelung(cell, kpts)
 
         # Release the scratch storage from the previous kernel call.
         self._close_amp_scratch()
@@ -1443,6 +1440,8 @@ class KRADCBase(lib.StreamObject):
                 't2_2',
                 (nkpts, nkpts, nkpts, nocc, nocc, nvir, nvir),
                 dtype=eris.ovov.dtype)
+            if self.exxdiv is not None:
+                madelung = tools.madelung(self.cell, self.kpts)
             for ki, kj, ka in kpts_helper.loop_kkk(nkpts):
                 amplitude = t2_1_vvvv[ki, kj, ka]
                 if self.exxdiv is not None:
@@ -3239,25 +3238,14 @@ class KRADCIP(_KRADCCharged):
             >>> sigma.shape
             (5,)
         """
-        self.method = check_implemented(self.method)
-
-        method = self.method
-
-        nkpts = self.nkpts
-        nocc = self.nocc
+        self.method = method = check_implemented(self.method)
+        nkpts, nocc, nvir = self.nkpts, self.nocc, self.nvir
         kconserv = self.khelper.kconserv
-        n_singles = nocc
-        nvir = self.nvir
-        n_doubles = nkpts * nkpts * nvir * nocc * nocc
-
-        s_singles = 0
-        f_singles = n_singles
-        s_doubles = f_singles
-        f_doubles = s_doubles + n_doubles
-
-        mo_coeff, e_occ, e_vir = (self.padded_coeff,
-
-            self.e_occ, self.e_vir)
+        n_singles = self.n_singles
+        e_occ, e_vir = self.e_occ, self.e_vir
+        madelung = None
+        if method in ('adc(2)-x', 'adc(3)') and self.exxdiv is not None:
+            madelung = tools.madelung(self.cell, self.kpts)
 
         if M_ij is None:
             M_ij = self.get_imds(eris=eris)
@@ -3281,22 +3269,16 @@ class KRADCIP(_KRADCCharged):
             cput0 = (time.process_time(), time.time())
             log = logger.Logger(self.stdout, self.verbose)
 
-            r1 = r[s_singles:f_singles]
-            r2 = r[s_doubles:f_doubles]
-
-            r2 = r2.reshape(nkpts, nkpts, nvir, nocc, nocc)
-            s2 = np.zeros(
-                (nkpts, nkpts, nvir, nocc, nocc), dtype=np.complex128)
-            cell = self.cell
-            kpts = self.kpts
-            madelung = tools.madelung(cell, kpts)
-
-            eris_ovoo = eris.ovoo
-
-            # Apply the effective one-hole block to the singles.
-            s1 = einsum('ij,j->i', M_ij[kshift], r1)
+            r1 = r[:n_singles]
+            r2 = r[n_singles:].reshape(nkpts, nkpts, nvir, nocc, nocc)
+            # Accumulate the doubles directly into the outgoing sigma vector.
+            sigma = np.zeros(r.size, dtype=np.result_type(M_ij, r, complex))
+            s1 = sigma[:n_singles]
+            np.matmul(M_ij[kshift], r1, out=s1)
+            s2 = sigma[n_singles:].reshape(r2.shape)
 
             # Couple the two-hole/one-particle amplitudes back to singles.
+            eris_ovoo = eris.ovoo
             for kj in range(nkpts):
                 for kk in range(nkpts):
                     ka = kconserv[kk, kshift, kj]
@@ -3374,12 +3356,10 @@ class KRADCIP(_KRADCCharged):
                                 'jabi,bki->ajk',
                                 eris_ovvo[kj, ka, kb], r2[kb, kk])
 
-                if self.exxdiv is not None:
+                if madelung is not None:
                     s2 += madelung * r2
 
             if (method == "adc(3)"):
-
-                eris_ovoo = eris.ovoo
 
                 # Dress the singles-doubles coupling with ground-state
                 # amplitudes.
@@ -3646,15 +3626,9 @@ class KRADCIP(_KRADCCharged):
                                 'jbl,klba->ajk',
                                 temp_2, t2_1[kk, kl, kb].conj())
                             del t2_1
-            s2 = s2.reshape(-1)
-            s = np.hstack((s1, s2))
-            del s1
-            del s2
-            cput0 = log.timer_debug1(
-                'completed sigma vector calculation', *cput0)
-            s *= -1.0
-
-            return s
+            sigma *= -1
+            log.timer_debug1('completed sigma vector calculation', *cput0)
+            return sigma
         return sigma_
 
     def mask_frozen_ip(self, v1, v2, kshift, const=-LARGE_DENOM):
@@ -5219,25 +5193,14 @@ class KRADCEA(_KRADCCharged):
             >>> sigma.shape
             (5,)
         """
-        self.method = check_implemented(self.method)
-
-        method = self.method
-
-        nkpts = self.nkpts
-        nocc = self.nocc
+        self.method = method = check_implemented(self.method)
+        nkpts, nocc, nvir = self.nkpts, self.nocc, self.nvir
         kconserv = self.khelper.kconserv
-        nvir = self.nvir
-        n_singles = self.nmo - self.nocc
-        n_doubles = nkpts * nkpts * nocc * nvir * nvir
-
-        s_singles = 0
-        f_singles = n_singles
-        s_doubles = f_singles
-        f_doubles = s_doubles + n_doubles
-
-        mo_coeff, e_occ, e_vir = (self.padded_coeff,
-
-            self.e_occ, self.e_vir)
+        n_singles = self.n_singles
+        e_occ, e_vir = self.e_occ, self.e_vir
+        madelung = None
+        if method in ('adc(2)-x', 'adc(3)') and self.exxdiv is not None:
+            madelung = tools.madelung(self.cell, self.kpts)
 
         if M_ab is None:
             M_ab = self.get_imds(eris=eris)
@@ -5262,18 +5225,13 @@ class KRADCEA(_KRADCCharged):
             cput0 = (time.process_time(), time.time())
             log = logger.Logger(self.stdout, self.verbose)
 
-            r1 = r[s_singles:f_singles]
-            r2 = r[s_doubles:f_doubles]
-
-            r2 = r2.reshape(nkpts, nkpts, nocc, nvir, nvir)
-            s2 = np.zeros(
-                (nkpts, nkpts, nocc, nvir, nvir), dtype=np.complex128)
-            cell = self.cell
-            kpts = self.kpts
-            madelung = tools.madelung(cell, kpts)
-
-            # Apply the effective one-particle block to the singles.
-            s1 = einsum('ab,b->a', M_ab[kshift], r1)
+            r1 = r[:n_singles]
+            r2 = r[n_singles:].reshape(nkpts, nkpts, nocc, nvir, nvir)
+            # Accumulate the doubles directly into the outgoing sigma vector.
+            sigma = np.zeros(r.size, dtype=np.result_type(M_ab, r, complex))
+            s1 = sigma[:n_singles]
+            np.matmul(M_ab[kshift], r1, out=s1)
+            s2 = sigma[n_singles:].reshape(r2.shape)
 
             # Couple one-particle and two-particle/one-hole configurations.
             for kb in range(nkpts):
@@ -5389,8 +5347,8 @@ class KRADCEA(_KRADCCharged):
                                 'iywj,jwx->ixy',
                                 eris_ovvo[ki, ky, kw], r2[kj, kw])
 
-                if self.exxdiv is not None:
-                    s2 += -madelung * r2
+                if madelung is not None:
+                    s2 -= madelung * r2
             if (method == "adc(3)"):
 
                 eris_ovoo = eris.ovoo
@@ -5755,15 +5713,8 @@ class KRADCEA(_KRADCCharged):
                             del temp_1_1
                             del temp_2_1
 
-            s2 = s2.reshape(-1)
-            s = np.hstack((s1, s2))
-            del s1
-            del s2
-
-            cput0 = log.timer_debug1(
-                'completed sigma vector calculation', *cput0)
-
-            return s
+            log.timer_debug1('completed sigma vector calculation', *cput0)
+            return sigma
         return sigma_
 
     def mask_frozen_ea(self, v1, v2, kshift, const=LARGE_DENOM):
@@ -6975,82 +6926,52 @@ class KRADCEE(KRADCBase):
             >>> updated is M_ph, updated.shape
             (True, (2, 2, 1, 1, 1, 1))
         """
-        M_ph = M
         nkpts, nocc, nvir = self.nkpts, self.nocc, self.nvir
         kconserv = self.khelper.kconserv
-        kshift_ia, ai, doubles = self._momentum_maps(kshift)
-        v_ovov = eris.ovov
-        t1_oovv = t1d_oovv = self.t2[0]
+        ia, _, _ = self._momentum_maps(kshift)
+        t2, ovov = self.t2[0], eris.ovov
+        M_ph = M
         if M_ph is None:
-            M_ph = np.zeros(self._singles_ham_shape, dtype=t1_oovv.dtype)
-        occ_identity, vir_identity = np.eye(nocc), np.eye(nvir)
-        # Contract first-order doubles with ovov in the singles block.
-        for kI in range(nkpts):
-            kD = kshift_ia[kI]
-            for kL in range(nkpts):
-                kA = kshift_ia[kL]
-                for ki in range(nkpts):
-                    M_ph[kI, kL] += 2 * einsum(
-                        'IiDa,LAia->IDLA',
-                        t1_oovv[kI, ki, kD], v_ovov[kL, kA, ki])
-                    M_ph[kI, kL] -= einsum(
-                        'IiDa,iALa->IDLA',
-                        t1_oovv[kI, ki, kD], v_ovov[ki, kA, kL])
-                    M_ph[kI, kL] += 2 * einsum(
-                        'LiAa,IDia->IDLA',
-                        t1d_oovv[kL, ki, kA].conj(), v_ovov[kI, kD, ki].conj())
-                    M_ph[kI, kL] -= einsum(
-                        'LiAa,iDIa->IDLA',
-                        t1d_oovv[kL, ki, kA].conj(), v_ovov[ki, kD, kI].conj())
-                    M_ph[kI, kL] -= einsum(
-                        'iIDa,LAia->IDLA',
-                        t1_oovv[ki, kI, kD], v_ovov[kL, kA, ki])
-                    M_ph[kI, kL] += 0.5 * einsum(
-                        'iIDa,iALa->IDLA',
-                        t1_oovv[ki, kI, kD], v_ovov[ki, kA, kL])
-                    M_ph[kI, kL] -= einsum(
-                        'iLAa,IDia->IDLA',
-                        t1d_oovv[ki, kL, kA].conj(), v_ovov[kI, kD, ki].conj())
-                    M_ph[kI, kL] += 0.5 * einsum(
-                        'iLAa,iDIa->IDLA',
-                        t1d_oovv[ki, kL, kA].conj(), v_ovov[ki, kD, kI].conj())
-                if kI == kL:
-                    M_IL = np.zeros((nocc, nocc), dtype=M_ph.dtype)
-                    M_DA = np.zeros((nvir, nvir), dtype=M_ph.dtype)
-                    for ki in range(nkpts):
-                        for ka in range(nkpts):
-                            kb = kconserv[kI, ka, ki]
-                            M_IL -= einsum(
-                                'Iiab,Laib->IL',
-                                t1_oovv[kI, ki, ka], v_ovov[kL, ka, ki])
-                            M_IL += 0.5 * einsum(
-                                'Iiab,Lbia->IL',
-                                t1_oovv[kI, ki, ka], v_ovov[kL, kb, ki])
-                            M_IL -= einsum(
-                                'Liab,Iaib->IL',
-                                t1d_oovv[kL, ki, ka].conj(),
-                                v_ovov[kI, ka, ki].conj())
-                            M_IL += 0.5 * einsum(
-                                'Liab,Ibia->IL',
-                                t1d_oovv[kL, ki, ka].conj(),
-                                v_ovov[kI, kb, ki].conj())
-                        for kj in range(nkpts):
-                            M_DA -= einsum(
-                                'ijAa,iDja->DA',
-                                t1d_oovv[ki, kj, kA].conj(),
-                                v_ovov[ki, kD, kj].conj())
-                            M_DA += 0.5 * einsum(
-                                'ijAa,jDia->DA',
-                                t1d_oovv[ki, kj, kA].conj(),
-                                v_ovov[kj, kD, ki].conj())
-                            M_DA -= einsum(
-                                'ijDa,iAja->DA',
-                                t1_oovv[ki, kj, kD], v_ovov[ki, kA, kj])
-                            M_DA += 0.5 * einsum(
-                                'ijDa,jAia->DA',
-                                t1_oovv[ki, kj, kD], v_ovov[kj, kA, ki])
-                    M_ph[kI, kL] += einsum('IL,DA->IDLA', M_IL, vir_identity)
-                    M_ph[kI, kL] += einsum('IL,DA->IDLA', occ_identity, M_DA)
+            M_ph = np.zeros(self._singles_ham_shape, dtype=t2.dtype)
+
+        for kI, kD in enumerate(ia):
+            M_IL = np.zeros((nocc, nocc), dtype=M_ph.dtype)
+            M_DA = np.zeros((nvir, nvir), dtype=M_ph.dtype)
+            for ki in range(nkpts):
+                # Prototype: 2*t*v - t*v_ex - t_ex*v + 0.5*t_ex*v_ex,
+                # plus its adjoint with the external pairs ID and LA swapped.
+                # Combine direct and exchange blocks before contracting.
+                amp = 2 * t2[kI, ki, kD]
+                amp -= t2[ki, kI, kD].swapaxes(0, 1)
+                for kL, kA in enumerate(ia):
+                    ints = -0.5 * ovov[ki, kA, kL].swapaxes(0, 2)
+                    ints += ovov[kL, kA, ki]
+                    block = einsum('IiDa,LAia->IDLA', amp, ints)
+                    M_ph[kI, kL] += block
+                    np.conjugate(block, out=block)
+                    M_ph[kL, kI] += block.transpose(2, 3, 0, 1)
+                    del block, ints
+                del amp
+
+                # Sum the occupied and virtual corrections for kI == kL.
+                # Each exchange swaps both the orbital and its k point.
+                for ka in range(nkpts):
+                    kb = kconserv[kI, ka, ki]
+                    ints = (ovov[kI, ka, ki]
+                            - 0.5 * ovov[kI, kb, ki].swapaxes(1, 3))
+                    M_IL -= einsum('Iiab,Laib->IL', t2[kI, ki, ka], ints)
+                for kj in range(nkpts):
+                    ints = (ovov[ki, kD, kj]
+                            - 0.5 * ovov[kj, kD, ki].swapaxes(0, 2))
+                    M_DA -= einsum('ijDa,iAja->DA', t2[ki, kj, kD], ints)
+
+            # Prototype: M[IDLA] += (M_IL + M_IL.H) * delta[D,A]
+            #                     + delta[I,L] * (M_DA + M_DA.H).
+            # Repeated indices give writable views on the spectator diagonal.
+            occ = np.einsum('IDLD->ILD', M_ph[kI, kI])
+            vir = np.einsum('IDIA->IDA', M_ph[kI, kI])
+            occ += (M_IL + M_IL.conj().T)[:, :, None]
+            vir += M_DA + M_DA.conj().T
 
         return M_ph
 
@@ -7115,13 +7036,17 @@ class KRADCEE(KRADCBase):
                 value = context.contract(term, fixed, signs)
                 if value is None:
                     continue
-                # Embed two-index terms with an identity on the spectator
-                # orbital.
+                # Prototype: delta[D,A] * value[IL] or delta[I,L] * value[DA].
+                # Add two-index terms only on their spectator diagonal.
+                block = M_ph[ki, kl]
                 if output == 'IL':
-                    value = einsum('IL,DA->IDLA', value, np.eye(self.nvir))
+                    occ = np.einsum('IDLD->ILD', block)
+                    occ += value[:, :, None]
                 elif output == 'DA':
-                    value = einsum('IL,DA->IDLA', np.eye(self.nocc), value)
-                M_ph[ki, kl] += value
+                    vir = np.einsum('IDIA->IDA', block)
+                    vir += value
+                else:
+                    block += value
 
         return M_ph
 
@@ -7178,7 +7103,8 @@ class KRADCEE(KRADCBase):
         dtype = np.result_type(self.t2[0], M_ab)
         diagonal = np.empty(self.vector_size(), dtype=dtype)
         diagonal[:self.n_singles] = np.diagonal(M_ab).real
-        diagonal[self.n_singles:] = self._doubles_diagonal(kshift).ravel()
+        self._doubles_diagonal(
+            kshift, out=diagonal[self.n_singles:].reshape(self.doubles_shape))
         return diagonal
 
     def matvec(self, kshift, M_ab=None, eris=None):
@@ -7186,11 +7112,9 @@ class KRADCEE(KRADCBase):
         momentum.
 
         The action evaluates :math:`\sigma=M(k)r` through the selected ADC
-        order,
-        using full singles/doubles vectors without constructing a dense ADC or
-        supercell matrix. A missing DF ovvv tensor is reconstructed once when
-        preparing the closure; higher-order table contractions reuse a bounded
-        MomentumContractions cache across trial vectors.
+        order using full singles/doubles vectors. DF ovvv blocks are
+        reconstructed on demand and share the bounded contraction cache
+        across trial vectors.
 
         Args:
             kshift (int): Hole-minus-particle momentum sector.
@@ -7230,27 +7154,11 @@ class KRADCEE(KRADCBase):
 
         self.method = check_implemented(self.method)
 
-        nkpts, nocc, nvir = self.nkpts, self.nocc, self.nvir
-        kconserv = self.khelper.kconserv
-        f_singles = s_doubles = self.n_singles
-        s_singles = 0
-        f_doubles = self.vector_size()
+        nkpts = self.nkpts
+        n_singles = self.n_singles
         if eris is None:
             eris = self.ao2mo()
         doubles_diagonal = self._doubles_diagonal(kshift)
-
-        # Prepare the coupling integrals shared by Davidson iterations.
-        v_ovoo = eris.ovoo
-        if eris.ovvv is None:
-            shape = (nkpts,) * 3 + (nocc,) + (nvir,) * 3
-            v_ovvv = np.empty(shape, dtype=eris.Lov.dtype)
-            for kp, kq, kr in kpts_helper.loop_kkk(nkpts):
-                ks = kconserv[kp, kq, kr]
-                v_ovvv[kp, kq, kr] = einsum(
-                    'Lpq,Lrs->pqrs',
-                    eris.Lov[kp, kq], eris.Lvv[kr, ks]) / nkpts
-        else:
-            v_ovvv = eris.ovvv
 
         kshift_ia, kshift_ai, kconserv_r2 = self._momentum_maps(kshift)
 
@@ -7276,52 +7184,43 @@ class KRADCEE(KRADCBase):
             cput0 = (time.process_time(), time.time())
             log = logger.Logger(self.stdout, self.verbose)
 
-            r1 = r[s_singles:f_singles].reshape(self.singles_shape)
-            r2 = r[s_doubles:f_doubles].reshape(self.doubles_shape)
+            r1 = r[:n_singles].reshape(self.singles_shape)
+            r2 = r[n_singles:].reshape(self.doubles_shape)
+            dtype = np.result_type(self.t2[0], M_ab, r)
+            sigma = np.empty(r.size, dtype=dtype)
+            s1 = sigma[:n_singles].reshape(r1.shape)
+            s2 = sigma[n_singles:].reshape(r2.shape)
+            np.matmul(M_ab, r[:n_singles], out=sigma[:n_singles])
+            np.multiply(doubles_diagonal, r2, out=s2)
 
-            s1 = (M_ab @ r[s_singles:f_singles]).reshape(self.singles_shape)
-            s2 = np.empty(
-                self.doubles_shape, dtype=np.result_type(self.t2[0], M_ab, r))
-
-            # doubles rows: holes I, J at kI, kJ; particles C, D at kC, kD
+            # Read each integral block once for both directions of coupling.
             for kI, kJ, kC in kpts_helper.loop_kkk(nkpts):
                 kD = kconserv_r2[kI, kC, kJ]
+                ka = kshift_ia[kJ]
+                kl = kshift_ai[kD]
+                if eris.ovvv is None:
+                    ovvv = context._block('ovvv', (kI, kC, ka, kD))
+                else:
+                    ovvv = eris.ovvv[kI, kC, ka]
+                ovoo = eris.ovoo[kI, kC, kJ]
 
-                s2[kI, kJ, kC] = doubles_diagonal[kI, kJ, kC] * r2[kI, kJ, kC]
+                # Prototype: s2[IJCD] += B[IJCD] + B[JIDC], where
+                # B[IJCD] = r[Ja] * (IC|aD)* - r[lD] * (IC|Jl)*.
+                # Scatter the same contraction to both momentum blocks.
+                coupling = einsum('Ja,ICaD->IJCD', r1[kJ], ovvv.conj())
+                coupling -= einsum('lD,ICJl->IJCD', r1[kl], ovoo.conj())
+                s2[kI, kJ, kC] += coupling
+                s2[kJ, kI, kD] += coupling.transpose(1, 0, 3, 2)
 
-                s2[kI, kJ, kC] += einsum(
-                    'Ia,JDaC->IJCD',
-                    r1[kI], v_ovvv[kJ, kD, kshift_ia[kI]].conj())
-                s2[kI, kJ, kC] += einsum(
-                    'Ja,ICaD->IJCD',
-                    r1[kJ], v_ovvv[kI, kC, kshift_ia[kJ]].conj())
-                s2[kI, kJ, kC] -= einsum(
-                    'iC,JDIi->IJCD',
-                    r1[kshift_ai[kC]], v_ovoo[kJ, kD, kI].conj())
-                s2[kI, kJ, kC] -= einsum(
-                    'iD,ICJi->IJCD',
-                    r1[kshift_ai[kD]], v_ovoo[kI, kC, kJ].conj())
-
-            # singles rows: hole I at kI, particle D at kD
-            for kI in range(nkpts):
-                kD = kshift_ia[kI]
-                for ki in range(nkpts):
-                    for ka in range(nkpts):
-                        kb = kconserv_r2[kI, ka, ki]
-                        s1[kI] -= einsum(
-                            'Iiab,iaDb->ID',
-                            r2[kI, ki, ka], v_ovvv[ki, ka, kD])
-                        s1[kI] += 2 * einsum(
-                            'Iiab,ibDa->ID',
-                            r2[kI, ki, ka], v_ovvv[ki, kb, kD])
-                    for kj in range(nkpts):
-                        ka = kconserv_r2[ki, kD, kj]
-                        s1[kI] -= 2 * einsum(
-                            'ijDa,jaiI->ID',
-                            r2[ki, kj, kD], v_ovoo[kj, ka, ki])
-                        s1[kI] += einsum(
-                            'ijDa,iajI->ID',
-                            r2[ki, kj, kD], v_ovoo[ki, ka, kj])
+                # Prototype: s1[Ja] += (2*r[JIDC] - r[JICD]) * (IC|aD)
+                #            s1[lD] += (r[IJDC] - 2*r[JIDC]) * (IC|Jl).
+                # Align exchanged orbital and momentum axes before summing.
+                exchanged = (2 * r2[kJ, kI, kD].swapaxes(2, 3)
+                             - r2[kJ, kI, kC])
+                s1[kJ] += einsum('JICD,ICaD->Ja', exchanged, ovvv)
+                exchanged = (r2[kI, kJ, kD]
+                             - 2 * r2[kJ, kI, kD].swapaxes(0, 1))
+                s1[kl] += einsum('IJDC,ICJl->lD', exchanged, ovoo)
 
             # Apply the extra doubles and coupling terms at the requested
             # order.
@@ -7331,11 +7230,10 @@ class KRADCEE(KRADCBase):
             if self.method == 'adc(3)':
                 self._add_sigma_terms(
                     s1, s2, r1, r2, context, kadc_ee_terms.SIGMA_3)
-            s = np.hstack((s1.reshape(-1), s2.reshape(-1)))
 
             log.timer_debug1('completed sigma vector calculation', *cput0)
 
-            return s
+            return sigma
         return sigma_
 
     def get_trans_moments(self, kshift, U=None):
@@ -7518,34 +7416,34 @@ class KRADCEE(KRADCBase):
             self._ee_momentum[kshift] = ia, ai, doubles
         return self._ee_momentum[kshift]
 
-    def _doubles_diagonal(self, kshift):
+    def _doubles_diagonal(self, kshift, out=None):
         r"""Build the zeroth-order EE doubles energy differences for one
         sector.
 
         Args:
             kshift (int): Sector used to determine the unstored fourth
                 momentum.
+            out (ndarray, optional): Destination with shape doubles_shape.
 
         Returns:
             ndarray: Shape doubles_shape, ordered as (k_i,k_j,k_a,i,j,a,b),
             with
             entries epsilon_a(k_a)+epsilon_b(k_b)-epsilon_i(k_i)-epsilon_j(k_j)
-            in Hartree. The result includes padded slots and uses the real
-            energy
-            dtype. No integral or interaction correction is added here.
+            in Hartree. With out omitted, allocate in the orbital energy dtype.
         """
         e_occ, e_vir = self.e_occ, self.e_vir
-        ia, ai, kconserv = self._momentum_maps(kshift)
-        diagonal = np.empty(
-            self.doubles_shape, dtype=np.result_type(e_occ, e_vir))
+        _, _, kconserv = self._momentum_maps(kshift)
+        if out is None:
+            out = np.empty(self.doubles_shape, dtype=np.result_type(
+                e_occ, e_vir))
         # Broadcast the two-particle and two-hole energies over each block.
         for ki, kj, ka in kpts_helper.loop_kkk(self.nkpts):
             kb = kconserv[ki, ka, kj]
             occupied = e_occ[ki][:, None] + e_occ[kj]
             virtual = e_vir[ka][:, None] + e_vir[kb]
-            diagonal[ki, kj, ka] = (virtual[None, None, :, :]
-                                     - occupied[:, :, None, None])
-        return diagonal
+            np.subtract(virtual, occupied[:, :, None, None],
+                        out=out[ki, kj, ka])
+        return out
 
     def _add_sigma_terms(self, s1, s2, r1, r2, context, table):
         r"""Accumulate table-driven higher-order singles and doubles matrix

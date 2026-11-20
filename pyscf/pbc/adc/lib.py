@@ -602,7 +602,16 @@ class MomentumContractions:
             return tensor[kpts[:3]]
         # These virtual blocks may need reconstruction from DF factors.
         if name == 'ovvv':
-            return self.eris.ovvv_kpoint_normalized[kpts[:3]]
+            blocks = getattr(self.eris, 'ovvv_kpoint_normalized', None)
+            if blocks is None:
+                blocks = self.eris.ovvv
+            if blocks is not None:
+                return blocks[kpts[:3]]
+            # EE matvec also accepts containers supplying just the DF pairs.
+            kp, kq, kr = kpts[:3]
+            ks = self.kconserv[kp, kq, kr]
+            return einsum('Lpq,Lrs->pqrs', self.eris.Lov[kp, kq],
+                          self.eris.Lvv[kr, ks]) / self.nkpts
         if name == 'vvvv':
             return self.eris.vvvv_kpoint_normalized[kpts[:3]]
         return getattr(self.eris, name)[kpts[:3]]

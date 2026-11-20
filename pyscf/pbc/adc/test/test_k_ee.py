@@ -2,6 +2,7 @@
 import copy
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import numpy as np
 
@@ -188,6 +189,20 @@ class KnownValues(unittest.TestCase):
                 action(vector),
                 mykradcee.matvec(shift, eris=stored)(vector),
                 atol=1e-12)
+
+        # A DF action should reconstruct only the blocks it uses and reuse
+        # them on the next vector when they fit in the contraction cache.
+        matrix = mykradcee.get_imds(eris, kshift=1)
+        with patch.object(eris, '_get_ovvv', wraps=eris._get_ovvv) as read:
+            action = mykradcee.matvec(1, matrix, eris)
+            read.assert_not_called()
+            sigma = action(vector)
+            np.testing.assert_allclose(action(-vector), -sigma, atol=1e-12)
+            self.assertEqual(read.call_count, nk**3)
+        factors = SimpleNamespace(ovoo=eris.ovoo, ovvv=None,
+                                  Lov=eris.Lov, Lvv=eris.Lvv)
+        np.testing.assert_allclose(
+            mykradcee.matvec(1, matrix, factors)(vector), sigma, atol=1e-12)
 
     def test_normalization(self):
         r"""Check singlet normalization, phase covariance and zero-vector
